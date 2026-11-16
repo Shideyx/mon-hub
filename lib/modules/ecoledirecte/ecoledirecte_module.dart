@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -72,14 +71,8 @@ class EcoleDirecteModule extends HubModule {
       final pass = await store.readSecret('password');
       if (user == null || pass == null) return _cache = [];
       final faRaw = await store.readSecret('fa');
-      var uuid = store.getJson<String>('uuid');
-      if (uuid == null) {
-        final r = Random.secure();
-        String h(int n) => List.generate(n, (_) => r.nextInt(16).toRadixString(16)).join();
-        uuid = '${h(8)}-${h(4)}-4${h(3)}-a${h(3)}-${h(12)}';
-        await store.setJson('uuid', uuid);
-      }
-      client.uuid = uuid;
+      // Comme le site officiel : identifiant d'appareil vide.
+      client.uuid = '';
       _weeks.clear();
       try {
         await client.login(
@@ -168,53 +161,58 @@ class EcoleDirecteModule extends HubModule {
 
   @override
   List<HubTool> get tools => [
-        HubTool(
-          name: 'ecole_notes',
-          description: 'Dernières notes École Directe.',
-          run: (_) async {
-            await load();
-            return [
-              for (final g in grades.take(40))
-                {'matiere': g.subject, 'note': '${g.value}/${g.outOf}', 'devoir': g.title, 'date': g.date},
-            ];
-          },
-        ),
-        HubTool(
-          name: 'ecole_devoirs',
-          description: 'Devoirs à faire (cahier de texte École Directe).',
-          run: (_) async {
-            await load();
-            return [
-              for (final h in homework)
-                {
-                  'pour_le': h.due,
-                  'matiere': h.subject,
-                  'contenu': h.content,
-                  'fait': h.done,
-                  if (h.isTest) 'controle': true,
-                },
-            ];
-          },
-        ),
-        HubTool(
-          name: 'ecole_messages',
-          description: 'Messages reçus sur la messagerie École Directe.',
-          run: (_) async {
-            await load();
-            return [
-              for (final m in messages.take(20))
-                {'id': m.id, 'de': m.from, 'objet': m.subject, 'date': m.date, 'lu': m.read},
-            ];
-          },
-        ),
-        HubTool(
-          name: 'ecole_message_lire',
-          description: 'Contenu d\'un message École Directe.',
-          params: {'id': ('integer', 'id donné par ecole_messages')},
-          required: ['id'],
-          run: (a) => client.messageContent((a['id'] as num).toInt()),
-        ),
-      ];
+    HubTool(
+      name: 'ecole_notes',
+      description: 'Dernières notes École Directe.',
+      run: (_) async {
+        await load();
+        return [
+          for (final g in grades.take(40))
+            {
+              'matiere': g.subject,
+              'note': '${g.value}/${g.outOf}',
+              'devoir': g.title,
+              'date': g.date,
+            },
+        ];
+      },
+    ),
+    HubTool(
+      name: 'ecole_devoirs',
+      description: 'Devoirs à faire (cahier de texte École Directe).',
+      run: (_) async {
+        await load();
+        return [
+          for (final h in homework)
+            {
+              'pour_le': h.due,
+              'matiere': h.subject,
+              'contenu': h.content,
+              'fait': h.done,
+              if (h.isTest) 'controle': true,
+            },
+        ];
+      },
+    ),
+    HubTool(
+      name: 'ecole_messages',
+      description: 'Messages reçus sur la messagerie École Directe.',
+      run: (_) async {
+        await load();
+        return [
+          for (final m in messages.take(20))
+            {'id': m.id, 'de': m.from, 'objet': m.subject, 'date': m.date, 'lu': m.read},
+        ];
+      },
+    ),
+    HubTool(
+      name: 'ecole_message_lire',
+      description: 'Contenu d\'un message École Directe.',
+      params: {'id': ('integer', 'id donné par ecole_messages')},
+      required: ['id'],
+      run: (a) => client.messageContent((a['id'] as num).toInt()),
+    ),
+  ];
 
   DateTime? _lastPoll;
   List<HubNotification> _lastItems = const [];
@@ -287,8 +285,25 @@ class EcoleDirecteModule extends HubModule {
     await store.writeSecret('password', r[1]);
     await store.writeSecret('fa', null);
     await store.setJson('user', r[0]);
+    final messenger = context.mounted ? ScaffoldMessenger.of(context) : null;
+    messenger?.showSnackBar(
+      const SnackBar(content: Text('Connexion à École Directe…'), duration: Duration(seconds: 20)),
+    );
     await load(force: true);
     store.changed();
+    // Toujours un retour clair : connecté, ou l'erreur exacte.
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            lastError == null
+                ? '✅ Connecté à École Directe${client.studentName == null ? '' : ' : ${client.studentName}'}'
+                : '❌ $lastError',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
   }
 
   @override

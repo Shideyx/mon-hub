@@ -22,63 +22,136 @@ void main() {
     expect(once.occurrences(DateTime(2026, 11, 16), DateTime(2026, 11, 30)), isEmpty);
   });
 
-  test('connexion École Directe avec question de sécurité', () async {
-    final seen = <String, Map<String, String>>{};
+  test('connexion École Directe avec question de sécurité (comme le vrai serveur)', () async {
+    // Le serveur lit le corps comme un formulaire : un « + » non encodé y
+    // devient un espace. Les réponses en base64 en contiennent souvent.
+    const answer = 'MjAxMSA+Pj4='; // « 2011 >>> »
+    const cn = 'Q04+cXc='; // contient un « + »
+    const cv = 'Y3YrK3Y=';
+    final log = <String>[];
+    var gtkCount = 0;
     final client = MockClient((req) async {
-      final path = req.url.path + (req.url.queryParameters['verbe'] ?? '');
-      seen[path] = req.headers;
       Map<String, dynamic> data() =>
-          jsonDecode(Uri.decodeComponent(req.body.substring(5))) as Map<String, dynamic>;
+          jsonDecode(Uri.splitQueryString(req.body)['data']!) as Map<String, dynamic>;
+      final h = {for (final e in req.headers.entries) e.key.toLowerCase(): e.value};
       if (req.method == 'GET') {
-        return http.Response('{"code":200}', 200,
-            headers: {'set-cookie': 'GTK=abc; Path=/,other=1; expires=Wed, 21 Oct 2026 07:28:00 GMT'});
+        gtkCount++;
+        log.add('gtk');
+        return http.Response(
+          '',
+          200,
+          headers: {
+            'set-cookie': 'GTK=gtk$gtkCount; Path=/,other=1; expires=Wed, 21 Oct 2026 07:28:00 GMT',
+          },
+        );
       }
       if (req.url.path.endsWith('login.awp')) {
         final d = data();
-        if (d['fa'] == null) {
-          return http.Response('{"code":250,"token":"tmp","message":"","data":{}}', 200,
-              headers: {'2fa-token': 'f2a'});
+        expect(h['x-gtk'], 'gtk$gtkCount', reason: 'GTK frais avant chaque connexion');
+        expect(h['cookie'], contains('GTK=gtk$gtkCount'));
+        expect(d['motdepasse'], 'p@ss&+ é', reason: 'mot de passe intact');
+        if ((d['fa'] as List).isEmpty) {
+          log.add('login');
+          return http.Response(
+            '{"code":250,"token":"tmp","message":"","data":{}}',
+            200,
+            headers: {'2fa-token': 'f2a', 'x-token': 'tmp'},
+          );
         }
-        expect((d['fa'] as List).first['cn'], 'CN');
+        log.add('login-final');
+        // Comme le site : cn/cv en haut ET dans fa, avec les deux jetons.
+        expect(d['cn'], cn);
+        expect(d['cv'], cv);
+        expect((d['fa'] as List).single, {'cn': cn, 'cv': cv, 'uniq': false});
+        expect(h['x-token'], 'tmp2');
+        expect(h['2fa-token'], 'f2a');
         return http.Response(
-            jsonEncode({
-              'code': 200,
-              'token': 'final',
-              'data': {
-                'accounts': [
-                  {'id': 42, 'prenom': 'Erik', 'nom': 'M', 'typeCompte': 'E'}
-                ]
-              }
-            }),
-            200);
+          jsonEncode({
+            'code': 200,
+            'token': 'final',
+            'data': {
+              'accounts': [
+                {'id': 42, 'prenom': 'Erik', 'nom': 'M', 'typeCompte': 'E'},
+              ],
+            },
+          }),
+          200,
+        );
       }
       if (req.url.queryParameters['verbe'] == 'get') {
+        log.add('question');
+        expect(h['x-token'], 'tmp');
+        expect(h['2fa-token'], 'f2a');
+        expect(h.containsKey('x-gtk'), isFalse);
         return http.Response(
-            jsonEncode({
-              'code': 200,
-              'data': {
-                'question': base64.encode(utf8.encode('Année ?')),
-                'propositions': [base64.encode(utf8.encode('2010')), base64.encode(utf8.encode('2011'))],
-              }
-            }),
-            200);
+          jsonEncode({
+            'code': 200,
+            'data': {
+              'question': base64.encode(utf8.encode('Année ?')),
+              'propositions': [base64.encode(utf8.encode('2010')), answer],
+            },
+          }),
+          200,
+        );
       }
-      return http.Response('{"code":200,"data":{"cn":"CN","cv":"CV"}}', 200);
+      log.add('réponse');
+      expect(data()['choix'], answer, reason: 'la réponse arrive intacte (avec son « + »)');
+      return http.Response(
+        jsonEncode({
+          'code': 200,
+          'token': 'tmp2',
+          'data': {'cn': cn, 'cv': cv},
+        }),
+        200,
+      );
     });
     final ed = EdClient(client);
-    await ed.login('erik', 'p@ss&+', answerQuestion: (q, c) async {
-      expect(q, 'Année ?');
-      return c.last;
-    });
+    await ed.login(
+      'erik',
+      'p@ss&+ é',
+      answerQuestion: (q, c) async {
+        expect(q, 'Année ?');
+        expect(c, ['2010', '2011 >>>']);
+        return c.last;
+      },
+    );
+    expect(log, ['gtk', 'login', 'question', 'réponse', 'gtk', 'login-final']);
     expect(ed.accountId, 42);
     expect(ed.token, 'final');
-    final dbl = seen['/v3/connexion/doubleauth.awpget']!;
-    expect(dbl['x-token'] ?? dbl['X-Token'], 'tmp');
-    expect(dbl['2fa-token'], 'f2a');
-    expect(dbl['Cookie'], contains('GTK=abc'));
-    expect(dbl['X-Gtk'], 'abc');
     expect(ed.lastFa, [
-      {'cn': 'CN', 'cv': 'CV'}
+      {'cn': cn, 'cv': cv},
     ]);
+  });
+
+  test('facteurs gardés refusés : on recommence sans eux', () async {
+    var logins = 0;
+    final client = MockClient((req) async {
+      if (req.method == 'GET') return http.Response('', 200, headers: {'set-cookie': 'GTK=g'});
+      final d = jsonDecode(Uri.splitQueryString(req.body)['data']!) as Map<String, dynamic>;
+      logins++;
+      if ((d['fa'] as List).isNotEmpty) return http.Response('{"code":505,"message":"x"}', 200);
+      return http.Response(
+        jsonEncode({
+          'code': 200,
+          'data': {
+            'accounts': [
+              {'id': 7, 'prenom': 'A', 'nom': 'B', 'typeCompte': 'E'},
+            ],
+          },
+        }),
+        200,
+      );
+    });
+    final ed = EdClient(client);
+    await ed.login(
+      'a',
+      'b',
+      answerQuestion: (_, _) async => null,
+      savedFa: [
+        {'cn': 'old', 'cv': 'old'},
+      ],
+    );
+    expect(logins, 2);
+    expect(ed.accountId, 7);
   });
 }

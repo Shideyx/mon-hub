@@ -11,29 +11,32 @@ class EdClient {
 
   static const _base = 'https://api.ecoledirecte.com/v3';
 
-  /// Même profil que l'application mobile officielle (c'est celui
-  /// qu'utilisent les applis libres type Papillon). École Directe lie le
-  /// jeton à l'User-Agent : il doit être identique sur toutes les requêtes.
-  static const _v = '7.0.1';
-  static const _ua = 'Android EDMOBILE v7.0.1';
+  /// Même profil que le site officiel www.ecoledirecte.com (suivi sur les
+  /// clients libres qui fonctionnent en 2026). École Directe lie le jeton à
+  /// l'User-Agent : il doit être identique sur toutes les requêtes.
+  static const _v = '4.101.4';
+  static const _ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+      'Chrome/146.0.0.0 Safari/537.36';
   final http.Client _http;
 
   String? token;
   String? _twoFa;
+  String? _gtk;
   int? accountId;
   String? studentName;
 
-  /// Identifiant d'appareil (gardé d'une connexion à l'autre).
+  /// Identifiant d'appareil (le site officiel envoie une valeur vide).
   String uuid = '';
   final Map<String, String> _cookies = {};
 
-  Map<String, String> get _headers => {
+  Map<String, String> _headers({bool gtk = false}) => {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Accept': 'application/json, text/plain, */*',
     'User-Agent': _ua,
-    'X-Gtk': ?_cookies['GTK'],
     if (_cookies.isNotEmpty)
       'Cookie': _cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
+    if (gtk && (_gtk ?? _cookies['GTK']) != null) 'X-Gtk': (_gtk ?? _cookies['GTK'])!,
     'X-Token': ?token,
     '2fa-token': ?_twoFa,
   };
@@ -46,21 +49,33 @@ class EdClient {
         _cookies[m.group(1)!] = m.group(2)!;
       }
     }
+    final g = res.headers['x-gtk'];
+    if (g != null && g.isNotEmpty) _gtk = g;
     final t = res.headers['x-token'];
     if (t != null && t.isNotEmpty) token = t;
     final f = res.headers['2fa-token'];
     if (f != null && f.isNotEmpty) _twoFa = f;
   }
 
-  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> data) async {
+  /// Corps de requête : `data=` + le JSON **encodé pour un formulaire**.
+  /// Indispensable : la réponse à la question de sécurité et les codes de
+  /// validation sont en base64 et contiennent des « + », que le serveur
+  /// lirait sinon comme des espaces (la réponse arrivait abîmée).
+  static String body(Map<String, dynamic> data) => 'data=${Uri.encodeComponent(jsonEncode(data))}';
+
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> data, {
+    bool gtk = false,
+  }) async {
     final sep = path.contains('?') ? '&' : '?';
     final http.Response res;
     try {
       res = await _http
           .post(
             Uri.parse('$_base$path${sep}v=$_v'),
-            headers: _headers,
-            body: 'data=${jsonEncode(data)}',
+            headers: _headers(gtk: gtk),
+            body: body(data),
           )
           .timeout(const Duration(seconds: 25));
     } catch (e) {
@@ -78,6 +93,29 @@ class EdClient {
     return j;
   }
 
+  /// `GET login.awp?gtk=1` : jeton anti-falsification (GTK) que la connexion
+  /// renvoie dans l'en-tête X-Gtk. Le site officiel le redemande avant
+  /// **chaque** connexion, y compris celle qui suit la question de sécurité.
+  Future<void> _bootstrapGtk() async {
+    _gtk = null;
+    final http.Response g;
+    try {
+      g = await _http
+          .get(Uri.parse('$_base/login.awp?gtk=1&v=$_v'), headers: _headers())
+          .timeout(const Duration(seconds: 25));
+    } catch (e) {
+      throw 'École Directe injoignable (vérifie ta connexion internet) : $e';
+    }
+    _keep(g);
+    try {
+      final j = jsonDecode(utf8.decode(g.bodyBytes)) as Map;
+      final t = j['token'];
+      if (t is String && t.isNotEmpty) _gtk = t;
+    } catch (_) {
+      // Corps vide : le GTK est dans le cookie.
+    }
+  }
+
   static String explain(Map<String, dynamic> r) {
     final msg = '${r['message'] ?? ''}'.trim();
     return switch (r['code']) {
@@ -86,13 +124,17 @@ class EdClient {
       517 => 'École Directe a changé sa version : mets à jour Mon Hub',
       520 || 525 => 'Session expirée, reconnecte-toi',
       535 => 'École Directe est en maintenance',
-      _ => msg.isNotEmpty ? msg : 'Échec de connexion (code ${r['code']})',
+      _ => msg.isNotEmpty ? '$msg (code ${r['code']})' : 'Échec de connexion (code ${r['code']})',
     };
   }
 
   /// Connexion. [answerQuestion] est appelé si École Directe pose sa
   /// question de sécurité (double authentification) : il reçoit la question
   /// et les choix, et doit renvoyer le choix sélectionné.
+  ///
+  /// Suit pas à pas le site officiel : GTK → connexion → (code 250) question
+  /// → réponse → nouveau GTK → connexion finale avec `cn`/`cv` en haut du
+  /// message **et** dans `fa`, avec les jetons X-Token et 2FA-Token.
   Future<void> login(
     String user,
     String password, {
@@ -101,59 +143,70 @@ class EdClient {
   }) async {
     token = null;
     _twoFa = null;
+    _gtk = null;
     _cookies.clear();
+    lastFa = null;
 
-    // 1. Cookie GTK exigé depuis 2025 (sinon « mot de passe incorrect »).
-    try {
-      final g = await _http
-          .get(Uri.parse('$_base/login.awp?gtk=1&v=$_v'), headers: {'User-Agent': _ua})
-          .timeout(const Duration(seconds: 25));
-      _keep(g);
-    } catch (e) {
-      throw 'École Directe injoignable (vérifie ta connexion internet) : $e';
+    // Facteurs déjà validés (évite de reposer la question à chaque fois).
+    final answered = <Map<String, String>>[
+      for (final f in savedFa ?? const <Map<String, String>>[])
+        if (f['cn'] != null && f['cv'] != null) {'cn': f['cn']!, 'cv': f['cv']!},
+    ];
+    List<Map<String, dynamic>> faList() => [
+      for (final f in answered) {...f, 'uniq': false},
+    ];
+    Map<String, dynamic> credentials() => {
+      'identifiant': user.trim(),
+      'motdepasse': password,
+      'isReLogin': false,
+    };
+
+    await _bootstrapGtk();
+    var r = await _post('/login.awp', {...credentials(), 'uuid': uuid, 'fa': faList()}, gtk: true);
+    if (r['code'] == 505 && answered.isNotEmpty) {
+      // Les facteurs gardés ne sont plus valables : on recommence sans.
+      return login(user, password, answerQuestion: answerQuestion);
     }
 
-    Future<Map<String, dynamic>> doLogin(List<Map<String, String>> fa) => _post('/login.awp', {
-      'identifiant': user.trim(),
-      'motdepasse': Uri.encodeComponent(password),
-      'isReLogin': false,
-      'sesouvenirdemoi': true,
-      'uuid': uuid,
-      if (fa.isNotEmpty)
-        'fa': [
-          for (final f in fa) {...f, 'uniq': false},
-        ],
-    });
-
-    var r = await doLogin(savedFa ?? []);
-    if (r['code'] == 250) {
-      // 2. Question de sécurité (ex. « Quelle est ton année de naissance ? »).
-      // Le jeton provisoire et le « 2fa-token » de la réponse sont
-      // indispensables ici (déjà mémorisés par _post).
+    var rounds = 0;
+    while (r['code'] == 250) {
+      // École Directe peut enchaîner deux questions ; au-delà, c'est qu'il
+      // refuse quelque chose (et chaque essai compte sur un compte qui se
+      // bloque) : on s'arrête.
+      if (++rounds > 3) throw 'École Directe repose sans cesse la question de sécurité';
       final q = await _post('/connexion/doubleauth.awp?verbe=get', {});
       if (q['code'] != 200 || q['data'] is! Map) {
         throw 'Question de sécurité indisponible : ${explain(q)}';
       }
       final d = q['data'] as Map<String, dynamic>;
       String b64(String s) => utf8.decode(base64.decode(s), allowMalformed: true);
-      final question = b64(d['question'] as String);
-      final choices = (d['propositions'] as List).cast<String>();
+      final question = b64('${d['question']}');
+      final choices = [for (final p in (d['propositions'] as List? ?? const [])) '$p'];
       final decoded = choices.map(b64).toList();
       final picked = await answerQuestion(question, decoded);
       if (picked == null) throw 'Réponds à la question de sécurité pour te connecter';
       final enc = choices[decoded.indexOf(picked)];
       final a = await _post('/connexion/doubleauth.awp?verbe=post', {'choix': enc});
-      if (a['code'] != 200 || a['data'] is! Map) {
+      final ad = a['data'];
+      final cn = ad is Map ? ad['cn'] : null;
+      final cv = ad is Map ? ad['cv'] : null;
+      if (a['code'] != 200 || cn is! String || cv is! String) {
         throw 'Mauvaise réponse à la question de sécurité (${explain(a)})';
       }
-      final ad = a['data'] as Map<String, dynamic>;
-      lastFa = [
-        {'cn': '${ad['cn']}', 'cv': '${ad['cv']}'},
-      ];
-      _twoFa = null;
-      r = await doLogin(lastFa!);
+      answered
+        ..removeWhere((f) => f['cn'] == cn)
+        ..add({'cn': cn, 'cv': cv});
+      await _bootstrapGtk();
+      r = await _post('/login.awp', {
+        ...credentials(),
+        'cn': cn,
+        'cv': cv,
+        'uuid': uuid,
+        'fa': faList(),
+      }, gtk: true);
     }
     if (r['code'] != 200) throw explain(r);
+    if (answered.isNotEmpty) lastFa = answered;
     final accounts = (r['data'] as Map?)?['accounts'] as List? ?? [];
     if (accounts.isEmpty) throw 'Aucun compte trouvé sur ce profil École Directe';
     final acc = accounts.first as Map;
