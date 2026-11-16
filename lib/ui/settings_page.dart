@@ -10,6 +10,7 @@ import '../core/module_store.dart';
 import '../core/notifications.dart';
 import '../core/session.dart';
 import '../core/shortcuts.dart';
+import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
 import 'clicky/clicky.dart';
 import 'widgets.dart';
@@ -50,6 +51,11 @@ class _SettingsPageState extends State<SettingsPage> {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.only(bottom: 32),
           children: [
+            ListTile(
+              leading: const Icon(Icons.info_outline_rounded),
+              title: const Text('Version de Mon Hub'),
+              trailing: Text(appVersion, style: Theme.of(context).textTheme.titleMedium),
+            ),
             section('Profil'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

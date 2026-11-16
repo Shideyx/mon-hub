@@ -4,8 +4,9 @@
 name: Build
 
 env:
-  # Connexion Google (secrets du dépôt, facultatifs).
-  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+  # Connexion Google (secrets du dépôt, facultatifs) + numéro de version
+  # affiché dans l'appli (le même que celui de la publication).
+  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} --dart-define=APP_VERSION=v1.${{ github.run_number }}
 
 on:
   push:

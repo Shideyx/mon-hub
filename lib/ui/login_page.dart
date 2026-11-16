@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../core/session.dart';
+import '../core/version.dart';
 
 /// Page d'accueil : se connecter à son compte Mon Hub ou en créer un.
 class LoginPage extends StatefulWidget {
@@ -90,15 +91,18 @@ class _LoginPageState extends State<LoginPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Center(
-                            child: Image.asset('assets/logo.png', width: 72, height: 72),
-                          ),
+                          Center(child: Image.asset('assets/logo.png', width: 72, height: 72)),
                           const SizedBox(height: 16),
                           Text(
                             'Mon Hub',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.headlineMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            'Version $appVersion',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelSmall,
                           ),
                           const SizedBox(height: 4),
                           Text(
