@@ -81,6 +81,18 @@ class ClickyDesktop {
   }
 
   static Future<void> stop() => send('quit');
+
+  /// Relance Clicky partout (compte changé, cerveau ou modèle modifié…).
+  static Future<void> restart() async {
+    if (!supported) return;
+    if (await send('quit')) {
+      // Attend que l'ancien Clicky soit bien parti (3 s au plus).
+      for (var i = 0; i < 15 && await running(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    await launch();
+  }
 }
 
 /// Point d'entrée de `hub.exe --clicky`.
@@ -94,6 +106,9 @@ Future<void> runClickyDesktop() async {
   }
   await ModuleStore.init();
   AppSession.instance.restore();
+  // Avant tout : ce programme ne doit jamais écrire dans les préférences.
+  ClickyController.instance.desktopMode = true;
+  await ClickyController.instance.followSharedOptions();
   if (!await ClickyController.instance.refreshReady()) exit(0);
 
   final c = ClickyController.instance
@@ -261,8 +276,10 @@ class _Desktop extends StatefulWidget {
 }
 
 /// Taille de la fenêtre (en points) : compacte, ou avec le panneau ouvert.
-const _compact = Size(380, 230);
-const _withPanel = Size(440, 430);
+const _cursorOnly = Size(110, 50);
+const _pointing = Size(300, 60);
+const _compact = Size(390, 330);
+const _withPanel = Size(420, 400);
 
 class _DesktopState extends State<_Desktop> {
   static _DesktopState? instance;
@@ -322,10 +339,7 @@ class _DesktopState extends State<_Desktop> {
 
   /// Réglages changés dans Mon Hub, Mon Hub fermé…
   Future<void> _housekeeping() async {
-    try {
-      await ModuleStore.global.reload();
-      ClaudeApi.forget();
-    } catch (_) {}
+    ClaudeApi.forget(); // clé ajoutée / retirée dans Mon Hub
     await c.refreshReady();
     if (!c.active || !c.everywhere) exit(0);
     // Mon Hub fermé depuis un moment : Clicky s'en va aussi.
@@ -353,7 +367,7 @@ class _DesktopState extends State<_Desktop> {
       c.hotkey(down: false);
     }
     _wasBoth = both;
-    if (c.panelOpen && Win.down(0x1B)) c.closePanel(); // Échap
+    if (c.boxOpen && Win.down(0x1B)) c.closeBox(); // Échap
 
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
@@ -363,7 +377,7 @@ class _DesktopState extends State<_Desktop> {
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    final visible = c.active && (c.buddyVisible || c.panelOpen);
+    final visible = c.active && (c.buddyVisible || c.boxOpen);
     if (!visible) {
       if (!_hidden) {
         Win.hide(h);
@@ -401,7 +415,15 @@ class _DesktopState extends State<_Desktop> {
         _flightStart = null;
       }
     }
-    final size = _interactive ? _withPanel : _compact;
+    // Fenêtre juste assez grande : minuscule autour du curseur, plus grande
+    // quand la boîte de texte est ouverte (elle ne bloque ainsi aucun clic).
+    final size = _interactive
+        ? _withPanel
+        : c.state == ClickyState.pointing
+        ? _pointing
+        : c.boxOpen
+        ? _compact
+        : _cursorOnly;
     final w = (size.width * dpr).round(), hh = (size.height * dpr).round();
     // On reste dans les écrans.
     final (vx, vy, vw, vh) = Win.virtualScreen();

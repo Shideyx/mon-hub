@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -13,6 +13,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../core/claude_api.dart';
+import '../../core/claude_bridge.dart';
 import '../../core/hub_controller.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
@@ -100,9 +101,102 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Réglages ----------
 
-  T _opt<T>(String k, T d) => ClaudeApi.store.getJson<T>('clicky.$k') ?? d;
+  T _opt<T>(String k, T d) {
+    final v = _shared?[k];
+    if (v is T) return v;
+    return ClaudeApi.store.getJson<T>('clicky.$k') ?? d;
+  }
+
+  // Réglages partagés avec « Clicky partout » (Windows). Les deux programmes
+  // gardent leurs préférences en mémoire sans relire le disque : on passe
+  // donc par un petit fichier commun, relu toutes les 2 secondes.
+  static const _sharedKeys = [
+    'enabled',
+    'voice',
+    'mic',
+    'follow',
+    'show',
+    'provider',
+    'everywhere',
+  ];
+  Map<String, dynamic>? _shared;
+  DateTime? _sharedStamp;
+  Timer? _sharedTimer;
+
+  static File? get _sharedFile {
+    final d = ClaudeBridge.folder;
+    return d == null ? null : File('$d${Platform.pathSeparator}clicky.json');
+  }
+
+  /// Mon Hub (Windows) : publie les réglages du compte ouvert et suit ceux
+  /// que « Clicky partout » modifie.
+  Future<void> shareOptions() async {
+    if (!everywhereSupported) return;
+    _shared = null;
+    _shared = {for (final k in _sharedKeys) k: ClaudeApi.store.getJson<Object>('clicky.$k')}
+      ..removeWhere((_, v) => v == null);
+    await _writeShared();
+    _watchShared();
+  }
+
+  /// « Clicky partout » : lit les réglages publiés par Mon Hub.
+  Future<void> followSharedOptions() async {
+    await _readShared();
+    _watchShared();
+  }
+
+  void _watchShared() {
+    _sharedTimer?.cancel();
+    _sharedTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readShared());
+  }
+
+  Future<void> _writeShared() async {
+    final f = _sharedFile;
+    if (f == null) return;
+    try {
+      await f.parent.create(recursive: true);
+      await f.writeAsString(jsonEncode(_shared ?? const {}));
+      _sharedStamp = (await f.stat()).modified;
+    } catch (_) {}
+  }
+
+  Future<void> _readShared() async {
+    final f = _sharedFile;
+    if (f == null) return;
+    try {
+      final stamp = (await f.stat()).modified;
+      if (stamp == _sharedStamp) return;
+      _sharedStamp = stamp;
+      final m = jsonDecode(await f.readAsString());
+      if (m is! Map) return;
+      final next = m.cast<String, dynamic>();
+      if (!desktopMode) {
+        // Changé depuis « Clicky partout » : on le garde pour ce compte.
+        for (final e in next.entries) {
+          if (_shared?[e.key] != e.value) await ClaudeApi.store.setJson('clicky.${e.key}', e.value);
+        }
+      }
+      _shared = next;
+      if (!voice) await stopSpeaking();
+      await refreshReady();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   bool get enabled => _opt('enabled', true);
+
+  /// Clicky lit ses réponses à voix haute (sinon : texte seulement).
   bool get voice => _opt('voice', true);
+
+  /// On peut parler à Clicky au micro (sinon : Ctrl + Alt ouvre la saisie).
+  bool get mic => _opt('mic', true);
+
+  /// Coupe / remet la voix de Clicky (et se tait tout de suite).
+  Future<void> toggleVoice() async {
+    if (voice) await stopSpeaking();
+    await setOption('voice', !voice);
+  }
+
   bool get follow => _opt('follow', true);
 
   /// Toujours afficher le curseur bleu (sinon seulement pendant un échange).
@@ -120,7 +214,13 @@ class ClickyController extends ChangeNotifier {
   bool get handledElsewhere => !desktopMode && everywhereSupported && everywhere;
 
   Future<void> setOption(String k, Object v) async {
-    await ClaudeApi.store.setJson('clicky.$k', v);
+    // « Clicky partout » n'écrit jamais dans les préférences (ça écraserait
+    // celles de Mon Hub) : seulement dans le fichier partagé.
+    if (!desktopMode) await ClaudeApi.store.setJson('clicky.$k', v);
+    if (_shared != null || desktopMode) {
+      (_shared ??= {})[k] = v;
+      await _writeShared();
+    }
     await refreshReady();
     notifyListeners();
   }
@@ -179,6 +279,11 @@ class ClickyController extends ChangeNotifier {
   Future<void> startListening() async {
     await stopSpeaking();
     if (state == ClickyState.thinking) return;
+    if (!mic) {
+      // Micro désactivé : on écrit à la place.
+      openPanel();
+      return;
+    }
     if (!await canListen) {
       openPanel();
       _set(ClickyState.idle, status: 'Micro indisponible ici : écris ta question.');
@@ -322,8 +427,8 @@ class ClickyController extends ChangeNotifier {
   bool _onKey(KeyEvent e) {
     if (!active || handledElsewhere) return false;
     final k = HardwareKeyboard.instance;
-    if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape && panelOpen) {
-      closePanel();
+    if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape && boxOpen) {
+      closeBox();
       return false;
     }
     // AltGr (claviers français : @, €, #…) envoie aussi Ctrl + Alt : on
@@ -342,7 +447,19 @@ class ClickyController extends ChangeNotifier {
     return false;
   }
 
-  // ---------- Panneau ----------
+  // ---------- Boîte de texte ----------
+
+  /// La boîte de texte est ouverte : saisie, écoute, réflexion, réponse
+  /// (elle se referme toute seule quelques secondes après la réponse).
+  bool get boxOpen =>
+      panelOpen || state != ClickyState.idle || reply.isNotEmpty || status.isNotEmpty;
+
+  /// Ferme la boîte (et efface la réponse).
+  void closeBox() {
+    reply = '';
+    status = '';
+    closePanel();
+  }
 
   void openPanel() {
     panelOpen = true;
@@ -750,39 +867,47 @@ class _ClickyLayerState extends State<ClickyLayer> {
 
 const clickyBlue = Color(0xFF3B82F6);
 
-/// Le curseur bleu, sa bulle de texte, le panneau et le bouton.
-class ClickyBuddy extends StatelessWidget {
+/// Le curseur bleu, la petite boîte de texte et le bouton.
+class ClickyBuddy extends StatefulWidget {
   const ClickyBuddy({super.key, required this.c});
   final ClickyController c;
 
   @override
+  State<ClickyBuddy> createState() => _ClickyBuddyState();
+}
+
+class _ClickyBuddyState extends State<ClickyBuddy> {
+  ClickyController get c => widget.c;
+
+  /// Endroit où la boîte s'est ouverte : elle reste là (au lieu de suivre la
+  /// souris) pour qu'on puisse cliquer dedans et écrire.
+  Offset? _anchor;
+  bool _wasOpen = false;
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final desktop = c.desktopMode;
-    final mobile = !desktop && size.width < 600;
+    final mobile = size.width < 600;
     final cursor = c.follow ? c.cursor : null;
     final home = cursor == null
         ? Offset(size.width - 44, size.height - (mobile ? 150 : 60))
         : cursor + const Offset(18, 16);
     final at = c.target ?? home;
-    final showBubble = c.state != ClickyState.idle || (c.reply.isNotEmpty && c.buddyVisible);
 
-    // Bulle de texte à côté du curseur (comme Clicky), gardée dans l'écran.
-    const bubbleW = 300.0;
-    final bubbleLeft = (at.dx + 30 + bubbleW > size.width) ? at.dx - 14 - bubbleW : at.dx + 30;
-    final bubbleTop = (at.dy + 4).clamp(8.0, math.max(8.0, size.height - 180)).toDouble();
+    final open = c.boxOpen;
+    if (open && !_wasOpen) _anchor = cursor;
+    _wasOpen = open;
+    final nearMouse = !mobile && _anchor != null;
+    const boxW = 320.0;
+    final a = _anchor ?? Offset.zero;
+    // À droite et sous la souris, sans sortir de la fenêtre.
+    final left = (a.dx + 30 + boxW > size.width ? a.dx - boxW - 10 : a.dx + 30)
+        .clamp(8.0, math.max(8.0, size.width - boxW - 8))
+        .toDouble();
+    final top = (a.dy + 34).clamp(8.0, math.max(8.0, size.height - 300)).toDouble();
 
     return Stack(
       children: [
-        // Dans « Clicky partout », un clic à côté du panneau le ferme.
-        if (desktop && c.panelOpen)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: c.closePanel,
-              child: const SizedBox.expand(),
-            ),
-          ),
         // Le petit curseur bleu de Clicky (suit la souris, vole vers la cible).
         AnimatedOpacity(
           opacity: c.buddyVisible ? 1 : 0,
@@ -792,69 +917,107 @@ class ClickyBuddy extends StatelessWidget {
               _Flight(
                 to: at,
                 flying: c.target != null,
-                child: IgnorePointer(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Pointer(c: c),
-                      if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(left: 4, top: 14),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: clickyBlue,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
-                          ),
-                          child: Text(
-                            c.targetLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                child: IgnorePointer(child: _PointerWithLabel(c: c)),
               ),
-              if (showBubble && !c.panelOpen && !mobile && cursor != null)
-                AnimatedPositioned(
-                  duration: Duration(milliseconds: c.target != null ? 650 : 90),
-                  curve: Curves.easeInOutCubic,
-                  left: bubbleLeft.clamp(8.0, math.max(8.0, size.width - bubbleW - 8)),
-                  top: bubbleTop,
-                  width: bubbleW,
-                  child: IgnorePointer(child: _Bubble(c: c)),
-                ),
             ],
           ),
         ),
-        // Panneau (question écrite, réponse complète).
-        if (c.panelOpen || (showBubble && (mobile || cursor == null)))
-          Positioned(
-            right: desktop ? null : 16,
-            left: desktop
-                ? (at.dx + 30).clamp(8.0, math.max(8.0, size.width - 396))
-                : (mobile ? 16 : null),
-            top: desktop ? (at.dy + 24).clamp(8.0, math.max(8.0, size.height - 380)) : null,
-            bottom: desktop ? null : (mobile ? 150 : 76),
-            child: _Panel(c: c),
+        // La boîte de texte, là où est la souris (en bas sur téléphone).
+        Positioned(
+          left: nearMouse ? left : (mobile ? 16 : null),
+          right: nearMouse ? null : 16,
+          top: nearMouse ? top : null,
+          bottom: nearMouse ? null : (mobile ? 150 : 76),
+          width: mobile ? null : boxW,
+          child: ClickyPopIn(
+            open: open,
+            alignment: nearMouse ? Alignment.topLeft : Alignment.bottomRight,
+            child: ClickyBox(c: c),
           ),
+        ),
         // Bouton toujours accessible dans l'appli (indispensable sur téléphone).
-        if (!desktop)
-          Positioned(
-            right: 16,
-            bottom: mobile ? 88 : 16,
-            child: _Fab(c: c),
-          ),
+        Positioned(
+          right: 16,
+          bottom: mobile ? 88 : 16,
+          child: _Fab(c: c),
+        ),
       ],
     );
   }
 }
 
+class _PointerWithLabel extends StatelessWidget {
+  const _PointerWithLabel({required this.c});
+  final ClickyController c;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _Pointer(c: c),
+      if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(left: 4, top: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: clickyBlue,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
+          ),
+          child: Text(
+            c.targetLabel,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ),
+    ],
+  );
+}
+
+/// Ouverture / fermeture animée : la boîte grandit depuis le curseur en
+/// rebondissant légèrement, et se replie en s'effaçant.
+class ClickyPopIn extends StatelessWidget {
+  const ClickyPopIn({
+    super.key,
+    required this.open,
+    required this.child,
+    this.alignment = Alignment.topLeft,
+  });
+
+  final bool open;
+  final Widget child;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 260),
+    reverseDuration: const Duration(milliseconds: 170),
+    layoutBuilder: (current, previous) =>
+        Stack(alignment: alignment, children: [...previous, ?current]),
+    // Le rebond (qui dépasse 1) ne s'applique qu'à la taille, jamais au
+    // fondu : l'animation reste entre 0 et 1.
+    transitionBuilder: (child, anim) => FadeTransition(
+      opacity: CurvedAnimation(parent: anim, curve: const Interval(0, 0.6)),
+      child: ScaleTransition(
+        alignment: alignment,
+        scale: Tween(begin: 0.55, end: 1.0).animate(
+          CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutBack,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        ),
+        child: child,
+      ),
+    ),
+    child: open
+        ? KeyedSubtree(key: const ValueKey('ouverte'), child: child)
+        : const SizedBox.shrink(key: ValueKey('fermée')),
+  );
+}
+
 /// Contenu de la petite fenêtre de « Clicky partout » : la fenêtre elle-même
-/// suit la souris, le bout du curseur bleu est dans son coin haut-gauche.
+/// suit la souris, le bout du curseur bleu est dans son coin haut-gauche, et
+/// la boîte de texte s'ouvre juste à côté.
 class ClickyFollower extends StatelessWidget {
   const ClickyFollower({super.key, required this.c, required this.interactive});
   final ClickyController c;
@@ -862,43 +1025,25 @@ class ClickyFollower extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showBubble =
-        !interactive && (c.state != ClickyState.idle || (c.reply.isNotEmpty && c.buddyVisible));
     return Stack(
       children: [
         Positioned(
           left: 0,
           top: 0,
+          child: IgnorePointer(child: _PointerWithLabel(c: c)),
+        ),
+        Positioned(
+          left: 22,
+          top: 22,
+          right: 4,
           child: IgnorePointer(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Pointer(c: c),
-                if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(left: 4, top: 14),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: clickyBlue,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      c.targetLabel,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-              ],
+            ignoring: !interactive,
+            child: ClickyPopIn(
+              open: c.boxOpen && c.state != ClickyState.pointing,
+              child: ClickyBox(c: c),
             ),
           ),
         ),
-        if (showBubble && c.state != ClickyState.pointing)
-          Positioned(
-            left: 30,
-            top: 6,
-            right: 8,
-            child: IgnorePointer(child: _Bubble(c: c)),
-          ),
-        if (interactive) Positioned(left: 22, top: 26, right: 4, child: _Panel(c: c)),
       ],
     );
   }
@@ -1008,7 +1153,6 @@ class _Pointer extends StatelessWidget {
             ],
           ),
         ),
-        if (c.state == ClickyState.listening) _Wave(levels: c.levels),
       ],
     );
   }
@@ -1071,48 +1215,6 @@ class _TrianglePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Bulle compacte à côté du curseur : ce que tu as dit, puis la réponse
-/// qui s'écrit en direct.
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.c});
-  final ClickyController c;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = switch (c.state) {
-      ClickyState.listening => c.transcript.isEmpty ? 'Je t\'écoute…' : c.transcript,
-      ClickyState.thinking =>
-        c.reply.isNotEmpty ? c.reply : (c.status.isEmpty ? 'Je regarde…' : c.status),
-      _ => c.reply.isNotEmpty ? c.reply : c.status,
-    };
-    if (text.isEmpty) return const SizedBox.shrink();
-    final listening = c.state == ClickyState.listening;
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 170),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: listening ? Colors.white : const Color(0xF21E293B),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [BoxShadow(blurRadius: 10, color: Color(0x40000000))],
-        ),
-        child: SingleChildScrollView(
-          reverse: true,
-          child: Text(
-            text,
-            style: TextStyle(
-              color: listening ? const Color(0xFF1E293B) : Colors.white,
-              fontStyle: listening ? FontStyle.italic : FontStyle.normal,
-              height: 1.3,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Fab extends StatelessWidget {
   const _Fab({required this.c});
   final ClickyController c;
@@ -1148,97 +1250,151 @@ class _Fab extends StatelessWidget {
   }
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel({required this.c});
+/// La petite boîte de texte de Clicky, ouverte là où est la souris : ce que
+/// tu dis s'y écrit pendant que tu parles, puis la réponse s'y écrit à son
+/// tour. On peut aussi y taper sa question.
+class ClickyBox extends StatelessWidget {
+  const ClickyBox({super.key, required this.c});
   final ClickyController c;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
+    final title = switch (c.state) {
+      ClickyState.listening => 'Je t\'écoute…',
+      ClickyState.thinking => c.reply.isEmpty ? 'Je réfléchis…' : 'Clicky',
+      _ => 'Clicky',
+    };
     return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(18),
+      elevation: 4,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(16),
       color: scheme.surfaceContainerHigh,
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 360),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+        constraints: const BoxConstraints(maxWidth: 360, maxHeight: 340),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Barre du haut : état, voix, fermer.
+            Container(
+              color: clickyBlue.withValues(alpha: 0.12),
+              padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
+              child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded, color: clickyBlue, size: 18),
-                  const SizedBox(width: 6),
-                  const Text('Clicky', style: TextStyle(fontWeight: FontWeight.w700)),
-                  if (c.agentsRunning > 0) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '· ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail',
-                      style: Theme.of(context).textTheme.labelSmall,
+                  if (busy)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: clickyBlue),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(
+                        listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
+                        color: listening ? Colors.redAccent : clickyBlue,
+                        size: 16,
+                      ),
                     ),
-                  ],
-                  const Spacer(),
-                  if (c.state == ClickyState.speaking || c.state == ClickyState.pointing)
+                  Expanded(
+                    child: Text(
+                      c.agentsRunning > 0
+                          ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
+                          : title,
+                      style: text.labelLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (c.voice &&
+                      (c.state == ClickyState.speaking || c.state == ClickyState.pointing))
                     IconButton(
-                      tooltip: 'Arrêter la voix',
+                      tooltip: 'Arrêter de parler',
                       visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.volume_off_rounded, size: 18),
+                      icon: const Icon(Icons.stop_circle_outlined, size: 18),
                       onPressed: c.stopSpeaking,
                     ),
+                  IconButton(
+                    tooltip: c.voice ? 'Couper la voix de Clicky' : 'Remettre la voix de Clicky',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      size: 18,
+                    ),
+                    onPressed: c.toggleVoice,
+                  ),
                   IconButton(
                     tooltip: 'Fermer (Échap)',
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: c.closePanel,
+                    onPressed: c.closeBox,
                   ),
                 ],
               ),
-              if (c.transcript.isNotEmpty && c.state != ClickyState.idle)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6, right: 8),
-                  child: Text(
-                    '« ${c.transcript} »',
-                    style: TextStyle(color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic),
-                  ),
-                ),
-              if (c.state == ClickyState.listening)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _Wave(levels: c.levels),
-                  ),
-                ),
-              if (c.status.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6, right: 8),
-                  child: Row(
-                    children: [
-                      if (busy)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 8),
-                          child: SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                reverse: true,
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Ce que tu dis, écrit en direct.
+                    if (listening) ...[
+                      _Wave(levels: c.levels),
+                      const SizedBox(height: 8),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 120),
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          c.transcript.isEmpty ? 'Parle, j\'écris…' : c.transcript,
+                          style: text.titleMedium?.copyWith(
+                            color: c.transcript.isEmpty ? scheme.onSurfaceVariant : null,
                           ),
                         ),
-                      Expanded(child: Text(c.status)),
-                    ],
-                  ),
+                      ),
+                    ] else if (c.transcript.isNotEmpty && c.state != ClickyState.idle)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          '«\u00a0${c.transcript}\u00a0»',
+                          style: text.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    if (!listening && c.status.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(c.status, style: text.bodySmall),
+                      ),
+                    // La réponse, écrite au fur et à mesure.
+                    if (!listening && c.reply.isNotEmpty)
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 120),
+                        alignment: Alignment.topLeft,
+                        child: SelectableText(
+                          c.reply,
+                          style: text.bodyMedium?.copyWith(height: 1.35),
+                        ),
+                      ),
+                  ],
                 ),
-              if (c.reply.isNotEmpty)
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(right: 8, bottom: 6),
-                    child: SelectableText(c.reply),
-                  ),
-                ),
-              if (c.panelOpen)
-                Row(
+              ),
+            ),
+            // Écrire (ou parler) une question.
+            if (c.panelOpen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 4, 10),
+                child: Row(
                   children: [
                     Expanded(
                       child: TextField(
@@ -1254,17 +1410,15 @@ class _Panel extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Parler',
-                      icon: Icon(
-                        c.state == ClickyState.listening ? Icons.stop_rounded : Icons.mic_rounded,
+                    if (c.mic)
+                      IconButton(
+                        tooltip: listening ? 'J\'ai fini' : 'Parler',
+                        icon: Icon(listening ? Icons.stop_rounded : Icons.mic_rounded),
+                        color: listening ? Colors.redAccent : null,
+                        onPressed: busy
+                            ? null
+                            : () => listening ? c.stopListening() : c.startListening(),
                       ),
-                      onPressed: busy
-                          ? null
-                          : () => c.state == ClickyState.listening
-                                ? c.stopListening()
-                                : c.startListening(),
-                    ),
                     IconButton(
                       tooltip: 'Envoyer',
                       icon: const Icon(Icons.send_rounded),
@@ -1272,8 +1426,20 @@ class _Panel extends StatelessWidget {
                     ),
                   ],
                 ),
-            ],
-          ),
+              )
+            else if (c.state == ClickyState.idle && c.reply.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 6, 6),
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.reply_rounded, size: 16),
+                    label: const Text('Répondre'),
+                    onPressed: c.openPanel,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

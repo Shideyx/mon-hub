@@ -206,7 +206,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     await ClaudeApi.store.setJson('ollama.url', ollamaUrl.text.trim());
     await ClaudeApi.store.setJson('ollama.model', ollamaModel.text.trim());
     // Clicky vient d'avoir un cerveau : on le démarre (Windows : partout).
-    if (await c.refreshReady()) unawaited(ClickyDesktop.launch());
+    // Nouveau cerveau / modèle : Clicky partout repart avec.
+    if (await c.refreshReady()) unawaited(ClickyDesktop.restart());
   }
 
   @override
@@ -388,9 +389,20 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Réponses à voix haute'),
+                  title: const Text('Voix de Clicky (réponses lues à voix haute)'),
+                  subtitle: const Text('Désactivée : il répond seulement par écrit'),
                   value: c.voice,
-                  onChanged: (v) => c.setOption('voice', v),
+                  onChanged: (v) async {
+                    if (!v) await c.stopSpeaking();
+                    await c.setOption('voice', v);
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Parler à Clicky au micro'),
+                  subtitle: const Text('Désactivé : Ctrl + Alt ouvre la zone pour écrire'),
+                  value: c.mic,
+                  onChanged: (v) => c.setOption('mic', v),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

@@ -10,6 +10,8 @@ import '../core/module_store.dart';
 import '../core/notifications.dart';
 import '../core/session.dart';
 import '../core/shortcuts.dart';
+import '../modules/claude/claude_module.dart';
+import 'clicky/clicky.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -31,11 +33,15 @@ class _SettingsPageState extends State<SettingsPage> {
     final n = widget.notifications;
     final theme = Theme.of(context);
     Widget section(String t) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-          child: Text(t.toUpperCase(),
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: theme.colorScheme.primary, letterSpacing: 1.1)),
-        );
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+      child: Text(
+        t.toUpperCase(),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.primary,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
@@ -50,8 +56,9 @@ class _SettingsPageState extends State<SettingsPage> {
               child: TextField(
                 controller: name,
                 decoration: const InputDecoration(
-                    labelText: 'Ton prénom (pour le message d\'accueil)',
-                    prefixIcon: Icon(Icons.person_rounded)),
+                  labelText: 'Ton prénom (pour le message d\'accueil)',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
                 onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
               ),
             ),
@@ -61,17 +68,20 @@ class _SettingsPageState extends State<SettingsPage> {
               child: SegmentedButton<ThemeMode>(
                 segments: const [
                   ButtonSegment(
-                      value: ThemeMode.light,
-                      icon: Icon(Icons.light_mode_rounded),
-                      label: Text('Clair')),
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode_rounded),
+                    label: Text('Clair'),
+                  ),
                   ButtonSegment(
-                      value: ThemeMode.dark,
-                      icon: Icon(Icons.dark_mode_rounded),
-                      label: Text('Sombre')),
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode_rounded),
+                    label: Text('Sombre'),
+                  ),
                   ButtonSegment(
-                      value: ThemeMode.system,
-                      icon: Icon(Icons.brightness_auto_rounded),
-                      label: Text('Auto')),
+                    value: ThemeMode.system,
+                    icon: Icon(Icons.brightness_auto_rounded),
+                    label: Text('Auto'),
+                  ),
                 ],
                 selected: {AppSession.instance.themeMode},
                 onSelectionChanged: (v) => AppSession.instance.setThemeMode(v.first),
@@ -94,22 +104,25 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             ListTile(
               leading: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
-              title: Text('Supprimer mon compte',
-                  style: TextStyle(color: theme.colorScheme.error)),
+              title: Text('Supprimer mon compte', style: TextStyle(color: theme.colorScheme.error)),
               onTap: () async {
                 final ok = await showDialog<bool>(
                   context: context,
                   builder: (d) => AlertDialog(
                     title: const Text('Supprimer ton compte ?'),
-                    content: const Text('Tes réglages, livres, évènements et connexions '
-                        'seront effacés de cet appareil.'),
+                    content: const Text(
+                      'Tes réglages, livres, évènements et connexions '
+                      'seront effacés de cet appareil.',
+                    ),
                     actions: [
                       TextButton(
-                          onPressed: () => Navigator.pop(d, false),
-                          child: const Text('Annuler')),
+                        onPressed: () => Navigator.pop(d, false),
+                        child: const Text('Annuler'),
+                      ),
                       FilledButton(
-                          onPressed: () => Navigator.pop(d, true),
-                          child: const Text('Supprimer')),
+                        onPressed: () => Navigator.pop(d, true),
+                        child: const Text('Supprimer'),
+                      ),
                     ],
                   ),
                 );
@@ -125,25 +138,35 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: DropdownButton<int>(
                 value: n.interval,
                 underline: const SizedBox.shrink(),
-                items: const [1, 2, 5, 10, 15, 30]
-                    .map((v) => DropdownMenuItem(value: v, child: Text('$v min')))
-                    .toList(),
+                items: const [
+                  1,
+                  2,
+                  5,
+                  10,
+                  15,
+                  30,
+                ].map((v) => DropdownMenuItem(value: v, child: Text('$v min'))).toList(),
                 onChanged: (v) => n.interval = v ?? 2,
               ),
             ),
             ListTile(
               leading: const Icon(Icons.notifications_active_outlined),
               title: const Text('Tester une alerte'),
-              onTap: () => n.show(HubNotification(
+              onTap: () => n.show(
+                HubNotification(
                   id: 'test${DateTime.now().millisecondsSinceEpoch}',
                   title: 'Mon Hub',
-                  body: 'Les alertes fonctionnent 🎉')),
+                  body: 'Les alertes fonctionnent 🎉',
+                ),
+              ),
             ),
             section('Modules'),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Glisse ⠿ pour changer l\'ordre. Interrupteur = afficher le module. '
-                  'Cloche = recevoir ses alertes.'),
+              child: Text(
+                'Glisse ⠿ pour changer l\'ordre. Interrupteur = afficher le module. '
+                'Cloche = recevoir ses alertes.',
+              ),
             ),
             ReorderableListView.builder(
               shrinkWrap: true,
@@ -157,24 +180,68 @@ class _SettingsPageState extends State<SettingsPage> {
                   key: ValueKey(m.id),
                   leading: ReorderableDragStartListener(
                     index: i,
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.drag_indicator_rounded),
-                      const SizedBox(width: 8),
-                      HubAvatar(label: m.name, color: m.color, size: 34),
-                    ]),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.drag_indicator_rounded),
+                        const SizedBox(width: 8),
+                        HubAvatar(label: m.name, color: m.color, size: 34),
+                      ],
+                    ),
                   ),
                   title: Text(m.name),
                   subtitle: Text(m.access.label),
-                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(
-                      tooltip: 'Alertes',
-                      icon: Icon(n.isMuted(m.id)
-                          ? Icons.notifications_off_outlined
-                          : Icons.notifications_active_rounded),
-                      onPressed: () => n.setMuted(m.id, !n.isMuted(m.id)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Alertes',
+                        icon: Icon(
+                          n.isMuted(m.id)
+                              ? Icons.notifications_off_outlined
+                              : Icons.notifications_active_rounded,
+                        ),
+                        onPressed: () => n.setMuted(m.id, !n.isMuted(m.id)),
+                      ),
+                      Switch(value: c.isEnabled(m), onChanged: (v) => c.setEnabled(m, v)),
+                    ],
+                  ),
+                );
+              },
+            ),
+            section('Clicky'),
+            ListenableBuilder(
+              listenable: ClickyController.instance,
+              builder: (context, _) {
+                final c = ClickyController.instance;
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: Icon(c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded),
+                      title: const Text('Voix de Clicky'),
+                      subtitle: const Text(
+                        'Désactivée : Clicky répond seulement par écrit, sans parler',
+                      ),
+                      value: c.voice,
+                      onChanged: (v) async {
+                        if (!v) await c.stopSpeaking();
+                        await c.setOption('voice', v);
+                      },
                     ),
-                    Switch(value: c.isEnabled(m), onChanged: (v) => c.setEnabled(m, v)),
-                  ]),
+                    SwitchListTile(
+                      secondary: Icon(c.mic ? Icons.mic_rounded : Icons.mic_off_rounded),
+                      title: const Text('Parler à Clicky au micro'),
+                      subtitle: const Text('Désactivé : Ctrl + Alt ouvre la zone pour écrire'),
+                      value: c.mic,
+                      onChanged: (v) => c.setOption('mic', v),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.auto_awesome_rounded),
+                      title: const Text('Autres réglages de Clicky'),
+                      subtitle: const Text('Cerveau (Claude ou Ollama), Clicky partout…'),
+                      onTap: () => ClaudeModule.showSettings(context),
+                    ),
+                  ],
                 );
               },
             ),
@@ -182,17 +249,24 @@ class _SettingsPageState extends State<SettingsPage> {
               section('Raccourcis'),
               ListTile(
                 leading: const Icon(Icons.shortcut_rounded),
-                title: Text(Platform.isWindows
-                    ? 'Recréer les raccourcis (Bureau et menu Démarrer)'
-                    : 'Recréer le raccourci du menu des applications'),
+                title: Text(
+                  Platform.isWindows
+                      ? 'Recréer les raccourcis (Bureau et menu Démarrer)'
+                      : 'Recréer le raccourci du menu des applications',
+                ),
                 subtitle: const Text('Ils sont créés tout seuls au premier lancement'),
                 onTap: () async {
                   final ok = await AppShortcuts.create();
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(ok
-                            ? 'Raccourcis créés ✅'
-                            : 'Impossible de créer les raccourcis sur ce PC')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Raccourcis créés ✅'
+                              : 'Impossible de créer les raccourcis sur ce PC',
+                        ),
+                      ),
+                    );
                   }
                 },
               ),
@@ -214,9 +288,10 @@ class _SettingsPageState extends State<SettingsPage> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
-                  'Configure tes comptes une fois (sur ton PC par exemple), exporte, puis '
-                  'importe le fichier sur ton téléphone. ⚠️ Le fichier contient tes mots de passe '
-                  'et jetons : garde-le pour toi et supprime-le après import.'),
+                'Configure tes comptes une fois (sur ton PC par exemple), exporte, puis '
+                'importe le fichier sur ton téléphone. ⚠️ Le fichier contient tes mots de passe '
+                'et jetons : garde-le pour toi et supprime-le après import.',
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.upload_file_rounded),
@@ -238,7 +313,10 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = ModuleStore.prefs;
     final data = <String, Object?>{
       for (final k in prefs.getKeys())
-        if (k.startsWith('mod.') || k.startsWith('hub.') || k == 'notif.muted' || k == 'notif.interval')
+        if (k.startsWith('mod.') ||
+            k.startsWith('hub.') ||
+            k == 'notif.muted' ||
+            k == 'notif.interval')
           k: prefs.get(k),
     };
     final secrets = await ModuleStore.readAllSecrets();
@@ -248,7 +326,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'prefs': data,
       'secrets': {
         for (final e in secrets.entries)
-          if (e.key.startsWith('mod.')) e.key: e.value
+          if (e.key.startsWith('mod.')) e.key: e.value,
       },
     });
   }
@@ -259,8 +337,9 @@ class _SettingsPageState extends State<SettingsPage> {
       if (Platform.isAndroid || Platform.isIOS) {
         await Clipboard.setData(ClipboardData(text: json));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Configuration copiée dans le presse-papiers')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Configuration copiée dans le presse-papiers')),
+          );
         }
         return;
       }
@@ -278,9 +357,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _import(BuildContext context) async {
     try {
-      final file = await openFile(acceptedTypeGroups: const [
-        XTypeGroup(label: 'Config Mon Hub', extensions: ['json']),
-      ]);
+      final file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'Config Mon Hub', extensions: ['json']),
+        ],
+      );
       if (file == null) return;
       final j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       if (j['app'] != 'mon-hub') throw 'Ce fichier n\'est pas une configuration Mon Hub';

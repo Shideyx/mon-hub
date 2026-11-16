@@ -103,7 +103,10 @@ class _HubAppState extends State<HubApp> {
   Future<void> _startClicky() async {
     // Clicky est un bonus : s'il échoue, le reste de l'appli continue.
     try {
-      await ClickyDesktop.launch();
+      // Réglages de ce compte partagés avec Clicky partout, qu'on relance
+      // pour qu'il reprenne le bon compte.
+      await ClickyController.instance.shareOptions();
+      await ClickyDesktop.restart();
     } catch (e) {
       debugPrint('Clicky : $e');
     }
