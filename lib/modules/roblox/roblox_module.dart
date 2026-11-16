@@ -5,6 +5,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
+import 'roblox_charts.dart';
+import 'roblox_dashboard.dart';
+import 'roblox_game.dart';
 
 class RobloxAccount {
   RobloxAccount({
@@ -95,7 +98,7 @@ class RobloxModule extends HubModule {
   @override
   String get name => 'Roblox';
   @override
-  String get description => 'Tes comptes Roblox : statut, amis, avatar';
+  String get description => 'Tableau de bord de ton jeu + tes comptes Roblox';
   @override
   IconData get icon => Icons.sports_esports_outlined;
   @override
@@ -126,8 +129,166 @@ class RobloxModule extends HubModule {
     }();
   }
 
+  // ---------- Mes jeux ----------
+
+  final gamesApi = RobloxGamesApi();
+  final _games = <int, RobloxGame>{};
+
+  List<int> get gameIds =>
+      [for (final e in store.getJson<List<dynamic>>('games') ?? const []) (e as num).toInt()];
+
+  int? get selectedGame {
+    final s = store.getJson<int>('game');
+    final ids = gameIds;
+    return ids.contains(s) ? s : ids.firstOrNull;
+  }
+
+  Future<void> selectGame(int id) => store.setJson('game', id);
+
+  RobloxGame game(int id) => _games[id] ??= RobloxGame(id);
+
+  Future<RobloxGame> addGame(String input) async {
+    final id = await gamesApi.resolve(input);
+    final g = game(id);
+    await gamesApi.refreshAll(g);
+    record(g);
+    await store.setJson('games', {...gameIds, id}.toList());
+    await selectGame(id);
+    return g;
+  }
+
+  Future<void> removeGame(int id) async {
+    await store.setJson('games', gameIds.where((x) => x != id).toList());
+    await store.setJson('hist.$id', null);
+    _games.remove(id);
+  }
+
+  final _full = <int, Future<RobloxGame>>{};
+
+  /// Données complètes (images, serveurs, badges…), rechargées au plus
+  /// toutes les 60 s sauf [force].
+  Future<RobloxGame> loadGame(int id, {bool force = false}) {
+    final g = game(id);
+    final fresh = g.fetchedAt != null &&
+        DateTime.now().difference(g.fetchedAt!).inSeconds < 60 &&
+        g.name.isNotEmpty;
+    if (!force && fresh && _full[id] != null) return _full[id]!;
+    return _full[id] = () async {
+      try {
+        await gamesApi.refreshAll(g);
+        record(g);
+      } catch (e) {
+        _full.remove(id);
+        rethrow;
+      }
+      return g;
+    }();
+  }
+
+  /// Relevés enregistrés sur l'appareil (pour les courbes).
+  List<GameSnapshot> history(int id) => [
+    for (final e in store.getJson<List<dynamic>>('hist.$id') ?? const [])
+      ?GameSnapshot.fromJson(e),
+  ];
+
+  /// Ajoute un relevé (au plus un toutes les 5 minutes).
+  void record(RobloxGame g) {
+    if (g.name.isEmpty) return;
+    final h = history(g.universeId);
+    final now = DateTime.now();
+    if (h.isNotEmpty && now.difference(h.last.at).inMinutes < 5) return;
+    h.add(GameSnapshot(now, g.playing, g.visits, g.favorites, g.upVotes, g.downVotes));
+    // On garde ~30 jours : au-delà de 2 jours, un relevé par heure suffit.
+    final cutoff = now.subtract(const Duration(days: 2));
+    final kept = <GameSnapshot>[];
+    DateTime? lastHour;
+    for (final x in h) {
+      if (now.difference(x.at).inDays > 60) continue;
+      if (x.at.isBefore(cutoff)) {
+        final hour = DateTime(x.at.year, x.at.month, x.at.day, x.at.hour);
+        if (hour == lastHour) continue;
+        lastHour = hour;
+      }
+      kept.add(x);
+    }
+    store.setJson('hist.${g.universeId}', [for (final x in kept) x.toJson()]);
+  }
+
+  DateTime? _lastGamePoll;
+
+  @override
+  Future<List<HubNotification>> poll() async {
+    final ids = gameIds;
+    if (ids.isEmpty) return const [];
+    final last = _lastGamePoll;
+    if (last != null && DateTime.now().difference(last).inMinutes < 10) return _gameAlerts;
+    _lastGamePoll = DateTime.now();
+    final out = <HubNotification>[];
+    for (final id in ids) {
+      final g = game(id);
+      try {
+        await gamesApi.refreshStats(g);
+      } catch (_) {
+        continue;
+      }
+      record(g);
+      for (final (value, what, emoji) in [
+        (g.visits, 'visites', '🚀'),
+        (g.favorites, 'favoris', '⭐'),
+        (g.playing, 'joueurs en même temps', '🎮'),
+      ]) {
+        final m = milestone(value);
+        if (m > 0) {
+          out.add(HubNotification(
+            id: 'rbx:$id:$what:$m',
+            title: '$emoji ${g.name} : ${fmtInt(m)} $what !',
+            body: 'Ton jeu vient de passer ${fmtInt(m)} $what.',
+          ));
+        }
+      }
+    }
+    store.changed();
+    return _gameAlerts = out;
+  }
+
+  List<HubNotification> _gameAlerts = const [];
+
+  /// Plus grand palier (10, 25, 50, 100, 250…) atteint.
+  static int milestone(int v) {
+    var best = 0;
+    for (var p = 10; p <= v; p *= 10) {
+      for (final k in [1, 2.5, 5]) {
+        final m = (p * k).round();
+        if (m <= v) best = m;
+      }
+    }
+    return best;
+  }
+
   @override
   List<HubTool> get tools => [
+        HubTool(
+          name: 'roblox_jeu_stats',
+          description: 'Statistiques du jeu Roblox suivi : joueurs en ligne, visites, '
+              'favoris, j\'aime, serveurs, badges.',
+          run: (_) async => [
+            for (final id in gameIds)
+              await loadGame(id).then((g) => {
+                    'jeu': g.name,
+                    'joueurs_en_ligne': g.playing,
+                    'visites': g.visits,
+                    'favoris': g.favorites,
+                    'jaime': g.upVotes,
+                    'jaime_pas': g.downVotes,
+                    'serveurs': g.servers.length,
+                    'mis_a_jour': g.updated,
+                    'badges': [
+                      for (final b in g.badges.take(20))
+                        {'nom': b.name, 'obtenu': b.awarded, 'taux': b.winRate},
+                    ],
+                  }),
+          ],
+        ),
         HubTool(
           name: 'roblox_statut',
           description: 'Statut des comptes Roblox suivis (en ligne, en jeu…).',
@@ -169,13 +330,15 @@ class RobloxModule extends HubModule {
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
         listenable: store,
-        builder: (context, _) => FutureBuilder(
+        builder: (context, _) => selectedGame != null
+            ? GameSummary(module: this, id: selectedGame!)
+            : FutureBuilder(
           future: load(),
           initialData: _cache,
           builder: (context, snap) {
             final list = snap.data ?? [];
             if (list.isEmpty) {
-              return const EmptyHint('Ajoute tes comptes Roblox', icon: Icons.add);
+              return const EmptyHint('Ajoute ton jeu ou tes comptes Roblox', icon: Icons.add);
             }
             return ListView(
               padding: EdgeInsets.zero,
@@ -196,13 +359,24 @@ class RobloxModule extends HubModule {
       );
 
   @override
-  Widget buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(name), actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => load(force: true).then((_) => store.changed()),
+  Widget buildPage(BuildContext context) => DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(name),
+            bottom: const TabBar(tabs: [Tab(text: 'Mon jeu'), Tab(text: 'Comptes')]),
           ),
-        ]),
+          body: TabBarView(
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              GameDashboard(module: this),
+              _accountsPage(context),
+            ],
+          ),
+        ),
+      );
+
+  Widget _accountsPage(BuildContext context) => Scaffold(
         floatingActionButton: Builder(
           builder: (context) => FloatingActionButton.extended(
             icon: const Icon(Icons.person_add_alt),

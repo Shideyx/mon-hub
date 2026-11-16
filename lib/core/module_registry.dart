@@ -1,11 +1,9 @@
-import 'package:material_ui/material_ui.dart';
-
 import '../modules/books/books_module.dart';
 import '../modules/claude/claude_module.dart';
 import '../modules/discord/discord_module.dart';
 import '../modules/ecoledirecte/ecoledirecte_module.dart';
 import '../modules/instagram/instagram_module.dart';
-import '../modules/links/links_module.dart';
+import '../modules/drive/drive_module.dart';
 import '../modules/mail/mail_module.dart';
 import '../modules/roblox/roblox_module.dart';
 import '../modules/schedule/schedule_module.dart';
@@ -27,14 +25,6 @@ List<HubModule> buildModules() {
     InstagramModule(),
     RobloxModule(),
     BooksModule(),
-    LinksModule(
-      id: 'drive',
-      name: 'Google Drive',
-      description: 'Raccourcis vers tes documents Drive',
-      icon: Icons.folder_shared_outlined,
-      color: const Color(0xFF1FA463),
-      presets: const [LinkPreset('Mon Drive', 'https://drive.google.com/drive/my-drive')],
-      hint: 'https://docs.google.com/…',
-    ),
+    DriveModule(),
   ];
 }

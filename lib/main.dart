@@ -6,9 +6,11 @@ import 'core/claude_bridge.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
 import 'core/module_store.dart';
+import 'core/nav.dart';
 import 'core/notifications.dart';
 import 'core/session.dart';
 import 'ui/app_shell.dart';
+import 'ui/clicky/clicky.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
 
@@ -89,6 +91,10 @@ class _HubAppState extends State<HubApp> {
     final n = widget.notifications ?? _notifications;
     return MaterialApp(
       title: 'Mon Hub',
+      navigatorKey: hubNavigatorKey,
+      // Clicky, le compagnon Claude, au-dessus de toutes les pages.
+      builder: (context, child) =>
+          ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),

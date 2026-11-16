@@ -13,7 +13,7 @@ class DiscordUser {
       : 'https://cdn.discordapp.com/avatars/$id/$avatar.png?size=64';
 
   factory DiscordUser.fromJson(Map<String, dynamic> j) => DiscordUser(
-        j['id'] as String,
+        '${j['id']}',
         (j['global_name'] as String?) ?? (j['username'] as String? ?? '?'),
         j['avatar'] as String?,
       );
@@ -37,16 +37,24 @@ class DiscordMessage {
           '${a['proxy_url'] ?? a['url']}',
       for (final e in (j['embeds'] as List?) ?? const [])
         if (e['type'] == 'image' || e['type'] == 'gifv')
-          '${e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']}',
+          if ((e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']) != null)
+            '${e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']}',
     ];
     if (content.isEmpty && atts.length > images.length) content = '📎 Pièce jointe';
 
     if (content.isEmpty && images.isEmpty && (j['sticker_items'] as List?)?.isNotEmpty == true) {
       content = '🖼️ Sticker';
     }
+    if (content.isEmpty && images.isEmpty) {
+      content = switch (j['type']) {
+        3 => '📞 Appel',
+        7 => '👋 A rejoint',
+        _ => (j['embeds'] as List?)?.isNotEmpty == true ? '🔗 Lien' : '',
+      };
+    }
     return DiscordMessage(
-      j['id'] as String,
-      DiscordUser.fromJson(j['author'] as Map<String, dynamic>),
+      '${j['id']}',
+      DiscordUser.fromJson((j['author'] as Map?)?.cast<String, dynamic>() ?? const {'id': '0'}),
       content,
       DateTime.tryParse(j['timestamp'] as String? ?? '')?.toLocal() ?? DateTime.now(),
       images,
@@ -77,22 +85,59 @@ class DiscordApi {
   final http.Client _http;
   static const _base = 'https://discord.com/api/v10';
 
+  static const _ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+      'Chrome/131.0.0.0 Safari/537.36';
+
+  /// Mêmes informations que le client web officiel : sans elles, Discord
+  /// renvoie parfois des listes vides ou refuse la lecture des messages.
+  static final _superProps = base64.encode(utf8.encode(jsonEncode({
+    'os': 'Windows',
+    'browser': 'Chrome',
+    'device': '',
+    'system_locale': 'fr-FR',
+    'browser_user_agent': _ua,
+    'browser_version': '131.0.0.0',
+    'os_version': '10',
+    'release_channel': 'stable',
+    'client_build_number': 360000,
+  })));
+
   Map<String, String> get _headers => {
         'Authorization': token,
         'Content-Type': 'application/json',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
+        'User-Agent': _ua,
+        'X-Super-Properties': _superProps,
+        'X-Discord-Locale': 'fr',
+        'X-Discord-Timezone': 'Europe/Paris',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'Origin': 'https://discord.com',
+        'Referer': 'https://discord.com/channels/@me',
       };
 
+  /// Requête avec une nouvelle tentative si Discord demande de ralentir.
+  Future<http.Response> _send(Future<http.Response> Function() run) async {
+    for (var i = 0; ; i++) {
+      final r = await run().timeout(const Duration(seconds: 20));
+      if (r.statusCode != 429 || i >= 2) return r;
+      double wait = 1;
+      try {
+        wait = ((jsonDecode(r.body) as Map)['retry_after'] as num).toDouble();
+      } catch (_) {}
+      await Future<void>.delayed(Duration(milliseconds: (wait.clamp(0.2, 5) * 1000).round()));
+    }
+  }
+
   dynamic _check(http.Response r) {
-    if (r.statusCode == 401) throw 'Jeton Discord invalide ou expiré';
+    if (r.statusCode == 401) throw 'Session Discord expirée : reconnecte ton compte';
+    if (r.statusCode == 403) throw 'Discord refuse l\'accès à cette conversation';
     if (r.statusCode == 429) throw 'Discord demande de ralentir, réessaie plus tard';
     if (r.statusCode >= 400) throw 'Discord : erreur ${r.statusCode}';
     return r.body.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
   }
 
-  Future<dynamic> _post(String path, Object body) async => _check(await _http
-      .post(Uri.parse('$_base$path'), headers: _headers, body: jsonEncode(body)));
+  Future<dynamic> _post(String path, Object body) async => _check(await _send(() => _http
+      .post(Uri.parse('$_base$path'), headers: _headers, body: jsonEncode(body))));
 
   /// Envoie un message dans une conversation.
   Future<DiscordMessage> send(String channelId, String content) async {
@@ -134,7 +179,7 @@ class DiscordApi {
   }
 
   Future<dynamic> _get(String path) async {
-    final r = await _http.get(Uri.parse('$_base$path'), headers: _headers);
+    final r = await _send(() => _http.get(Uri.parse('$_base$path'), headers: _headers));
     return _check(r);
   }
 
@@ -147,19 +192,22 @@ class DiscordApi {
     final out = [
       for (final c in list)
         if (c['type'] == 1 || c['type'] == 3)
-          DiscordDm(
-            c['id'] as String,
-            (c['name'] as String?)?.isNotEmpty == true
-                ? c['name'] as String
-                : (c['recipients'] as List)
-                    .map((u) => DiscordUser.fromJson(u as Map<String, dynamic>).name)
-                    .join(', '),
-            [
-              for (final u in c['recipients'] as List)
-                DiscordUser.fromJson(u as Map<String, dynamic>)
-            ],
-            c['last_message_id'] as String?,
-          ),
+          () {
+            final users = [
+              for (final u in (c['recipients'] as List?) ?? const [])
+                DiscordUser.fromJson((u as Map).cast<String, dynamic>())
+            ];
+            return DiscordDm(
+              '${c['id']}',
+              (c['name'] as String?)?.isNotEmpty == true
+                  ? c['name'] as String
+                  : users.isEmpty
+                      ? 'Conversation'
+                      : users.map((u) => u.name).join(', '),
+              users,
+              c['last_message_id'] as String?,
+            );
+          }(),
     ];
     BigInt k(DiscordDm d) => BigInt.tryParse(d.lastMessageId ?? '0') ?? BigInt.zero;
     out.sort((a, b) => k(b).compareTo(k(a)));

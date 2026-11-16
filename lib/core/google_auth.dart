@@ -30,6 +30,8 @@ class GoogleAuth {
     'email',
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
+    // Lecture de ton Drive (dossiers, fichiers, aperçus) pour le module Drive.
+    'https://www.googleapis.com/auth/drive.readonly',
   ];
 
   static final ModuleStore store = ModuleStore()..bind('google');
@@ -65,6 +67,7 @@ class GoogleAuth {
       'code_challenge_method': 'S256',
       'state': state,
       'access_type': 'offline',
+      'include_granted_scopes': 'true',
       'prompt': 'consent select_account',
     });
     try {

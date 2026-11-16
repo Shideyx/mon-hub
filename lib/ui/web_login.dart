@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _desktopUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -27,7 +28,12 @@ class WebLoginPage extends StatefulWidget {
     this.cookieUrl,
     this.captureAuthorizationHeader = false,
     this.returnAllCookies = false,
+    this.validate,
   });
+
+  /// Vérifie un jeton capturé avant de fermer la page (sinon on continue
+  /// d'attendre le bon).
+  final Future<bool> Function(String value)? validate;
 
   /// Une fois [cookieName] présent, renvoie tous les cookies du site sous
   /// forme d'en-tête `Cookie` (nécessaire pour envoyer des messages).
@@ -56,6 +62,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   Timer? _timer;
   bool _done = false;
   double _progress = 0;
+  final _tried = <String>{};
 
   static const _hookScript = r'''
 (function () {
@@ -191,9 +198,12 @@ class _WebLoginPageState extends State<WebLoginPage> {
                 _c = c;
                 c.addJavaScriptHandler(
                   handlerName: 'hubToken',
-                  callback: (args) {
+                  callback: (args) async {
                     final v = args.isEmpty ? '' : '${args.first}';
-                    if (v.length > 20) _finish(v);
+                    if (v.length <= 20 || _tried.contains(v)) return null;
+                    _tried.add(v);
+                    final check = widget.validate;
+                    if (check == null || await check(v)) _finish(v);
                     return null;
                   },
                 );
@@ -228,6 +238,53 @@ class HubWebView extends StatefulWidget {
 class _HubWebViewState extends State<HubWebView> {
   InAppWebViewController? _c;
   double _progress = 0;
+  bool _blank = false;
+  Timer? _blankCheck;
+
+  InAppWebViewSettings get _settings => InAppWebViewSettings(
+    userAgent: widget.desktopUserAgent && !(Platform.isAndroid || Platform.isIOS) ? _desktopUa : null,
+    javaScriptEnabled: true,
+    thirdPartyCookiesEnabled: true,
+    supportMultipleWindows: true,
+    javaScriptCanOpenWindowsAutomatically: true,
+    mediaPlaybackRequiresUserGesture: false,
+    allowsInlineMediaPlayback: true,
+    domStorageEnabled: true,
+    databaseEnabled: true,
+  );
+
+  /// Après chargement, vérifie que la page n'est pas restée blanche (site qui
+  /// attend une fenêtre de connexion, script bloqué…).
+  void _scheduleBlankCheck() {
+    _blankCheck?.cancel();
+    _blankCheck = Timer(const Duration(seconds: 6), () async {
+      final c = _c;
+      if (c == null || !mounted) return;
+      try {
+        final n = await c.evaluateJavascript(
+          source: "(document.body ? document.body.innerText.trim().length + "
+              "document.body.querySelectorAll('img,svg,canvas,video,input,button').length : 0)",
+        );
+        final blank = (n is num ? n : num.tryParse('$n') ?? 1) == 0;
+        if (mounted && blank != _blank) setState(() => _blank = blank);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    _blankCheck?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    setState(() => _blank = false);
+    final c = _c;
+    if (c == null) return;
+    final url = await c.getUrl();
+    // Une page blanche après connexion se règle souvent en rouvrant l'adresse de départ.
+    await c.loadUrl(urlRequest: URLRequest(url: _blank || url == null ? WebUri(widget.url) : url));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -246,22 +303,26 @@ class _HubWebViewState extends State<HubWebView> {
         children: [
           InAppWebView(
             initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-            initialSettings: InAppWebViewSettings(
-              userAgent: widget.desktopUserAgent ? _desktopUa : null,
-              javaScriptEnabled: true,
-              thirdPartyCookiesEnabled: true,
-              supportMultipleWindows: true,
-              javaScriptCanOpenWindowsAutomatically: true,
-              mediaPlaybackRequiresUserGesture: false,
-              allowsInlineMediaPlayback: true,
-            ),
+            initialSettings: _settings,
             onWebViewCreated: (c) => _c = c,
             onProgressChanged: (_, p) => setState(() => _progress = p / 100),
-            // Fenêtres « pop-up » (connexion Google…) : on les ouvre au même endroit.
+            onLoadStop: (_, _) => _scheduleBlankCheck(),
+            onUpdateVisitedHistory: (_, _, _) => _scheduleBlankCheck(),
+            // Fenêtres « pop-up » (connexion Google, Apple…) : on les ouvre
+            // dans une vraie fenêtre liée à la page, pour que le site reçoive
+            // la réponse (sinon la page restait blanche après connexion).
             onCreateWindow: (c, action) async {
-              final u = action.request.url;
-              if (u != null) await c.loadUrl(urlRequest: URLRequest(url: u));
-              return false;
+              if (!mounted) return false;
+              unawaited(
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => _PopupWindow(action: action, settings: _settings),
+                  ),
+                ).then((_) => _scheduleBlankCheck()),
+              );
+              return true;
             },
             onPermissionRequest: (_, req) async => PermissionResponse(
               resources: req.resources,
@@ -275,7 +336,68 @@ class _HubWebViewState extends State<HubWebView> {
               right: 0,
               child: LinearProgressIndicator(value: _progress, minHeight: 3),
             ),
+          Positioned(
+            right: 12,
+            top: 12,
+            child: Material(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: 'Recharger',
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                onPressed: _reload,
+              ),
+            ),
+          ),
+          if (_blank)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('La page reste blanche ?'),
+                      FilledButton.tonal(onPressed: _reload, child: const Text('Recharger')),
+                      TextButton(
+                        onPressed: () => launchUrl(
+                          Uri.parse(widget.url),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        child: const Text('Ouvrir dans le navigateur'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// Fenêtre ouverte par un site (connexion Google…), reliée à la page d'origine.
+class _PopupWindow extends StatelessWidget {
+  const _PopupWindow({required this.action, required this.settings});
+  final CreateWindowAction action;
+  final InAppWebViewSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Connexion')),
+      body: InAppWebView(
+        windowId: action.windowId,
+        initialSettings: settings,
+        onCloseWindow: (_) {
+          if (context.mounted) Navigator.maybePop(context);
+        },
       ),
     );
   }

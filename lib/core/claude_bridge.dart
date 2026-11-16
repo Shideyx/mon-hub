@@ -92,7 +92,7 @@ class ClaudeBridge {
         if (tool == null) return await reply(404, {'error': 'Action inconnue : $name'});
         final args = (body['arguments'] as Map?)?.cast<String, dynamic>() ?? {};
         final result = await tool.run(args);
-        return await reply(200, {'result': _plain(result)});
+        return await reply(200, {'result': plain(result)});
       } catch (e) {
         return reply(200, {'error': '$e'});
       }
@@ -101,11 +101,11 @@ class ClaudeBridge {
   }
 
   /// Convertit le résultat en JSON simple (dates en texte).
-  static Object? _plain(Object? v) => switch (v) {
+  static Object? plain(Object? v) => switch (v) {
     null || String() || num() || bool() => v,
     DateTime() => v.toIso8601String(),
-    Map() => {for (final e in v.entries) '${e.key}': _plain(e.value)},
-    Iterable() => [for (final x in v) _plain(x)],
+    Map() => {for (final e in v.entries) '${e.key}': plain(e.value)},
+    Iterable() => [for (final x in v) plain(x)],
     _ => '$v',
   };
 }

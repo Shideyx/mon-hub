@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../core/nav.dart';
 import '../../ui/widgets.dart';
 import 'ed_client.dart';
 
@@ -117,6 +118,9 @@ class EcoleDirecteModule extends HubModule {
         return _cache;
       } catch (e) {
         lastError = '$e';
+        // Échec : la prochaine demande retentera (sinon on resterait bloqué
+        // sur l'erreur jusqu'au redémarrage).
+        _loading = null;
         return _cache;
       }
     }();
@@ -215,19 +219,60 @@ class EcoleDirecteModule extends HubModule {
   DateTime? _lastPoll;
   List<HubNotification> _lastItems = const [];
 
-  Future<String?> _ask(String question, List<String> choices) async {
-    final ctx = _ctx;
-    if (ctx == null || !ctx.mounted) return null;
-    return showDialog<String>(
-      context: ctx,
-      builder: (c) => SimpleDialog(
-        title: Text(question),
-        children: [
-          for (final ch in choices)
-            SimpleDialogOption(onPressed: () => Navigator.pop(c, ch), child: Text(ch)),
-        ],
-      ),
-    );
+  Future<String?>? _pendingQuestion;
+
+  /// Question de sécurité (double authentification). Affichée par le
+  /// navigateur principal : elle marche même si la connexion a été lancée en
+  /// arrière-plan (vérification des notifications au démarrage…).
+  Future<String?> _ask(String question, List<String> choices) {
+    return _pendingQuestion ??= () async {
+      try {
+        BuildContext? ctx = _ctx;
+        if (ctx == null || !ctx.mounted) ctx = await hubDialogContext();
+        if (ctx == null || !ctx.mounted) return null;
+        return await showDialog<String>(
+          context: ctx,
+          barrierDismissible: false,
+          useRootNavigator: true,
+          builder: (c) => AlertDialog(
+            icon: const Icon(Icons.verified_user_rounded),
+            title: const Text('Question de sécurité École Directe'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(question, style: Theme.of(c).textTheme.titleMedium),
+                    const SizedBox(height: 12),
+                    for (final ch in choices)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(c, ch),
+                          child: Text(ch, textAlign: TextAlign.center),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Plus tard')),
+            ],
+          ),
+        );
+      } finally {
+        _pendingQuestion = null;
+      }
+    }();
+  }
+
+  /// Relance la connexion (après une question restée sans réponse…).
+  Future<void> retry() async {
+    await load(force: true);
+    store.changed();
   }
 
   Future<void> _configure(BuildContext context) async {
@@ -259,7 +304,9 @@ class EcoleDirecteModule extends HubModule {
           future: load(),
           initialData: _cache,
           builder: (context, snap) {
-            if (lastError != null && _cache.isEmpty) return EmptyHint(lastError!);
+            if (lastError != null && _cache.isEmpty) {
+              return EmptyHint(lastError!, action: ('Réessayer', retry));
+            }
             final now = DateTime.now();
             final next = (snap.data ?? [])
                 .where((l) => l.end.isAfter(now) && !l.cancelled)

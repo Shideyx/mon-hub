@@ -63,22 +63,36 @@ class DiscordModule extends HubModule {
         lastError = null;
         me ??= await api.me();
         final dms = await api.dms();
-        // On ne relit que les conversations qui ont bougé (8 plus récentes),
-        // pour rester discret vis-à-vis de Discord.
-        for (final d in dms.take(8)) {
-          if (d.lastMessageId == null) continue;
-          if (_lastSeenId[d.id] != d.lastMessageId) {
-            final msgs = await api.messages(d.id, limit: 1);
-            if (msgs.isNotEmpty) _lastMsg[d.id] = msgs.first;
-            _lastSeenId[d.id] = d.lastMessageId!;
-          }
+        // La liste s'affiche tout de suite, même si la lecture des derniers
+        // messages échoue ensuite (avant : tout restait vide jusqu'à une
+        // reconnexion).
+        for (final d in dms) {
           d.last = _lastMsg[d.id];
         }
         _dms = dms;
+        // On ne relit que les conversations qui ont bougé (10 plus récentes),
+        // pour rester discret vis-à-vis de Discord.
+        for (final d in dms.take(10)) {
+          if (d.lastMessageId == null) continue;
+          if (_lastSeenId[d.id] != d.lastMessageId || _lastMsg[d.id] == null) {
+            try {
+              final msgs = await api.messages(d.id, limit: 1);
+              if (msgs.isNotEmpty) _lastMsg[d.id] = msgs.first;
+              _lastSeenId[d.id] = d.lastMessageId!;
+            } catch (_) {
+              // Une conversation illisible n'empêche pas les autres.
+            }
+          }
+          d.last = _lastMsg[d.id];
+        }
         badge.value = dms.where(isUnread).length;
       } catch (e) {
         lastError = '$e';
+        if ('$e'.contains('expirée')) {
+          _api = null;
+        }
       }
+      if (lastError != null && _dms.isEmpty) _loading = null;
       return _dms;
     }();
   }
@@ -180,10 +194,20 @@ class DiscordModule extends HubModule {
     if (webLoginSupported) {
       token = await WebLoginPage.open(
             context,
-            const WebLoginPage(
+            WebLoginPage(
               title: 'Connexion à Discord',
               url: 'https://discord.com/login',
               captureAuthorizationHeader: true,
+              // On ne garde que le vrai jeton du compte (pas une requête
+              // anonyme faite avant la connexion).
+              validate: (t) async {
+                try {
+                  await DiscordApi(t).me();
+                  return true;
+                } catch (_) {
+                  return false;
+                }
+              },
             ),
           ) ??
           '';
@@ -202,6 +226,8 @@ class DiscordModule extends HubModule {
       await store.writeSecret('token', token);
       _api = null;
       me = u;
+      _lastMsg.clear();
+      _lastSeenId.clear();
       await store.setJson('connected', true);
       await load(force: true);
       store.changed();
@@ -254,11 +280,14 @@ class DiscordModule extends HubModule {
             future: load(),
             initialData: _dms,
             builder: (context, snap) {
-              final list = (snap.data ?? []).where((d) => d.last != null).take(4).toList();
+              final list = (snap.data ?? []).take(4).toList();
               if (list.isEmpty) {
                 return snap.connectionState == ConnectionState.waiting
                     ? const LoadingHint()
-                    : EmptyHint(lastError ?? 'Aucun message');
+                    : EmptyHint(lastError ?? 'Aucun message',
+                        action: lastError == null
+                            ? null
+                            : ('Réessayer', () => load(force: true).then((_) => store.changed())));
               }
               return ListView(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -308,7 +337,7 @@ class DiscordModule extends HubModule {
   Widget buildPage(BuildContext context) {
     markAllRead();
     return DefaultTabController(
-      length: 2,
+      length: webLoginSupported ? 3 : 2,
       child: Scaffold(
         appBar: AppBar(
           title: Text(name),
@@ -323,14 +352,25 @@ class DiscordModule extends HubModule {
               onPressed: () => openLink(context, 'https://discord.com/channels/@me'),
             ),
           ],
-          bottom: const TabBar(tabs: [Tab(text: 'Messages privés'), Tab(text: 'Serveurs')]),
+          bottom: TabBar(tabs: [
+            const Tab(text: 'Messages privés'),
+            const Tab(text: 'Serveurs'),
+            if (webLoginSupported) const Tab(text: 'Discord complet'),
+          ]),
         ),
         body: ListenableBuilder(
           listenable: store,
-          builder: (context, _) => TabBarView(children: [
-            _dmsTab(context),
-            _guildsTab(context),
-          ]),
+          builder: (context, _) => TabBarView(
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _dmsTab(context),
+              _guildsTab(context),
+              // Le vrai Discord (serveurs, salons, appels…) dans l'appli, avec
+              // la session gardée d'une fois sur l'autre.
+              if (webLoginSupported)
+                const HubWebView(url: 'https://discord.com/channels/@me', desktopUserAgent: true),
+            ],
+          ),
         ),
       ),
     );
@@ -353,7 +393,19 @@ class DiscordModule extends HubModule {
               title: Text('Connecté : ${me!.name}'),
               trailing: TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
             ),
-          if (lastError != null) ErrorBanner(lastError!),
+          if (lastError != null) ...[
+            ErrorBanner(lastError!),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(spacing: 8, children: [
+                OutlinedButton(
+                  onPressed: () => load(force: true).then((_) => store.changed()),
+                  child: const Text('Réessayer'),
+                ),
+                OutlinedButton(onPressed: () => connect(context), child: const Text('Reconnecter')),
+              ]),
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: FilledButton.tonalIcon(
@@ -363,6 +415,8 @@ class DiscordModule extends HubModule {
             ),
           ),
           const Divider(),
+          if (snap.connectionState == ConnectionState.waiting && (snap.data ?? []).isEmpty)
+            const Padding(padding: EdgeInsets.all(24), child: LoadingHint()),
           for (final d in snap.data ?? <DiscordDm>[]) _dmTile(context, d),
         ],
       ),
@@ -474,8 +528,14 @@ class _ConversationPageState extends State<_ConversationPage> {
   Future<void> _load() async {
     try {
       final api = await module._client();
-      final m = await api!.messages(widget.channelId, limit: 50);
-      if (mounted) setState(() => msgs = m);
+      if (api == null) throw 'Discord n\'est pas connecté';
+      final m = await api.messages(widget.channelId, limit: 50);
+      if (mounted) {
+        setState(() {
+          msgs = m;
+          error = null;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     }
@@ -509,7 +569,10 @@ class _ConversationPageState extends State<_ConversationPage> {
         children: [
           Expanded(
             child: error != null && msgs == null
-                ? EmptyHint(error!)
+                ? EmptyHint(error!, action: ('Réessayer', () {
+                    setState(() => error = null);
+                    _load();
+                  }))
                 : msgs == null
                     ? const LoadingHint()
                     : ListView.builder(
