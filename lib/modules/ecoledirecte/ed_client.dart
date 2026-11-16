@@ -62,6 +62,17 @@ class EdClient {
   int? accountId;
   String? studentName;
 
+  /// Compte parent : la messagerie est celle de la famille
+  /// (`/familles/{id}`), pas celle de l'élève.
+  int? familyId;
+
+  /// Année scolaire donnée par École Directe à la connexion (« 2026-2027 »).
+  String? year;
+
+  /// Chemin de la messagerie : élève, ou famille pour un compte parent.
+  String get _mailbox => familyId != null ? '/familles/$familyId' : '/eleves/$accountId';
+  String get _year => (year != null && RegExp(r'^\d{4}-\d{4}$').hasMatch(year!)) ? year! : schoolYear();
+
   /// Identifiant d'appareil (le site officiel envoie une valeur vide).
   String uuid = '';
   final Map<String, String> _cookies = {};
@@ -261,15 +272,20 @@ class EdClient {
     final accounts = (r['data'] as Map?)?['accounts'] as List? ?? [];
     if (accounts.isEmpty) throw 'Aucun compte trouvé sur ce profil École Directe';
     final acc = accounts.first as Map;
-    if ('${acc['typeCompte']}' == '1' || '${acc['typeCompte']}' == 'P') {
-      // Compte parent : on prend le premier enfant.
+    final y = '${acc['anneeScolaireCourante'] ?? ''}';
+    year = y.isEmpty ? null : y;
+    if ('${acc['typeCompte']}' != 'E') {
+      // Compte parent (« 1 » ou « P ») : on prend le premier enfant, et la
+      // messagerie est celle de la famille.
       final kids = (acc['profile'] as Map?)?['eleves'] as List? ?? [];
       if (kids.isEmpty) throw 'Compte parent sans élève associé';
       final k = kids.first as Map;
-      accountId = k['id'] as int;
+      accountId = _int(k['id']);
+      familyId = _int(acc['id']);
       studentName = '${k['prenom']} ${k['nom']}';
     } else {
-      accountId = acc['id'] as int;
+      accountId = _int(acc['id']);
+      familyId = null;
       studentName = '${acc['prenom']} ${acc['nom']}';
     }
   }
@@ -288,6 +304,8 @@ class EdClient {
     list.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
     return list;
   }
+
+  static int? _int(Object? v) => v is int ? v : int.tryParse('${v ?? ''}');
 
   static String _b64(String? s) {
     if (s == null || s.isEmpty) return '';
@@ -311,29 +329,104 @@ class EdClient {
   /// Année scolaire au format « 2026-2027 ».
   static String schoolYear([DateTime? d]) {
     final n = d ?? DateTime.now();
-    final start = n.month >= 8 ? n.year : n.year - 1;
+    // Comme le site officiel : l'année change en septembre.
+    final start = n.month >= 9 ? n.year : n.year - 1;
     return '$start-${start + 1}';
   }
 
-  /// Messages reçus dans la messagerie École Directe.
-  Future<List<EdMessage>> messages() async {
-    final r = await _post(
-      '/eleves/$accountId/messages.awp?force=false&typeRecuperation=received&idClasseur=0'
-      '&orderBy=date&order=desc&query=&onlyRead=&page=0&itemsPerPage=30&getAll=0&verbe=get',
-      {'anneeMessages': schoolYear()},
+  /// Messages d'un dossier de la messagerie : `received` (reçus), `sent`
+  /// (envoyés) ou `archived` (archivés).
+  ///
+  /// Mêmes paramètres que le site officiel (et qu'Ecole Directe Plus) :
+  /// `getAll=1`, l'année scolaire donnée à la connexion, et la messagerie de
+  /// la famille pour un compte parent.
+  Future<List<EdMessage>> messages({String folder = 'received'}) async {
+    Future<Map<String, dynamic>> get(String y) => _post(
+      '$_mailbox/messages.awp?force=false&typeRecuperation=$folder&idClasseur=0'
+      '&orderBy=date&order=desc&query=&onlyRead=&getAll=1&verbe=get',
+      {'anneeMessages': y},
     );
-    if (r['code'] != 200) throw 'Messagerie indisponible (code ${r['code']})';
-    final list = r['data']?['messages']?['received'] as List? ?? [];
-    return list.map((e) => EdMessage.fromJson(e as Map<String, dynamic>)).toList();
+    var r = await get(_year);
+    if (r['code'] != 200) throw _messagesError(r);
+    var list = parseMessages(r['data'], folder);
+    // Rentrée : École Directe peut encore ranger les messages sous l'année
+    // d'avant (ou déjà sous la suivante) quelques jours.
+    if (list.isEmpty && folder == 'received') {
+      final y = _year.split('-').map(int.parse).toList();
+      final other = DateTime.now().month >= 9 ? '${y[0] - 1}-${y[0]}' : '${y[1]}-${y[1] + 1}';
+      final r2 = await get(other);
+      if (r2['code'] == 200) {
+        final l2 = parseMessages(r2['data'], folder);
+        if (l2.isNotEmpty) {
+          r = r2;
+          list = l2;
+        }
+      }
+    }
+    final param = (r['data'] is Map) ? (r['data'] as Map)['parametrage'] : null;
+    if (list.isEmpty && param is Map && param['isActif'] == false) {
+      throw 'La messagerie est désactivée pour ton compte par ton établissement.';
+    }
+    return list;
   }
 
-  /// Contenu d'un message (texte).
-  Future<String> messageContent(int id) async {
-    final r = await _post('/eleves/$accountId/messages/$id.awp?verbe=get&mode=destinataire', {
-      'anneeMessages': schoolYear(),
+  String _messagesError(Map<String, dynamic> r) => switch (r['code']) {
+    520 || 525 => 'Session expirée, reconnecte-toi',
+    403 => 'Ton établissement n\'autorise pas la messagerie pour ce compte',
+    _ => 'Messagerie indisponible (${explain(r)})',
+  };
+
+  /// Lit la liste des messages, quelle que soit la forme renvoyée.
+  static List<EdMessage> parseMessages(Object? data, String folder) {
+    if (data is! Map) return const [];
+    final m = data['messages'];
+    final Object? raw = m is Map ? (m[folder] ?? m['received']) : m;
+    if (raw is! List) return const [];
+    return [
+      for (final e in raw)
+        if (e is Map) EdMessage.fromJson(e.cast<String, dynamic>(), sent: folder == 'sent'),
+    ];
+  }
+
+  /// Contenu d'un message (texte) et ses pièces jointes.
+  Future<EdMessageContent> message(int id, {bool sent = false}) async {
+    final mode = sent ? 'expediteur' : 'destinataire';
+    var r = await _post('$_mailbox/messages/$id.awp?verbe=get&mode=$mode', {
+      'anneeMessages': _year,
     });
-    if (r['code'] != 200) throw 'Message indisponible (code ${r['code']})';
-    return htmlToText(_b64(r['data']?['content'] as String?));
+    if (r['code'] != 200 || r['data'] is! Map) {
+      // Message d'une autre année scolaire, ou rangé de l'autre côté.
+      r = await _post(
+        '$_mailbox/messages/$id.awp?verbe=get&mode=${sent ? 'destinataire' : 'expediteur'}',
+        {'anneeMessages': _year},
+      );
+    }
+    if (r['code'] != 200 || r['data'] is! Map) {
+      throw 'Message indisponible (${explain(r)})';
+    }
+    return EdMessageContent.fromJson((r['data'] as Map).cast<String, dynamic>());
+  }
+
+  /// Contenu d'un message (texte seulement).
+  Future<String> messageContent(int id) async => (await message(id)).text;
+
+  /// Télécharge une pièce jointe (octets du fichier).
+  Future<List<int>> attachment(EdAttachment f) async {
+    await _pace();
+    final uri = Uri.parse(
+      '$_base/telechargement.awp?verbe=get&fichierId=${f.id}'
+      '&leTypeDeFichier=${f.type.isEmpty ? 'PIECE_JOINTE' : f.type}&anneeMessages=$_year&v=$_v',
+    );
+    final res = await _http
+        .post(uri, headers: _headers(), body: body({'forceDownload': 0}))
+        .timeout(const Duration(seconds: 60));
+    _keep(res);
+    if (res.statusCode >= 400 || res.bodyBytes.isEmpty) {
+      throw 'Pièce jointe indisponible (code ${res.statusCode})';
+    }
+    final head = utf8.decode(res.bodyBytes.take(40).toList(), allowMalformed: true).trimLeft();
+    if (head.startsWith('{"code"')) throw 'Pièce jointe indisponible';
+    return res.bodyBytes;
   }
 
   /// Répond à l'expéditeur d'un message.
@@ -344,7 +437,7 @@ class EdClient {
     final subject = original.subject.toLowerCase().startsWith('re')
         ? original.subject
         : 'RE : ${original.subject}';
-    final r = await _post('/eleves/$accountId/messages.awp?verbe=post', {
+    final r = await _post('$_mailbox/messages.awp?verbe=post', {
       'message': {
         'groupesDestinataires': [
           {
@@ -359,7 +452,7 @@ class EdClient {
         'files': [],
         'parentID': original.id,
       },
-      'anneeMessages': schoolYear(),
+      'anneeMessages': _year,
     });
     if (r['code'] != 200) {
       throw (r['message'] as String?)?.isNotEmpty == true
@@ -408,9 +501,20 @@ class EdClient {
 }
 
 class EdMessage {
-  EdMessage(this.id, this.subject, this.from, this.date, this.read, [this.sender = const {}]);
+  EdMessage(
+    this.id,
+    this.subject,
+    this.from,
+    this.date,
+    this.read, [
+    this.sender = const {},
+    this.sent = false,
+    this.hasFiles = false,
+  ]);
   final int id;
   final String subject;
+
+  /// Expéditeur (ou destinataire pour un message envoyé).
   final String from;
   final DateTime? date;
   bool read;
@@ -418,19 +522,74 @@ class EdMessage {
   /// Fiche brute de l'expéditeur (sert à lui répondre).
   final Map<String, dynamic> sender;
 
-  factory EdMessage.fromJson(Map<String, dynamic> j) {
-    final f = j['from'] as Map<String, dynamic>? ?? const {};
-    final name =
-        (f['name'] as String?) ??
-        [f['civilite'], f['prenom'], f['nom']].whereType<String>().join(' ').trim();
+  /// Message que tu as envoyé.
+  final bool sent;
+  final bool hasFiles;
+
+  static String _name(Map f) {
+    final n = f['name'];
+    if (n is String && n.trim().isNotEmpty) return n.trim();
+    return [f['civilite'], f['prenom'], f['nom']]
+        .whereType<String>()
+        .where((s) => s.trim().isNotEmpty)
+        .join(' ')
+        .trim();
+  }
+
+  factory EdMessage.fromJson(Map<String, dynamic> j, {bool sent = false}) {
+    final f = (j['from'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    String name;
+    if (sent) {
+      final to = j['to'];
+      final first = to is List && to.isNotEmpty && to.first is Map ? to.first as Map : const {};
+      name = _name(first);
+      if (to is List && to.length > 1) name = '$name +${to.length - 1}';
+      name = name.isEmpty ? '?' : 'À $name';
+    } else {
+      name = _name(f);
+    }
     return EdMessage(
-      j['id'] as int? ?? 0,
-      j['subject'] as String? ?? '(sans objet)',
+      j['id'] is int ? j['id'] as int : int.tryParse('${j['id']}') ?? 0,
+      (j['subject'] as String?)?.trim().isNotEmpty == true ? j['subject'] as String : '(sans objet)',
       name.isEmpty ? '?' : name,
       DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
-      j['read'] == true,
+      sent || j['read'] == true,
       f,
+      sent,
+      (j['files'] as List?)?.isNotEmpty == true,
     );
+  }
+}
+
+/// Une pièce jointe d'un message.
+class EdAttachment {
+  EdAttachment(this.id, this.name, this.type);
+  final int id;
+  final String name;
+  final String type;
+}
+
+/// Contenu d'un message École Directe.
+class EdMessageContent {
+  EdMessageContent(this.text, this.files);
+  final String text;
+  final List<EdAttachment> files;
+
+  factory EdMessageContent.fromJson(Map<String, dynamic> d) {
+    final raw = '${d['content'] ?? ''}';
+    // Le contenu est en base64 (HTML) ; certains établissements renvoient
+    // directement le HTML.
+    final looksB64 = RegExp(r'^[A-Za-z0-9+/=\s]+$').hasMatch(raw) && raw.length % 4 == 0;
+    final html = looksB64 ? EdClient._b64(raw) : raw;
+    return EdMessageContent(EdClient.htmlToText(html), [
+      for (final f in (d['files'] as List?) ?? const [])
+        if (f is Map)
+          EdAttachment(
+            f['id'] is int ? f['id'] as int : int.tryParse('${f['id']}') ?? 0,
+            '${f['libelle'] ?? f['name'] ?? 'pièce jointe'}',
+            '${f['type'] ?? 'PIECE_JOINTE'}',
+          ),
+    ]);
   }
 }
 

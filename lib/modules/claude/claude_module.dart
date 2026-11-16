@@ -1,15 +1,20 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
+import '../../ui/chat_history.dart';
 import '../../ui/clicky/clicky.dart';
 import '../../ui/clicky/mic_test.dart';
 import '../../ui/clicky/claude_code.dart';
+import '../../ui/clicky/journal.dart';
+import '../../ui/clicky/routines.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
+import '../../ui/clicky/settings.dart';
 import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 
@@ -97,9 +102,21 @@ class ClaudeModule extends HubModule {
     ),
   );
 
+  /// Pose une question à Clicky (celui de l'appli, ou Clicky partout).
+  static Future<void> askClicky(String q) async {
+    final c = ClickyController.instance;
+    if (c.handledElsewhere) {
+      await ClickyDesktop.launch();
+      await ClickyDesktop.ask(q);
+    } else {
+      c.openPanel();
+      await c.ask(q);
+    }
+  }
+
   @override
   Widget buildPage(BuildContext context) => DefaultTabController(
-    length: 2,
+    length: 5,
     child: Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -117,9 +134,14 @@ class ClaudeModule extends HubModule {
             ),
         ],
         bottom: const TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: [
-            Tab(text: 'Discuter'),
-            Tab(text: 'claude.ai'),
+            Tab(icon: Icon(Icons.chat_rounded), text: 'Discuter'),
+            Tab(icon: Icon(Icons.history_rounded), text: 'Historique Clicky'),
+            Tab(icon: Icon(Icons.psychology_rounded), text: 'Journal'),
+            Tab(icon: Icon(Icons.event_repeat_rounded), text: 'Routines'),
+            Tab(icon: Icon(Icons.public_rounded), text: 'claude.ai'),
           ],
         ),
       ),
@@ -127,6 +149,28 @@ class ClaudeModule extends HubModule {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _ChatTab(module: this),
+          ChatHistoryList(
+            history: ChatHistory.clicky,
+            color: color,
+            otherName: ClickyController.instance.jarvis ? 'Jarvis' : 'Clicky',
+            onOpen: (t) => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => _ClickyThreadPage(thread: t, color: color)),
+            ),
+          ),
+          JournalView(
+            color: color,
+            onQuiz: (entries) {
+              final c = ClickyController.instance;
+              if (c.handledElsewhere) {
+                askClicky('qu\'est-ce que je dois réviser');
+              } else {
+                c.openPanel();
+                c.reviewQuiz(entries);
+              }
+            },
+          ),
+          RoutinesView(color: color),
           webLoginSupported
               ? const HubWebView(url: 'https://claude.ai/new', desktopUserAgent: true)
               : Center(
@@ -141,8 +185,10 @@ class ClaudeModule extends HubModule {
     ),
   );
 
-  static Future<void> showSettings(BuildContext context) =>
-      showDialog<void>(context: context, builder: (_) => const _SettingsDialog());
+  static Future<void> showSettings(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(builder: (_) => const _SettingsDialog()),
+  );
 
   static Future<void> showBridgeHelp(BuildContext context) => showDialog<void>(
     context: context,
@@ -215,12 +261,41 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return AlertDialog(
-      title: const Text('Claude et Clicky'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: ListenableBuilder(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) unawaited(_save());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(c.jarvis ? 'Jarvis, Claude et Clicky' : 'Claude et Clicky'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Enregistrer'),
+              ),
+            ),
+          ],
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+              children: [
+                _body(context, text),
+                const ClickyMoreSettings(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, TextTheme text) {
+    return ListenableBuilder(
             listenable: c,
             builder: (context, _) => Column(
               mainAxisSize: MainAxisSize.min,
@@ -438,18 +513,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () async {
-            await _save();
-            if (context.mounted) Navigator.pop(context);
-          },
-          child: const Text('Enregistrer'),
-        ),
-      ],
     );
   }
 }
@@ -569,7 +632,8 @@ class _ClaudeProSectionState extends State<_ClaudeProSection> {
   }
 }
 
-/// Discussion directe avec Claude (sans passer par claude.ai).
+/// Discussion directe avec Claude (sans passer par claude.ai), avec
+/// l'historique de toutes tes conversations.
 class _ChatTab extends StatefulWidget {
   const _ChatTab({required this.module});
   final ClaudeModule module;
@@ -579,13 +643,39 @@ class _ChatTab extends StatefulWidget {
 }
 
 class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
-  /// (question, réponse) affichés ; la conversation envoyée à l'API.
-  final shown = <(bool, String, DateTime)>[];
-  final history = <Map<String, dynamic>>[];
+  final history = ChatHistory.claude;
+
+  /// Conversation ouverte (null = nouvelle, pas encore enregistrée).
+  String? threadId;
   bool busy = false;
+  String streaming = '';
+  String status = '';
+
+  /// Message d'erreur (pas enregistré dans l'historique).
+  String? error;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    history.addListener(_changed);
+    unawaited(history.load());
+  }
+
+  @override
+  void dispose() {
+    history.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  ChatThread? get thread => history.byId(threadId);
+  List<ChatMsg> get messages => thread?.messages ?? const [];
 
   static const _system =
       'Tu es Claude, intégré à Mon Hub, l\'appli personnelle d\'un·e élève. '
@@ -597,78 +687,236 @@ class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
   Future<bool> _usePro() async =>
       ClickyController.instance.provider == 'claudecode' && await ClaudeCode.find() != null;
 
+  void _newChat() {
+    if (busy) return;
+    setState(() {
+      threadId = null;
+      error = null;
+    });
+  }
+
+  void _open(ChatThread t) {
+    if (busy) return;
+    setState(() {
+      threadId = t.id;
+      error = null;
+    });
+  }
+
   Future<void> _send(String text) async {
     final pro = await _usePro();
     if (!pro && !await ClaudeApi.hasKey()) {
       if (mounted) await ClaudeModule.showSettings(context);
       if (!await _usePro() && !await ClaudeApi.hasKey()) return;
     }
+    final id = threadId ?? ChatThread.newId();
+    final past = [...messages];
     setState(() {
-      shown.add((true, text, DateTime.now()));
+      threadId = id;
       busy = true;
+      streaming = '';
+      status = '';
+      error = null;
     });
-    history.add({'role': 'user', 'content': text});
+    await history.add(id, ChatMsg(mine: true, text: text));
     try {
       final String r;
       if (await _usePro()) {
         // Claude Code ne garde pas la conversation : on la lui redonne.
-        final past = [
-          for (final m in history.take(history.length - 1))
-            if (m['content'] is String)
-              '${m['role'] == 'user' ? 'Moi' : 'Claude'} : ${m['content']}',
+        final lines = [
+          for (final m in past.skip(math.max(0, past.length - 30)))
+            '${m.mine ? 'Moi' : 'Claude'} : ${m.text}',
         ];
         r = await ClaudeCode.ask(
           system: _system,
-          question: past.isEmpty ? text : '${past.join('\n\n')}\n\nMoi : $text',
+          question: lines.isEmpty ? text : '${lines.join('\n\n')}\n\nMoi : $text',
+          web: ClickyController.instance.webSearch,
+          onText: (t) => mounted ? setState(() => streaming = t) : null,
+          onStatus: (s) => mounted ? setState(() => status = s) : null,
         );
-        history.add({'role': 'assistant', 'content': r});
       } else {
-        r = await ClaudeApi.chat(system: _system, history: history, effort: 'medium');
+        final h = <Map<String, dynamic>>[
+          for (final m in past.skip(math.max(0, past.length - 40)))
+            {'role': m.mine ? 'user' : 'assistant', 'content': m.text},
+          {'role': 'user', 'content': text},
+        ];
+        r = await ClaudeApi.chat(
+          system: _system,
+          history: h,
+          effort: 'medium',
+          onText: (t) => mounted ? setState(() => streaming = t) : null,
+          onStatus: (s) => mounted ? setState(() => status = s) : null,
+        );
       }
-      if (mounted) setState(() => shown.add((false, r, DateTime.now())));
+      await history.add(id, ChatMsg(mine: false, text: r));
     } catch (e) {
-      // On retire la question pour pouvoir la renvoyer.
-      while (history.isNotEmpty && history.last['role'] != 'user') {
-        history.removeLast();
-      }
-      if (history.isNotEmpty) history.removeLast();
-      if (mounted) setState(() => shown.add((false, '⚠️ $e', DateTime.now())));
+      if (mounted) setState(() => error = '$e');
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() {
+          busy = false;
+          streaming = '';
+          status = '';
+        });
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
+  Widget _chat(BuildContext context, {required bool wide}) {
     final color = widget.module.color;
+    final msgs = messages;
+    final extra = (busy ? 1 : 0) + (error != null ? 1 : 0);
     return Column(
       children: [
+        Material(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: Row(
+            children: [
+              if (!wide)
+                IconButton(
+                  tooltip: 'Historique des conversations',
+                  icon: const Icon(Icons.history_rounded),
+                  onPressed: () => _showHistorySheet(context),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  thread?.label ?? 'Nouvelle conversation',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Nouvelle conversation',
+                icon: const Icon(Icons.add_comment_rounded),
+                onPressed: busy ? null : _newChat,
+              ),
+            ],
+          ),
+        ),
         Expanded(
-          child: shown.isEmpty
+          child: msgs.isEmpty && extra == 0
               ? const EmptyHint(
-                  'Pose une question, fais-toi expliquer un exercice, organise ta semaine…',
+                  'Pose une question, fais-toi expliquer un exercice, organise ta semaine… '
+                  'Tes conversations sont enregistrées dans l\'historique.',
                   icon: Icons.auto_awesome_rounded,
                 )
               : ListView.builder(
                   reverse: true,
                   padding: const EdgeInsets.all(12),
-                  itemCount: shown.length + (busy ? 1 : 0),
+                  itemCount: msgs.length + extra,
                   itemBuilder: (context, i) {
-                    if (busy && i == 0) return const LoadingHint();
-                    final (mine, text, at) = shown[shown.length - 1 - (i - (busy ? 1 : 0))];
+                    if (error != null && i == 0) return ErrorBanner(error!);
+                    final j = i - (error != null ? 1 : 0);
+                    if (busy && j == 0) {
+                      return streaming.isEmpty
+                          ? Column(
+                              children: [
+                                const LoadingHint(),
+                                if (status.isNotEmpty)
+                                  Text(status, style: Theme.of(context).textTheme.labelSmall),
+                              ],
+                            )
+                          : ChatBubble(
+                              text: streaming,
+                              time: status.isEmpty ? '…' : status,
+                              mine: false,
+                              color: color,
+                              author: 'Claude',
+                            );
+                    }
+                    final m = msgs[msgs.length - 1 - (j - (busy ? 1 : 0))];
                     return ChatBubble(
-                      text: text,
-                      time: hhmm(at),
-                      mine: mine,
+                      text: m.text,
+                      time: '${dayLabel(m.at)} ${hhmm(m.at)}',
+                      mine: m.mine,
                       color: color,
-                      author: mine ? null : 'Claude',
+                      author: m.mine ? null : 'Claude',
                     );
                   },
                 ),
         ),
         ChatComposer(color: color, hint: 'Écrire à Claude', onSend: _send),
       ],
+    );
+  }
+
+  Future<void> _showHistorySheet(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (c) => SizedBox(
+      height: MediaQuery.sizeOf(c).height * 0.8,
+      child: ChatHistoryList(
+        history: history,
+        selectedId: threadId,
+        color: widget.module.color,
+        onNew: () {
+          Navigator.pop(c);
+          _newChat();
+        },
+        onOpen: (t) {
+          Navigator.pop(c);
+          _open(t);
+        },
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final wide = box.maxWidth >= 820;
+        if (!wide) return _chat(context, wide: false);
+        return Row(
+          children: [
+            SizedBox(
+              width: 300,
+              child: ChatHistoryList(
+                history: history,
+                selectedId: threadId,
+                color: widget.module.color,
+                onNew: _newChat,
+                onOpen: _open,
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: _chat(context, wide: true)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Une conversation de Clicky enregistrée, avec « Continuer ».
+class _ClickyThreadPage extends StatelessWidget {
+  const _ClickyThreadPage({required this.thread, required this.color});
+  final ChatThread thread;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ClickyController.instance;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(thread.label, overflow: TextOverflow.ellipsis),
+        actions: [
+          if (!c.handledElsewhere)
+            TextButton.icon(
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Continuer'),
+              onPressed: () {
+                Navigator.pop(context);
+                c.continueThread(thread);
+              },
+            ),
+        ],
+      ),
+      body: ChatThreadView(thread: thread, color: color, otherName: c.jarvis ? 'Jarvis' : 'Clicky'),
     );
   }
 }

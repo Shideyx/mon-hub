@@ -19,13 +19,66 @@ class DiscordUser {
       );
 }
 
+/// Une réaction sous un message Discord.
+class DiscordReaction {
+  DiscordReaction(this.name, this.emojiId, this.count, this.me, [this.animated = false]);
+  final String name;
+  final String? emojiId;
+  final int count;
+  final bool me;
+  final bool animated;
+
+  /// Texte affiché : l'emoji lui-même, ou :nom: pour un emoji de serveur.
+  String get label => emojiId == null ? name : ':$name:';
+
+  /// Forme attendue par l'API (nom, ou nom:id pour un emoji de serveur).
+  String get apiKey => emojiId == null ? name : '$name:$emojiId';
+}
+
 class DiscordMessage {
-  DiscordMessage(this.id, this.author, this.content, this.at, [this.images = const []]);
+  DiscordMessage(
+    this.id,
+    this.author,
+    this.content,
+    this.at, [
+    this.images = const [],
+    this.audioUrl,
+    this.audioLength,
+    this.waveform = const [],
+    this.reactions = const [],
+  ]);
   final String id;
   final DiscordUser author;
   final String content;
   final DateTime at;
   final List<String> images;
+
+  /// Message vocal (ou fichier audio) : adresse, durée, onde.
+  final String? audioUrl;
+  final Duration? audioLength;
+  final List<double> waveform;
+  final List<DiscordReaction> reactions;
+
+  bool get isVoice => audioUrl != null;
+
+  /// Texte court (liste des conversations, alertes).
+  String get preview => content.isNotEmpty
+      ? content
+      : isVoice
+      ? '🎤 Message vocal'
+      : images.isNotEmpty
+      ? '📷 Photo'
+      : '';
+
+  /// Onde des messages vocaux : octets 0..255 en base64.
+  static List<double> _wave(Object? b64) {
+    if (b64 is! String || b64.isEmpty) return const [];
+    try {
+      return [for (final b in base64.decode(b64)) b / 255];
+    } catch (_) {
+      return const [];
+    }
+  }
 
   factory DiscordMessage.fromJson(Map<String, dynamic> j) {
     var content = j['content'] as String? ?? '';
@@ -40,12 +93,24 @@ class DiscordMessage {
           if ((e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']) != null)
             '${e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']}',
     ];
-    if (content.isEmpty && atts.length > images.length) content = '📎 Pièce jointe';
+    // Message vocal (drapeau 8192) ou fichier audio.
+    final audio = atts.whereType<Map>().where((a) {
+      final type = '${a['content_type'] ?? ''}';
+      return type.startsWith('audio/') ||
+          a['waveform'] != null ||
+          RegExp(r'\.(ogg|mp3|m4a|wav|opus)$', caseSensitive: false).hasMatch('${a['filename']}');
+    }).firstOrNull;
+    final secs = (audio?['duration_secs'] as num?)?.toDouble();
+    final others = atts.length - images.length - (audio == null ? 0 : 1);
+    if (content.isEmpty && others > 0) content = '📎 Pièce jointe';
 
-    if (content.isEmpty && images.isEmpty && (j['sticker_items'] as List?)?.isNotEmpty == true) {
+    if (content.isEmpty &&
+        images.isEmpty &&
+        audio == null &&
+        (j['sticker_items'] as List?)?.isNotEmpty == true) {
       content = '🖼️ Sticker';
     }
-    if (content.isEmpty && images.isEmpty) {
+    if (content.isEmpty && images.isEmpty && audio == null) {
       content = switch (j['type']) {
         3 => '📞 Appel',
         7 => '👋 A rejoint',
@@ -58,6 +123,20 @@ class DiscordMessage {
       content,
       DateTime.tryParse(j['timestamp'] as String? ?? '')?.toLocal() ?? DateTime.now(),
       images,
+      audio == null ? null : '${audio['url'] ?? audio['proxy_url']}',
+      secs == null ? null : Duration(milliseconds: (secs * 1000).round()),
+      _wave(audio?['waveform']),
+      [
+        for (final r in (j['reactions'] as List?) ?? const [])
+          if (r is Map)
+            DiscordReaction(
+              '${(r['emoji'] as Map?)?['name'] ?? '?'}',
+              (r['emoji'] as Map?)?['id'] as String?,
+              (r['count'] as num?)?.toInt() ?? 1,
+              r['me'] == true,
+              (r['emoji'] as Map?)?['animated'] == true,
+            ),
+      ],
     );
   }
 }
@@ -212,6 +291,25 @@ class DiscordApi {
     BigInt k(DiscordDm d) => BigInt.tryParse(d.lastMessageId ?? '0') ?? BigInt.zero;
     out.sort((a, b) => k(b).compareTo(k(a)));
     return out;
+  }
+
+  /// Qui a mis une réaction sur un message.
+  Future<List<DiscordUser>> reactors(String channelId, String messageId, DiscordReaction r) async {
+    final list = await _get(
+      '/channels/$channelId/messages/$messageId/reactions/${Uri.encodeComponent(r.apiKey)}?limit=100',
+    ) as List;
+    return [for (final u in list) DiscordUser.fromJson((u as Map).cast<String, dynamic>())];
+  }
+
+  /// Ajoute une réaction (❤️ par défaut) à un message.
+  Future<void> react(String channelId, String messageId, [String emoji = '❤️']) async {
+    final r = await _send(() => _http.put(
+          Uri.parse(
+            '$_base/channels/$channelId/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}/@me',
+          ),
+          headers: _headers,
+        ));
+    _check(r);
   }
 
   Future<List<DiscordMessage>> messages(String channelId, {int limit = 30}) async {

@@ -1,6 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'voice_note.dart';
+
+export 'voice_note.dart' show Reaction, VoiceNotePlayer;
+
 /// Ouvre un lien dans l'appli correspondante si elle est installée
 /// (Instagram, Discord…), sinon dans le navigateur.
 Future<void> openLink(BuildContext context, String url) async {
@@ -147,6 +151,10 @@ class ChatBubble extends StatelessWidget {
     required this.color,
     this.author,
     this.images = const [],
+    this.extra,
+    this.reactions = const [],
+    this.onWho,
+    this.onDoubleTap,
   });
 
   final String text;
@@ -158,12 +166,22 @@ class ChatBubble extends StatelessWidget {
   /// Photos jointes au message.
   final List<String> images;
 
+  /// Contenu en plus dans la bulle (lecteur de message vocal…).
+  final Widget? extra;
+
+  /// Réactions (❤️, 😂…) affichées sous la bulle.
+  final List<Reaction> reactions;
+  final Future<List<String>> Function(Reaction r)? onWho;
+
+  /// Double-clic sur la bulle (aimer le message).
+  final VoidCallback? onDoubleTap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final bg = mine ? color : scheme.surfaceContainerHighest;
     final fg = mine ? Colors.white : scheme.onSurface;
-    return Align(
+    final bubble = Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -205,6 +223,8 @@ class ChatBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (extra != null)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: extra),
               if (text.isNotEmpty) Text(text, style: TextStyle(color: fg)),
               const SizedBox(height: 2),
               Text(time, style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 10)),
@@ -212,6 +232,21 @@ class ChatBubble extends StatelessWidget {
           ),
         ),
       ),
+    );
+    final tappable = onDoubleTap == null
+        ? bubble
+        : GestureDetector(onDoubleTap: onDoubleTap, child: bubble);
+    if (reactions.isEmpty) return tappable;
+    return Column(
+      crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        tappable,
+        Transform.translate(
+          offset: const Offset(0, -4),
+          child: ReactionChips(reactions: reactions, onWho: onWho, alignEnd: mine),
+        ),
+      ],
     );
   }
 }

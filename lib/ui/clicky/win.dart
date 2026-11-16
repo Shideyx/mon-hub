@@ -1,13 +1,18 @@
 import 'dart:ffi';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:win32/win32.dart';
 
 /// Petits appels Windows pour « Clicky partout » : clavier et souris de tout
 /// le système, écrans, capture, et placement de la fenêtre de Clicky.
 class Win {
   Win._();
+
+  /// Ces appels ne marchent que sur Windows.
+  static bool get supportedHere => !kIsWeb && Platform.isWindows;
 
   static bool down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
@@ -176,5 +181,154 @@ class Win {
         ..dwFlags = up ? KEYEVENTF_KEYUP : const KEYBD_EVENT_FLAGS(0);
     }
     SendInput(keys.length, inputs, sizeOf<INPUT>());
+  });
+
+  // ---------- Fenêtres ----------
+
+  static String _title(HWND h) => using((a) {
+    final n = GetWindowTextLength(h).value;
+    if (n <= 0) return '';
+    final buf = wsalloc(n + 1, a);
+    GetWindowText(h, buf, n + 1);
+    return buf.toDartString();
+  });
+
+  /// La fenêtre au premier plan (celle où tu travailles).
+  static HWND foreground() => GetForegroundWindow();
+
+  /// Titre de la fenêtre au premier plan (« Document1 - Word »).
+  static String foregroundTitle() {
+    try {
+      return _title(GetForegroundWindow());
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Titres de toutes les fenêtres visibles (pour la protection de la vie
+  /// privée : on ne capture pas l'écran si une fenêtre sensible est ouverte).
+  static List<String> visibleTitles() {
+    final out = <String>[];
+    int callback(Pointer h, int _) {
+      final hwnd = HWND(h);
+      if (IsWindowVisible(hwnd)) {
+        final t = _title(hwnd);
+        if (t.trim().isNotEmpty) out.add(t);
+      }
+      return 1;
+    }
+
+    final cb = NativeCallable<WNDENUMPROC>.isolateLocal(callback, exceptionalReturn: 0);
+    try {
+      EnumWindows(cb.nativeFunction, const LPARAM(0));
+    } catch (_) {
+    } finally {
+      cb.close();
+    }
+    return out;
+  }
+
+  // ---------- Clavier et souris (Clicky pilote, dictée) ----------
+
+  static void _keys(List<(int vk, bool up)> keys) => using((a) {
+    final inputs = a<INPUT>(keys.length);
+    for (var i = 0; i < keys.length; i++) {
+      final (vk, up) = keys[i];
+      inputs[i].type = INPUT_KEYBOARD;
+      inputs[i].Anonymous.ki
+        ..wVk = VIRTUAL_KEY(vk)
+        ..dwFlags = up ? KEYEVENTF_KEYUP : const KEYBD_EVENT_FLAGS(0);
+    }
+    SendInput(keys.length, inputs, sizeOf<INPUT>());
+  });
+
+  /// Relâche Ctrl, Alt, Maj et Windows (pour taper sans raccourci parasite).
+  static void releaseModifiers() =>
+      _keys([for (final vk in const [0x10, 0x11, 0x12, 0x5B, 0x5C]) if (down(vk)) (vk, true)]);
+
+  /// Tape un texte (caractères Unicode, sans dépendre du clavier).
+  static void typeText(String text) => using((a) {
+    final units = text.replaceAll('\r\n', '\n').codeUnits;
+    if (units.isEmpty) return;
+    final inputs = a<INPUT>(units.length * 2);
+    for (var i = 0; i < units.length; i++) {
+      for (var j = 0; j < 2; j++) {
+        final k = inputs[i * 2 + j];
+        k.type = INPUT_KEYBOARD;
+        final ki = k.Anonymous.ki;
+        if (units[i] == 10) {
+          ki
+            ..wVk = VK_RETURN
+            ..dwFlags = j == 1 ? KEYEVENTF_KEYUP : const KEYBD_EVENT_FLAGS(0);
+        } else {
+          ki
+            ..wVk = const VIRTUAL_KEY(0)
+            ..wScan = units[i]
+            ..dwFlags = j == 1
+                ? KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)
+                : KEYEVENTF_UNICODE;
+        }
+      }
+    }
+    SendInput(units.length * 2, inputs, sizeOf<INPUT>());
+  });
+
+  static const _named = {
+    'ctrl': 0x11, 'control': 0x11, 'alt': 0x12, 'shift': 0x10, 'maj': 0x10,
+    'win': 0x5B, 'windows': 0x5B, 'enter': 0x0D, 'entree': 0x0D, 'entrée': 0x0D,
+    'tab': 0x09, 'esc': 0x1B, 'echap': 0x1B, 'échap': 0x1B, 'escape': 0x1B,
+    'space': 0x20, 'espace': 0x20, 'backspace': 0x08, 'retour': 0x08,
+    'delete': 0x2E, 'suppr': 0x2E, 'del': 0x2E, 'home': 0x24, 'end': 0x23,
+    'fin': 0x23, 'pageup': 0x21, 'pagedown': 0x22, 'up': 0x26, 'haut': 0x26,
+    'down': 0x28, 'bas': 0x28, 'left': 0x25, 'gauche': 0x25, 'right': 0x27,
+    'droite': 0x27,
+  };
+
+  /// Code de touche d'un nom (« ctrl », « s », « f5 »…), ou null.
+  static int? keyCode(String name) {
+    final n = name.trim().toLowerCase();
+    if (_named[n] case final v?) return v;
+    if (RegExp(r'^f([1-9]|1[0-2])$').hasMatch(n)) return 0x70 + int.parse(n.substring(1)) - 1;
+    if (n.length == 1) {
+      final c = n.toUpperCase().codeUnitAt(0);
+      if ((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5A)) return c;
+    }
+    return null;
+  }
+
+  /// Un raccourci : « ctrl+s », « alt+tab », « enter ». Renvoie false si une
+  /// touche est inconnue.
+  static bool pressCombo(String combo) {
+    final codes = [for (final p in combo.split('+')) keyCode(p)];
+    if (codes.isEmpty || codes.contains(null)) return false;
+    final vks = codes.cast<int>();
+    _keys([for (final k in vks) (k, false), for (final k in vks.reversed) (k, true)]);
+    return true;
+  }
+
+  /// Clic (pixels physiques de l'écran).
+  static void click(int x, int y, {bool right = false, bool double = false}) {
+    SetCursorPos(x, y);
+    using((a) {
+      final n = double ? 4 : 2;
+      final inputs = a<INPUT>(n);
+      for (var i = 0; i < n; i++) {
+        inputs[i].type = INPUT_MOUSE;
+        final downFlag = right ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
+        final upFlag = right ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
+        inputs[i].Anonymous.mi.dwFlags = i.isEven ? downFlag : upFlag;
+      }
+      SendInput(n, inputs, sizeOf<INPUT>());
+    });
+  }
+
+  /// Molette : [notches] positif = vers le haut.
+  static void scroll(int notches) => using((a) {
+    final input = a<INPUT>();
+    input.ref.type = INPUT_MOUSE;
+    input.ref.Anonymous.mi
+      ..dwFlags = MOUSEEVENTF_WHEEL
+      ..mouseData = (notches * 120) & 0xFFFFFFFF;
+    SendInput(1, input, sizeOf<INPUT>());
   });
 }
