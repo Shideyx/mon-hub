@@ -109,9 +109,10 @@ jobs:
   # Publie les fichiers sur la page « Releases » avec des liens fixes :
   # https://github.com/<compte>/mon-hub/releases/latest
   release:
-    # Windows + Android suffisent : on n'attend pas l'iPhone (bonus).
-    needs: [windows, android]
-    if: ${{ always() && needs.windows.result == 'success' && needs.android.result == 'success' }}
+    # Seul Windows est indispensable : Android est ajouté s'il est prêt,
+    # l'iPhone n'est jamais attendu (bonus).
+    needs: [windows]
+    if: ${{ always() && needs.windows.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -124,14 +125,15 @@ jobs:
         run: |
           cd dist
           (cd MonHub-Windows && zip -qr ../MonHub-Windows.zip .)
-          cp MonHub-Android/app-release.apk MonHub-Android.apk
+          if [ -f MonHub-Android/app-release.apk ]; then cp MonHub-Android/app-release.apk MonHub-Android.apk; fi
           if [ -f MonHub-iOS/MonHub-iOS.ipa ]; then cp MonHub-iOS/MonHub-iOS.ipa .; fi
           (cd ../claude-extension && zip -qr ../dist/MonHub-Claude.mcpb .)
       - name: Publier la release (marquée « dernière version »)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files="dist/MonHub-Windows.zip dist/MonHub-Android.apk dist/MonHub-Claude.mcpb"
+          files="dist/MonHub-Windows.zip dist/MonHub-Claude.mcpb"
+          if [ -f dist/MonHub-Android.apk ]; then files="$files dist/MonHub-Android.apk"; fi
           if [ -f dist/MonHub-iOS.ipa ]; then files="$files dist/MonHub-iOS.ipa"; fi
           # Un numéro par version : les liens « releases/latest/download/... »
           # pointent toujours vers la plus récente.
