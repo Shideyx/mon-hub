@@ -109,6 +109,53 @@ class BooksModule extends HubModule {
   Future<void> remove(Book b) => save(books..removeWhere((x) => x.id == b.id));
 
   @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'livres_lister',
+          description: 'Tous les livres de la bibliothèque (statut, note, à retenir).',
+          run: (_) async => [
+            for (final b in books)
+              {
+                'titre': b.title,
+                'auteur': b.author,
+                'statut': b.status.label,
+                if (b.rating > 0) 'etoiles': b.rating,
+                if (b.takeaway.isNotEmpty) 'a_retenir': b.takeaway,
+              },
+          ],
+        ),
+        HubTool(
+          name: 'livre_ajouter',
+          description: 'Ajoute un livre (ou met à jour s\'il a le même titre).',
+          params: {
+            'titre': ('string', 'Titre'),
+            'auteur': ('string', 'Auteur'),
+            'statut': ('string', 'lu, en_cours ou a_lire'),
+            'etoiles': ('integer', 'Note de 0 à 5'),
+            'a_retenir': ('string', 'Ce qu\'il faut retenir du livre'),
+          },
+          required: ['titre'],
+          run: (a) async {
+            final title = (a['titre'] as String).trim();
+            final b = books.where((x) => x.title.toLowerCase() == title.toLowerCase()).firstOrNull ??
+                Book(id: '${DateTime.now().microsecondsSinceEpoch}', title: title);
+            if (a['auteur'] is String) b.author = a['auteur'] as String;
+            b.status = switch ('${a['statut'] ?? ''}') {
+              'en_cours' => BookStatus.reading,
+              'a_lire' => BookStatus.toRead,
+              'lu' => BookStatus.read,
+              _ => b.status,
+            };
+            if (a['etoiles'] is num) b.rating = (a['etoiles'] as num).toInt().clamp(0, 5);
+            if (a['a_retenir'] is String) b.takeaway = a['a_retenir'] as String;
+            await upsert(b);
+            store.changed();
+            return {'ok': true};
+          },
+        ),
+      ];
+
+  @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (context, _) {

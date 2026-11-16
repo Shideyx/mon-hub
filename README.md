@@ -5,7 +5,11 @@ temps, École Directe, mails, Discord, Instagram, comptes Roblox, livres lus et
 raccourcis Google Drive. Chaque bloc est un **module** qu'on peut masquer,
 réordonner, retirer ou remplacer.
 
+![Connexion](docs/connexion.png)
+
 ![Accueil](docs/capture.png)
+
+![Mode sombre](docs/sombre.png)
 
 ![Agenda](docs/agenda.png)
 
@@ -23,7 +27,7 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | Windows | Dossier `MonHub-Windows` produit par GitHub Actions → lancer `hub.exe` |
 | Android | `app-release.apk` produit par GitHub Actions → l'installer sur le téléphone |
 | Mac / Linux | Idem, artefacts `MonHub-macOS` / `MonHub-Linux` |
-| iPhone | Nécessite un Mac avec Xcode (`flutter run` sur l'iPhone branché) ou un compte développeur Apple (99 €/an) pour TestFlight |
+| iPhone | `MonHub-iOS.ipa` (non signé) à installer avec Sideloadly depuis un PC, voir INSTALL.md |
 
 ## Ce que chaque module sait faire (honnêtement)
 
@@ -37,6 +41,12 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | **Roblox** | ⚠️ Semi-public | Plusieurs comptes : avatar, nombre d'amis, statut (en ligne / en jeu). Utilise les API publiques du site Roblox, sans mot de passe. |
 | **Bibliothèque** | ✅ Local | Étagère visuelle avec couvertures, statut *Lu / En cours / À lire*, étoiles, note « À retenir », statistiques, recherche Open Library. |
 | **Google Drive** | Raccourcis | Liens vers tes documents Drive (emploi du temps PDF, etc.). |
+
+## Comptes, thème et Claude
+
+* **Comptes Mon Hub** : page de connexion (identifiant + mot de passe) au démarrage. Chaque compte a ses modules, réglages et connexions, rangés à part (mot de passe stocké sous forme d'empreinte salée). Les comptes sont propres à l'appareil : *Exporter / Importer* pour passer d'un appareil à l'autre.
+* **Mode clair / sombre / auto** : bouton 🌙 sur l'accueil et *Réglages → Apparence*.
+* **Claude** : module qui intègre claude.ai (ton compte habituel). Sur PC, l'extension `claude-extension/` (fichier `MonHub-Claude.mcpb`) permet à l'appli Claude de lire et d'agir dans Mon Hub via un pont local (`lib/core/claude_bridge.dart`, 127.0.0.1 + clé secrète). Chaque module déclare ses actions dans `tools`.
 
 ## Notifications
 

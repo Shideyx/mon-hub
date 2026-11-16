@@ -4,6 +4,8 @@ Liens de téléchargement (toujours la dernière version) :
 
 - **PC Windows** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Windows.zip
 - **Téléphone Android** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Android.apk
+- **iPhone** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-iOS.ipa (à installer depuis un PC, voir plus bas)
+- **Extension Claude (PC)** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Claude.mcpb
 
 ## 1. Sur le PC (Windows 10 ou 11)
 
@@ -22,9 +24,27 @@ Liens de téléchargement (toujours la dernière version) :
 4. Si Play Protect affiche un avertissement : **Plus de détails** → **Installer quand même**.
 5. Au premier lancement, **autorise les notifications** pour recevoir les alertes.
 
-> iPhone : pas encore possible sans Mac (Apple impose Xcode ou un compte développeur à 99 €/an).
+## 2 bis. Sur iPhone (iPhone 12 et plus récents, iOS 15+)
 
-## 3. Connecter tes comptes (une seule fois, sur le PC)
+Apple n'autorise que l'App Store, sauf pour les applis « installées par le développeur ». On passe donc par **Sideloadly** (gratuit) depuis le PC, avec ton identifiant Apple :
+
+1. Sur le PC, installe **iTunes** (version du site d'Apple, pas du Microsoft Store) puis **Sideloadly** : https://sideloadly.io
+2. Télécharge **MonHub-iOS.ipa**.
+3. Branche l'iPhone en USB, déverrouille-le et appuie sur **Faire confiance**.
+4. Ouvre Sideloadly, glisse le fichier `.ipa` dedans, tape ton **identifiant Apple** et clique sur **Start** (mot de passe Apple demandé : c'est Apple qui le vérifie).
+5. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton identifiant → **Faire confiance**. Puis **Réglages → Confidentialité et sécurité → Mode développeur** → activer (l'iPhone redémarre).
+6. Ouvre Mon Hub et autorise les notifications.
+
+> Avec un identifiant Apple gratuit, Apple limite l'installation à **7 jours** : il suffit de refaire l'étape 4 (Sideloadly peut le faire tout seul quand l'iPhone est sur le même Wi-Fi). Pour éviter ça, il faut le compte développeur Apple (99 €/an) ou une publication sur l'App Store.
+
+## 3. Créer ton compte Mon Hub
+
+Au premier lancement : **identifiant + mot de passe** → **Créer mon compte**. Chaque personne qui utilise l'appli a son propre compte, avec ses propres connexions. Le bouton 🌙 / ☀️ (en haut) passe en **mode sombre** ou **clair** ; *Réglages → Apparence* propose aussi « Auto ».
+
+## 3 bis. Connecter tes comptes (une seule fois, sur le PC)
+
+Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service qui s'ouvre dans l'appli : tu tapes ton identifiant et ton mot de passe, c'est tout.
+
 
 | Service | Comment |
 |---|---|
@@ -36,7 +56,13 @@ Liens de téléchargement (toujours la dernière version) :
 | **Roblox** | Carte Roblox → **Ajouter un compte** → ton pseudo (pas de mot de passe). |
 | **Livres** | Bibliothèque → **Ajouter un livre** → cherche le titre. |
 
-Puis **Réglages → Ton prénom** pour le message d'accueil.
+| **Claude** | Carte Claude → **Ouvrir Claude** → connecte-toi comme sur claude.ai (si « Continuer avec Google » refuse dans l'appli, choisis « Continuer avec l'e-mail »). |
+
+## 3 ter. Laisser Claude agir dans Mon Hub (PC)
+
+1. Installe l'appli **Claude pour Windows** : https://claude.ai/download et connecte-toi.
+2. Télécharge **MonHub-Claude.mcpb** et double-clique dessus : Claude s'ouvre → **Installer**.
+3. Laisse Mon Hub ouvert, puis demande à Claude : « Qu'est-ce que j'ai demain ? », « Ajoute foot mercredi 14h », « Réponds à Léo sur Discord que j'arrive »… Claude demande ta permission avant chaque action.
 
 ## 4. Copier la configuration sur le téléphone
 

@@ -84,6 +84,53 @@ class DiscordModule extends HubModule {
   }
 
   @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'discord_conversations',
+          description: 'Conversations privées Discord (MP) avec le dernier message.',
+          run: (_) async {
+            final dms = await load();
+            if (lastError != null && dms.isEmpty) throw lastError!;
+            return [
+              for (final d in dms.take(25))
+                {
+                  'id': d.id,
+                  'nom': d.name,
+                  if (d.last != null) 'dernier': '${d.last!.author.name} : ${d.last!.content}',
+                  'non_lu': isUnread(d),
+                },
+            ];
+          },
+        ),
+        HubTool(
+          name: 'discord_messages',
+          description: 'Messages d\'une conversation Discord.',
+          params: {'id': ('string', 'id donné par discord_conversations')},
+          required: ['id'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Discord n\'est pas connecté';
+            return [
+              for (final m in (await api.messages(a['id'] as String)).reversed)
+                {'de': m.author.name, 'texte': m.content, 'date': m.at},
+            ];
+          },
+        ),
+        HubTool(
+          name: 'discord_envoyer',
+          description: 'Envoie un message dans une conversation Discord.',
+          params: {'id': ('string', 'id de la conversation'), 'texte': ('string', 'Message')},
+          required: ['id', 'texte'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Discord n\'est pas connecté';
+            await api.send(a['id'] as String, a['texte'] as String);
+            return {'ok': true};
+          },
+        ),
+      ];
+
+  @override
   Future<List<HubNotification>> poll() async {
     if (!connected) return const [];
     final dms = await load(force: true);

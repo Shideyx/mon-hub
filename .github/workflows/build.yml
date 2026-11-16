@@ -56,11 +56,35 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
+      # CocoaPods (et non Swift Package Manager) pour pouvoir relever la
+      # version minimale des plugins dans macos/Podfile.
+      - run: flutter config --no-enable-swift-package-manager
       - run: flutter build macos --release
       - uses: actions/upload-artifact@v4
         with:
           name: MonHub-macOS
           path: build/macos/Build/Products/Release/*.app
+
+  ios:
+    needs: test
+    runs-on: macos-latest
+    # Appli iPhone non signée : à installer avec Sideloadly (voir INSTALL.md).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter config --no-enable-swift-package-manager
+      - run: flutter build ios --release --no-codesign
+      - name: Fabriquer le fichier .ipa
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/ios/iphoneos/Runner.app dist/Payload/
+          cd dist && zip -qr MonHub-iOS.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MonHub-iOS
+          path: dist/MonHub-iOS.ipa
 
   linux:
     needs: test
@@ -81,11 +105,13 @@ jobs:
   # Publie les fichiers sur la page « Releases » avec des liens fixes :
   # https://github.com/<compte>/mon-hub/releases/latest
   release:
-    needs: [windows, android]
+    needs: [windows, android, ios]
+    if: ${{ always() && needs.windows.result == 'success' && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -94,13 +120,17 @@ jobs:
           cd dist
           (cd MonHub-Windows && zip -qr ../MonHub-Windows.zip .)
           cp MonHub-Android/app-release.apk MonHub-Android.apk
+          if [ -f MonHub-iOS/MonHub-iOS.ipa ]; then cp MonHub-iOS/MonHub-iOS.ipa .; fi
+          (cd ../claude-extension && zip -qr ../dist/MonHub-Claude.mcpb .)
       - name: Publier la release « latest »
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --repo "${{ github.repository }}" --cleanup-tag -y || true
-          gh release create latest dist/MonHub-Windows.zip dist/MonHub-Android.apk \
+          files="dist/MonHub-Windows.zip dist/MonHub-Android.apk dist/MonHub-Claude.mcpb"
+          if [ -f dist/MonHub-iOS.ipa ]; then files="$files dist/MonHub-iOS.ipa"; fi
+          gh release create latest $files \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Mon Hub (dernière version)" \
-            --notes "PC Windows : MonHub-Windows.zip · Téléphone Android : MonHub-Android.apk · Guide : INSTALL.md"
+            --notes "PC Windows : MonHub-Windows.zip · Android : MonHub-Android.apk · iPhone : MonHub-iOS.ipa · Extension Claude (PC) : MonHub-Claude.mcpb · Guide : INSTALL.md"

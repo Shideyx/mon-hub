@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../modules/books/books_module.dart';
+import '../modules/claude/claude_module.dart';
 import '../modules/discord/discord_module.dart';
 import '../modules/ecoledirecte/ecoledirecte_module.dart';
 import '../modules/instagram/instagram_module.dart';
@@ -19,6 +20,7 @@ List<HubModule> buildModules() {
   final ecole = EcoleDirecteModule();
   return [
     ScheduleModule(ecole: ecole),
+    ClaudeModule(),
     ecole,
     MailModule(),
     DiscordModule(),

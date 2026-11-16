@@ -162,6 +162,56 @@ class EcoleDirecteModule extends HubModule {
     ];
   }
 
+  @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'ecole_notes',
+          description: 'Dernières notes École Directe.',
+          run: (_) async {
+            await load();
+            return [
+              for (final g in grades.take(40))
+                {'matiere': g.subject, 'note': '${g.value}/${g.outOf}', 'devoir': g.title, 'date': g.date},
+            ];
+          },
+        ),
+        HubTool(
+          name: 'ecole_devoirs',
+          description: 'Devoirs à faire (cahier de texte École Directe).',
+          run: (_) async {
+            await load();
+            return [
+              for (final h in homework)
+                {
+                  'pour_le': h.due,
+                  'matiere': h.subject,
+                  'contenu': h.content,
+                  'fait': h.done,
+                  if (h.isTest) 'controle': true,
+                },
+            ];
+          },
+        ),
+        HubTool(
+          name: 'ecole_messages',
+          description: 'Messages reçus sur la messagerie École Directe.',
+          run: (_) async {
+            await load();
+            return [
+              for (final m in messages.take(20))
+                {'id': m.id, 'de': m.from, 'objet': m.subject, 'date': m.date, 'lu': m.read},
+            ];
+          },
+        ),
+        HubTool(
+          name: 'ecole_message_lire',
+          description: 'Contenu d\'un message École Directe.',
+          params: {'id': ('integer', 'id donné par ecole_messages')},
+          required: ['id'],
+          run: (a) => client.messageContent((a['id'] as num).toInt()),
+        ),
+      ];
+
   DateTime? _lastPoll;
   List<HubNotification> _lastItems = const [];
 

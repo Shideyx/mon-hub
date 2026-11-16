@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
+import '../core/session.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -38,7 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
       body: ListenableBuilder(
-        listenable: Listenable.merge([c, n]),
+        listenable: Listenable.merge([c, n, AppSession.instance]),
         builder: (context, _) => ListView(
           padding: const EdgeInsets.only(bottom: 32),
           children: [
@@ -52,6 +53,69 @@ class _SettingsPageState extends State<SettingsPage> {
                     prefixIcon: Icon(Icons.person_rounded)),
                 onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
               ),
+            ),
+            section('Apparence'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(
+                      value: ThemeMode.light,
+                      icon: Icon(Icons.light_mode_rounded),
+                      label: Text('Clair')),
+                  ButtonSegment(
+                      value: ThemeMode.dark,
+                      icon: Icon(Icons.dark_mode_rounded),
+                      label: Text('Sombre')),
+                  ButtonSegment(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto_rounded),
+                      label: Text('Auto')),
+                ],
+                selected: {AppSession.instance.themeMode},
+                onSelectionChanged: (v) => AppSession.instance.setThemeMode(v.first),
+              ),
+            ),
+            section('Compte'),
+            ListTile(
+              leading: const Icon(Icons.account_circle_rounded),
+              title: Text(AppSession.instance.current?.name ?? ''),
+              subtitle: Text('@${AppSession.instance.current?.login ?? ''}'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const Text('Se déconnecter'),
+              subtitle: const Text('Tes données restent sur l\'appareil'),
+              onTap: () {
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                AppSession.instance.signOut();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
+              title: Text('Supprimer mon compte',
+                  style: TextStyle(color: theme.colorScheme.error)),
+              onTap: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('Supprimer ton compte ?'),
+                    content: const Text('Tes réglages, livres, évènements et connexions '
+                        'seront effacés de cet appareil.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(d, false),
+                          child: const Text('Annuler')),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(d, true),
+                          child: const Text('Supprimer')),
+                    ],
+                  ),
+                );
+                if (ok != true || !context.mounted) return;
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                await AppSession.instance.deleteAccount();
+              },
             ),
             section('Notifications'),
             ListTile(
@@ -144,7 +208,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (k.startsWith('mod.') || k.startsWith('hub.') || k == 'notif.muted' || k == 'notif.interval')
           k: prefs.get(k),
     };
-    final secrets = await ModuleStore.secure.readAll();
+    final secrets = await ModuleStore.readAllSecrets();
     return const JsonEncoder.withIndent(' ').convert({
       'app': 'mon-hub',
       'version': 1,
@@ -196,7 +260,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (v is List) await prefs.setStringList(e.key, v.cast<String>());
       }
       for (final e in (j['secrets'] as Map<String, dynamic>).entries) {
-        await ModuleStore.secure.write(key: e.key, value: e.value as String);
+        await ModuleStore.writeSecretRaw(e.key, e.value as String);
       }
       if (context.mounted) {
         await showDialog<void>(

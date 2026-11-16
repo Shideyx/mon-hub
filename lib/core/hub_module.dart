@@ -57,6 +57,45 @@ abstract class HubModule {
   /// déjà vu et n'alerte que pour les nouveautés. Par défaut : rien.
   Future<List<HubNotification>> poll() async => const [];
 
+  /// Actions que Claude peut utiliser dans ce module (via l'extension
+  /// « Mon Hub » de l'appli Claude sur PC). Par défaut : aucune.
+  List<HubTool> get tools => const [];
+
   /// Appelé une fois au démarrage, après l'initialisation du stockage.
   void attach() => store.bind(id);
+}
+
+/// Une action que Claude peut déclencher dans l'appli.
+class HubTool {
+  const HubTool({
+    required this.name,
+    required this.description,
+    required this.run,
+    this.params = const {},
+    this.required = const [],
+  });
+
+  /// Nom technique (lettres, chiffres, _), unique dans toute l'appli.
+  final String name;
+
+  /// Ce que fait l'action, en une phrase (lu par Claude).
+  final String description;
+
+  /// Paramètres : nom → (type JSON, description). Types : string, integer,
+  /// number, boolean.
+  final Map<String, (String, String)> params;
+  final List<String> required;
+  final Future<Object?> Function(Map<String, dynamic> args) run;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'description': description,
+    'inputSchema': {
+      'type': 'object',
+      'properties': {
+        for (final e in params.entries) e.key: {'type': e.value.$1, 'description': e.value.$2},
+      },
+      'required': required,
+    },
+  };
 }

@@ -126,6 +126,18 @@ class RobloxModule extends HubModule {
     }();
   }
 
+  @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'roblox_statut',
+          description: 'Statut des comptes Roblox suivis (en ligne, en jeu…).',
+          run: (_) async => [
+            for (final a in await load(force: true))
+              {'pseudo': a.name, 'nom': a.displayName, 'statut': a.presenceLabel},
+          ],
+        ),
+      ];
+
   Future<void> addAccount(String username) async {
     final acc = await api.lookup(username);
     if (acc == null) throw 'Compte « $username » introuvable';

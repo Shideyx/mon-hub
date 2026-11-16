@@ -328,6 +328,77 @@ class ScheduleModule extends HubModule {
   }
 
   @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'agenda_lire',
+          description: 'Liste les cours (École Directe), évènements Google Agenda et '
+              'évènements perso, entre deux dates.',
+          params: {
+            'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
+            'jours': ('integer', 'Nombre de jours (défaut 7)'),
+          },
+          run: (a) async {
+            final now = DateTime.now();
+            final from = DateTime.tryParse('${a['debut'] ?? ''}') ??
+                DateTime(now.year, now.month, now.day);
+            final days = (a['jours'] as num?)?.toInt() ?? 7;
+            final items = await itemsBetween(from, from.add(Duration(days: days)));
+            return [
+              for (final e in items)
+                {
+                  'titre': e.title,
+                  'debut': e.start,
+                  'fin': e.end,
+                  'source': e.source.label,
+                  if (e.place.isNotEmpty) 'lieu': e.place,
+                  if (e.detail.isNotEmpty) 'detail': e.detail,
+                  if (e.cancelled) 'annule': true,
+                  if (e.personal != null) 'id': e.personal!.id,
+                },
+            ];
+          },
+        ),
+        HubTool(
+          name: 'agenda_ajouter',
+          description: 'Ajoute un évènement perso dans l\'agenda de Mon Hub.',
+          params: {
+            'titre': ('string', 'Titre'),
+            'debut': ('string', 'Date et heure de début, ex. 2026-11-20T17:00'),
+            'fin': ('string', 'Date et heure de fin (défaut : 1 h après)'),
+            'lieu': ('string', 'Lieu (facultatif)'),
+            'note': ('string', 'Note (facultatif)'),
+            'chaque_semaine': ('boolean', 'Répéter chaque semaine'),
+          },
+          required: ['titre', 'debut'],
+          run: (a) async {
+            final start = DateTime.parse(a['debut'] as String);
+            final end = DateTime.tryParse('${a['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
+            final e = PersonalEvent(
+              id: '${DateTime.now().microsecondsSinceEpoch}',
+              title: a['titre'] as String,
+              start: start,
+              end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
+              place: a['lieu'] as String? ?? '',
+              note: a['note'] as String? ?? '',
+              weekly: a['chaque_semaine'] == true,
+            );
+            await savePersonal(e);
+            return {'ok': true, 'id': e.id};
+          },
+        ),
+        HubTool(
+          name: 'agenda_supprimer',
+          description: 'Supprime un évènement perso (id donné par agenda_lire).',
+          params: {'id': ('string', 'Identifiant de l\'évènement')},
+          required: ['id'],
+          run: (a) async {
+            await deletePersonal(a['id'] as String);
+            return {'ok': true};
+          },
+        ),
+      ];
+
+  @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([store, if (ecole != null) ecole!.store]),
     builder: (context, _) => FutureBuilder(

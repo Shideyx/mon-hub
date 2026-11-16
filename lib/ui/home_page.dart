@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/session.dart';
+
 import '../core/hub_controller.dart';
 import '../core/hub_module.dart';
 import '../core/module_store.dart';
@@ -129,6 +131,15 @@ class _Header extends StatelessWidget {
                                   notifications: notifications, controller: controller)));
                     },
                   ),
+                ),
+                IconButton(
+                  tooltip: theme.brightness == Brightness.dark ? 'Mode clair' : 'Mode sombre',
+                  color: Colors.white,
+                  icon: Icon(theme.brightness == Brightness.dark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded),
+                  onPressed: () => AppSession.instance.setThemeMode(
+                      theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark),
                 ),
                 IconButton(
                   tooltip: 'Réglages',

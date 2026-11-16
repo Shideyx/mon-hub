@@ -31,8 +31,7 @@ class HubController extends ChangeNotifier {
   List<HubModule> get ordered => _order.map(_byId).toList();
 
   /// Modules actifs, dans l'ordre choisi.
-  List<HubModule> get enabled =>
-      ordered.where((m) => !_disabled.contains(m.id)).toList();
+  List<HubModule> get enabled => ordered.where((m) => !_disabled.contains(m.id)).toList();
 
   bool isEnabled(HubModule m) => !_disabled.contains(m.id);
 

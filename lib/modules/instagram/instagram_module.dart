@@ -501,6 +501,57 @@ class InstagramModule extends HubModule {
   }
 
   @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'instagram_conversations',
+          description: 'Conversations Instagram (messages privés) avec le dernier message.',
+          run: (_) async {
+            final threads = await load(force: true);
+            if (lastError != null && threads.isEmpty) throw lastError!;
+            return [
+              for (final t in threads)
+                {
+                  'id': t.id,
+                  'nom': t.title,
+                  if (t.last != null) 'dernier': t.last!.text,
+                  'non_lu': t.unread,
+                },
+            ];
+          },
+        ),
+        HubTool(
+          name: 'instagram_messages',
+          description: 'Messages d\'une conversation Instagram.',
+          params: {'id': ('string', 'id donné par instagram_conversations')},
+          required: ['id'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Instagram n\'est pas connecté';
+            final t = _threads.where((x) => x.id == a['id']).firstOrNull;
+            String who(String uid) => uid == me?.id
+                ? 'moi'
+                : t?.users.where((u) => u.id == uid).firstOrNull?.display ?? uid;
+            return [
+              for (final m in (await api.thread(a['id'] as String)).reversed)
+                {'de': who(m.userId), 'texte': m.text, 'date': m.at},
+            ];
+          },
+        ),
+        HubTool(
+          name: 'instagram_envoyer',
+          description: 'Envoie un message dans une conversation Instagram.',
+          params: {'id': ('string', 'id de la conversation'), 'texte': ('string', 'Message')},
+          required: ['id', 'texte'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Instagram n\'est pas connecté';
+            await api.send(a['id'] as String, a['texte'] as String);
+            return {'ok': true};
+          },
+        ),
+      ];
+
+  @override
   Future<List<HubNotification>> poll() async {
     if (!connected) return const [];
     final threads = await load(force: true);

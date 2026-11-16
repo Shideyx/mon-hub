@@ -1,0 +1,21 @@
+{
+  "manifest_version": "0.2",
+  "name": "mon-hub",
+  "display_name": "Mon Hub",
+  "version": "1.0.0",
+  "description": "Laisse Claude lire et agir dans ton appli Mon Hub : agenda, École Directe, mails, Discord, Instagram, livres, Roblox.",
+  "long_description": "Mon Hub doit être ouvert sur ce PC. Claude te demande la permission avant chaque action (envoyer un message, ajouter un évènement…). Rien ne sort de ton ordinateur : l'extension parle à Mon Hub en local.",
+  "author": { "name": "Mon Hub" },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "compatibility": {
+    "platforms": ["win32", "darwin", "linux"],
+    "runtimes": { "node": ">=16.0.0" }
+  }
+}

@@ -26,20 +26,20 @@ class HubNotification {
   final DateTime at;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'body': body,
-        'moduleId': moduleId,
-        'at': at.toIso8601String(),
-      };
+    'id': id,
+    'title': title,
+    'body': body,
+    'moduleId': moduleId,
+    'at': at.toIso8601String(),
+  };
 
   factory HubNotification.fromJson(Map<String, dynamic> j) => HubNotification(
-        id: j['id'] as String,
-        title: j['title'] as String,
-        body: j['body'] as String,
-        moduleId: j['moduleId'] as String? ?? '',
-        at: DateTime.tryParse(j['at'] as String? ?? ''),
-      );
+    id: j['id'] as String,
+    title: j['title'] as String,
+    body: j['body'] as String,
+    moduleId: j['moduleId'] as String? ?? '',
+    at: DateTime.tryParse(j['at'] as String? ?? ''),
+  );
 }
 
 /// Interroge régulièrement les modules actifs et affiche une alerte système
@@ -71,8 +71,7 @@ class NotificationCenter extends ChangeNotifier {
     notifyListeners();
   }
 
-  Set<String> get muted =>
-      (ModuleStore.prefs.getStringList(_mutedKey) ?? const []).toSet();
+  Set<String> get muted => (ModuleStore.prefs.getStringList(_mutedKey) ?? const []).toSet();
 
   bool isMuted(String moduleId) => muted.contains(moduleId);
 
@@ -83,9 +82,7 @@ class NotificationCenter extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<HubNotification> get history => (ModuleStore.prefs
-              .getStringList(_historyKey) ??
-          const [])
+  List<HubNotification> get history => (ModuleStore.prefs.getStringList(_historyKey) ?? const [])
       .map((s) => HubNotification.fromJson(jsonDecode(s) as Map<String, dynamic>))
       .toList();
 
@@ -112,8 +109,7 @@ class NotificationCenter extends ChangeNotifier {
       );
       if (!kIsWeb && Platform.isAndroid) {
         await _plugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
             ?.requestNotificationsPermission();
       }
       _ready = true;
@@ -166,8 +162,10 @@ class NotificationCenter extends ChangeNotifier {
       await prefs.setStringList(_seededKey, seeded.toList());
 
       if (fresh.isNotEmpty) {
-        final hist = [...fresh.map((n) => jsonEncode(n.toJson())),
-            ...prefs.getStringList(_historyKey) ?? const <String>[]];
+        final hist = [
+          ...fresh.map((n) => jsonEncode(n.toJson())),
+          ...prefs.getStringList(_historyKey) ?? const <String>[],
+        ];
         await prefs.setStringList(_historyKey, hist.take(100).toList());
         unread += fresh.length;
         for (final n in fresh) {
@@ -188,10 +186,13 @@ class NotificationCenter extends ChangeNotifier {
         title: n.title,
         body: n.body,
         notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails('hub', 'Mon Hub',
-              channelDescription: 'Nouveaux messages, mails et cours',
-              importance: Importance.high,
-              priority: Priority.high),
+          android: AndroidNotificationDetails(
+            'hub',
+            'Mon Hub',
+            channelDescription: 'Nouveaux messages, mails et cours',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
           iOS: DarwinNotificationDetails(),
           macOS: DarwinNotificationDetails(),
           linux: LinuxNotificationDetails(),

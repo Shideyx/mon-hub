@@ -214,3 +214,69 @@ class _WebLoginPageState extends State<WebLoginPage> {
     );
   }
 }
+
+/// Site web intégré dans l'appli (session gardée d'une fois sur l'autre).
+class HubWebView extends StatefulWidget {
+  const HubWebView({super.key, required this.url, this.desktopUserAgent = false});
+  final String url;
+  final bool desktopUserAgent;
+
+  @override
+  State<HubWebView> createState() => _HubWebViewState();
+}
+
+class _HubWebViewState extends State<HubWebView> {
+  InAppWebViewController? _c;
+  double _progress = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final c = _c;
+        if (c != null && await c.canGoBack()) {
+          await c.goBack();
+        } else if (context.mounted) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: Stack(
+        children: [
+          InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              userAgent: widget.desktopUserAgent ? _desktopUa : null,
+              javaScriptEnabled: true,
+              thirdPartyCookiesEnabled: true,
+              supportMultipleWindows: true,
+              javaScriptCanOpenWindowsAutomatically: true,
+              mediaPlaybackRequiresUserGesture: false,
+              allowsInlineMediaPlayback: true,
+            ),
+            onWebViewCreated: (c) => _c = c,
+            onProgressChanged: (_, p) => setState(() => _progress = p / 100),
+            // Fenêtres « pop-up » (connexion Google…) : on les ouvre au même endroit.
+            onCreateWindow: (c, action) async {
+              final u = action.request.url;
+              if (u != null) await c.loadUrl(urlRequest: URLRequest(url: u));
+              return false;
+            },
+            onPermissionRequest: (_, req) async => PermissionResponse(
+              resources: req.resources,
+              action: PermissionResponseAction.GRANT,
+            ),
+          ),
+          if (_progress < 1)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(value: _progress, minHeight: 3),
+            ),
+        ],
+      ),
+    );
+  }
+}

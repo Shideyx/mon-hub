@@ -194,6 +194,62 @@ class MailModule extends HubModule {
   }
 
   @override
+  List<HubTool> get tools => [
+        HubTool(
+          name: 'mails_lister',
+          description: 'Derniers mails reçus (toutes les boîtes connectées).',
+          params: {'nombre': ('integer', 'Combien (défaut 15)')},
+          run: (a) async {
+            final list = await load();
+            return [
+              for (final m in list.take((a['nombre'] as num?)?.toInt() ?? 15))
+                {
+                  'boite': m.account,
+                  'uid': m.uid,
+                  'de': '${m.from} <${m.fromEmail}>',
+                  'objet': m.subject,
+                  'date': m.date,
+                  'lu': m.seen,
+                },
+            ];
+          },
+        ),
+        HubTool(
+          name: 'mail_lire',
+          description: 'Texte complet d\'un mail (uid et boîte donnés par mails_lister).',
+          params: {'boite': ('string', 'Adresse de la boîte'), 'uid': ('integer', 'uid du mail')},
+          required: ['boite', 'uid'],
+          run: (a) async {
+            final m = (await load()).where((x) =>
+                x.account == a['boite'] && x.uid == (a['uid'] as num).toInt()).firstOrNull;
+            if (m == null) throw 'Mail introuvable';
+            return readBody(m);
+          },
+        ),
+        HubTool(
+          name: 'mail_envoyer',
+          description: 'Envoie un mail depuis une des boîtes connectées.',
+          params: {
+            'a': ('string', 'Destinataire(s), séparés par des virgules'),
+            'objet': ('string', 'Objet'),
+            'texte': ('string', 'Contenu'),
+            'de': ('string', 'Boîte d\'envoi (défaut : la première)'),
+          },
+          required: ['a', 'objet', 'texte'],
+          run: (a) async {
+            if (accounts.isEmpty) throw 'Aucune boîte mail connectée';
+            await send(
+              from: a['de'] as String? ?? accounts.first,
+              to: a['a'] as String,
+              subject: a['objet'] as String,
+              body: a['texte'] as String,
+            );
+            return {'ok': true};
+          },
+        ),
+      ];
+
+  @override
   Future<List<HubNotification>> poll() async {
     if (accounts.isEmpty) return const [];
     final list = await load(force: true);
