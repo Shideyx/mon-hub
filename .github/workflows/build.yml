@@ -109,7 +109,8 @@ jobs:
   # Publie les fichiers sur la page « Releases » avec des liens fixes :
   # https://github.com/<compte>/mon-hub/releases/latest
   release:
-    needs: [windows, android, ios]
+    # Windows + Android suffisent : on n'attend pas l'iPhone (bonus).
+    needs: [windows, android]
     if: ${{ always() && needs.windows.result == 'success' && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
