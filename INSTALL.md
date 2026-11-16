@@ -66,7 +66,9 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
    - **Local gratuit (Ollama)** : sans clé ni compte, rien ne sort du PC. Installe https://ollama.com/download puis, dans un terminal : `ollama pull qwen2.5vl`. Il faut un PC assez puissant.
 2. **Maintiens Ctrl + Alt et parle**, relâche pour envoyer (appui court = écrire). Sur téléphone : touche la bulle bleue.
 3. Sur Windows, **Clicky partout** (activé par défaut) : Clicky suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
-4. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Clicky te prévient quand c'est fini.
+4. **Clicky prof** : dis « je comprends pas », « apprends-moi un truc », « montre-moi en schéma » ou « teste-moi » : il dessine un tableau (schéma, étapes, frise, quiz…).
+5. **Micro** : Réglages → Clicky → **Tester le micro**. Sur Windows, s'il ne t'entend pas : Paramètres → Confidentialité et sécurité → **Microphone** (activer « Autoriser les applications de bureau ») et → **Voix** (activer « Reconnaissance vocale en ligne »). Clicky affiche directement le bouton du bon réglage. En secours : bouton « Dictée Windows (Win + H) ».
+6. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Clicky te prévient quand c'est fini.
 
 Le micro de Windows doit comprendre le français : *Paramètres → Heure et langue → Voix* (installe le pack français si besoin).
 

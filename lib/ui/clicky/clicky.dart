@@ -10,15 +10,18 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_controller.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import 'board.dart';
 import 'claude_code.dart';
+import 'ears.dart';
 import 'ollama.dart';
+import 'win.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -92,6 +95,37 @@ class ClickyController extends ChangeNotifier {
   /// Cible montrée par l'IA (coordonnées de la couche) et son libellé.
   Offset? target;
   String targetLabel = '';
+
+  /// Tableau visuel ouvert (schéma, étapes, frise, quiz…), et s'il est en
+  /// train de s'écrire.
+  ClickyBoard? board;
+  bool drawing = false;
+
+  void closeBoard() {
+    board = null;
+    if (!panelOpen) onInteractive?.call(false);
+    _fadeSoon();
+    notifyListeners();
+  }
+
+  void _showBoard(ClickyBoard b) {
+    board = b;
+    // Le tableau se clique (quiz, boutons) : la fenêtre doit rester là.
+    onInteractive?.call(true);
+  }
+
+  /// « Apprends-moi un truc » et « Montre-moi en schéma ».
+  static const teachPrompt =
+      'Apprends-moi un truc intéressant et utile pour mon niveau (si tu peux, en lien avec mes '
+      'cours, mes devoirs ou ce qu\'il y a à l\'écran), avec un tableau visuel et un petit quiz à la fin.';
+  static const visualPrompt =
+      'Je n\'ai pas bien compris. Réexplique-moi autrement, plus simplement, avec un tableau visuel '
+      '(schéma ou étapes) et une comparaison de la vie de tous les jours.';
+  static const explainScreenPrompt =
+      'Explique-moi ce qu\'il y a à l\'écran comme un prof : de quoi ça parle, les notions '
+      'importantes, avec un tableau visuel.';
+
+  bool get hasHistory => _memory.isNotEmpty;
 
   /// Mode discret : Clicky n'apparaît que pendant un échange.
   bool _recent = false;
@@ -244,6 +278,8 @@ class ClickyController extends ChangeNotifier {
     } catch (_) {
       r = false;
     }
+    // Windows : prépare le micro à l'avance pour ne pas rater le début.
+    if (r && enabled && mic && (desktopMode || !handledElsewhere)) ears.warmUp();
     if (r != ready) {
       ready = r;
       notifyListeners();
@@ -255,7 +291,12 @@ class ClickyController extends ChangeNotifier {
   bool get active => enabled && ready;
 
   bool get buddyVisible =>
-      alwaysShow || _recent || panelOpen || state != ClickyState.idle || agentsRunning > 0;
+      alwaysShow ||
+      _recent ||
+      panelOpen ||
+      board != null ||
+      state != ClickyState.idle ||
+      agentsRunning > 0;
 
   void moveCursor(Offset p) {
     if (cursor == p) return;
@@ -265,92 +306,122 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Voix ----------
 
-  final _stt = SpeechToText();
-  bool? _sttReady;
+  final ClickyEars ears = ClickyEars.create();
   FlutterTts? _tts;
 
-  bool get _voicePlatform =>
-      !kIsWeb && (Platform.isWindows || Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+  bool get _voicePlatform => ClickyEars.supported;
 
-  Future<bool> get canListen async {
-    if (!_voicePlatform) return false;
-    if (_sttReady != null) return _sttReady!;
-    try {
-      _sttReady = await _stt.initialize(onError: (_) {}, onStatus: (_) {});
-    } catch (_) {
-      _sttReady = false;
-    }
-    return _sttReady!;
-  }
+  /// Dernier souci de micro (affiché dans la boîte, avec un bouton pour
+  /// ouvrir le bon réglage).
+  EarsProblem? micProblem;
+
+  Timer? _autoSend;
 
   Future<void> startListening() async {
     await stopSpeaking();
-    if (state == ClickyState.thinking) return;
+    if (state == ClickyState.thinking || state == ClickyState.listening) return;
     if (!mic) {
       // Micro désactivé : on écrit à la place.
       openPanel();
       return;
     }
-    if (!await canListen) {
+    if (!_voicePlatform) {
       openPanel();
       _set(ClickyState.idle, status: 'Micro indisponible ici : écris ta question.');
       return;
     }
     transcript = '';
     target = null;
+    micProblem = null;
     levels.fillRange(0, levels.length, 0);
     _set(ClickyState.listening, status: '', reply: '');
-    try {
-      await _stt.listen(
-        listenOptions: SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: true,
-          localeId: 'fr_FR',
-          listenFor: const Duration(seconds: 60),
-          pauseFor: const Duration(seconds: 5),
-        ),
-        onSoundLevelChange: (l) {
-          // Selon l'appareil, le niveau va d'environ -2 à 10.
-          levels.setRange(0, levels.length - 1, levels.skip(1));
-          levels[levels.length - 1] = ((l + 2) / 12).clamp(0.05, 1.0);
-          notifyListeners();
-        },
-        onResult: (r) {
-          transcript = r.recognizedWords;
-          notifyListeners();
-          if (r.finalResult && state == ClickyState.listening && !_holding) {
-            unawaited(_sendTranscript());
-          }
-        },
-      );
-    } catch (e) {
-      _set(ClickyState.idle, status: 'Micro : $e');
-    }
+    final starting = ears.start(
+      onText: (t) {
+        if (state != ClickyState.listening) return;
+        transcript = t;
+        _autoSend?.cancel();
+        notifyListeners();
+      },
+      onLevel: (l) {
+        if (state != ClickyState.listening) return;
+        levels.setRange(0, levels.length - 1, levels.skip(1));
+        levels[levels.length - 1] = l;
+        notifyListeners();
+      },
+      onProblem: _micFailed,
+      onFinalPhrase: () {
+        // Sans Ctrl + Alt maintenus (bouton micro) : on envoie après un
+        // petit silence.
+        if (_holding || state != ClickyState.listening) return;
+        _autoSend?.cancel();
+        _autoSend = Timer(const Duration(milliseconds: 1800), () {
+          if (!_holding && state == ClickyState.listening) unawaited(stopListening());
+        });
+      },
+    );
+    _micStarting = starting;
+    final problem = await starting;
+    _micStarting = null;
+    if (problem != null) _micFailed(problem);
+  }
+
+  /// Le micro est en train de démarrer (premier lancement : 1 à 2 s).
+  Future<EarsProblem?>? _micStarting;
+
+  void _micFailed(EarsProblem p) {
+    micProblem = p;
+    panelOpen = true;
+    onInteractive?.call(true);
+    _set(ClickyState.idle, status: '', reply: '');
   }
 
   Future<void> stopListening({bool send = true}) async {
     if (state != ClickyState.listening) return;
-    try {
-      await _stt.stop();
-    } catch (_) {}
-    // Laisse le temps au dernier mot d'arriver.
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (send) {
-      await _sendTranscript();
-    } else {
+    _autoSend?.cancel();
+    if (!send) {
+      await ears.cancel();
       _set(ClickyState.idle, status: '');
+      return;
     }
+    _set(ClickyState.listening, status: 'Je finis d\'écouter…');
+    final starting = _micStarting;
+    if (starting != null && await starting != null) return;
+    final heard = await ears.stop();
+    if (state != ClickyState.listening) return;
+    if (heard.trim().isNotEmpty) transcript = heard.trim();
+    await _sendTranscript();
   }
 
   Future<void> _sendTranscript() async {
     if (state != ClickyState.listening) return;
     final t = transcript.trim();
     if (t.isEmpty) {
-      _set(ClickyState.idle, status: 'Je n\'ai rien entendu.');
+      _set(
+        ClickyState.idle,
+        status:
+            'Je n\'ai rien entendu. Parle un peu plus fort, ou teste ton micro '
+            'dans Réglages → Clicky.',
+      );
       _fadeSoon();
       return;
     }
     await ask(t);
+  }
+
+  /// Secours Windows : la dictée de Windows (Win + H) écrit dans la zone
+  /// de texte de Clicky.
+  final inputFocus = FocusNode();
+  Future<void> windowsDictation() async {
+    micProblem = null;
+    openPanel();
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    inputFocus.requestFocus();
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!kIsWeb && Platform.isWindows) {
+      try {
+        Win.voiceTyping();
+      } catch (_) {}
+    }
   }
 
   Future<void> speak(String text) async {
@@ -434,8 +505,12 @@ class ClickyController extends ChangeNotifier {
   bool _onKey(KeyEvent e) {
     if (!active || handledElsewhere) return false;
     final k = HardwareKeyboard.instance;
-    if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape && boxOpen) {
-      closeBox();
+    if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape) {
+      if (boxOpen) {
+        closeBox();
+      } else if (board != null) {
+        closeBoard();
+      }
       return false;
     }
     // AltGr (claviers français : @, €, #…) envoie aussi Ctrl + Alt : on
@@ -459,12 +534,17 @@ class ClickyController extends ChangeNotifier {
   /// La boîte de texte est ouverte : saisie, écoute, réflexion, réponse
   /// (elle se referme toute seule quelques secondes après la réponse).
   bool get boxOpen =>
-      panelOpen || state != ClickyState.idle || reply.isNotEmpty || status.isNotEmpty;
+      panelOpen ||
+      state != ClickyState.idle ||
+      reply.isNotEmpty ||
+      status.isNotEmpty ||
+      micProblem != null;
 
   /// Ferme la boîte (et efface la réponse).
   void closeBox() {
     reply = '';
     status = '';
+    micProblem = null;
     closePanel();
   }
 
@@ -483,7 +563,7 @@ class ClickyController extends ChangeNotifier {
       state = ClickyState.idle;
     }
     target = null;
-    onInteractive?.call(false);
+    onInteractive?.call(board != null);
     _fadeSoon();
     notifyListeners();
   }
@@ -581,11 +661,31 @@ Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au b
 Ta réponse est lue à voix haute :
 - réponds en français, comme à l'oral, chaleureux et clair, en 1 à 4 phrases courtes ;
 - pas de markdown, pas de listes à puces, pas d'émojis ;
-- si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève.
+- si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève : tu es un prof patient qui aide à comprendre (comparaisons de la vie de tous les jours, exemples concrets), et tu vérifies que c'est compris.
 ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les vraies données (agenda, notes, devoirs, messages…) ou agir ; celles qui envoient ou modifient quelque chose demandent la permission.'}
+
+$_boardGuide
 
 Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse par une balise [POINT:x,y:libellé court${shots.length > 1 ? ':screenN' : ''}] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise, à la toute fin. Si rien n'est à montrer, termine par [POINT:none].''';
   }
+
+  /// Comment écrire un tableau visuel (voir board.dart).
+  static const _boardGuide = '''
+Tableau visuel : quand la personne dit qu'elle ne comprend pas, demande une explication, veut apprendre, réviser ou être interrogée, ou quand un dessin aide (étapes, schéma, cycle, comparaison, chronologie, chiffres, formule, vocabulaire), ajoute après ta réponse orale un tableau entre [TABLEAU] et [/TABLEAU], en JSON valide :
+[TABLEAU]{"titre":"…","blocs":[…]}[/TABLEAU]
+Blocs possibles (2 à 5 par tableau, textes très courts, adaptés à un·e élève) :
+- {"type":"texte","titre":"…","texte":"…"} : l'idée clé
+- {"type":"etapes","items":[{"titre":"…","texte":"…"}]}
+- {"type":"schema","forme":"fleches","noeuds":["A","B","C"],"liens":[[0,1,"légende"],[1,2,""]]} : liens = [numéro du nœud de départ, numéro d'arrivée, légende courte] ; "forme":"cycle" pour un cycle (ex. cycle de l'eau)
+- {"type":"comparaison","colonnes":["","Animal","Plante"],"lignes":[["Respire","oui","oui"]]}
+- {"type":"frise","items":[{"date":"1789","texte":"…"}]}
+- {"type":"graphique","titre":"…","unite":"…","valeurs":[{"label":"…","valeur":12}]}
+- {"type":"formule","formule":"v = d ÷ t","legende":[{"terme":"v","sens":"vitesse (km/h)"}]}
+- {"type":"exemple","titre":"…","texte":"…"} : un exemple résolu pas à pas
+- {"type":"vocabulaire","items":[{"mot":"…","sens":"…"}]}
+- {"type":"retenir","items":["…"]} : à retenir
+- {"type":"quiz","question":"…","choix":["…","…","…"],"reponse":0,"explication":"…"} : pour vérifier que c'est compris (reponse = numéro du bon choix, à partir de 0) ; plusieurs blocs quiz pour un quiz de plusieurs questions
+Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une phrase (« regarde le schéma »). Pas de tableau pour une simple question pratique.''';
 
   static final _agentRe = RegExp(
     r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?agent\b[\s,:]*',
@@ -615,8 +715,12 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
     try {
       final String raw;
       void streamed(String t) {
-        final clean = _stripTag(t);
-        if (clean != reply) _set(state, status: '', reply: clean);
+        final clean = _stripTag(ClickyBoard.strip(t));
+        final d = ClickyBoard.writing(t);
+        if (clean != reply || d != drawing) {
+          drawing = d;
+          _set(state, status: d ? 'Je dessine au tableau…' : '', reply: clean);
+        }
       }
 
       if (usePro) {
@@ -668,8 +772,17 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
           onText: streamed,
         );
       }
-      final (text, point, label, screen) = parsePoint(raw);
-      _memory.add((q, text.isEmpty ? '(je t\'ai montré à l\'écran)' : text));
+      drawing = false;
+      final (spoken, newBoard) = ClickyBoard.extract(raw);
+      final (text, point, label, screen) = parsePoint(spoken);
+      if (newBoard != null) _showBoard(newBoard);
+      _memory.add((
+        q,
+        [
+          text.isEmpty ? '(je t\'ai montré à l\'écran)' : text,
+          if (newBoard != null) '(tableau affiché : ${newBoard.summary})',
+        ].join(' '),
+      ));
       if (_memory.length > 6) _memory.removeAt(0);
       final shot = shots.isEmpty ? null : shots[(screen - 1).clamp(0, shots.length - 1)];
       if (point != null && shot != null) {
@@ -695,9 +808,10 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
         });
       }
     } catch (e) {
+      drawing = false;
       panelOpen = true;
       onInteractive?.call(true);
-      _set(ClickyState.idle, status: '', reply: e is MissingKey ? '$e' : '$e');
+      _set(ClickyState.idle, status: '', reply: '$e');
     }
   }
 
@@ -766,7 +880,7 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
               confirm: confirmAction,
               effort: 'high',
             );
-      final text = parsePoint(r).$1;
+      final text = parsePoint(ClickyBoard.strip(r)).$1;
       agentsRunning--;
       _set(state, reply: 'Agent : $text');
       notify?.call('Clicky : tâche terminée', text);
@@ -804,7 +918,7 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
       );
       return ok == true;
     } finally {
-      if (!panelOpen) onInteractive?.call(false);
+      if (!panelOpen && board == null) onInteractive?.call(false);
     }
   }
 
@@ -978,6 +1092,25 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
             child: ClickyBox(c: c),
           ),
         ),
+        // Le tableau visuel, sur le côté (en haut sur téléphone).
+        if (c.board != null)
+          Positioned(
+            right: 16,
+            left: mobile ? 16 : null,
+            top: 16,
+            bottom: mobile ? size.height * 0.45 : 76,
+            width: mobile ? null : math.min(500, size.width - 32),
+            child: Align(
+              alignment: Alignment.topRight,
+              child: ClickyBoardView(
+                key: ValueKey(c.board),
+                board: c.board!,
+                busy: c.state == ClickyState.thinking || c.state == ClickyState.listening,
+                onClose: c.closeBoard,
+                onAsk: c.ask,
+              ),
+            ),
+          ),
         // Bouton toujours accessible dans l'appli (indispensable sur téléphone).
         Positioned(
           right: 16,
@@ -1079,11 +1212,31 @@ class ClickyFollower extends StatelessWidget {
           left: 22,
           top: 22,
           right: 4,
+          bottom: c.board != null ? 4 : null,
           child: IgnorePointer(
             ignoring: !interactive,
-            child: ClickyPopIn(
-              open: c.boxOpen && c.state != ClickyState.pointing,
-              child: ClickyBox(c: c),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (c.board != null)
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ClickyBoardView(
+                        key: ValueKey(c.board),
+                        board: c.board!,
+                        busy: c.state == ClickyState.thinking || c.state == ClickyState.listening,
+                        onClose: c.closeBoard,
+                        onAsk: c.ask,
+                      ),
+                    ),
+                  ),
+                ClickyPopIn(
+                  open: c.boxOpen && c.state != ClickyState.pointing,
+                  child: ClickyBox(c: c, compact: c.board != null),
+                ),
+              ],
             ),
           ),
         ),
@@ -1297,8 +1450,11 @@ class _Fab extends StatelessWidget {
 /// tu dis s'y écrit pendant que tu parles, puis la réponse s'y écrit à son
 /// tour. On peut aussi y taper sa question.
 class ClickyBox extends StatelessWidget {
-  const ClickyBox({super.key, required this.c});
+  const ClickyBox({super.key, required this.c, this.compact = false});
   final ClickyController c;
+
+  /// Plus petite (le tableau prend déjà de la place au-dessus).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1306,7 +1462,9 @@ class ClickyBox extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
+    final problem = c.micProblem;
     final title = switch (c.state) {
+      _ when problem != null => 'Souci de micro',
       ClickyState.listening => 'Je t\'écoute…',
       ClickyState.thinking => c.reply.isEmpty ? 'Je réfléchis…' : 'Clicky',
       _ => 'Clicky',
@@ -1318,7 +1476,7 @@ class ClickyBox extends StatelessWidget {
       color: scheme.surfaceContainerHigh,
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360, maxHeight: 340),
+        constraints: BoxConstraints(maxWidth: compact ? 520 : 360, maxHeight: compact ? 220 : 380),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1414,7 +1572,19 @@ class ClickyBox extends StatelessWidget {
                           ),
                         ),
                       ),
-                    if (!listening && c.status.isNotEmpty)
+                    if (problem != null) _MicHelp(c: c, problem: problem),
+                    if (c.drawing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.draw_rounded, size: 16, color: clickyBlue),
+                            const SizedBox(width: 6),
+                            Text('Je dessine au tableau…', style: text.bodySmall),
+                          ],
+                        ),
+                      ),
+                    if (!listening && c.status.isNotEmpty && !c.drawing)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Text(c.status, style: text.bodySmall),
@@ -1433,6 +1603,37 @@ class ClickyBox extends StatelessWidget {
                 ),
               ),
             ),
+            // Raccourcis pour apprendre.
+            if ((c.panelOpen || c.reply.isNotEmpty) &&
+                c.state == ClickyState.idle &&
+                problem == null &&
+                !compact)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (c.hasHistory)
+                      _QuickChip(
+                        icon: Icons.draw_rounded,
+                        label: 'Montre-moi en schéma',
+                        onTap: () => c.ask(ClickyController.visualPrompt),
+                      ),
+                    _QuickChip(
+                      icon: Icons.school_rounded,
+                      label: 'Apprends-moi un truc',
+                      onTap: () => c.ask(ClickyController.teachPrompt),
+                    ),
+                    if (!c.hasHistory)
+                      _QuickChip(
+                        icon: Icons.screen_search_desktop_rounded,
+                        label: 'Explique mon écran',
+                        onTap: () => c.ask(ClickyController.explainScreenPrompt),
+                      ),
+                  ],
+                ),
+              ),
             // Écrire (ou parler) une question.
             if (c.panelOpen)
               Padding(
@@ -1442,6 +1643,7 @@ class ClickyBox extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: c.input,
+                        focusNode: c.inputFocus,
                         autofocus: true,
                         enabled: !busy,
                         textInputAction: TextInputAction.send,
@@ -1485,6 +1687,77 @@ class ClickyBox extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ActionChip(
+    avatar: Icon(icon, size: 16, color: clickyBlue),
+    label: Text(label),
+    visualDensity: VisualDensity.compact,
+    onPressed: onTap,
+  );
+}
+
+/// Le micro ne marche pas : ce qui se passe, et le bouton qui règle ça.
+class _MicHelp extends StatelessWidget {
+  const _MicHelp({required this.c, required this.problem});
+  final ClickyController c;
+  final EarsProblem problem;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final windows = !kIsWeb && Platform.isWindows;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2, right: 8),
+              child: Icon(Icons.mic_off_rounded, color: Colors.redAccent, size: 18),
+            ),
+            Expanded(child: Text(problem.message, style: text.bodyMedium?.copyWith(height: 1.35))),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            if (problem.fixUri != null)
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.settings_rounded, size: 16),
+                label: Text(problem.fixLabel ?? 'Ouvrir les réglages'),
+                onPressed: () => launchUrl(Uri.parse(problem.fixUri!)),
+              ),
+            TextButton.icon(
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Réessayer'),
+              onPressed: () {
+                c.micProblem = null;
+                c.startListening();
+              },
+            ),
+            if (windows)
+              TextButton.icon(
+                icon: const Icon(Icons.keyboard_voice_rounded, size: 16),
+                label: const Text('Dictée Windows (Win + H)'),
+                onPressed: c.windowsDictation,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

@@ -13,6 +13,7 @@ import '../core/shortcuts.dart';
 import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
 import 'clicky/clicky.dart';
+import 'clicky/mic_test.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -241,6 +242,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       value: c.mic,
                       onChanged: (v) => c.setOption('mic', v),
                     ),
+                    if (c.mic)
+                      ListTile(
+                        leading: const Icon(Icons.graphic_eq_rounded),
+                        title: const Text('Tester le micro'),
+                        subtitle: const Text('Vérifie que Clicky t\'entend, et règle le souci sinon'),
+                        onTap: () => MicTestDialog.show(context),
+                      ),
                     ListTile(
                       leading: const Icon(Icons.auto_awesome_rounded),
                       title: const Text('Autres réglages de Clicky'),

@@ -6,6 +6,7 @@ import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import '../../ui/clicky/clicky.dart';
+import '../../ui/clicky/mic_test.dart';
 import '../../ui/clicky/claude_code.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
@@ -413,6 +414,15 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   value: c.mic,
                   onChanged: (v) => c.setOption('mic', v),
                 ),
+                if (c.mic)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.graphic_eq_rounded, size: 18),
+                      label: const Text('Tester le micro'),
+                      onPressed: () => MicTestDialog.show(context),
+                    ),
+                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Le curseur de Clicky suit la souris'),

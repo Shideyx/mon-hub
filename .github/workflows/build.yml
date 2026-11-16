@@ -39,6 +39,9 @@ jobs:
 
   android:
     needs: test
+    # Désactivé : seule la version Windows est compilée (mettre true pour
+    # recompiler Android).
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +57,9 @@ jobs:
 
   macos:
     needs: test
+    # Désactivé : seule la version Windows est compilée (mettre true pour
+    # recompiler Mac).
+    if: false
     runs-on: macos-latest
     # Mac est bonus : le navigateur intégré (bêta) n'y compile pas encore.
     continue-on-error: true
@@ -72,6 +78,9 @@ jobs:
 
   ios:
     needs: test
+    # Désactivé : seule la version Windows est compilée (mettre true pour
+    # recompiler iPhone).
+    if: false
     runs-on: macos-latest
     # Appli iPhone non signée : à installer avec Sideloadly (voir INSTALL.md).
     continue-on-error: true
@@ -93,6 +102,9 @@ jobs:
 
   linux:
     needs: test
+    # Désactivé : seule la version Windows est compilée (mettre true pour
+    # recompiler Linux).
+    if: false
     runs-on: ubuntu-latest
     # Linux est bonus : le navigateur intégré y demande WPE WebKit.
     continue-on-error: true
@@ -143,4 +155,4 @@ jobs:
             --target "${{ github.sha }}" \
             --latest \
             --title "Mon Hub v1.${{ github.run_number }}" \
-            --notes "PC Windows : MonHub-Windows.zip · Android : MonHub-Android.apk · iPhone : MonHub-iOS.ipa · Extension Claude (PC) : MonHub-Claude.mcpb · Guide : INSTALL.md"
+            --notes "PC Windows : MonHub-Windows.zip · Extension Claude (PC) : MonHub-Claude.mcpb · Guide : INSTALL.md"

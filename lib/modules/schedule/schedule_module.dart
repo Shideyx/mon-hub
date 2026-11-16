@@ -653,7 +653,7 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _refresh() async {
     m._icsAt = null;
     m._gCache.clear();
-    await Future.wait([m._loadIcs(force: true), if (m.ecole != null) m.ecole!.load(force: true)]);
+    await Future.wait([m._loadIcs(force: true), if (m.ecole != null) m.ecole!.load(force: true, manual: true)]);
     m.store.changed();
   }
 

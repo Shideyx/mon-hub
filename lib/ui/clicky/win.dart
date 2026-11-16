@@ -156,4 +156,25 @@ class Win {
     SetForegroundWindow(hwnd);
     if (attach) AttachThreadInput(me, fgThread, false);
   }
+
+  /// Ouvre la dictée de Windows (Win + H) : elle écrit ce que tu dis dans la
+  /// zone de texte qui a le focus. Solution de secours si le micro de
+  /// Clicky ne marche pas.
+  static void voiceTyping() => using((a) {
+    const keys = [
+      (VK_LWIN, false),
+      (VIRTUAL_KEY(0x48), false),
+      (VIRTUAL_KEY(0x48), true),
+      (VK_LWIN, true),
+    ];
+    final inputs = a<INPUT>(keys.length);
+    for (var i = 0; i < keys.length; i++) {
+      final (vk, up) = keys[i];
+      inputs[i].type = INPUT_KEYBOARD;
+      inputs[i].Anonymous.ki
+        ..wVk = vk
+        ..dwFlags = up ? KEYEVENTF_KEYUP : const KEYBD_EVENT_FLAGS(0);
+    }
+    SendInput(keys.length, inputs, sizeOf<INPUT>());
+  });
 }

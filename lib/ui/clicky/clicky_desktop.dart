@@ -280,6 +280,7 @@ const _cursorOnly = Size(110, 50);
 const _pointing = Size(300, 60);
 const _compact = Size(390, 330);
 const _withPanel = Size(420, 400);
+const _withBoard = Size(560, 760);
 
 class _DesktopState extends State<_Desktop> {
   static _DesktopState? instance;
@@ -288,6 +289,7 @@ class _DesktopState extends State<_Desktop> {
   final c = ClickyController.instance;
   Timer? _tick, _slow;
   bool _wasBoth = false;
+  bool _wasEsc = false;
   bool _interactive = false;
   bool _hidden = true;
   int _deadChecks = 0;
@@ -367,7 +369,16 @@ class _DesktopState extends State<_Desktop> {
       c.hotkey(down: false);
     }
     _wasBoth = both;
-    if (c.boxOpen && Win.down(0x1B)) c.closeBox(); // Échap
+    // Échap : ferme la boîte, puis le tableau.
+    final esc = Win.down(0x1B);
+    if (esc && !_wasEsc) {
+      if (c.boxOpen) {
+        c.closeBox();
+      } else if (c.board != null) {
+        c.closeBoard();
+      }
+    }
+    _wasEsc = esc;
 
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
@@ -377,7 +388,7 @@ class _DesktopState extends State<_Desktop> {
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    final visible = c.active && (c.buddyVisible || c.boxOpen);
+    final visible = c.active && (c.buddyVisible || c.boxOpen || c.board != null);
     if (!visible) {
       if (!_hidden) {
         Win.hide(h);
@@ -417,7 +428,9 @@ class _DesktopState extends State<_Desktop> {
     }
     // Fenêtre juste assez grande : minuscule autour du curseur, plus grande
     // quand la boîte de texte est ouverte (elle ne bloque ainsi aucun clic).
-    final size = _interactive
+    final size = c.board != null
+        ? _withBoard
+        : _interactive
         ? _withPanel
         : c.state == ClickyState.pointing
         ? _pointing
