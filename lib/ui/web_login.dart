@@ -90,22 +90,40 @@ class _WebLoginPageState extends State<WebLoginPage> {
     Navigator.pop(context, value);
   }
 
-  Future<void> _checkCookie() async {
+  /// Renvoie true si la session a été trouvée.
+  Future<bool> _checkCookie() async {
     final name = widget.cookieName;
-    if (name == null || _done) return;
-    final cookie = await CookieManager.instance().getCookie(
-      url: WebUri(widget.cookieUrl ?? widget.url),
-      name: name,
-      webViewController: _c,
+    if (name == null || _done) return _done;
+    try {
+      final url = WebUri(widget.cookieUrl ?? widget.url);
+      final all = await CookieManager.instance().getCookies(url: url, webViewController: _c);
+      String clean(Object? v) => '${v ?? ''}'.replaceAll('"', '').trim();
+      final hit = all.where((c) => c.name == name && clean(c.value).isNotEmpty).firstOrNull;
+      if (hit == null) return false;
+      _finish(
+        widget.returnAllCookies
+            ? all
+                  .where((c) => clean(c.value).isNotEmpty)
+                  .map((c) => '${c.name}=${clean(c.value)}')
+                  .join('; ')
+            : clean(hit.value),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _manualCheck() async {
+    if (await _checkCookie() || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Connexion pas encore détectée. Termine la connexion sur la page '
+          '(code de sécurité, « Enregistrer les identifiants »…) puis réessaie.',
+        ),
+      ),
     );
-    final v = cookie?.value?.toString() ?? '';
-    if (v.isEmpty || v == '""') return;
-    if (!widget.returnAllCookies) return _finish(v);
-    final all = await CookieManager.instance().getCookies(
-      url: WebUri(widget.cookieUrl ?? widget.url),
-      webViewController: _c,
-    );
-    _finish(all.map((c) => '${c.name}=${c.value}').join('; '));
   }
 
   @override
@@ -127,6 +145,14 @@ class _WebLoginPageState extends State<WebLoginPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        actions: [
+          if (widget.cookieName != null)
+            TextButton.icon(
+              onPressed: _manualCheck,
+              icon: const Icon(Icons.check_rounded),
+              label: const Text("J'ai fini"),
+            ),
+        ],
         bottom: _progress < 1
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(3),
@@ -173,6 +199,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                 );
               },
               onProgressChanged: (_, p) => setState(() => _progress = p / 100),
+              onUpdateVisitedHistory: (_, _, _) => _checkCookie(),
               onLoadStop: (c, _) async {
                 if (widget.captureAuthorizationHeader) {
                   // Ceinture et bretelles si le script n'a pas été injecté tôt.

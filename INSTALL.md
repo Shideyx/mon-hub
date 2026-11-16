@@ -32,7 +32,7 @@ Liens de téléchargement (toujours la dernière version) :
 | **Discord** | Carte Discord → **Connecter** → **Continuer** → connecte-toi sur la page Discord. Elle se ferme toute seule. |
 | **Mails (Gmail)** | Carte Mails → **Ajouter** → **Ouvrir la page Google** → crée un mot de passe d'application nommé « Mon Hub » → copie les 16 lettres → reviens et colle-les avec ton adresse. *(La validation en 2 étapes doit être activée sur ton compte Google.)* |
 | **École Directe** | Carte École Directe → **Se connecter** → identifiant + mot de passe. Réponds à la question de sécurité la première fois. |
-| **Agenda Google** | Sur ordinateur : Google Agenda → ⚙️ Paramètres → ton agenda → *Intégrer l'agenda* → copie l'**Adresse secrète au format iCal** → colle-la dans la carte Agenda. |
+| **Agenda** | Les cours École Directe y apparaissent tout seuls. Bouton **+ Ajouter** (ou clic sur un créneau vide) pour tes évènements. Pour Google : bouton 🔗 en haut de l'Agenda, puis sur ordinateur : Google Agenda → ⚙️ Paramètres → ton agenda → *Intégrer l'agenda* → copie l'**Adresse secrète au format iCal** → colle-la. |
 | **Roblox** | Carte Roblox → **Ajouter un compte** → ton pseudo (pas de mot de passe). |
 | **Livres** | Bibliothèque → **Ajouter un livre** → cherche le titre. |
 
@@ -52,6 +52,9 @@ Re-télécharge simplement le fichier depuis les mêmes liens. Sur PC, remplace 
 ## En cas de problème
 
 - **« Session expirée »** sur Instagram ou Discord : appuie sur **Déconnecter** puis **Connecter**.
+- **Instagram : la page de connexion ne se ferme pas** : une fois connecté sur la page, appuie sur **J'ai fini** en haut à droite.
+- **Instagram demande une vérification** : ouvre l'appli Instagram ou instagram.com, confirme « C'était moi », puis reconnecte-toi dans Mon Hub.
+- **École Directe** : le message d'erreur affiché dit maintenant ce qui bloque (mot de passe, question de sécurité, maintenance…).
 - **Mails : erreur de connexion** : vérifie que tu as utilisé le mot de passe d'application, pas ton mot de passe Google.
 - **Pas de notifications sur Android** : Paramètres du téléphone → Applis → Mon Hub → Notifications → activer, et Batterie → *Sans restriction*.
 - **École Directe ne marche plus** : leur site a sans doute changé, préviens-moi.

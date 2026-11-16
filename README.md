@@ -7,6 +7,8 @@ réordonner, retirer ou remplacer.
 
 ![Accueil](docs/capture.png)
 
+![Agenda](docs/agenda.png)
+
 ![Bibliothèque](docs/bibliotheque.png)
 
 > 📥 **Installer : voir [INSTALL.md](INSTALL.md)** · [Télécharger la dernière version](https://github.com/Shideyx/mon-hub/releases/latest)
@@ -27,11 +29,11 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 
 | Module | Accès | Ce qui marche |
 |---|---|---|
-| **Agenda** | ✅ Officiel (iCal) | Affiche Google Agenda (ou tout agenda .ics) sur 14 jours, récurrences comprises. Lien : Google Agenda → Paramètres → ton agenda → « Adresse secrète au format iCal ». |
+| **Agenda** | ✅ Officiel (iCal) + École Directe + local | Un seul emploi du temps, présenté comme celui d'École Directe (grille horaire, couleurs par matière, cours annulés barrés) : **cours École Directe** + **Google Agenda** (adresse secrète iCal, lecture seule) + **tes propres évènements** (ajouter, modifier, supprimer, répéter chaque semaine). Filtre par source, rappel 15 min avant. |
 | **École Directe** | ⚠️ Non officiel | Emploi du temps, devoirs (avec contenu), notes, messagerie (lecture). Alertes : nouvelle note, nouveau devoir, nouveau message, cours annulé. Pas d'API publique : peut casser après une mise à jour d'École Directe. |
 | **Mails** | ✅ Standard (IMAP/SMTP) | Lire les mails en entier, répondre, écrire, plusieurs boîtes. Gmail : **mot de passe d'application** (l'appli ouvre la bonne page). Outlook/Hotmail : pas encore (Microsoft impose OAuth). |
 | **Discord** | ⚠️ Jeton utilisateur | Lire et **écrire** tes MP, démarrer une conversation avec un ami, alerte à chaque nouveau message. Connexion intégrée (la vraie page discord.com). Discord interdit officiellement l'automatisation d'un compte : risque de suspension faible mais réel. Serveurs : widget public officiel. |
-| **Instagram** | ⚠️ API privée | Lire et **répondre** à tes conversations, alerte à chaque nouveau message, via l'API interne d'instagram.com (comme les projets de github.com/topics/instagram-api). Connexion intégrée. Pas de fil d'actu ni de stories. |
+| **Instagram** | ⚠️ API privée | Lire et **répondre** à tes conversations, alerte à chaque nouveau message, via l'API interne d'instagram.com (comme les projets de github.com/topics/instagram-api). Connexion intégrée. Si l'API web refuse, l'appli bascule toute seule sur l'API mobile d'Instagram. |
 | **Roblox** | ⚠️ Semi-public | Plusieurs comptes : avatar, nombre d'amis, statut (en ligne / en jeu). Utilise les API publiques du site Roblox, sans mot de passe. |
 | **Bibliothèque** | ✅ Local | Étagère visuelle avec couvertures, statut *Lu / En cours / À lire*, étoiles, note « À retenir », statistiques, recherche Open Library. |
 | **Google Drive** | Raccourcis | Liens vers tes documents Drive (emploi du temps PDF, etc.). |

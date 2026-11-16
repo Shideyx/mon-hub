@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -10,6 +11,33 @@ import 'ed_client.dart';
 class EcoleDirecteModule extends HubModule {
   final client = EdClient();
   List<EdLesson> _cache = [];
+
+  /// Cours chargés (semaine en cours + 3 semaines), utilisés par l'Agenda.
+  List<EdLesson> get lessons => _cache;
+
+  /// Cours entre deux dates (semaine affichée dans l'Agenda). Recharge depuis
+  /// École Directe si la période sort de ce qui est déjà chargé.
+  Future<List<EdLesson>> lessonsBetween(DateTime from, DateTime to) async {
+    if (!configured) return const [];
+    await load();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final cacheFrom = today.subtract(Duration(days: today.weekday - 1));
+    final cacheTo = today.add(const Duration(days: 21));
+    if (!from.isBefore(cacheFrom) && !to.isAfter(cacheTo)) {
+      return _cache.where((l) => l.end.isAfter(from) && l.start.isBefore(to)).toList();
+    }
+    final key = from.toIso8601String();
+    if (_weeks[key] case final w?) return w;
+    if (client.accountId == null) return const [];
+    try {
+      return _weeks[key] = await client.timetable(from, to);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  final Map<String, List<EdLesson>> _weeks = {};
   List<EdGrade> grades = [];
   List<EdHomework> homework = [];
   List<EdMessage> messages = [];
@@ -43,15 +71,22 @@ class EcoleDirecteModule extends HubModule {
       final pass = await store.readSecret('password');
       if (user == null || pass == null) return _cache = [];
       final faRaw = await store.readSecret('fa');
+      var uuid = store.getJson<String>('uuid');
+      if (uuid == null) {
+        final r = Random.secure();
+        String h(int n) => List.generate(n, (_) => r.nextInt(16).toRadixString(16)).join();
+        uuid = '${h(8)}-${h(4)}-4${h(3)}-a${h(3)}-${h(12)}';
+        await store.setJson('uuid', uuid);
+      }
+      client.uuid = uuid;
+      _weeks.clear();
       try {
         await client.login(
           user,
           pass,
           savedFa: faRaw == null
               ? null
-              : (jsonDecode(faRaw) as List)
-                  .map((e) => Map<String, String>.from(e as Map))
-                  .toList(),
+              : (jsonDecode(faRaw) as List).map((e) => Map<String, String>.from(e as Map)).toList(),
           answerQuestion: _ask,
         );
         if (client.lastFa != null) {
@@ -59,7 +94,14 @@ class EcoleDirecteModule extends HubModule {
         }
         final now = DateTime.now();
         final from = DateTime(now.year, now.month, now.day);
-        _cache = await client.timetable(from, from.add(const Duration(days: 7)));
+        try {
+          _cache = await client.timetable(
+            from.subtract(Duration(days: from.weekday - 1)),
+            from.add(const Duration(days: 21)),
+          );
+        } catch (e) {
+          lastError = '$e';
+        }
         try {
           grades = await client.grades();
         } catch (_) {}
@@ -69,7 +111,8 @@ class EcoleDirecteModule extends HubModule {
         try {
           messages = await client.messages();
         } catch (_) {}
-        badge.value = messages.where((m) => !m.read).length +
+        badge.value =
+            messages.where((m) => !m.read).length +
             homework.where((h) => !h.done && h.due.difference(now).inDays <= 1).length;
         return _cache;
       } catch (e) {
@@ -138,11 +181,13 @@ class EcoleDirecteModule extends HubModule {
   }
 
   Future<void> _configure(BuildContext context) async {
-    final r = await askFields(context,
-        title: 'Connexion École Directe',
-        labels: ['Identifiant', 'Mot de passe'],
-        initial: [store.getJson<String>('user') ?? '', ''],
-        obscure: {1});
+    final r = await askFields(
+      context,
+      title: 'Connexion École Directe',
+      labels: ['Identifiant', 'Mot de passe'],
+      initial: [store.getJson<String>('user') ?? '', ''],
+      obscure: {1},
+    );
     if (r == null || r[0].isEmpty || r[1].isEmpty) return;
     await store.writeSecret('password', r[1]);
     await store.writeSecret('fa', null);
@@ -181,8 +226,10 @@ class EcoleDirecteModule extends HubModule {
                   ListTile(
                     dense: true,
                     title: Text(l.subject),
-                    subtitle: Text('${dayLabel(l.start)} · ${hhmm(l.start)}'
-                        '${l.room.isEmpty ? '' : ' · ${l.room}'}'),
+                    subtitle: Text(
+                      '${dayLabel(l.start)} · ${hhmm(l.start)}'
+                      '${l.room.isEmpty ? '' : ' · ${l.room}'}',
+                    ),
                   ),
               ],
             );
@@ -228,30 +275,35 @@ class EcoleDirecteModule extends HubModule {
           listenable: store,
           builder: (context, _) {
             if (!configured) {
-              return EmptyHint('Connecte ton compte École Directe',
-                  icon: icon, action: ('Se connecter', () => _configure(context)));
+              return EmptyHint(
+                'Connecte ton compte École Directe',
+                icon: icon,
+                action: ('Se connecter', () => _configure(context)),
+              );
             }
             return FutureBuilder(
               future: load(),
               initialData: _cache,
               builder: (context, snap) {
                 final waiting = snap.connectionState == ConnectionState.waiting;
-                Widget wrap(List<Widget> children, String empty) => ListView(children: [
-                      if (lastError != null) ErrorBanner(lastError!),
-                      if (waiting && children.isEmpty)
-                        const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
-                      ...children,
-                      if (!waiting && children.isEmpty) Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: EmptyHint(empty),
-                      ),
-                    ]);
-                return TabBarView(children: [
-                  wrap(_lessonTiles(context), 'Aucun cours cette semaine'),
-                  wrap(_homeworkTiles(context), 'Aucun devoir à venir 🎉'),
-                  wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
-                  wrap(_messageTiles(context), 'Aucun message'),
-                ]);
+                Widget wrap(List<Widget> children, String empty) => ListView(
+                  children: [
+                    if (lastError != null) ErrorBanner(lastError!),
+                    if (waiting && children.isEmpty)
+                      const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
+                    ...children,
+                    if (!waiting && children.isEmpty)
+                      Padding(padding: const EdgeInsets.all(32), child: EmptyHint(empty)),
+                  ],
+                );
+                return TabBarView(
+                  children: [
+                    wrap(_lessonTiles(context), 'Aucun cours cette semaine'),
+                    wrap(_homeworkTiles(context), 'Aucun devoir à venir 🎉'),
+                    wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
+                    wrap(_messageTiles(context), 'Aucun message'),
+                  ],
+                );
               },
             );
           },
@@ -261,10 +313,12 @@ class EcoleDirecteModule extends HubModule {
   }
 
   Widget _dayHeader(BuildContext context, String d) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(d,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    child: Text(
+      d,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    ),
+  );
 
   List<Widget> _lessonTiles(BuildContext context) {
     final out = <Widget>[];
@@ -275,20 +329,28 @@ class EcoleDirecteModule extends HubModule {
         out.add(_dayHeader(context, d));
         lastDay = d;
       }
-      out.add(ListTile(
-        leading: SizedBox(
-          width: 52,
-          child: Text('${hhmm(l.start)}\n${hhmm(l.end)}',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+      out.add(
+        ListTile(
+          leading: SizedBox(
+            width: 52,
+            child: Text(
+              '${hhmm(l.start)}\n${hhmm(l.end)}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          title: Text(
+            l.subject,
+            style: l.cancelled ? const TextStyle(decoration: TextDecoration.lineThrough) : null,
+          ),
+          subtitle: Text(
+            [
+              if (l.cancelled) 'ANNULÉ',
+              if (l.room.isNotEmpty) l.room,
+              if (l.teacher.isNotEmpty) l.teacher,
+            ].join(' · '),
+          ),
         ),
-        title: Text(l.subject,
-            style: l.cancelled ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
-        subtitle: Text([
-          if (l.cancelled) 'ANNULÉ',
-          if (l.room.isNotEmpty) l.room,
-          if (l.teacher.isNotEmpty) l.teacher,
-        ].join(' · ')),
-      ));
+      );
     }
     return out;
   }
@@ -302,98 +364,110 @@ class EcoleDirecteModule extends HubModule {
         out.add(_dayHeader(context, d));
         lastDay = d;
       }
-      out.add(Card(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: ExpansionTile(
-          shape: const Border(),
-          leading: Icon(
-            h.done ? Icons.check_circle_rounded : (h.isTest ? Icons.warning_rounded : Icons.circle_outlined),
-            color: h.done ? Colors.green : (h.isTest ? Colors.orange : color),
+      out.add(
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: ExpansionTile(
+            shape: const Border(),
+            leading: Icon(
+              h.done
+                  ? Icons.check_circle_rounded
+                  : (h.isTest ? Icons.warning_rounded : Icons.circle_outlined),
+              color: h.done ? Colors.green : (h.isTest ? Colors.orange : color),
+            ),
+            title: Text(h.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(
+              h.content.split('\n').first,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            children: [SelectableText(h.content)],
           ),
-          title: Text(h.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(h.content.split('\n').first, maxLines: 1, overflow: TextOverflow.ellipsis),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [SelectableText(h.content)],
         ),
-      ));
+      );
     }
     return out;
   }
 
   List<Widget> _gradeTiles(BuildContext context) => [
-        for (final g in grades)
-          ListTile(
-            leading: HubAvatar(label: g.subject, color: color, size: 38),
-            title: Text(g.subject),
-            subtitle: Text([
-              if (g.title.isNotEmpty) g.title,
-              if (g.date != null) dayLabel(g.date!),
-            ].join(' · ')),
-            trailing: Text('${g.value}/${g.outOf}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-          ),
-      ];
+    for (final g in grades)
+      ListTile(
+        leading: HubAvatar(label: g.subject, color: color, size: 38),
+        title: Text(g.subject),
+        subtitle: Text(
+          [if (g.title.isNotEmpty) g.title, if (g.date != null) dayLabel(g.date!)].join(' · '),
+        ),
+        trailing: Text(
+          '${g.value}/${g.outOf}',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+      ),
+  ];
 
   List<Widget> _messageTiles(BuildContext context) => [
-        for (final m in messages)
-          ListTile(
-            leading: HubAvatar(label: m.from, color: m.read ? Colors.blueGrey : color),
-            title: Text(m.from,
-                style: TextStyle(fontWeight: m.read ? FontWeight.w500 : FontWeight.w800)),
-            subtitle: Text(m.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: m.date == null
-                ? null
-                : Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
-            onTap: () async {
-              m.read = true;
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => Scaffold(
-                    appBar: AppBar(title: Text(m.from)),
-                    body: Column(children: [
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.all(20),
-                          children: [
-                            Text(m.subject,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w800)),
-                            const Divider(height: 28),
-                            FutureBuilder(
-                              future: client.messageContent(m.id),
-                              builder: (c, snap) => snap.hasError
-                                  ? ErrorBanner('${snap.error}')
-                                  : !snap.hasData
-                                      ? const LoadingHint()
-                                      : SelectableText(snap.data!,
-                                          style: const TextStyle(height: 1.5)),
-                            ),
-                          ],
-                        ),
+    for (final m in messages)
+      ListTile(
+        leading: HubAvatar(label: m.from, color: m.read ? Colors.blueGrey : color),
+        title: Text(
+          m.from,
+          style: TextStyle(fontWeight: m.read ? FontWeight.w500 : FontWeight.w800),
+        ),
+        subtitle: Text(m.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: m.date == null
+            ? null
+            : Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
+        onTap: () async {
+          m.read = true;
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => Scaffold(
+                appBar: AppBar(title: Text(m.from)),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          Text(
+                            m.subject,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const Divider(height: 28),
+                          FutureBuilder(
+                            future: client.messageContent(m.id),
+                            builder: (c, snap) => snap.hasError
+                                ? ErrorBanner('${snap.error}')
+                                : !snap.hasData
+                                ? const LoadingHint()
+                                : SelectableText(snap.data!, style: const TextStyle(height: 1.5)),
+                          ),
+                        ],
                       ),
-                      Builder(
-                        builder: (c) => ChatComposer(
-                          color: color,
-                          hint: 'Répondre à ${m.from}',
-                          onSend: (text) async {
-                            await client.reply(m, text);
-                            if (c.mounted) {
-                              ScaffoldMessenger.of(c).showSnackBar(
-                                  const SnackBar(content: Text('Réponse envoyée ✉️')));
-                            }
-                          },
-                        ),
+                    ),
+                    Builder(
+                      builder: (c) => ChatComposer(
+                        color: color,
+                        hint: 'Répondre à ${m.from}',
+                        onSend: (text) async {
+                          await client.reply(m, text);
+                          if (c.mounted) {
+                            ScaffoldMessenger.of(c)
+                                .showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
+                          }
+                        },
                       ),
-                    ]),
-                  ),
+                    ),
+                  ],
                 ),
-              );
-              store.changed();
-            },
-          ),
-      ];
+              ),
+            ),
+          );
+          store.changed();
+        },
+      ),
+  ];
 }

@@ -20,11 +20,11 @@ class IgUser {
   String get display => fullName.isNotEmpty ? fullName : username;
 
   factory IgUser.fromJson(Map<String, dynamic> j) => IgUser(
-        '${j['pk'] ?? j['pk_id'] ?? j['id']}',
-        j['username'] as String? ?? '',
-        j['full_name'] as String? ?? '',
-        j['profile_pic_url'] as String?,
-      );
+    '${j['pk'] ?? j['pk_id'] ?? j['id']}',
+    j['username'] as String? ?? '',
+    j['full_name'] as String? ?? '',
+    j['profile_pic_url'] as String?,
+  );
 }
 
 /// Cherche la première image (la plus grande) n'importe où dans un objet
@@ -83,8 +83,18 @@ class IgMessage {
 }
 
 class IgPost {
-  IgPost(this.id, this.code, this.user, this.images, this.caption, this.likes, this.comments,
-      this.liked, this.isVideo, this.at);
+  IgPost(
+    this.id,
+    this.code,
+    this.user,
+    this.images,
+    this.caption,
+    this.likes,
+    this.comments,
+    this.liked,
+    this.isVideo,
+    this.at,
+  );
   final String id;
   final String code;
   final IgUser user;
@@ -100,9 +110,11 @@ class IgPost {
     final carousel = m['carousel_media'] as List?;
     final images = carousel != null
         ? [for (final c in carousel) findIgImage(c)].whereType<String>().toList()
-        : [findIgImage({'x': m['image_versions2'] == null ? null : {'image_versions2': m['image_versions2']}})]
-            .whereType<String>()
-            .toList();
+        : [
+            findIgImage({
+              'x': m['image_versions2'] == null ? null : {'image_versions2': m['image_versions2']},
+            }),
+          ].whereType<String>().toList();
     return IgPost(
       '${m['id'] ?? m['pk']}',
       '${m['code'] ?? ''}',
@@ -149,8 +161,8 @@ class InstagramApi {
   /// [auth] : soit la valeur du cookie `sessionid`, soit l'en-tête Cookie
   /// complet récupéré par la connexion intégrée (permet d'envoyer).
   InstagramApi(String auth, [http.Client? client])
-      : _http = client ?? http.Client(),
-        _cookies = _parse(auth);
+    : _http = client ?? http.Client(),
+      _cookies = _parse(auth);
 
   final http.Client _http;
   final Map<String, String> _cookies;
@@ -165,45 +177,145 @@ class InstagramApi {
   }
 
   String get sessionId => _cookies['sessionid'] ?? '';
-  String get _userId =>
-      _cookies['ds_user_id'] ?? Uri.decodeComponent(sessionId).split(':').first;
+  String get _userId => _cookies['ds_user_id'] ?? Uri.decodeComponent(sessionId).split(':').first;
   String? get _csrf => _cookies['csrftoken'];
 
-  Map<String, String> get _headers => {
-        'Cookie': {
-          ..._cookies,
-          'ds_user_id': _userId,
-        }.entries.map((e) => '${e.key}=${e.value}').join('; '),
-        'X-CSRFToken': ?_csrf,
-        'X-IG-App-ID': '936619743392459',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Referer': 'https://www.instagram.com/direct/inbox/',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
-      };
+  /// Après un échec sur instagram.com, on bascule sur l'API mobile
+  /// (i.instagram.com, celle de l'appli Android) avec la même session.
+  bool _mobile = false;
+
+  static const _webUa =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+      'Chrome/131.0.0.0 Safari/537.36';
+  static const _mobileUa =
+      'Instagram 361.0.0.35.82 Android (34/14; 480dpi; 1080x2400; '
+      'samsung; SM-S918B; dm3q; qcom; fr_FR; 674675155)';
+
+  String get _host => _mobile ? 'https://i.instagram.com' : 'https://www.instagram.com';
+
+  Map<String, String> get _headers => _mobile
+      ? {
+          'User-Agent': _mobileUa,
+          'X-IG-App-ID': '567067343352427',
+          'X-IG-Capabilities': '3brTv10=',
+          'X-IG-Connection-Type': 'WIFI',
+          'Accept-Language': 'fr-FR, en-US',
+          'IG-U-DS-USER-ID': _userId,
+          'Authorization':
+              'Bearer IGT:2:${base64.encode(utf8.encode(jsonEncode({'ds_user_id': _userId, 'sessionid': Uri.decodeComponent(sessionId)})))}',
+        }
+      : {
+          'Cookie': {
+            ..._cookies,
+            'ds_user_id': _userId,
+          }.entries.map((e) => '${e.key}=${e.value}').join('; '),
+          'X-CSRFToken': ?_csrf,
+          'X-IG-App-ID': '936619743392459',
+          'X-ASBD-ID': '129477',
+          'X-IG-WWW-Claim': '0',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': 'https://www.instagram.com',
+          'Referer': 'https://www.instagram.com/direct/inbox/',
+          'User-Agent': _webUa,
+        };
+
+  /// Transforme une réponse d'Instagram en message clair.
+  static String _explain(http.Response r) {
+    String msg = '';
+    try {
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      if (j is Map) msg = '${j['message'] ?? j['error_type'] ?? ''}';
+    } catch (_) {}
+    final m = msg.toLowerCase();
+    if (m.contains('checkpoint') || m.contains('challenge')) {
+      return 'Instagram demande une vérification : ouvre l\'appli Instagram ou instagram.com, '
+          'valide « C\'était moi », puis reconnecte-toi dans Mon Hub';
+    }
+    if (m.contains('login_required') || r.statusCode == 401) {
+      return 'Session Instagram expirée : appuie sur Déconnecter puis Connecter';
+    }
+    if (r.statusCode == 429 || m.contains('wait')) {
+      return 'Instagram demande de patienter quelques minutes';
+    }
+    if (r.body.trimLeft().startsWith('<')) {
+      return 'Instagram a renvoyé une page web au lieu des données (code ${r.statusCode})';
+    }
+    return 'Instagram : erreur ${r.statusCode}${msg.isEmpty ? '' : ' ($msg)'}';
+  }
+
+  static bool _ok(http.Response r) => r.statusCode < 400 && !r.body.trimLeft().startsWith('<');
+
+  /// Envoie une requête, en essayant l'API web puis l'API mobile.
+  Future<http.Response> _send(
+    String path, {
+    Map<String, String>? form,
+    List<int>? bytes,
+    Map<String, String> extra = const {},
+    bool api = true,
+  }) async {
+    Future<http.Response> go() {
+      final uri = Uri.parse('$_host${api ? '/api/v1' : ''}$path');
+      final h = {..._headers, ...extra};
+      if (form == null && bytes == null) return _http.get(uri, headers: h);
+      if (form != null) h['Content-Type'] = 'application/x-www-form-urlencoded';
+      return _http.post(uri, headers: h, body: form ?? bytes);
+    }
+
+    http.Response r;
+    try {
+      r = await go().timeout(const Duration(seconds: 25));
+    } catch (e) {
+      throw 'Instagram injoignable (vérifie ta connexion internet) : $e';
+    }
+    if (!_ok(r) && !_mobile && r.statusCode != 429) {
+      final first = r;
+      _mobile = true;
+      try {
+        r = await go().timeout(const Duration(seconds: 25));
+      } catch (_) {
+        r = first;
+      }
+      if (!_ok(r)) {
+        _mobile = false;
+        // Le message le plus parlant des deux.
+        final m = _explain(r);
+        throw m.startsWith('Instagram : erreur') ? _explain(first) : m;
+      }
+    }
+    if (!_ok(r)) throw _explain(r);
+    return r;
+  }
 
   Future<Map<String, dynamic>> _get(String path) async {
-    final r = await _http.get(Uri.parse('https://www.instagram.com/api/v1$path'),
-        headers: _headers);
-    if (r.statusCode == 401 || r.statusCode == 403 || r.body.startsWith('<')) {
-      throw 'Session Instagram expirée : reconnecte ton compte';
-    }
-    if (r.statusCode == 429) throw 'Instagram demande de ralentir';
-    if (r.statusCode >= 400) throw 'Instagram : erreur ${r.statusCode}';
+    final r = await _send(path);
     return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// Vérifie la session et renvoie le compte connecté.
+  Future<IgUser> me() async {
+    try {
+      final j = await _get('/accounts/current_user/?edit=true');
+      return IgUser.fromJson(j['user'] as Map<String, dynamic>);
+    } catch (_) {
+      final (viewer, _) = await inbox();
+      return viewer;
+    }
+  }
+
+  void _needCsrf() {
+    if (_csrf == null && !_cookies.containsKey('ds_user_id')) {
+      throw 'Pour envoyer, reconnecte Instagram avec le bouton « Connecter » '
+          '(connexion intégrée)';
+    }
   }
 
   /// Envoie un message texte dans une conversation.
   Future<void> send(String threadId, String text) async {
-    if (_csrf == null) {
-      throw 'Pour envoyer, reconnecte Instagram avec le bouton « Connecter » '
-          '(connexion intégrée)';
-    }
+    _needCsrf();
     final ctx = '${DateTime.now().microsecondsSinceEpoch}${DateTime.now().millisecond}';
-    final r = await _http.post(
-      Uri.parse('https://www.instagram.com/api/v1/direct_v2/threads/broadcast/text/'),
-      headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
+    await _send(
+      '/direct_v2/threads/broadcast/text/',
+      form: {
         'action': 'send_item',
         'client_context': ctx,
         'mutation_token': ctx,
@@ -212,22 +324,18 @@ class InstagramApi {
         'text': text,
       },
     );
-    if (r.statusCode >= 400 || r.body.startsWith('<')) {
-      throw 'Instagram a refusé l\'envoi (code ${r.statusCode})';
-    }
   }
 
   /// Envoie une photo (JPEG/PNG) dans une conversation.
   Future<void> sendPhoto(String threadId, List<int> bytes, int width, int height) async {
-    if (_csrf == null) {
-      throw 'Pour envoyer, reconnecte Instagram avec le bouton « Connecter »';
-    }
+    _needCsrf();
     final uploadId = '${DateTime.now().millisecondsSinceEpoch}';
     final name = 'fb_uploader_$uploadId';
-    final up = await _http.post(
-      Uri.parse('https://www.instagram.com/rupload_igphoto/$name'),
-      headers: {
-        ..._headers,
+    await _send(
+      '/rupload_igphoto/$name',
+      api: false,
+      bytes: bytes,
+      extra: {
         'Content-Type': 'image/jpeg',
         'Offset': '0',
         'X-Entity-Name': name,
@@ -240,14 +348,11 @@ class InstagramApi {
           'upload_media_width': width,
         }),
       },
-      body: bytes,
     );
-    if (up.statusCode >= 400) throw 'Instagram a refusé la photo (code ${up.statusCode})';
     final ctx = '${DateTime.now().microsecondsSinceEpoch}';
-    final r = await _http.post(
-      Uri.parse('https://www.instagram.com/api/v1/direct_v2/threads/broadcast/configure_photo/'),
-      headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
+    await _send(
+      '/direct_v2/threads/broadcast/configure_photo/',
+      form: {
         'action': 'send_item',
         'thread_ids': '[$threadId]',
         'upload_id': uploadId,
@@ -257,18 +362,10 @@ class InstagramApi {
         'offline_threading_id': ctx,
       },
     );
-    if (r.statusCode >= 400 || r.body.startsWith('<')) {
-      throw 'Instagram a refusé l\'envoi de la photo (code ${r.statusCode})';
-    }
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, String> body) async {
-    final r = await _http.post(Uri.parse('https://www.instagram.com/api/v1$path'),
-        headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'}, body: body);
-    if (r.statusCode == 401 || r.statusCode == 403 || r.body.startsWith('<')) {
-      throw 'Session Instagram expirée : reconnecte ton compte';
-    }
-    if (r.statusCode >= 400) throw 'Instagram : erreur ${r.statusCode}';
+    final r = await _send(path, form: body);
     return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
   }
 
@@ -276,7 +373,10 @@ class InstagramApi {
   Future<List<IgPost>> timeline() async {
     Map<String, dynamic> j;
     try {
-      j = await _post('/feed/timeline/', {'is_async_ads_rti': '0', 'is_async_ads_double_request': '0'});
+      j = await _post('/feed/timeline/', {
+        'is_async_ads_rti': '0',
+        'is_async_ads_double_request': '0',
+      });
     } catch (_) {
       j = await _get('/feed/timeline/');
     }
@@ -300,8 +400,11 @@ class InstagramApi {
     return [
       for (final t in (j['tray'] as List? ?? []))
         if (t['user'] != null)
-          IgStoryUser('${t['id']}', IgUser.fromJson(t['user'] as Map<String, dynamic>),
-              (t['seen'] ?? 0) != 0 && (t['seen'] ?? 0) >= (t['latest_reel_media'] ?? 0)),
+          IgStoryUser(
+            '${t['id']}',
+            IgUser.fromJson(t['user'] as Map<String, dynamic>),
+            (t['seen'] ?? 0) != 0 && (t['seen'] ?? 0) >= (t['latest_reel_media'] ?? 0),
+          ),
     ];
   }
 
@@ -320,12 +423,14 @@ class InstagramApi {
   }
 
   Future<(IgUser, List<IgThread>)> inbox() async {
-    final j = await _get('/direct_v2/inbox/?persistentBadging=true&limit=20&thread_message_limit=1');
+    final j = await _get(
+      '/direct_v2/inbox/?persistentBadging=true&limit=20&thread_message_limit=1',
+    );
     final viewer = IgUser.fromJson(j['viewer'] as Map<String, dynamic>);
     final threads = <IgThread>[];
     for (final t in (j['inbox']?['threads'] as List? ?? [])) {
       final users = [
-        for (final u in t['users'] as List? ?? []) IgUser.fromJson(u as Map<String, dynamic>)
+        for (final u in t['users'] as List? ?? []) IgUser.fromJson(u as Map<String, dynamic>),
       ];
       final items = t['items'] as List? ?? [];
       final last = items.isEmpty ? null : IgMessage.fromJson(items.first as Map<String, dynamic>);
@@ -343,7 +448,7 @@ class InstagramApi {
     final j = await _get('/direct_v2/threads/$id/?limit=30');
     return [
       for (final m in j['thread']?['items'] as List? ?? [])
-        IgMessage.fromJson(m as Map<String, dynamic>)
+        IgMessage.fromJson(m as Map<String, dynamic>),
     ];
   }
 }
@@ -403,18 +508,15 @@ class InstagramModule extends HubModule {
     return [
       for (final t in threads)
         if (t.last != null && t.last!.userId != me?.id)
-          HubNotification(
-            id: t.last!.id,
-            title: 'Instagram · ${t.title}',
-            body: t.last!.text,
-          ),
+          HubNotification(id: t.last!.id, title: 'Instagram · ${t.title}', body: t.last!.text),
     ];
   }
 
   Future<void> connect(BuildContext context) async {
     String s;
     if (webLoginSupported) {
-      s = await WebLoginPage.open(
+      s =
+          await WebLoginPage.open(
             context,
             const WebLoginPage(
               title: 'Connexion à Instagram',
@@ -429,7 +531,8 @@ class InstagramModule extends HubModule {
       final r = await askFields(
         context,
         title: 'Connecter Instagram',
-        message: '1. Ouvre instagram.com dans ton navigateur et connecte-toi.\n'
+        message:
+            '1. Ouvre instagram.com dans ton navigateur et connecte-toi.\n'
             '2. F12 > onglet « Application » > Cookies > instagram.com.\n'
             '3. Copie la valeur du cookie « sessionid ».',
         labels: ['sessionid'],
@@ -438,19 +541,23 @@ class InstagramModule extends HubModule {
       s = r?.first.trim() ?? '';
     }
     if (s.isEmpty || !context.mounted) return;
+    // On garde la session tout de suite : même si la vérification échoue
+    // (réseau, vérification Instagram…), il suffira d'actualiser.
+    await store.writeSecret('sessionid', s);
+    _api = null;
+    await store.setJson('connected', true);
     try {
-      final (viewer, _) = await InstagramApi(s).inbox();
-      await store.writeSecret('sessionid', s);
-      _api = null;
-      await store.setJson('connected', true);
+      final viewer = await InstagramApi(s).me();
       await load(force: true);
       store.changed();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Connecté en tant que @${viewer.username}')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Connecté en tant que @${viewer.username}')));
       }
     } catch (e) {
-      if (context.mounted) showError(context, e);
+      await load(force: true);
+      store.changed();
+      if (context.mounted) showError(context, 'Compte enregistré, mais : $e');
     }
   }
 
@@ -466,118 +573,141 @@ class InstagramModule extends HubModule {
   }
 
   Widget _threadTile(BuildContext context, IgThread t, {bool dense = false}) => ListTile(
-        dense: dense,
-        visualDensity: dense ? VisualDensity.compact : null,
-        leading: HubAvatar(
-            url: t.users.length == 1 ? t.users.first.pic : null,
-            label: t.title,
-            color: color,
-            size: dense ? 30 : 40),
-        title: Text(t.title,
+    dense: dense,
+    visualDensity: dense ? VisualDensity.compact : null,
+    leading: HubAvatar(
+      url: t.users.length == 1 ? t.users.first.pic : null,
+      label: t.title,
+      color: color,
+      size: dense ? 30 : 40,
+    ),
+    title: Text(
+      t.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontWeight: t.unread ? FontWeight.w700 : FontWeight.w500),
+    ),
+    subtitle: t.last == null
+        ? null
+        : Text(
+            '${t.last!.userId == me?.id ? 'Toi : ' : ''}${t.last!.text}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontWeight: t.unread ? FontWeight.w700 : FontWeight.w500)),
-        subtitle: t.last == null
-            ? null
-            : Text('${t.last!.userId == me?.id ? 'Toi : ' : ''}${t.last!.text}',
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: t.last == null
-            ? null
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(timeAgo(t.last!.at), style: Theme.of(context).textTheme.labelSmall),
-                  if (t.unread) ...[const SizedBox(height: 4), Dot(color: color)],
-                ],
-              ),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => _ThreadPage(module: this, thread: t))),
-      );
+          ),
+    trailing: t.last == null
+        ? null
+        : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(timeAgo(t.last!.at), style: Theme.of(context).textTheme.labelSmall),
+              if (t.unread) ...[const SizedBox(height: 4), Dot(color: color)],
+            ],
+          ),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ThreadPage(module: this, thread: t),
+      ),
+    ),
+  );
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) {
-          if (!connected) {
-            return EmptyHint('Connecte ton compte pour voir tes messages',
-                icon: Icons.link_rounded, action: ('Connecter', () => connect(context)));
+    listenable: store,
+    builder: (context, _) {
+      if (!connected) {
+        return EmptyHint(
+          'Connecte ton compte pour voir tes messages',
+          icon: Icons.link_rounded,
+          action: ('Connecter', () => connect(context)),
+        );
+      }
+      return FutureBuilder(
+        future: load(),
+        initialData: _threads,
+        builder: (context, snap) {
+          final list = (snap.data ?? []).take(4).toList();
+          if (list.isEmpty) {
+            return snap.connectionState == ConnectionState.waiting
+                ? const LoadingHint()
+                : EmptyHint(lastError ?? 'Aucun message');
           }
-          return FutureBuilder(
-            future: load(),
-            initialData: _threads,
-            builder: (context, snap) {
-              final list = (snap.data ?? []).take(4).toList();
-              if (list.isEmpty) {
-                return snap.connectionState == ConnectionState.waiting
-                    ? const LoadingHint()
-                    : EmptyHint(lastError ?? 'Aucun message');
-              }
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                physics: const NeverScrollableScrollPhysics(),
-                children: [for (final t in list) _threadTile(context, t, dense: true)],
-              );
-            },
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            physics: const NeverScrollableScrollPhysics(),
+            children: [for (final t in list) _threadTile(context, t, dense: true)],
           );
         },
       );
+    },
+  );
 
   @override
   Widget buildPage(BuildContext context) => DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(name),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                onPressed: () => load(force: true).then((_) => store.changed()),
-              ),
-              IconButton(
-                tooltip: 'Ouvrir Instagram',
-                icon: const Icon(Icons.open_in_new_rounded),
-                onPressed: () => openLink(context, 'https://www.instagram.com/'),
+    length: 2,
+    child: Scaffold(
+      appBar: AppBar(
+        title: Text(name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => load(force: true).then((_) => store.changed()),
+          ),
+          IconButton(
+            tooltip: 'Ouvrir Instagram',
+            icon: const Icon(Icons.open_in_new_rounded),
+            onPressed: () => openLink(context, 'https://www.instagram.com/'),
+          ),
+        ],
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Fil d\'actu'),
+            Tab(text: 'Messages'),
+          ],
+        ),
+      ),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          if (!connected) {
+            return EmptyHint(
+              'Connecte ton compte Instagram pour voir ton fil, tes stories et '
+              'tes messages ici.',
+              icon: icon,
+              action: ('Connecter mon compte', () => connect(context)),
+            );
+          }
+          return TabBarView(
+            children: [
+              _FeedTab(module: this),
+              FutureBuilder(
+                future: load(),
+                initialData: _threads,
+                builder: (context, snap) => ListView(
+                  children: [
+                    if (me != null)
+                      ListTile(
+                        leading: HubAvatar(url: me!.pic, label: me!.username, color: color),
+                        title: Text('@${me!.username}'),
+                        subtitle: const Text('Connecté'),
+                        trailing: TextButton(
+                          onPressed: disconnect,
+                          child: const Text('Déconnecter'),
+                        ),
+                      ),
+                    if (lastError != null) ErrorBanner(lastError!),
+                    const Divider(),
+                    for (final t in snap.data ?? <IgThread>[]) _threadTile(context, t),
+                  ],
+                ),
               ),
             ],
-            bottom: const TabBar(tabs: [Tab(text: 'Fil d\'actu'), Tab(text: 'Messages')]),
-          ),
-          body: ListenableBuilder(
-            listenable: store,
-            builder: (context, _) {
-              if (!connected) {
-                return EmptyHint(
-                    'Connecte ton compte Instagram pour voir ton fil, tes stories et '
-                    'tes messages ici.',
-                    icon: icon,
-                    action: ('Connecter mon compte', () => connect(context)));
-              }
-              return TabBarView(children: [
-                _FeedTab(module: this),
-                FutureBuilder(
-                  future: load(),
-                  initialData: _threads,
-                  builder: (context, snap) => ListView(
-                    children: [
-                      if (me != null)
-                        ListTile(
-                          leading: HubAvatar(url: me!.pic, label: me!.username, color: color),
-                          title: Text('@${me!.username}'),
-                          subtitle: const Text('Connecté'),
-                          trailing:
-                              TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
-                        ),
-                      if (lastError != null) ErrorBanner(lastError!),
-                      const Divider(),
-                      for (final t in snap.data ?? <IgThread>[]) _threadTile(context, t),
-                    ],
-                  ),
-                ),
-              ]);
-            },
-          ),
-        ),
-      );
+          );
+        },
+      ),
+    ),
+  );
 }
 
 class _FeedTab extends StatefulWidget {
@@ -646,30 +776,40 @@ class _FeedTabState extends State<_FeedTab> with AutomaticKeepAliveClientMixin {
                             ),
                             child: SizedBox(
                               width: 76,
-                              child: Column(children: [
-                                Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: t.seen
-                                        ? null
-                                        : const LinearGradient(colors: [
-                                            Color(0xFFFEDA75),
-                                            Color(0xFFFA7E1E),
-                                            Color(0xFFD62976),
-                                            Color(0xFF962FBF),
-                                          ]),
-                                    color: t.seen ? Colors.grey.shade400 : null,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: t.seen
+                                          ? null
+                                          : const LinearGradient(
+                                              colors: [
+                                                Color(0xFFFEDA75),
+                                                Color(0xFFFA7E1E),
+                                                Color(0xFFD62976),
+                                                Color(0xFF962FBF),
+                                              ],
+                                            ),
+                                      color: t.seen ? Colors.grey.shade400 : null,
+                                    ),
+                                    child: HubAvatar(
+                                      url: t.user.pic,
+                                      label: t.user.username,
+                                      color: color,
+                                      size: 58,
+                                    ),
                                   ),
-                                  child: HubAvatar(
-                                      url: t.user.pic, label: t.user.username, color: color, size: 58),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(t.user.username,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    t.user.username,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11)),
-                              ]),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -710,67 +850,91 @@ class _PostCardState extends State<_PostCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ListTile(
-            leading: HubAvatar(url: p.user.pic, label: p.user.username, color: widget.module.color, size: 36),
+            leading: HubAvatar(
+              url: p.user.pic,
+              label: p.user.username,
+              color: widget.module.color,
+              size: 36,
+            ),
             title: Text(p.user.username, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(timeAgo(p.at)),
           ),
           if (p.images.isNotEmpty)
             AspectRatio(
               aspectRatio: 1,
-              child: Stack(children: [
-                PageView(
-                  onPageChanged: (i) => setState(() => page = i),
-                  children: [
-                    for (final url in p.images)
-                      GestureDetector(
-                        onTap: () => showPhoto(context, url),
-                        onDoubleTap: _toggleLike,
-                        child: Image.network(url, fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_rounded))),
-                      ),
-                  ],
-                ),
-                if (p.isVideo)
-                  const Center(
-                    child: Icon(Icons.play_circle_fill_rounded, size: 64, color: Colors.white70),
+              child: Stack(
+                children: [
+                  PageView(
+                    onPageChanged: (i) => setState(() => page = i),
+                    children: [
+                      for (final url in p.images)
+                        GestureDetector(
+                          onTap: () => showPhoto(context, url),
+                          onDoubleTap: _toggleLike,
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const Center(child: Icon(Icons.broken_image_rounded)),
+                          ),
+                        ),
+                    ],
                   ),
-                if (p.images.length > 1)
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          color: Colors.black54, borderRadius: BorderRadius.circular(12)),
-                      child: Text('${page + 1}/${p.images.length}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  if (p.isVideo)
+                    const Center(
+                      child: Icon(Icons.play_circle_fill_rounded, size: 64, color: Colors.white70),
                     ),
-                  ),
-              ]),
+                  if (p.images.length > 1)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${page + 1}/${p.images.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          Row(children: [
-            IconButton(
-              icon: Icon(p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  color: p.liked ? Colors.red : null),
-              onPressed: _toggleLike,
-            ),
-            Text('${p.likes}'),
-            const SizedBox(width: 12),
-            IconButton(
-              tooltip: 'Commentaires / vidéo (ouvre Instagram)',
-              icon: const Icon(Icons.mode_comment_outlined),
-              onPressed: () => openLink(context, 'https://www.instagram.com/p/${p.code}/'),
-            ),
-            Text('${p.comments}'),
-          ]),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  color: p.liked ? Colors.red : null,
+                ),
+                onPressed: _toggleLike,
+              ),
+              Text('${p.likes}'),
+              const SizedBox(width: 12),
+              IconButton(
+                tooltip: 'Commentaires / vidéo (ouvre Instagram)',
+                icon: const Icon(Icons.mode_comment_outlined),
+                onPressed: () => openLink(context, 'https://www.instagram.com/p/${p.code}/'),
+              ),
+              Text('${p.comments}'),
+            ],
+          ),
           if (p.caption.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: '${p.user.username} ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  TextSpan(text: p.caption),
-                ]),
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${p.user.username} ',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    TextSpan(text: p.caption),
+                  ],
+                ),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,
@@ -812,8 +976,9 @@ class _StoryViewer extends StatefulWidget {
 }
 
 class _StoryViewerState extends State<_StoryViewer> {
-  late final Future<List<IgStoryItem>> future =
-      widget.module._client().then((api) => api!.stories(widget.story.reelId));
+  late final Future<List<IgStoryItem>> future = widget.module._client().then(
+    (api) => api!.stories(widget.story.reelId),
+  );
   int index = 0;
   Timer? timer;
 
@@ -860,49 +1025,67 @@ class _StoryViewerState extends State<_StoryViewer> {
                 _next(items.length);
               }
             },
-            child: Stack(fit: StackFit.expand, children: [
-              Image.network(it.image, fit: BoxFit.contain),
-              if (it.isVideo)
-                Center(
-                  child: FilledButton.icon(
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Vidéo : ouvrir dans Instagram'),
-                    onPressed: () => openLink(context,
-                        'https://www.instagram.com/stories/${widget.story.user.username}/'),
-                  ),
-                ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(children: [
-                    Row(children: [
-                      for (var i = 0; i < items.length; i++)
-                        Expanded(
-                          child: Container(
-                            height: 3,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            color: i <= index ? Colors.white : Colors.white30,
-                          ),
-                        ),
-                    ]),
-                    ListTile(
-                      leading: HubAvatar(
-                          url: widget.story.user.pic,
-                          label: widget.story.user.username,
-                          color: widget.module.color,
-                          size: 32),
-                      title: Text(widget.story.user.username,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                      subtitle: Text(timeAgo(it.at), style: const TextStyle(color: Colors.white70)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(it.image, fit: BoxFit.contain),
+                if (it.isVideo)
+                  Center(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Vidéo : ouvrir dans Instagram'),
+                      onPressed: () => openLink(
+                        context,
+                        'https://www.instagram.com/stories/${widget.story.user.username}/',
                       ),
                     ),
-                  ]),
+                  ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            for (var i = 0; i < items.length; i++)
+                              Expanded(
+                                child: Container(
+                                  height: 3,
+                                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                                  color: i <= index ? Colors.white : Colors.white30,
+                                ),
+                              ),
+                          ],
+                        ),
+                        ListTile(
+                          leading: HubAvatar(
+                            url: widget.story.user.pic,
+                            label: widget.story.user.username,
+                            color: widget.module.color,
+                            size: 32,
+                          ),
+                          title: Text(
+                            widget.story.user.username,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            timeAgo(it.at),
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           );
         },
       ),
@@ -955,21 +1138,23 @@ class _ThreadPageState extends State<_ThreadPage> {
     final names = {for (final u in thread.users) u.id: u.display};
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: [
-          HubAvatar(
+        title: Row(
+          children: [
+            HubAvatar(
               url: thread.users.length == 1 ? thread.users.first.pic : null,
               label: thread.title,
               color: module.color,
-              size: 32),
-          const SizedBox(width: 10),
-          Expanded(child: Text(thread.title, overflow: TextOverflow.ellipsis)),
-        ]),
+              size: 32,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(thread.title, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Appel vocal / vidéo (ouvre Instagram)',
             icon: const Icon(Icons.call_rounded),
-            onPressed: () =>
-                openLink(context, 'https://www.instagram.com/direct/t/${thread.id}/'),
+            onPressed: () => openLink(context, 'https://www.instagram.com/direct/t/${thread.id}/'),
           ),
         ],
       ),
@@ -979,32 +1164,34 @@ class _ThreadPageState extends State<_ThreadPage> {
             child: error != null && msgs == null
                 ? EmptyHint(error!)
                 : msgs == null
-                    ? const LoadingHint()
-                    : ListView.builder(
-                        reverse: true,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: msgs!.length,
-                        itemBuilder: (context, i) {
-                          final m = msgs![i];
-                          final mine = m.userId == module.me?.id;
-                          return ChatBubble(
-                            text: m.text,
-                            images: [?m.image],
-                            author: mine || thread.users.length < 2 ? null : names[m.userId],
-                            time: '${dayLabel(m.at)} ${hhmm(m.at)}',
-                            mine: mine,
-                            color: module.color,
-                          );
-                        },
-                      ),
+                ? const LoadingHint()
+                : ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.all(12),
+                    itemCount: msgs!.length,
+                    itemBuilder: (context, i) {
+                      final m = msgs![i];
+                      final mine = m.userId == module.me?.id;
+                      return ChatBubble(
+                        text: m.text,
+                        images: [?m.image],
+                        author: mine || thread.users.length < 2 ? null : names[m.userId],
+                        time: '${dayLabel(m.at)} ${hhmm(m.at)}',
+                        mine: mine,
+                        color: module.color,
+                      );
+                    },
+                  ),
           ),
           ChatComposer(
             color: module.color,
             hint: 'Écrire à ${thread.title}',
             onAttach: () async {
-              final file = await openFile(acceptedTypeGroups: const [
-                XTypeGroup(label: 'Photos', extensions: ['jpg', 'jpeg', 'png']),
-              ]);
+              final file = await openFile(
+                acceptedTypeGroups: const [
+                  XTypeGroup(label: 'Photos', extensions: ['jpg', 'jpeg', 'png']),
+                ],
+              );
               if (file == null) return;
               final bytes = await file.readAsBytes();
               final codec = await ui.instantiateImageCodec(bytes);
