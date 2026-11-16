@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 
 class IgUser {
@@ -186,20 +187,31 @@ class InstagramModule extends HubModule {
   }
 
   Future<void> connect(BuildContext context) async {
-    final r = await askFields(
-      context,
-      title: 'Connecter Instagram',
-      message: '1. Sur ton PC, ouvre instagram.com dans Chrome ou Edge et connecte-toi.\n'
-          '2. Appuie sur F12 > onglet « Application » > Cookies > instagram.com.\n'
-          '3. Copie la valeur du cookie « sessionid ».\n\n'
-          '⚠️ Ce cookie donne accès à ton compte : ne le partage avec personne. '
-          'Il reste chiffré sur l\'appareil. Instagram n\'autorise pas officiellement '
-          'les applis tierces : risque (faible, lecture seule) de blocage temporaire.',
-      labels: ['sessionid'],
-      obscure: {0},
-    );
-    final s = r?.first.trim() ?? '';
-    if (s.isEmpty) return;
+    String s;
+    if (webLoginSupported) {
+      s = await WebLoginPage.open(
+            context,
+            const WebLoginPage(
+              title: 'Connexion à Instagram',
+              url: 'https://www.instagram.com/accounts/login/',
+              cookieName: 'sessionid',
+              cookieUrl: 'https://www.instagram.com',
+            ),
+          ) ??
+          '';
+    } else {
+      final r = await askFields(
+        context,
+        title: 'Connecter Instagram',
+        message: '1. Ouvre instagram.com dans ton navigateur et connecte-toi.\n'
+            '2. F12 > onglet « Application » > Cookies > instagram.com.\n'
+            '3. Copie la valeur du cookie « sessionid ».',
+        labels: ['sessionid'],
+        obscure: {0},
+      );
+      s = r?.first.trim() ?? '';
+    }
+    if (s.isEmpty || !context.mounted) return;
     try {
       final (viewer, _) = await InstagramApi(s).inbox();
       await store.writeSecret('sessionid', s);

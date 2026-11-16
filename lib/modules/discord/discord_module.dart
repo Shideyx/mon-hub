@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 import 'discord_api.dart';
 
@@ -111,12 +112,9 @@ class DiscordModule extends HubModule {
         title: const Text('Connecter ton compte Discord'),
         content: const SingleChildScrollView(
           child: Text(
-            '1. Ouvre discord.com/app dans Chrome ou Edge sur ton PC et connecte-toi.\n'
-            '2. Appuie sur F12, onglet « Réseau » (Network).\n'
-            '3. Clique sur n\'importe quel salon, puis sur une requête « messages ».\n'
-            '4. Dans « En-têtes de requête », copie la valeur de « authorization ».\n\n'
-            '⚠️ Ce jeton donne un accès complet à ton compte : ne le partage avec '
-            'personne. Il reste chiffré sur cet appareil.\n\n'
+            'La page de connexion officielle de Discord va s\'ouvrir dans l\'appli. '
+            'Connecte-toi normalement : Mon Hub récupère ensuite ta session toute seule '
+            '(elle reste chiffrée sur cet appareil).\n\n'
             '⚠️ Discord interdit officiellement l\'usage d\'un compte par une appli '
             'tierce. Mon Hub ne fait que lire tes MP toutes les quelques minutes, '
             'mais un risque de suspension existe.',
@@ -124,15 +122,32 @@ class DiscordModule extends HubModule {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('J\'ai compris')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Continuer')),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
-    final r = await askFields(context,
-        title: 'Jeton Discord', labels: ['authorization'], obscure: {0});
-    final token = r?.first.trim().replaceAll('"', '') ?? '';
-    if (token.isEmpty) return;
+    String token;
+    if (webLoginSupported) {
+      token = await WebLoginPage.open(
+            context,
+            const WebLoginPage(
+              title: 'Connexion à Discord',
+              url: 'https://discord.com/login',
+              captureAuthorizationHeader: true,
+            ),
+          ) ??
+          '';
+    } else {
+      final r = await askFields(context,
+          title: 'Jeton Discord',
+          message: 'Sur discord.com/app : F12 > Réseau > une requête « messages » > '
+              'copie l\'en-tête « authorization ».',
+          labels: ['authorization'],
+          obscure: {0});
+      token = r?.first.trim().replaceAll('"', '') ?? '';
+    }
+    if (token.isEmpty || !context.mounted) return;
     try {
       final u = await DiscordApi(token).me();
       await store.writeSecret('token', token);

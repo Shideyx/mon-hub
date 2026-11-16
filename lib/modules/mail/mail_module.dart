@@ -123,6 +123,25 @@ class MailModule extends HubModule {
   }
 
   Future<void> _addAccount(BuildContext context) async {
+    // Gmail : on ouvre directement la page qui crée le mot de passe d'application.
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Boîte Gmail ?'),
+        content: const Text(
+            'Pour Gmail, Google demande un « mot de passe d\'application » (16 lettres) '
+            'au lieu de ton vrai mot de passe. Je t\'ouvre la page qui le crée : '
+            'donne-lui le nom « Mon Hub », copie le code, puis reviens ici.\n\n'
+            '(La validation en 2 étapes doit être activée sur ton compte Google.)'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Pas Gmail')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ouvrir la page Google')),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    if (open == true) await openLink(context, 'https://myaccount.google.com/apppasswords');
+    if (!context.mounted) return;
     final r = await askFields(context,
         title: 'Ajouter une boîte mail',
         labels: [
