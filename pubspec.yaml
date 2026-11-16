@@ -46,7 +46,8 @@ dependencies:
   flutter_inappwebview: 6.2.0-beta.3
   flutter_tts: ^4.2.5
   speech_to_text: ^7.5.0
-
+  win32: ^6.4.0
+  ffi: ^2.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -68,6 +69,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

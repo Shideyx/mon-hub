@@ -9,15 +9,21 @@ import 'core/module_store.dart';
 import 'core/nav.dart';
 import 'core/notifications.dart';
 import 'core/session.dart';
+import 'core/shortcuts.dart';
 import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
+import 'ui/clicky/clicky_desktop.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
+  if (args.contains('--clicky')) return runClickyDesktop();
   WidgetsFlutterBinding.ensureInitialized();
   await ModuleStore.init();
   AppSession.instance.restore();
+  // Raccourcis Bureau / menu Démarrer, créés ou réparés tout seuls.
+  unawaited(AppShortcuts.ensure());
   runApp(const HubApp());
 }
 
@@ -78,11 +84,20 @@ class _HubAppState extends State<HubApp> {
         _bridge = b;
         _openFor = login;
         // Laisse l'appli Claude (PC) lire et agir dans Mon Hub.
-        unawaited(b.start());
+        unawaited(b.start().then((_) => _startClicky()));
         unawaited(n.start());
+        // Alertes de Clicky (agent terminé…).
+        ClickyController.instance.notify = (title, body) =>
+            n.show(HubNotification(id: 'clicky:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body));
       }
     }
     if (mounted) setState(() {});
+  }
+
+  /// Windows : Clicky au-dessus de tout l'écran (petit programme à part).
+  Future<void> _startClicky() async {
+    final c = ClickyController.instance;
+    if (ClickyDesktop.supported && c.enabled && c.everywhere) await ClickyDesktop.launch();
   }
 
   @override

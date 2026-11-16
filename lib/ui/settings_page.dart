@@ -9,6 +9,7 @@ import '../core/hub_controller.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
 import '../core/session.dart';
+import '../core/shortcuts.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -177,6 +178,38 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               },
             ),
+            if (AppShortcuts.supported) ...[
+              section('Raccourcis'),
+              ListTile(
+                leading: const Icon(Icons.shortcut_rounded),
+                title: Text(Platform.isWindows
+                    ? 'Recréer les raccourcis (Bureau et menu Démarrer)'
+                    : 'Recréer le raccourci du menu des applications'),
+                subtitle: const Text('Ils sont créés tout seuls au premier lancement'),
+                onTap: () async {
+                  final ok = await AppShortcuts.create();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(ok
+                            ? 'Raccourcis créés ✅'
+                            : 'Impossible de créer les raccourcis sur ce PC')));
+                  }
+                },
+              ),
+              if (Platform.isWindows)
+                StatefulBuilder(
+                  builder: (context, setState) => SwitchListTile(
+                    secondary: const Icon(Icons.power_settings_new_rounded),
+                    title: const Text('Lancer Mon Hub au démarrage de Windows'),
+                    subtitle: const Text('Pratique pour avoir Clicky et les alertes tout de suite'),
+                    value: AppShortcuts.startup,
+                    onChanged: (v) async {
+                      await AppShortcuts.setStartup(v);
+                      setState(() {});
+                    },
+                  ),
+                ),
+            ],
             section('Mes appareils'),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),

@@ -5,6 +5,8 @@
 
 #include "resource.h"
 
+static void MakeTransparent(HWND hwnd);
+
 namespace {
 
 /// Window attribute that enables dark mode window decorations.
@@ -134,8 +136,11 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+  const DWORD ex_style =
+      overlay_ ? (WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE) : 0;
+  const DWORD style = overlay_ ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+  HWND window = CreateWindowEx(
+      ex_style, window_class, title.c_str(), style,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -145,12 +150,44 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  if (overlay_) MakeTransparent(window);
 
   return OnCreate();
 }
 
 bool Win32Window::Show() {
+  // La fenêtre de Clicky est affichée par Dart, au bon endroit.
+  if (overlay_) return true;
   return ShowWindow(window_handle_, SW_SHOWNORMAL);
+}
+
+// Fond transparent : seuls le curseur bleu et la bulle de Clicky se voient.
+static void MakeTransparent(HWND hwnd) {
+  MARGINS margins = {-1, -1, -1, -1};
+  DwmExtendFrameIntoClientArea(hwnd, &margins);
+  HMODULE user32 = LoadLibrary(TEXT("user32.dll"));
+  if (!user32) return;
+  struct ACCENTPOLICY {
+    int nAccentState;
+    int nFlags;
+    int nColor;
+    int nAnimationId;
+  };
+  struct WINCOMPATTRDATA {
+    int nAttribute;
+    PVOID pData;
+    ULONG ulDataSize;
+  };
+  typedef BOOL(WINAPI * SetWca)(HWND, WINCOMPATTRDATA*);
+  auto set_wca = reinterpret_cast<SetWca>(
+      GetProcAddress(user32, "SetWindowCompositionAttribute"));
+  if (set_wca) {
+    // 2 = ACCENT_ENABLE_TRANSPARENTGRADIENT, couleur entièrement transparente.
+    ACCENTPOLICY policy = {2, 2, 0, 0};
+    WINCOMPATTRDATA data = {19, &policy, sizeof(policy)};
+    set_wca(hwnd, &data);
+  }
+  FreeLibrary(user32);
 }
 
 // static

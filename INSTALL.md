@@ -13,7 +13,7 @@ Liens de téléchargement (toujours la dernière version) :
 2. Clic droit sur le fichier → **Extraire tout…** → choisis par exemple `Documents\Mon Hub` → **Extraire**.
 3. Dans le dossier, double-clique sur **hub.exe**.
 4. Si Windows affiche « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires** puis **Exécuter quand même** (normal pour une appli qui n'est pas sur le Microsoft Store).
-5. Pour l'avoir sous la main : clic droit sur `hub.exe` → **Épingler à la barre des tâches**.
+5. C'est tout : au premier lancement, Mon Hub crée tout seul ses raccourcis **sur le Bureau** et **dans le menu Démarrer** (ils sont réparés automatiquement si tu déplaces le dossier ou installes une nouvelle version ailleurs). Pour l'épingler : clic droit sur le raccourci → **Épingler à la barre des tâches**. Option : *Réglages → Lancer Mon Hub au démarrage de Windows*.
 6. Si la page de connexion Instagram/Discord reste blanche : installe **Microsoft Edge WebView2** (déjà présent sur la plupart des PC) depuis https://go.microsoft.com/fwlink/p/?LinkId=2124703
 
 ## 2. Sur le téléphone Android
@@ -58,7 +58,18 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 
 | **Claude** | Carte Claude → **Ouvrir Claude** → connecte-toi comme sur claude.ai (si « Continuer avec Google » refuse dans l'appli, choisis « Continuer avec l'e-mail »). |
 
-## 3 ter. Laisser Claude agir dans Mon Hub (PC)
+## 3 ter. Clicky, ton compagnon à côté du curseur
+
+1. Carte **Claude** → **Configurer Clicky** → choisis son cerveau :
+   - **Claude (clé API)** : le plus malin (voit très bien l'écran, utilise tes modules, mode agent). Crée une clé sur https://console.anthropic.com/settings/keys (payée à l'usage, quelques centimes par question) et colle-la.
+   - **Local gratuit (Ollama)** : sans clé ni compte, rien ne sort du PC. Installe https://ollama.com/download puis, dans un terminal : `ollama pull qwen2.5vl`. Il faut un PC assez puissant.
+2. **Maintiens Ctrl + Alt et parle**, relâche pour envoyer (appui court = écrire). Sur téléphone : touche la bulle bleue.
+3. Sur Windows, **Clicky partout** (activé par défaut) : Clicky suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
+4. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Clicky te prévient quand c'est fini.
+
+Le micro de Windows doit comprendre le français : *Paramètres → Heure et langue → Voix* (installe le pack français si besoin).
+
+## 3 quater. Laisser l'appli Claude agir dans Mon Hub (PC)
 
 1. Installe l'appli **Claude pour Windows** : https://claude.ai/download et connecte-toi.
 2. Télécharge **MonHub-Claude.mcpb** et double-clique dessus : Claude s'ouvre → **Installer**.
@@ -73,7 +84,7 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 
 ## 5. Mettre à jour
 
-Re-télécharge simplement le fichier depuis les mêmes liens. Sur PC, remplace l'ancien dossier (tes comptes sont conservés). Sur Android, installe le nouvel APK par-dessus.
+Re-télécharge simplement le fichier depuis les mêmes liens. Sur PC, remplace l'ancien dossier (tes comptes sont conservés, les raccourcis se mettent à jour tout seuls). Sur Android, installe le nouvel APK par-dessus.
 
 ## En cas de problème
 

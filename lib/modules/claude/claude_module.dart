@@ -4,6 +4,8 @@ import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import '../../ui/clicky/clicky.dart';
+import '../../ui/clicky/clicky_desktop.dart';
+import '../../ui/clicky/ollama.dart';
 import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 
@@ -33,7 +35,7 @@ class ClaudeModule extends HubModule {
   Widget buildSummary(BuildContext context) => ListenableBuilder(
     listenable: ClaudeApi.store,
     builder: (context, _) => FutureBuilder(
-      future: ClaudeApi.hasKey(),
+      future: ClaudeApi.hasKey().then((k) => k || ClickyController.instance.provider == 'ollama'),
       builder: (context, snap) {
         final ready = snap.data == true;
         return Center(
@@ -46,7 +48,7 @@ class ClaudeModule extends HubModule {
                   ready
                       ? 'Maintiens Ctrl + Alt et parle à Clicky, ou touche la bulle bleue. '
                             'Il voit ton écran et te montre où cliquer.'
-                      : 'Ajoute ta clé API Claude pour activer Clicky, le compagnon '
+                      : 'Choisis le cerveau de Clicky (Claude, ou une IA gratuite sur ton PC) : le compagnon '
                             'qui voit ton écran, parle et te montre où cliquer.',
                   textAlign: TextAlign.center,
                 ),
@@ -59,14 +61,21 @@ class ClaudeModule extends HubModule {
                     if (!ready)
                       FilledButton.icon(
                         icon: const Icon(Icons.key_rounded),
-                        label: const Text('Ajouter ma clé'),
+                        label: const Text('Configurer Clicky'),
                         onPressed: () => showSettings(context),
                       )
                     else
                       FilledButton.icon(
                         icon: const Icon(Icons.auto_awesome_rounded),
                         label: const Text('Parler à Clicky'),
-                        onPressed: ClickyController.instance.openPanel,
+                        onPressed: () {
+                          final c = ClickyController.instance;
+                          if (c.handledElsewhere) {
+                            ClickyDesktop.launch().then((_) => ClickyDesktop.send('open'));
+                          } else {
+                            c.openPanel();
+                          }
+                        },
                       ),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.chat_bubble_outline_rounded),
@@ -172,21 +181,37 @@ class _SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<_SettingsDialog> {
   final key = TextEditingController();
+  late final ollamaUrl = TextEditingController(text: Ollama.url);
+  late final ollamaModel = TextEditingController(text: Ollama.model);
   bool? hasKey;
+  List<String>? installed;
   final c = ClickyController.instance;
 
   @override
   void initState() {
     super.initState();
     ClaudeApi.hasKey().then((v) => mounted ? setState(() => hasKey = v) : null);
+    _checkOllama();
+  }
+
+  Future<void> _checkOllama() async {
+    final l = await Ollama.installed();
+    if (mounted) setState(() => installed = l);
+  }
+
+  Future<void> _save() async {
+    if (key.text.trim().isNotEmpty) await ClaudeApi.setApiKey(key.text);
+    await ClaudeApi.store.setJson('ollama.url', ollamaUrl.text.trim());
+    await ClaudeApi.store.setJson('ollama.model', ollamaModel.text.trim());
   }
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
     return AlertDialog(
       title: const Text('Claude et Clicky'),
       content: SizedBox(
-        width: 460,
+        width: 480,
         child: SingleChildScrollView(
           child: ListenableBuilder(
             listenable: c,
@@ -194,51 +219,165 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Clicky et la discussion utilisent l\'API de Claude avec ta propre clé '
-                  '(payée à l\'usage, quelques centimes par question). Crée-la sur '
-                  'console.anthropic.com → API keys. Elle reste chiffrée sur cet appareil.',
+                Text('Cerveau de Clicky', style: text.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'claude',
+                      icon: Icon(Icons.auto_awesome_rounded),
+                      label: Text('Claude (clé API)'),
+                    ),
+                    ButtonSegment(
+                      value: 'ollama',
+                      icon: Icon(Icons.computer_rounded),
+                      label: Text('Local gratuit (Ollama)'),
+                    ),
+                  ],
+                  selected: {c.provider},
+                  onSelectionChanged: (v) => c.setOption('provider', v.first),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: key,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: hasKey == true
-                        ? 'Clé enregistrée (remplacer…)'
-                        : 'Clé API (sk-ant-…)',
-                    border: const OutlineInputBorder(),
+                if (c.provider == 'claude') ...[
+                  const Text(
+                    'Le plus malin : voit et comprend très bien l\'écran, utilise tes modules '
+                    '(agenda, notes, messages…) et le mode agent. Clé API personnelle, payée à '
+                    'l\'usage (quelques centimes par question), créée sur console.anthropic.com. '
+                    'Elle reste chiffrée sur cet appareil.',
                   ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: key,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: hasKey == true
+                          ? 'Clé enregistrée (remplacer…)'
+                          : 'Clé API (sk-ant-…)',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text('Créer une clé'),
+                        onPressed: () =>
+                            openLink(context, 'https://console.anthropic.com/settings/keys'),
+                      ),
+                      const Spacer(),
+                      if (hasKey == true)
+                        TextButton(
+                          onPressed: () async {
+                            await ClaudeApi.setApiKey(null);
+                            setState(() => hasKey = false);
+                          },
+                          child: const Text('Supprimer la clé'),
+                        ),
+                    ],
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: ClaudeApi.model,
+                    decoration: const InputDecoration(
+                      labelText: 'Modèle',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final e in ClaudeApi.models.entries)
+                        DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    ],
+                    onChanged: (v) => v == null ? null : ClaudeApi.setModel(v),
+                  ),
+                ] else ...[
+                  const Text(
+                    'Sans clé ni compte : une IA tourne directement sur ton PC, rien ne sort sur '
+                    'internet. 1. Installe Ollama (ollama.com). 2. Dans un terminal, tape '
+                    '« ollama pull qwen2.5vl » (un modèle qui voit les images). Il faut un PC '
+                    'assez puissant ; Clicky voit et répond, mais sans le mode agent.',
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        installed == null
+                            ? Icons.hourglass_empty_rounded
+                            : installed!.isEmpty
+                            ? Icons.error_outline_rounded
+                            : Icons.check_circle_rounded,
+                        size: 18,
+                        color: installed?.isNotEmpty == true ? Colors.green : null,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          installed == null
+                              ? 'Recherche d\'Ollama…'
+                              : installed!.isEmpty
+                              ? 'Ollama introuvable sur ce PC (ou pas lancé).'
+                              : 'Ollama trouvé : ${installed!.join(', ')}',
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Revérifier',
+                        icon: const Icon(Icons.refresh_rounded),
+                        onPressed: () {
+                          setState(() => installed = null);
+                          _checkOllama();
+                        },
+                      ),
+                    ],
+                  ),
+                  TextButton.icon(
                     icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                    label: const Text('Créer une clé'),
-                    onPressed: () =>
-                        openLink(context, 'https://console.anthropic.com/settings/keys'),
+                    label: const Text('Télécharger Ollama'),
+                    onPressed: () => openLink(context, 'https://ollama.com/download'),
                   ),
-                ),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<String>(
-                  initialValue: ClaudeApi.model,
-                  decoration: const InputDecoration(
-                    labelText: 'Modèle',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: ollamaModel,
+                    decoration: InputDecoration(
+                      labelText: 'Modèle (qui voit les images)',
+                      helperText: 'Conseillés : ${Ollama.suggested.join(', ')}',
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
-                  items: [
-                    for (final e in ClaudeApi.models.entries)
-                      DropdownMenuItem(value: e.key, child: Text(e.value)),
-                  ],
-                  onChanged: (v) => v == null ? null : ClaudeApi.setModel(v),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: ollamaUrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Adresse d\'Ollama',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                const Divider(),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Activer Clicky'),
                   subtitle: const Text('Maintiens Ctrl + Alt pour parler, appui court pour écrire'),
                   value: c.enabled,
                   onChanged: (v) => c.setOption('enabled', v),
+                ),
+                if (ClickyController.everywhereSupported)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Clicky partout'),
+                    subtitle: const Text(
+                      'Clicky vit au-dessus de tout l\'écran : il voit toutes tes applis et '
+                      'tous tes écrans, même quand Mon Hub est réduit.',
+                    ),
+                    value: c.everywhere,
+                    onChanged: (v) async {
+                      await c.setOption('everywhere', v);
+                      v ? await ClickyDesktop.launch() : await ClickyDesktop.stop();
+                    },
+                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Toujours afficher le curseur bleu'),
+                  subtitle: const Text('Sinon, Clicky n\'apparaît que quand tu lui parles'),
+                  value: c.alwaysShow,
+                  onChanged: (v) => c.setOption('show', v),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -252,23 +391,22 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   value: c.follow,
                   onChanged: (v) => c.setOption('follow', v),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  'Astuce : commence par « Agent, … » (ex. « Agent, fais-moi le résumé de mes '
+                  'devoirs de la semaine ») pour une tâche de fond ; Clicky te prévient quand '
+                  'c\'est fini.',
+                  style: text.labelSmall,
+                ),
               ],
             ),
           ),
         ),
       ),
       actions: [
-        if (hasKey == true)
-          TextButton(
-            onPressed: () async {
-              await ClaudeApi.setApiKey(null);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Supprimer la clé'),
-          ),
         FilledButton(
           onPressed: () async {
-            if (key.text.trim().isNotEmpty) await ClaudeApi.setApiKey(key.text);
+            await _save();
             if (context.mounted) Navigator.pop(context);
           },
           child: const Text('Enregistrer'),

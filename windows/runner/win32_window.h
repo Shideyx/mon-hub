@@ -36,6 +36,11 @@ class Win32Window {
   // |Show| is called. Returns true if the window was created successfully.
   bool Create(const std::wstring& title, const Point& origin, const Size& size);
 
+  // Fenêtre « Clicky partout » : sans bordure, transparente, toujours au
+  // premier plan, absente de la barre des tâches et qui ne prend pas le
+  // focus. Elle reste cachée tant que Dart ne l'affiche pas.
+  void SetOverlay(bool overlay) { overlay_ = overlay; }
+
   // Show the current window. Returns true if the window was successfully shown.
   bool Show();
 
@@ -91,6 +96,9 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+
+  // Fenêtre de Clicky (voir SetOverlay).
+  bool overlay_ = false;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;

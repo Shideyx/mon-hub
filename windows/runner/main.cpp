@@ -22,12 +22,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 
-  project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
+  project.set_dart_entrypoint_arguments(command_line_arguments);
+
+  // « hub.exe --clicky » : la petite fenêtre transparente de Clicky qui
+  // suit la souris au-dessus de toutes les applis (lancée par Mon Hub).
+  bool clicky = false;
+  for (const auto& arg : command_line_arguments) {
+    if (arg == "--clicky") clicky = true;
+  }
 
   FlutterWindow window(project);
+  window.SetOverlay(clicky);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"Mon Hub", origin, size)) {
+  if (clicky) {
+    origin = Win32Window::Point(0, 0);
+    size = Win32Window::Size(380, 230);
+  }
+  if (!window.Create(clicky ? L"Clicky" : L"Mon Hub", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
