@@ -101,8 +101,25 @@ class MailModule extends HubModule {
         }
       }));
       all.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
+      badge.value = all.where((m) => !m.seen).length;
       return _cache = all;
     }();
+  }
+
+  @override
+  Future<List<HubNotification>> poll() async {
+    if (accounts.isEmpty) return const [];
+    final list = await load(force: true);
+    store.changed();
+    return [
+      for (final m in list)
+        if (!m.seen)
+          HubNotification(
+            id: '${m.account}|${m.date?.millisecondsSinceEpoch}|${m.subject}',
+            title: '✉️ ${m.from}',
+            body: m.subject,
+          ),
+    ];
   }
 
   Future<void> _addAccount(BuildContext context) async {

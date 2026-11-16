@@ -26,11 +26,21 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | **Agenda** | ✅ Officiel (iCal) | Affiche Google Agenda (ou tout agenda .ics) sur 14 jours, récurrences comprises. Lien : Google Agenda → Paramètres → ton agenda → « Adresse secrète au format iCal ». |
 | **École Directe** | ⚠️ Non officiel | Connexion + question de sécurité + emploi du temps de la semaine. École Directe n'a pas d'API publique : on imite leur site, ça peut casser après une de leurs mises à jour (correctif dans `ed_client.dart`). |
 | **Mails** | ✅ Standard (IMAP) | Derniers mails et non lus, plusieurs boîtes. Gmail : créer un **mot de passe d'application** (myaccount.google.com/apppasswords, validation en 2 étapes requise). Outlook/Hotmail : Microsoft a coupé les mots de passe en IMAP, il faudra une connexion OAuth (évolution prévue). |
-| **Discord** | ✅ Officiel (limité) | Raccourci vers tes MP + nombre de membres en ligne de tes serveurs (si le widget du serveur est activé). Lire tes MP depuis une autre appli est **interdit** par Discord (risque de ban), donc pas fait. |
-| **Instagram** | ❌ Pas d'API | Instagram a fermé son API pour les comptes perso (déc. 2024). Le module est donc une liste de raccourcis qui ouvrent l'appli Instagram (profils, messages). |
+| **Discord** | ⚠️ Jeton utilisateur | Tes MP (liste, conversations, non lus) + alerte à chaque nouveau message, avec ton jeton Discord (lecture seule). Discord interdit officiellement l'automatisation d'un compte : risque de suspension faible mais réel. Serveurs : widget public officiel. |
+| **Instagram** | ⚠️ API privée | Tes conversations et messages + alerte à chaque nouveau message, via l'API interne d'instagram.com (comme les projets de github.com/topics/instagram-api) avec ton cookie `sessionid`. Lecture seule. |
 | **Roblox** | ⚠️ Semi-public | Plusieurs comptes : avatar, nombre d'amis, statut (en ligne / en jeu). Utilise les API publiques du site Roblox, sans mot de passe. |
 | **Mes livres** | ✅ Local | Liste de tous tes livres lus, note, date, avis, recherche de couverture via Open Library. |
 | **Google Drive** | Raccourcis | Liens vers tes documents Drive (emploi du temps PDF, etc.). |
+
+## Notifications
+
+Mon Hub vérifie tes comptes toutes les 2 minutes (réglable) et affiche une alerte système : nouveau mail, nouveau MP Discord ou Instagram, nouvelle note et cours annulé sur École Directe, rappel 15 min avant un évènement de l'agenda. Chaque module peut être mis en sourdine dans les réglages. Les alertes arrivent tant que l'appli tourne (même réduite).
+
+## Configurer une seule fois pour tous tes appareils
+
+Réglages → *Exporter ma configuration* sur le PC, puis *Importer une configuration* sur le téléphone. Le fichier contient tes identifiants : ne le partage pas.
+
+L'appli publiée sur GitHub ne contient **aucun identifiant** : chacun y connecte ses propres comptes.
 
 Mots de passe et jetons sont stockés dans le coffre sécurisé du système
 (Gestionnaire d'identification Windows, Keystore Android, Trousseau Apple).

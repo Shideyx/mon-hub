@@ -98,6 +98,17 @@ class EdClient {
   /// de répondre à la question à chaque fois.
   List<Map<String, String>>? lastFa;
 
+  Future<List<EdGrade>> grades() async {
+    final r = await _post('/eleves/$accountId/notes.awp?verbe=get', {'anneeScolaireId': ''});
+    if (r['code'] != 200) throw 'Notes indisponibles (code ${r['code']})';
+    final list = (r['data']?['notes'] as List? ?? [])
+        .map((e) => EdGrade.fromJson(e as Map<String, dynamic>))
+        .where((g) => g.value.isNotEmpty)
+        .toList();
+    list.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
+    return list;
+  }
+
   Future<List<EdLesson>> timetable(DateTime from, DateTime to) async {
     String d(DateTime x) => x.toIso8601String().substring(0, 10);
     final r = await _post('/E/$accountId/emploidutemps.awp?verbe=get',
@@ -108,6 +119,25 @@ class EdClient {
         .toList()
       ..sort((a, b) => a.start.compareTo(b.start));
   }
+}
+
+class EdGrade {
+  EdGrade(this.id, this.subject, this.value, this.outOf, this.title, this.date);
+  final String id;
+  final String subject;
+  final String value;
+  final String outOf;
+  final String title;
+  final DateTime? date;
+
+  factory EdGrade.fromJson(Map<String, dynamic> j) => EdGrade(
+        '${j['id']}',
+        j['libelleMatiere'] as String? ?? '',
+        '${j['valeur'] ?? ''}'.trim(),
+        '${j['noteSur'] ?? '20'}'.trim(),
+        j['devoir'] as String? ?? '',
+        DateTime.tryParse(j['date'] as String? ?? ''),
+      );
 }
 
 class EdLesson {

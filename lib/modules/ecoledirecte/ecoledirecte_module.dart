@@ -10,6 +10,7 @@ import 'ed_client.dart';
 class EcoleDirecteModule extends HubModule {
   final client = EdClient();
   List<EdLesson> _cache = [];
+  List<EdGrade> grades = [];
   Future<List<EdLesson>>? _loading;
   String? lastError;
 
@@ -56,13 +57,48 @@ class EcoleDirecteModule extends HubModule {
         }
         final now = DateTime.now();
         final from = DateTime(now.year, now.month, now.day);
-        return _cache = await client.timetable(from, from.add(const Duration(days: 7)));
+        _cache = await client.timetable(from, from.add(const Duration(days: 7)));
+        try {
+          grades = await client.grades();
+        } catch (_) {}
+        badge.value = _cache.where((l) => l.cancelled && l.end.isAfter(now)).length;
+        return _cache;
       } catch (e) {
         lastError = '$e';
         return _cache;
       }
     }();
   }
+
+  @override
+  Future<List<HubNotification>> poll() async {
+    if (!configured) return const [];
+    // Toutes les 2 min c'est trop pour École Directe : 15 min minimum.
+    final last = _lastPoll;
+    if (last != null && DateTime.now().difference(last).inMinutes < 15) return _lastItems;
+    _lastPoll = DateTime.now();
+    await load(force: true);
+    store.changed();
+    final now = DateTime.now();
+    return _lastItems = [
+      for (final g in grades.take(30))
+        HubNotification(
+          id: 'note:${g.id}',
+          title: '📝 Nouvelle note en ${g.subject}',
+          body: '${g.value}/${g.outOf}${g.title.isEmpty ? '' : ' · ${g.title}'}',
+        ),
+      for (final l in _cache)
+        if (l.cancelled && l.end.isAfter(now))
+          HubNotification(
+            id: 'annule:${l.subject}@${l.start.toIso8601String()}',
+            title: '🎉 Cours annulé : ${l.subject}',
+            body: '${dayLabel(l.start)} à ${hhmm(l.start)}',
+          ),
+    ];
+  }
+
+  DateTime? _lastPoll;
+  List<HubNotification> _lastItems = const [];
 
   Future<String?> _ask(String question, List<String> choices) async {
     final ctx = _ctx;
@@ -204,6 +240,24 @@ class EcoleDirecteModule extends HubModule {
               }
               if (lessons.isEmpty && lastError == null) {
                 children.add(const EmptyHint('Aucun cours cette semaine'));
+              }
+              if (grades.isNotEmpty) {
+                children.add(Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+                  child: Text('Dernières notes', style: Theme.of(context).textTheme.titleMedium),
+                ));
+                for (final g in grades.take(15)) {
+                  children.add(ListTile(
+                    leading: HubAvatar(label: g.subject, color: color, size: 36),
+                    title: Text(g.subject),
+                    subtitle: Text([
+                      if (g.title.isNotEmpty) g.title,
+                      if (g.date != null) dayLabel(g.date!),
+                    ].join(' · ')),
+                    trailing: Text('${g.value}/${g.outOf}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  ));
+                }
               }
               return ListView(children: children);
             },

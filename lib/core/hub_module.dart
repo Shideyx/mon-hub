@@ -1,6 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'module_store.dart';
+import 'notifications.dart';
+
+export 'notifications.dart' show HubNotification;
 
 /// Niveau d'accès officiel au service derrière un module.
 enum ApiAccess {
@@ -45,6 +48,14 @@ abstract class HubModule {
 
   /// Page complète ouverte quand on touche la tuile.
   Widget buildPage(BuildContext context);
+
+  /// Nombre affiché en pastille sur la tuile (non lus, etc.).
+  final badge = ValueNotifier<int>(0);
+
+  /// Renvoie l'état actuel des choses « alertables » (mails non lus,
+  /// derniers messages…). Le centre de notifications compare avec ce qu'il a
+  /// déjà vu et n'alerte que pour les nouveautés. Par défaut : rien.
+  Future<List<HubNotification>> poll() async => const [];
 
   /// Appelé une fois au démarrage, après l'initialisation du stockage.
   void attach() => store.bind(id);

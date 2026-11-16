@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hub/core/hub_module.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hub/core/hub_controller.dart';
 import 'package:hub/core/module_registry.dart';
 import 'package:hub/core/module_store.dart';
+import 'package:hub/core/notifications.dart';
 import 'package:hub/main.dart';
 import 'package:hub/modules/mail/mail_module.dart';
 import 'package:hub/modules/schedule/ics_parser.dart';
@@ -49,11 +52,50 @@ void main() {
     expect(c2.enabled.any((m) => m.id == first.id), isFalse);
   });
 
+  test('NotificationCenter n\'alerte pas au premier passage puis alerte les nouveautés', () async {
+    SharedPreferences.setMockInitialValues({});
+    await ModuleStore.init();
+    final fake = _FakeModule();
+    final hub = HubController([fake]);
+    final center = NotificationCenter(hub);
+    fake.items = [HubNotification(id: 'a', title: 'A', body: '')];
+    await center.pollNow();
+    expect(center.history, isEmpty);
+    fake.items = [...fake.items, HubNotification(id: 'b', title: 'B', body: '')];
+    await center.pollNow();
+    expect(center.history.map((n) => n.id), ['b']);
+    await center.pollNow();
+    expect(center.history.length, 1);
+  });
+
   testWidgets('le tableau de bord affiche les modules', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await ModuleStore.init();
-    await tester.pumpWidget(HubApp(controller: HubController(buildModules())));
-    expect(find.text('Mon Hub'), findsOneWidget);
+    final hub = HubController(buildModules());
+    await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
+    expect(find.textContaining('👋'), findsOneWidget);
     expect(find.text('Agenda'), findsOneWidget);
   });
+}
+
+class _FakeModule extends HubModule {
+  List<HubNotification> items = [];
+  @override
+  String get id => 'fake';
+  @override
+  String get name => 'Fake';
+  @override
+  String get description => '';
+  @override
+  IconData get icon => Icons.star;
+  @override
+  Color get color => Colors.red;
+  @override
+  ApiAccess get access => ApiAccess.local;
+  @override
+  Future<List<HubNotification>> poll() async => items;
+  @override
+  Widget buildSummary(BuildContext context) => const SizedBox();
+  @override
+  Widget buildPage(BuildContext context) => const SizedBox();
 }

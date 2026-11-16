@@ -45,6 +45,26 @@ class ScheduleModule extends HubModule {
     }();
   }
 
+  /// Rappel 15 minutes avant chaque évènement.
+  @override
+  Future<List<HubNotification>> poll() async {
+    if (urls.isEmpty) return const [];
+    final now = DateTime.now();
+    final events = await load(force: true);
+    store.changed();
+    return [
+      for (final e in events)
+        if (!e.allDay &&
+            e.start.isAfter(now) &&
+            e.start.difference(now) <= const Duration(minutes: 15))
+          HubNotification(
+            id: '${e.title}@${e.start.toIso8601String()}',
+            title: '⏰ ${e.title} à ${hhmm(e.start)}',
+            body: e.location.isEmpty ? 'Dans ${e.start.difference(now).inMinutes} min' : e.location,
+          ),
+    ];
+  }
+
   Widget _eventTile(CalEvent e, {bool dense = false}) => ListTile(
         dense: dense,
         leading: SizedBox(

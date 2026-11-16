@@ -5,167 +5,384 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
+import 'discord_api.dart';
 
-class DiscordServer {
-  DiscordServer({required this.guildId, this.name = '', this.online, this.invite});
-  final String guildId;
-  String name;
-  int? online;
-  String? invite;
-  String? error;
-}
-
-/// Discord n'autorise pas une appli tierce à lire tes messages privés avec
-/// ton compte (les « self-bots » sont interdits par les conditions
-/// d'utilisation et peuvent faire bannir le compte).
-///
-/// Ce module utilise donc ce qui est officiel et sans risque :
-/// * le widget public de serveur (`/api/guilds/<id>/widget.json`), qui donne
-///   le nombre de membres en ligne si le widget est activé sur le serveur ;
-/// * des raccourcis qui ouvrent l'appli Discord.
-///
-/// Évolution possible : un bot Discord (API officielle) invité sur tes
-/// serveurs pour afficher les derniers messages de certains salons.
+/// Discord : tes messages privés (avec ton jeton, lecture seule) + l'état de
+/// tes serveurs via le widget public officiel.
 class DiscordModule extends HubModule {
   @override
   String get id => 'discord';
   @override
   String get name => 'Discord';
   @override
-  String get description => 'Tes serveurs Discord et un accès rapide';
+  String get description => 'Tes messages privés et tes serveurs';
   @override
-  IconData get icon => Icons.forum_outlined;
+  IconData get icon => Icons.forum_rounded;
   @override
   Color get color => const Color(0xFF5865F2);
   @override
-  ApiAccess get access => ApiAccess.official;
+  ApiAccess get access => ApiAccess.unofficial;
+
+  DiscordApi? _api;
+  DiscordUser? me;
+  List<DiscordDm> _dms = [];
+  final _lastSeenId = <String, String>{};
+  final _lastMsg = <String, DiscordMessage>{};
+  Future<List<DiscordDm>>? _loading;
+  String? lastError;
+
+  bool get connected => store.getJson<bool>('connected') == true;
+
+  Future<DiscordApi?> _client() async {
+    if (_api != null) return _api;
+    final t = await store.readSecret('token');
+    if (t == null || t.isEmpty) return null;
+    return _api = DiscordApi(t);
+  }
+
+  Map<String, String> get _readUpTo =>
+      (store.getJson<Map<String, dynamic>>('read') ?? const {}).cast<String, String>();
+
+  bool _isNewer(String? a, String? b) =>
+      (BigInt.tryParse(a ?? '0') ?? BigInt.zero) > (BigInt.tryParse(b ?? '0') ?? BigInt.zero);
+
+  bool isUnread(DiscordDm d) =>
+      d.last != null &&
+      d.last!.author.id != me?.id &&
+      _isNewer(d.lastMessageId, _readUpTo[d.id]);
+
+  Future<List<DiscordDm>> load({bool force = false}) {
+    if (_loading != null && !force) return _loading!;
+    return _loading = () async {
+      final api = await _client();
+      if (api == null) return _dms = [];
+      try {
+        lastError = null;
+        me ??= await api.me();
+        final dms = await api.dms();
+        // On ne relit que les conversations qui ont bougé (8 plus récentes),
+        // pour rester discret vis-à-vis de Discord.
+        for (final d in dms.take(8)) {
+          if (d.lastMessageId == null) continue;
+          if (_lastSeenId[d.id] != d.lastMessageId) {
+            final msgs = await api.messages(d.id, limit: 1);
+            if (msgs.isNotEmpty) _lastMsg[d.id] = msgs.first;
+            _lastSeenId[d.id] = d.lastMessageId!;
+          }
+          d.last = _lastMsg[d.id];
+        }
+        _dms = dms;
+        badge.value = dms.where(isUnread).length;
+      } catch (e) {
+        lastError = '$e';
+      }
+      return _dms;
+    }();
+  }
+
+  @override
+  Future<List<HubNotification>> poll() async {
+    if (!connected) return const [];
+    final dms = await load(force: true);
+    store.changed();
+    return [
+      for (final d in dms.take(8))
+        if (d.last != null && d.last!.author.id != me?.id)
+          HubNotification(
+            id: d.last!.id,
+            title: 'Discord · ${d.last!.author.name}',
+            body: d.last!.content,
+          ),
+    ];
+  }
+
+  Future<void> markAllRead() async {
+    await store.setJson('read', {
+      for (final d in _dms)
+        if (d.lastMessageId != null) d.id: d.lastMessageId!,
+    });
+    badge.value = 0;
+  }
+
+  Future<void> connect(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Connecter ton compte Discord'),
+        content: const SingleChildScrollView(
+          child: Text(
+            '1. Ouvre discord.com/app dans Chrome ou Edge sur ton PC et connecte-toi.\n'
+            '2. Appuie sur F12, onglet « Réseau » (Network).\n'
+            '3. Clique sur n\'importe quel salon, puis sur une requête « messages ».\n'
+            '4. Dans « En-têtes de requête », copie la valeur de « authorization ».\n\n'
+            '⚠️ Ce jeton donne un accès complet à ton compte : ne le partage avec '
+            'personne. Il reste chiffré sur cet appareil.\n\n'
+            '⚠️ Discord interdit officiellement l\'usage d\'un compte par une appli '
+            'tierce. Mon Hub ne fait que lire tes MP toutes les quelques minutes, '
+            'mais un risque de suspension existe.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('J\'ai compris')),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final r = await askFields(context,
+        title: 'Jeton Discord', labels: ['authorization'], obscure: {0});
+    final token = r?.first.trim().replaceAll('"', '') ?? '';
+    if (token.isEmpty) return;
+    try {
+      final u = await DiscordApi(token).me();
+      await store.writeSecret('token', token);
+      _api = null;
+      me = u;
+      await store.setJson('connected', true);
+      await load(force: true);
+      store.changed();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Connecté en tant que ${u.name}')));
+      }
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  Future<void> disconnect() async {
+    await store.writeSecret('token', null);
+    await store.setJson('connected', null);
+    _api = null;
+    me = null;
+    _dms = [];
+    badge.value = 0;
+    _loading = null;
+    store.changed();
+  }
+
+  // ---------- Serveurs (widget public officiel) ----------
 
   List<String> get guildIds =>
       (store.getJson<List<dynamic>>('guilds') ?? const []).cast<String>();
 
-  Future<List<DiscordServer>> fetch() => Future.wait(guildIds.map((id) async {
-        final s = DiscordServer(guildId: id);
+  Future<List<Map<String, dynamic>>> fetchGuilds() => Future.wait(guildIds.map((id) async {
         try {
-          final r = await http
-              .get(Uri.parse('https://discord.com/api/guilds/$id/widget.json'));
-          if (r.statusCode != 200) {
-            s.error = 'Widget désactivé sur ce serveur';
-          } else {
-            final j = jsonDecode(r.body) as Map<String, dynamic>;
-            s.name = j['name'] as String? ?? id;
-            s.online = j['presence_count'] as int?;
-            s.invite = j['instant_invite'] as String?;
-          }
+          final r = await http.get(Uri.parse('https://discord.com/api/guilds/$id/widget.json'));
+          if (r.statusCode != 200) return {'id': id, 'error': 'Widget désactivé'};
+          return {'id': id, ...jsonDecode(r.body) as Map<String, dynamic>};
         } catch (e) {
-          s.error = '$e';
+          return {'id': id, 'error': '$e'};
         }
-        return s;
       }));
 
-  void _openDiscord(BuildContext context, [String? guildId]) => openLink(
-      context,
-      guildId == null
-          ? 'https://discord.com/channels/@me'
-          : 'https://discord.com/channels/$guildId');
+  // ---------- Interface ----------
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
         listenable: store,
-        builder: (context, _) => Column(
+        builder: (context, _) {
+          if (!connected) {
+            return EmptyHint('Connecte ton compte pour voir tes MP',
+                icon: Icons.link_rounded, action: ('Connecter', () => connect(context)));
+          }
+          return FutureBuilder(
+            future: load(),
+            initialData: _dms,
+            builder: (context, snap) {
+              final list = (snap.data ?? []).where((d) => d.last != null).take(4).toList();
+              if (list.isEmpty) {
+                return snap.connectionState == ConnectionState.waiting
+                    ? const LoadingHint()
+                    : EmptyHint(lastError ?? 'Aucun message');
+              }
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                physics: const NeverScrollableScrollPhysics(),
+                children: [for (final d in list) _dmTile(context, d, dense: true)],
+              );
+            },
+          );
+        },
+      );
+
+  Widget _dmTile(BuildContext context, DiscordDm d, {bool dense = false}) {
+    final unread = isUnread(d);
+    return ListTile(
+      dense: dense,
+      visualDensity: dense ? VisualDensity.compact : null,
+      leading: HubAvatar(url: d.avatarUrl, label: d.name, color: color, size: dense ? 30 : 40),
+      title: Text(d.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontWeight: unread ? FontWeight.w700 : FontWeight.w500)),
+      subtitle: d.last == null
+          ? null
+          : Text(
+              '${d.last!.author.id == me?.id ? 'Toi : ' : ''}${d.last!.content}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+      trailing: d.last == null
+          ? null
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(timeAgo(d.last!.at), style: Theme.of(context).textTheme.labelSmall),
+                if (unread) ...[
+                  const SizedBox(height: 4),
+                  Dot(color: color),
+                ],
+              ],
+            ),
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => _ConversationPage(module: this, dm: d))),
+    );
+  }
+
+  @override
+  Widget buildPage(BuildContext context) {
+    markAllRead();
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(name),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: () => load(force: true).then((_) => store.changed()),
+            ),
+            IconButton(
+              tooltip: 'Ouvrir Discord',
+              icon: const Icon(Icons.open_in_new_rounded),
+              onPressed: () => openLink(context, 'https://discord.com/channels/@me'),
+            ),
+          ],
+          bottom: const TabBar(tabs: [Tab(text: 'Messages privés'), Tab(text: 'Serveurs')]),
+        ),
+        body: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) => TabBarView(children: [
+            _dmsTab(context),
+            _guildsTab(context),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _dmsTab(BuildContext context) {
+    if (!connected) {
+      return EmptyHint('Connecte ton compte Discord pour lire tes messages privés ici '
+          'et recevoir une alerte à chaque nouveau message.',
+          icon: Icons.forum_rounded, action: ('Connecter mon compte', () => connect(context)));
+    }
+    return FutureBuilder(
+      future: load(),
+      initialData: _dms,
+      builder: (context, snap) => ListView(
+        children: [
+          if (me != null)
+            ListTile(
+              leading: HubAvatar(url: me!.avatarUrl, label: me!.name, color: color),
+              title: Text('Connecté : ${me!.name}'),
+              trailing: TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
+            ),
+          if (lastError != null) ErrorBanner(lastError!),
+          const Divider(),
+          for (final d in snap.data ?? <DiscordDm>[]) _dmTile(context, d),
+        ],
+      ),
+    );
+  }
+
+  Widget _guildsTab(BuildContext context) => FutureBuilder(
+        future: fetchGuilds(),
+        builder: (context, snap) => ListView(
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Expanded(
-              child: FutureBuilder(
-                future: fetch(),
-                builder: (context, snap) {
-                  final list = snap.data ?? [];
-                  if (guildIds.isEmpty) {
-                    return const EmptyHint('Ajoute tes serveurs dans la page Discord');
-                  }
-                  return ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      for (final s in list)
-                        ListTile(
-                          dense: true,
-                          title: Text(s.name.isEmpty ? s.guildId : s.name),
-                          trailing: s.online == null
-                              ? null
-                              : Text('● ${s.online} en ligne',
-                                  style: const TextStyle(color: Colors.green)),
-                        ),
-                    ],
-                  );
+            for (final g in snap.data ?? <Map<String, dynamic>>[])
+              ListTile(
+                leading: HubAvatar(label: g['name'] as String? ?? '#', color: color),
+                title: Text(g['name'] as String? ?? g['id'] as String),
+                subtitle: Text(g['error'] as String? ?? '● ${g['presence_count']} en ligne'),
+                onTap: () => openLink(context, 'https://discord.com/channels/${g['id']}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: () => store.setJson(
+                      'guilds', guildIds.where((x) => x != g['id']).toList()),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Ajouter un serveur'),
+                onPressed: () async {
+                  final r = await askFields(context,
+                      title: 'ID du serveur',
+                      labels: ['Clic droit sur le serveur > Copier l\'identifiant']);
+                  final v = r?.first.trim() ?? '';
+                  if (v.isNotEmpty) await store.setJson('guilds', {...guildIds, v}.toList());
                 },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FilledButton.tonalIcon(
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Mes messages privés'),
-                onPressed: () => _openDiscord(context),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Le nombre de membres en ligne s\'affiche si le widget est activé '
+                '(Paramètres du serveur > Widget).',
+                style: TextStyle(fontSize: 12),
               ),
             ),
           ],
         ),
       );
+}
+
+class _ConversationPage extends StatelessWidget {
+  const _ConversationPage({required this.module, required this.dm});
+  final DiscordModule module;
+  final DiscordDm dm;
 
   @override
-  Widget buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(name)),
-        floatingActionButton: Builder(
-          builder: (context) => FloatingActionButton.extended(
-            icon: const Icon(Icons.add),
-            label: const Text('Ajouter un serveur'),
-            onPressed: () async {
-              final r = await askFields(context,
-                  title: 'ID du serveur Discord',
-                  labels: ['ID (clic droit sur le serveur > Copier l\'identifiant)']);
-              final v = r?.first.trim() ?? '';
-              if (v.isEmpty) return;
-              await store.setJson('guilds', {...guildIds, v}.toList());
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(dm.name),
+        actions: [
+          IconButton(
+            tooltip: 'Répondre dans Discord',
+            icon: const Icon(Icons.open_in_new_rounded),
+            onPressed: () => openLink(context, 'https://discord.com/channels/@me/${dm.id}'),
+          ),
+        ],
+      ),
+      body: FutureBuilder(
+        future: module._client().then((api) => api!.messages(dm.id)),
+        builder: (context, snap) {
+          if (snap.hasError) return EmptyHint('${snap.error}');
+          if (!snap.hasData) return const LoadingHint();
+          final msgs = snap.data!;
+          return ListView.builder(
+            reverse: true,
+            padding: const EdgeInsets.all(12),
+            itemCount: msgs.length,
+            itemBuilder: (context, i) {
+              final m = msgs[i];
+              final mine = m.author.id == module.me?.id;
+              return ChatBubble(
+                text: m.content,
+                author: mine ? null : m.author.name,
+                time: hhmm(m.at),
+                mine: mine,
+                color: module.color,
+              );
             },
-          ),
-        ),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) => FutureBuilder(
-            future: fetch(),
-            builder: (context, snap) => ListView(
-              padding: const EdgeInsets.only(bottom: 80),
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.chat_bubble_outline),
-                  title: const Text('Ouvrir mes messages privés'),
-                  onTap: () => _openDiscord(context),
-                ),
-                const Divider(),
-                for (final s in snap.data ?? <DiscordServer>[])
-                  ListTile(
-                    leading: const Icon(Icons.groups_outlined),
-                    title: Text(s.name.isEmpty ? s.guildId : s.name),
-                    subtitle: Text(s.error ??
-                        '${s.online ?? '?'} membres en ligne'),
-                    onTap: () => _openDiscord(context, s.guildId),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => store.setJson(
-                          'guilds', guildIds.where((g) => g != s.guildId).toList()),
-                    ),
-                  ),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Pour voir le nombre de membres en ligne, le widget doit être '
-                    'activé : Paramètres du serveur > Widget > Activer le widget. '
-                    'Pour copier un ID, active le mode développeur dans '
-                    'Discord (Paramètres > Avancés).',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+          );
+        },
+      ),
+    );
+  }
 }
