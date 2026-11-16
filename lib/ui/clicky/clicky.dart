@@ -121,8 +121,31 @@ class ClickyController extends ChangeNotifier {
 
   Future<void> setOption(String k, Object v) async {
     await ClaudeApi.store.setJson('clicky.$k', v);
+    await refreshReady();
     notifyListeners();
   }
+
+  /// Clicky a un cerveau (clé Claude, ou Ollama choisi). Tant que ce n'est
+  /// pas le cas, il reste complètement invisible et ne fait rien : le reste
+  /// de Mon Hub marche exactement pareil sans lui.
+  bool ready = false;
+
+  Future<bool> refreshReady() async {
+    bool r;
+    try {
+      r = provider == 'ollama' || await ClaudeApi.hasKey();
+    } catch (_) {
+      r = false;
+    }
+    if (r != ready) {
+      ready = r;
+      notifyListeners();
+    }
+    return r;
+  }
+
+  /// Clicky doit s'afficher et écouter le clavier.
+  bool get active => enabled && ready;
 
   bool get buddyVisible =>
       alwaysShow || _recent || panelOpen || state != ClickyState.idle || agentsRunning > 0;
@@ -130,7 +153,7 @@ class ClickyController extends ChangeNotifier {
   void moveCursor(Offset p) {
     if (cursor == p) return;
     cursor = p;
-    if (follow && enabled && state != ClickyState.pointing && buddyVisible) notifyListeners();
+    if (follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
   }
 
   // ---------- Voix ----------
@@ -245,7 +268,7 @@ class ClickyController extends ChangeNotifier {
   /// Appelé quand Ctrl + Alt (sans AltGr) est enfoncé ou relâché, ou quand
   /// une autre touche est tapée pendant l'appui ([other]).
   void hotkey({required bool down, bool other = false}) {
-    if (!enabled) return;
+    if (!active) return;
     if (_holding && other) {
       // Ctrl + Alt + une touche = un raccourci clavier, pas Clicky.
       _cancelled = true;
@@ -289,7 +312,15 @@ class ClickyController extends ChangeNotifier {
 
   /// Clavier de l'appli (quand Clicky vit dans la fenêtre de Mon Hub).
   bool onKey(KeyEvent e) {
-    if (!enabled || handledElsewhere) return false;
+    try {
+      return _onKey(e);
+    } catch (_) {
+      return false; // Clicky ne doit jamais gêner le clavier de l'appli
+    }
+  }
+
+  bool _onKey(KeyEvent e) {
+    if (!active || handledElsewhere) return false;
     final k = HardwareKeyboard.instance;
     if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape && panelOpen) {
       closePanel();
@@ -663,7 +694,11 @@ class _ClickyLayerState extends State<ClickyLayer> {
     super.initState();
     c.hub = widget.hub;
     HardwareKeyboard.instance.addHandler(c.onKey);
+    ClaudeApi.store.addListener(_settingsChanged);
+    _settingsChanged();
   }
+
+  void _settingsChanged() => unawaited(c.refreshReady());
 
   @override
   void didUpdateWidget(ClickyLayer old) {
@@ -677,6 +712,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(c.onKey);
+    ClaudeApi.store.removeListener(_settingsChanged);
     super.dispose();
   }
 
@@ -694,8 +730,9 @@ class _ClickyLayerState extends State<ClickyLayer> {
             Positioned.fill(
               child: ListenableBuilder(
                 listenable: Listenable.merge([c, ClaudeApi.store]),
+                // Sans cerveau configuré (ou désactivé) : aucun Clicky.
                 builder: (context, _) =>
-                    c.enabled && !c.handledElsewhere ? ClickyBuddy(c: c) : const SizedBox.shrink(),
+                    c.active && !c.handledElsewhere ? ClickyBuddy(c: c) : const SizedBox.shrink(),
               ),
             ),
         ],

@@ -50,7 +50,10 @@ class ClickyDesktop {
 
   /// Démarre Clicky partout (s'il n'est pas déjà lancé).
   static Future<void> launch() async {
-    if (!supported || await running()) return;
+    final c = ClickyController.instance;
+    // Pas de cerveau configuré : on ne lance rien du tout.
+    if (!supported || !c.everywhere || !await c.refreshReady() || !c.enabled) return;
+    if (await running()) return;
     try {
       await Process.start(Platform.resolvedExecutable, [
         '--clicky',
@@ -91,6 +94,7 @@ Future<void> runClickyDesktop() async {
   }
   await ModuleStore.init();
   AppSession.instance.restore();
+  if (!await ClickyController.instance.refreshReady()) exit(0);
 
   final c = ClickyController.instance
     ..desktopMode = true
@@ -322,7 +326,8 @@ class _DesktopState extends State<_Desktop> {
       await ModuleStore.global.reload();
       ClaudeApi.forget();
     } catch (_) {}
-    if (!c.enabled || !c.everywhere) exit(0);
+    await c.refreshReady();
+    if (!c.active || !c.everywhere) exit(0);
     // Mon Hub fermé depuis un moment : Clicky s'en va aussi.
     if (await _BridgeTools.alive()) {
       _deadChecks = 0;
@@ -358,7 +363,7 @@ class _DesktopState extends State<_Desktop> {
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    final visible = c.enabled && (c.buddyVisible || c.panelOpen);
+    final visible = c.active && (c.buddyVisible || c.panelOpen);
     if (!visible) {
       if (!_hidden) {
         Win.hide(h);

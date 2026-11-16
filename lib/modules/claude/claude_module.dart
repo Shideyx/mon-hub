@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/claude_api.dart';
@@ -203,6 +205,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (key.text.trim().isNotEmpty) await ClaudeApi.setApiKey(key.text);
     await ClaudeApi.store.setJson('ollama.url', ollamaUrl.text.trim());
     await ClaudeApi.store.setJson('ollama.model', ollamaModel.text.trim());
+    // Clicky vient d'avoir un cerveau : on le démarre (Windows : partout).
+    if (await c.refreshReady()) unawaited(ClickyDesktop.launch());
   }
 
   @override
@@ -356,7 +360,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   title: const Text('Activer Clicky'),
                   subtitle: const Text('Maintiens Ctrl + Alt pour parler, appui court pour écrire'),
                   value: c.enabled,
-                  onChanged: (v) => c.setOption('enabled', v),
+                  onChanged: (v) async {
+                    await c.setOption('enabled', v);
+                    v ? await ClickyDesktop.launch() : await ClickyDesktop.stop();
+                  },
                 ),
                 if (ClickyController.everywhereSupported)
                   SwitchListTile(

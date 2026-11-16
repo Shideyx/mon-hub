@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
   await ModuleStore.init();
   AppSession.instance.restore();
   // Raccourcis Bureau / menu Démarrer, créés ou réparés tout seuls.
-  unawaited(AppShortcuts.ensure());
+  unawaited(AppShortcuts.ensure().catchError((Object _) {}));
   runApp(const HubApp());
 }
 
@@ -87,8 +87,13 @@ class _HubAppState extends State<HubApp> {
         unawaited(b.start().then((_) => _startClicky()));
         unawaited(n.start());
         // Alertes de Clicky (agent terminé…).
-        ClickyController.instance.notify = (title, body) =>
-            n.show(HubNotification(id: 'clicky:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body));
+        ClickyController.instance.notify = (title, body) => n.show(
+          HubNotification(
+            id: 'clicky:${DateTime.now().millisecondsSinceEpoch}',
+            title: title,
+            body: body,
+          ),
+        );
       }
     }
     if (mounted) setState(() {});
@@ -96,8 +101,12 @@ class _HubAppState extends State<HubApp> {
 
   /// Windows : Clicky au-dessus de tout l'écran (petit programme à part).
   Future<void> _startClicky() async {
-    final c = ClickyController.instance;
-    if (ClickyDesktop.supported && c.enabled && c.everywhere) await ClickyDesktop.launch();
+    // Clicky est un bonus : s'il échoue, le reste de l'appli continue.
+    try {
+      await ClickyDesktop.launch();
+    } catch (e) {
+      debugPrint('Clicky : $e');
+    }
   }
 
   @override
@@ -108,8 +117,7 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
-      builder: (context, child) =>
-          ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),

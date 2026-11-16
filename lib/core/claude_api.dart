@@ -34,7 +34,14 @@ class ClaudeApi {
   static String? _key;
   static bool? _hasKey;
 
-  static Future<String?> apiKey() async => _key ??= await store.readSecret('apiKey');
+  static Future<String?> apiKey() async {
+    try {
+      return _key ??= await store.readSecret('apiKey');
+    } catch (_) {
+      return null; // coffre sécurisé indisponible : pas de clé, rien ne casse
+    }
+  }
+
   static Future<bool> hasKey() async => _hasKey ??= (await apiKey())?.isNotEmpty == true;
 
   static Future<void> setApiKey(String? key) async {

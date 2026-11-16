@@ -7,6 +7,8 @@ import 'package:hub/core/module_store.dart';
 import 'package:hub/core/notifications.dart';
 import 'package:hub/main.dart';
 import 'package:hub/modules/mail/mail_module.dart';
+import 'package:hub/ui/clicky/clicky.dart';
+import 'package:flutter/services.dart';
 import 'package:hub/modules/schedule/ics_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -74,6 +76,29 @@ void main() {
     final hub = HubController(buildModules());
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
     expect(find.textContaining('👋'), findsOneWidget);
+    expect(find.text('Agenda'), findsWidgets);
+    expect(find.text('Accueil'), findsOneWidget);
+  });
+
+  testWidgets('sans Clicky configuré, rien de Clicky ne s\'affiche et l\'appli marche', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await ModuleStore.init();
+    final hub = HubController(buildModules());
+    await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ClickyController.instance.ready, isFalse);
+    expect(find.byTooltip('Clicky (maintiens Ctrl + Alt pour parler)'), findsNothing);
+    // Ctrl + Alt ne fait rien.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(ClickyController.instance.panelOpen, isFalse);
+    // Le reste du tableau de bord est là.
     expect(find.text('Agenda'), findsWidgets);
     expect(find.text('Accueil'), findsOneWidget);
   });
