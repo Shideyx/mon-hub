@@ -1,13 +1,49 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
+
+/// La session (jeton) a expiré : il faut se reconnecter.
+class EdSessionExpired implements Exception {
+  const EdSessionExpired();
+  @override
+  String toString() => 'Session École Directe expirée';
+}
+
+/// École Directe refuse l'identifiant, le mot de passe ou la réponse de
+/// sécurité. Mon Hub ne doit **pas** réessayer tout seul : chaque essai raté
+/// rapproche du blocage du compte.
+class EdAuthError implements Exception {
+  const EdAuthError(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
 
 /// Client pour l'API **non officielle** d'École Directe (celle qu'utilise
 /// leur propre site). Elle n'est pas documentée et change de temps en temps :
 /// si la connexion casse après une mise à jour d'École Directe, c'est ici
 /// qu'il faut corriger.
 class EdClient {
-  EdClient([http.Client? client]) : _http = client ?? http.Client();
+  /// [paced] : laisse un petit délai variable entre deux requêtes, comme une
+  /// vraie personne sur le site (désactivé dans les tests).
+  EdClient([http.Client? client, this.paced = true]) : _http = client ?? http.Client();
+
+  final bool paced;
+  DateTime? _lastRequest;
+  final _rnd = math.Random();
+
+  /// Pas de rafale : au moins ~0,7 à 1,6 s entre deux requêtes.
+  Future<void> _pace() async {
+    if (!paced) return;
+    final last = _lastRequest;
+    if (last != null) {
+      final gap = Duration(milliseconds: 700 + _rnd.nextInt(900));
+      final wait = gap - DateTime.now().difference(last);
+      if (wait > Duration.zero) await Future<void>.delayed(wait);
+    }
+    _lastRequest = DateTime.now();
+  }
 
   static const _base = 'https://api.ecoledirecte.com/v3';
 
@@ -33,6 +69,10 @@ class EdClient {
   Map<String, String> _headers({bool gtk = false}) => {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    // Comme une requête partie du site officiel.
+    'Origin': 'https://www.ecoledirecte.com',
+    'Referer': 'https://www.ecoledirecte.com/',
     'User-Agent': _ua,
     if (_cookies.isNotEmpty)
       'Cookie': _cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
@@ -67,8 +107,10 @@ class EdClient {
     String path,
     Map<String, dynamic> data, {
     bool gtk = false,
+    bool session = true,
   }) async {
     final sep = path.contains('?') ? '&' : '?';
+    await _pace();
     final http.Response res;
     try {
       res = await _http
@@ -90,6 +132,9 @@ class EdClient {
     final j = jsonDecode(text) as Map<String, dynamic>;
     final t = j['token'];
     if (t is String && t.isNotEmpty) token = t;
+    // Jeton périmé sur une requête de données : on se reconnectera (une
+    // seule fois), au lieu d'enchaîner les erreurs.
+    if (session && (j['code'] == 520 || j['code'] == 525)) throw const EdSessionExpired();
     return j;
   }
 
@@ -98,6 +143,7 @@ class EdClient {
   /// **chaque** connexion, y compris celle qui suit la question de sécurité.
   Future<void> _bootstrapGtk() async {
     _gtk = null;
+    await _pace();
     final http.Response g;
     try {
       g = await _http
@@ -162,7 +208,12 @@ class EdClient {
     };
 
     await _bootstrapGtk();
-    var r = await _post('/login.awp', {...credentials(), 'uuid': uuid, 'fa': faList()}, gtk: true);
+    var r = await _post(
+      '/login.awp',
+      {...credentials(), 'uuid': uuid, 'fa': faList()},
+      gtk: true,
+      session: false,
+    );
     if (r['code'] == 505 && answered.isNotEmpty) {
       // Les facteurs gardés ne sont plus valables : on recommence sans.
       return login(user, password, answerQuestion: answerQuestion);
@@ -174,7 +225,7 @@ class EdClient {
       // refuse quelque chose (et chaque essai compte sur un compte qui se
       // bloque) : on s'arrête.
       if (++rounds > 3) throw 'École Directe repose sans cesse la question de sécurité';
-      final q = await _post('/connexion/doubleauth.awp?verbe=get', {});
+      final q = await _post('/connexion/doubleauth.awp?verbe=get', {}, session: false);
       if (q['code'] != 200 || q['data'] is! Map) {
         throw 'Question de sécurité indisponible : ${explain(q)}';
       }
@@ -186,25 +237,25 @@ class EdClient {
       final picked = await answerQuestion(question, decoded);
       if (picked == null) throw 'Réponds à la question de sécurité pour te connecter';
       final enc = choices[decoded.indexOf(picked)];
-      final a = await _post('/connexion/doubleauth.awp?verbe=post', {'choix': enc});
+      final a = await _post('/connexion/doubleauth.awp?verbe=post', {'choix': enc}, session: false);
       final ad = a['data'];
       final cn = ad is Map ? ad['cn'] : null;
       final cv = ad is Map ? ad['cv'] : null;
       if (a['code'] != 200 || cn is! String || cv is! String) {
-        throw 'Mauvaise réponse à la question de sécurité (${explain(a)})';
+        throw EdAuthError('Mauvaise réponse à la question de sécurité (${explain(a)})');
       }
       answered
         ..removeWhere((f) => f['cn'] == cn)
         ..add({'cn': cn, 'cv': cv});
       await _bootstrapGtk();
-      r = await _post('/login.awp', {
-        ...credentials(),
-        'cn': cn,
-        'cv': cv,
-        'uuid': uuid,
-        'fa': faList(),
-      }, gtk: true);
+      r = await _post(
+        '/login.awp',
+        {...credentials(), 'cn': cn, 'cv': cv, 'uuid': uuid, 'fa': faList()},
+        gtk: true,
+        session: false,
+      );
     }
+    if (r['code'] == 505 || r['code'] == 516) throw EdAuthError(explain(r));
     if (r['code'] != 200) throw explain(r);
     if (answered.isNotEmpty) lastFa = answered;
     final accounts = (r['data'] as Map?)?['accounts'] as List? ?? [];

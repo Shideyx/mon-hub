@@ -105,7 +105,7 @@ void main() {
         200,
       );
     });
-    final ed = EdClient(client);
+    final ed = EdClient(client, false);
     await ed.login(
       'erik',
       'p@ss&+ é',
@@ -142,7 +142,7 @@ void main() {
         200,
       );
     });
-    final ed = EdClient(client);
+    final ed = EdClient(client, false);
     await ed.login(
       'a',
       'b',
@@ -153,5 +153,29 @@ void main() {
     );
     expect(logins, 2);
     expect(ed.accountId, 7);
+  });
+
+  test('École Directe : mot de passe refusé = arrêt, session expirée = signalée', () async {
+    var calls = 0;
+    final refuse = MockClient((req) async {
+      calls++;
+      if (req.method == 'GET') return http.Response('{}', 200);
+      expect(req.headers['Origin'] ?? req.headers['origin'], 'https://www.ecoledirecte.com');
+      return http.Response(jsonEncode({'code': 505, 'message': 'Mot de passe invalide'}), 200);
+    });
+    final ed = EdClient(refuse, false);
+    await expectLater(
+      ed.login('a', 'b', answerQuestion: (_, _) async => null),
+      throwsA(isA<EdAuthError>()),
+    );
+    expect(calls, 2, reason: 'une seule tentative de connexion, pas de boucle');
+
+    final expired = MockClient(
+      (req) async => http.Response(jsonEncode({'code': 525, 'message': ''}), 200),
+    );
+    final ed2 = EdClient(expired, false)
+      ..token = 'vieux'
+      ..accountId = 1;
+    await expectLater(ed2.grades(), throwsA(isA<EdSessionExpired>()));
   });
 }

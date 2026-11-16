@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -31,7 +32,7 @@ class EcoleDirecteModule extends HubModule {
     if (_weeks[key] case final w?) return w;
     if (client.accountId == null) return const [];
     try {
-      return _weeks[key] = await client.timetable(from, to);
+      return _weeks[key] = await withSession(() => client.timetable(from, to));
     } catch (_) {
       return const [];
     }
@@ -63,69 +64,200 @@ class EcoleDirecteModule extends HubModule {
   /// sécurité ; on garde le dernier disponible.
   BuildContext? _ctx;
 
-  Future<List<EdLesson>> load({bool force = false}) {
-    if (_loading != null && !force) return _loading!;
-    return _loading = () async {
-      lastError = null;
+  bool _busy = false;
+  DateTime? _homeworkAt;
+
+  /// Charge (ou recharge) les données.
+  ///
+  /// Pour ne pas passer pour un robot aux yeux d'École Directe :
+  /// * on **garde la session** (jeton) au lieu de se reconnecter à chaque
+  ///   fois, même après un redémarrage de Mon Hub ;
+  /// * une seule connexion à la fois, et pas plus d'une connexion
+  ///   automatique toutes les 30 minutes ;
+  /// * si École Directe refuse le mot de passe ou la réponse de sécurité,
+  ///   Mon Hub **s'arrête** et attend que tu te reconnectes (les essais ratés
+  ///   à répétition font bloquer le compte).
+  ///
+  /// [manual] : demandé par toi (bouton Actualiser, Réessayer…).
+  Future<List<EdLesson>> load({bool force = false, bool manual = false}) {
+    final running = _loading;
+    if (running != null && (!force || _busy)) return running;
+    return _loading = _run(manual: manual);
+  }
+
+  /// Message affiché quand Mon Hub s'est arrêté après un refus.
+  String? get blocked => store.getJson<String>('blocked');
+
+  Future<List<EdLesson>> _run({required bool manual}) async {
+    _busy = true;
+    lastError = null;
+    try {
       final user = store.getJson<String>('user');
       final pass = await store.readSecret('password');
       if (user == null || pass == null) return _cache = [];
-      final faRaw = await store.readSecret('fa');
-      // Comme le site officiel : identifiant d'appareil vide.
-      client.uuid = '';
-      _weeks.clear();
-      try {
-        await client.login(
-          user,
-          pass,
-          savedFa: faRaw == null
-              ? null
-              : (jsonDecode(faRaw) as List).map((e) => Map<String, String>.from(e as Map)).toList(),
-          answerQuestion: _ask,
-        );
-        if (client.lastFa != null) {
-          await store.writeSecret('fa', jsonEncode(client.lastFa));
-        }
-        final now = DateTime.now();
-        final from = DateTime(now.year, now.month, now.day);
-        try {
-          _cache = await client.timetable(
-            from.subtract(Duration(days: from.weekday - 1)),
-            from.add(const Duration(days: 21)),
-          );
-        } catch (e) {
-          lastError = '$e';
-        }
-        try {
-          grades = await client.grades();
-        } catch (_) {}
-        try {
-          homework = await client.homework();
-        } catch (_) {}
-        try {
-          messages = await client.messages();
-        } catch (_) {}
-        badge.value =
-            messages.where((m) => !m.read).length +
-            homework.where((h) => !h.done && h.due.difference(now).inDays <= 1).length;
-        return _cache;
-      } catch (e) {
-        lastError = '$e';
-        // Échec : la prochaine demande retentera (sinon on resterait bloqué
-        // sur l'erreur jusqu'au redémarrage).
-        _loading = null;
+      if (blocked case final b?) {
+        lastError = b;
         return _cache;
       }
-    }();
+      if (client.token == null) await _restoreSession();
+      if (client.token == null) await _login(user, pass, manual: manual);
+      try {
+        await _fetch();
+      } on EdSessionExpired {
+        await _login(user, pass, manual: manual);
+        await _fetch();
+      }
+      return _cache;
+    } catch (e) {
+      lastError = '$e';
+      // Échec : la prochaine demande retentera (sans reconnexion trop tôt).
+      _loading = null;
+      return _cache;
+    } finally {
+      _busy = false;
+    }
   }
+
+  /// Reprend la session gardée (évite une connexion à chaque démarrage).
+  Future<void> _restoreSession() async {
+    final raw = await store.readSecret('session');
+    if (raw == null) return;
+    try {
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      final at = DateTime.tryParse('${j['at']}');
+      if (at == null || DateTime.now().difference(at) > const Duration(hours: 12)) return;
+      client
+        ..token = j['token'] as String?
+        ..accountId = j['id'] as int?
+        ..studentName = j['name'] as String?;
+      if (client.accountId == null) client.token = null;
+    } catch (_) {}
+  }
+
+  Future<void> _login(String user, String pass, {required bool manual}) async {
+    final now = DateTime.now();
+    final last = DateTime.tryParse(store.getJson<String>('lastLogin') ?? '');
+    final pause = manual ? const Duration(minutes: 1) : const Duration(minutes: 30);
+    if (last != null && now.difference(last) < pause && now.isAfter(last)) {
+      final left = pause - now.difference(last);
+      throw 'Connexion à École Directe en pause encore ${left.inMinutes + 1} min, '
+          'pour ne pas être pris pour un robot.';
+    }
+    await store.setJson('lastLogin', now.toIso8601String());
+    client.token = null;
+    await store.writeSecret('session', null);
+    final faRaw = await store.readSecret('fa');
+    // Comme le site officiel : identifiant d'appareil vide.
+    client.uuid = '';
+    _weeks.clear();
+    try {
+      await client.login(
+        user,
+        pass,
+        savedFa: faRaw == null
+            ? null
+            : (jsonDecode(faRaw) as List).map((e) => Map<String, String>.from(e as Map)).toList(),
+        answerQuestion: _ask,
+      );
+    } on EdAuthError catch (e) {
+      // Plus aucun essai automatique tant que tu ne t'es pas reconnecté.
+      await store.setJson(
+        'blocked',
+        '$e. Mon Hub a arrêté d\'essayer pour protéger ton compte : '
+            'reconnecte-toi (icône clé) avec le bon mot de passe.',
+      );
+      rethrow;
+    }
+    if (client.lastFa != null) await store.writeSecret('fa', jsonEncode(client.lastFa));
+    await store.writeSecret(
+      'session',
+      jsonEncode({
+        'token': client.token,
+        'id': client.accountId,
+        'name': client.studentName,
+        'at': DateTime.now().toIso8601String(),
+      }),
+    );
+  }
+
+  /// Récupère les données avec la session ouverte (requêtes espacées).
+  Future<void> _fetch() async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    try {
+      _cache = await client.timetable(
+        from.subtract(Duration(days: from.weekday - 1)),
+        from.add(const Duration(days: 21)),
+      );
+    } on EdSessionExpired {
+      rethrow;
+    } catch (e) {
+      lastError = '$e';
+    }
+    try {
+      grades = await client.grades();
+    } on EdSessionExpired {
+      rethrow;
+    } catch (_) {}
+    try {
+      messages = await client.messages();
+    } on EdSessionExpired {
+      rethrow;
+    } catch (_) {}
+    // Le cahier de texte demande une requête par jour : pas plus d'une
+    // fois toutes les 2 heures.
+    final hw = _homeworkAt;
+    if (hw == null || now.difference(hw) > const Duration(hours: 2)) {
+      try {
+        homework = await client.homework();
+        _homeworkAt = now;
+      } on EdSessionExpired {
+        rethrow;
+      } catch (_) {}
+    }
+    badge.value =
+        messages.where((m) => !m.read).length +
+        homework.where((h) => !h.done && h.due.difference(now).inDays <= 1).length;
+    // La session reste valable : on note qu'elle vient de servir.
+    await store.writeSecret(
+      'session',
+      jsonEncode({
+        'token': client.token,
+        'id': client.accountId,
+        'name': client.studentName,
+        'at': DateTime.now().toIso8601String(),
+      }),
+    );
+  }
+
+  /// Une action ponctuelle (lire, répondre…) avec reconnexion si la session
+  /// a expiré.
+  Future<T> withSession<T>(Future<T> Function() f) async {
+    if (blocked case final b?) throw b;
+    if (client.token == null) await load(force: true, manual: true);
+    try {
+      return await f();
+    } on EdSessionExpired {
+      final user = store.getJson<String>('user');
+      final pass = await store.readSecret('password');
+      if (user == null || pass == null) rethrow;
+      await _login(user, pass, manual: true);
+      return f();
+    }
+  }
+
+  DateTime? _nextPoll;
 
   @override
   Future<List<HubNotification>> poll() async {
-    if (!configured) return const [];
-    // Toutes les 2 min c'est trop pour École Directe : 15 min minimum.
-    final last = _lastPoll;
-    if (last != null && DateTime.now().difference(last).inMinutes < 15) return _lastItems;
-    _lastPoll = DateTime.now();
+    if (!configured || blocked != null) return _lastItems;
+    final now0 = DateTime.now();
+    // Pas de vérification la nuit (22 h – 6 h 30) : personne ne consulte
+    // École Directe toutes les demi-heures en pleine nuit.
+    final night = now0.hour >= 22 || now0.hour < 6 || (now0.hour == 6 && now0.minute < 30);
+    if (_nextPoll != null && (night || now0.isBefore(_nextPoll!))) return _lastItems;
+    // Toutes les 30 à 45 minutes environ (jamais pile au même rythme).
+    _nextPoll = now0.add(Duration(minutes: 30 + math.Random().nextInt(16)));
     await load(force: true);
     store.changed();
     final now = DateTime.now();
@@ -210,11 +342,10 @@ class EcoleDirecteModule extends HubModule {
       description: 'Contenu d\'un message École Directe.',
       params: {'id': ('integer', 'id donné par ecole_messages')},
       required: ['id'],
-      run: (a) => client.messageContent((a['id'] as num).toInt()),
+      run: (a) => withSession(() => client.messageContent((a['id'] as num).toInt())),
     ),
   ];
 
-  DateTime? _lastPoll;
   List<HubNotification> _lastItems = const [];
 
   Future<String?>? _pendingQuestion;
@@ -269,7 +400,7 @@ class EcoleDirecteModule extends HubModule {
 
   /// Relance la connexion (après une question restée sans réponse…).
   Future<void> retry() async {
-    await load(force: true);
+    await load(force: true, manual: true);
     store.changed();
   }
 
@@ -284,12 +415,17 @@ class EcoleDirecteModule extends HubModule {
     if (r == null || r[0].isEmpty || r[1].isEmpty) return;
     await store.writeSecret('password', r[1]);
     await store.writeSecret('fa', null);
+    await store.writeSecret('session', null);
     await store.setJson('user', r[0]);
+    // Nouveaux identifiants : on a le droit de réessayer tout de suite.
+    await store.setJson('blocked', null);
+    await store.setJson('lastLogin', null);
+    client.token = null;
     final messenger = context.mounted ? ScaffoldMessenger.of(context) : null;
     messenger?.showSnackBar(
       const SnackBar(content: Text('Connexion à École Directe…'), duration: Duration(seconds: 20)),
     );
-    await load(force: true);
+    await load(force: true, manual: true);
     store.changed();
     // Toujours un retour clair : connecté, ou l'erreur exacte.
     messenger
@@ -362,7 +498,7 @@ class EcoleDirecteModule extends HubModule {
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
-              onPressed: () => load(force: true).then((_) => store.changed()),
+              onPressed: () => load(force: true, manual: true).then((_) => store.changed()),
             ),
             Builder(
               builder: (context) => IconButton(
@@ -550,7 +686,7 @@ class EcoleDirecteModule extends HubModule {
                           ),
                           const Divider(height: 28),
                           FutureBuilder(
-                            future: client.messageContent(m.id),
+                            future: withSession(() => client.messageContent(m.id)),
                             builder: (c, snap) => snap.hasError
                                 ? ErrorBanner('${snap.error}')
                                 : !snap.hasData
@@ -565,7 +701,7 @@ class EcoleDirecteModule extends HubModule {
                         color: color,
                         hint: 'Répondre à ${m.from}',
                         onSend: (text) async {
-                          await client.reply(m, text);
+                          await withSession(() => client.reply(m, text));
                           if (c.mounted) {
                             ScaffoldMessenger.of(c)
                                 .showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
