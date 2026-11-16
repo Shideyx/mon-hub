@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
 import '../ecoledirecte/ecoledirecte_module.dart';
@@ -69,6 +70,9 @@ class PersonalEvent {
 
   /// Se répète chaque semaine (sport, cours particulier…).
   bool weekly;
+
+  /// À créer dans Google Agenda plutôt que dans Mon Hub (non enregistré).
+  bool toGoogle = false;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -208,6 +212,92 @@ class ScheduleModule extends HubModule {
     store.changed();
   }
 
+  // ---- Google (connexion officielle) ------------------------------------
+
+  final Map<String, (DateTime, List<AgendaItem>)> _gCache = {};
+  String? googleError;
+
+  Future<List<AgendaItem>> _googleBetween(DateTime from, DateTime to) async {
+    final key = '${from.toIso8601String()}|${to.toIso8601String()}';
+    final c = _gCache[key];
+    if (c != null && DateTime.now().difference(c.$1).inMinutes < 5) return c.$2;
+    googleError = null;
+    final out = <AgendaItem>[];
+    const base = 'https://www.googleapis.com/calendar/v3';
+    for (final email in GoogleAuth.accounts) {
+      try {
+        final cals = await GoogleAuth.api(email, 'GET', '$base/users/me/calendarList');
+        for (final cal in (cals['items'] as List? ?? [])) {
+          if (cal['selected'] == false || cal['hidden'] == true) continue;
+          final hex = '${cal['backgroundColor'] ?? '#4285F4'}'.replaceAll('#', '');
+          final color = Color(0xFF000000 | (int.tryParse(hex, radix: 16) ?? 0x4285F4));
+          final q = Uri(queryParameters: {
+            'timeMin': from.toUtc().toIso8601String(),
+            'timeMax': to.toUtc().toIso8601String(),
+            'singleEvents': 'true',
+            'orderBy': 'startTime',
+            'maxResults': '250',
+          }).query;
+          final ev = await GoogleAuth.api(email, 'GET',
+              '$base/calendars/${Uri.encodeComponent(cal['id'] as String)}/events?$q');
+          for (final e in (ev['items'] as List? ?? [])) {
+            if (e['status'] == 'cancelled') continue;
+            final s = e['start'] as Map? ?? {};
+            final en = e['end'] as Map? ?? {};
+            final allDay = s['date'] != null;
+            final start = DateTime.tryParse('${s['dateTime'] ?? s['date']}')?.toLocal();
+            final end = DateTime.tryParse('${en['dateTime'] ?? en['date']}')?.toLocal();
+            if (start == null || end == null) continue;
+            out.add(AgendaItem(
+              title: e['summary'] as String? ?? '(sans titre)',
+              start: start,
+              end: end,
+              source: AgendaSource.google,
+              color: color,
+              place: e['location'] as String? ?? '',
+              detail: cal['summary'] as String? ?? '',
+              allDay: allDay,
+            ));
+          }
+        }
+      } catch (e) {
+        googleError = '$e';
+      }
+    }
+    _gCache[key] = (DateTime.now(), out);
+    return out;
+  }
+
+  /// Crée l'évènement dans l'agenda principal Google.
+  Future<void> addToGoogle(PersonalEvent e) async {
+    final email = GoogleAuth.accounts.first;
+    String t(DateTime d) => d.toIso8601String().substring(0, 19);
+    await GoogleAuth.api(email, 'POST',
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        body: {
+          'summary': e.title,
+          if (e.place.isNotEmpty) 'location': e.place,
+          if (e.note.isNotEmpty) 'description': e.note,
+          'start': {'dateTime': t(e.start), 'timeZone': _tz},
+          'end': {'dateTime': t(e.end), 'timeZone': _tz},
+          if (e.weekly) 'recurrence': ['RRULE:FREQ=WEEKLY'],
+        });
+    _gCache.clear();
+    store.changed();
+  }
+
+  static String get _tz => 'Europe/Paris';
+
+  Future<void> connectGoogle(BuildContext context) async {
+    try {
+      await GoogleAuth.signIn();
+      _gCache.clear();
+      store.changed();
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
   // ---- Google / iCal -----------------------------------------------------
 
   List<String> _icsTexts = [];
@@ -261,6 +351,9 @@ class ScheduleModule extends HubModule {
           ),
         );
       }
+    }
+    if (!hide.contains(AgendaSource.google) && GoogleAuth.accounts.isNotEmpty) {
+      out.addAll(await _googleBetween(from, to));
     }
     if (!hide.contains(AgendaSource.google) && urls.isNotEmpty) {
       await _loadIcs();
@@ -453,6 +546,32 @@ class ScheduleModule extends HubModule {
           children: [
             Text('Agendas Google', style: Theme.of(c).textTheme.titleLarge),
             const SizedBox(height: 8),
+            if (GoogleAuth.available) ...[
+              for (final a in GoogleAuth.accounts)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.verified_user_rounded),
+                  title: Text(a),
+                  subtitle: const Text('Connecté avec Google : lecture et ajout'),
+                  trailing: IconButton(
+                    tooltip: 'Déconnecter',
+                    icon: const Icon(Icons.logout_rounded),
+                    onPressed: () async {
+                      await GoogleAuth.signOut(a);
+                      _gCache.clear();
+                      store.changed();
+                    },
+                  ),
+                ),
+              FilledButton.icon(
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Se connecter avec Google'),
+                onPressed: () => connectGoogle(c),
+              ),
+              const SizedBox(height: 16),
+              const Text('Ou bien, sans connexion, un lien iCal (lecture seule) :'),
+              const SizedBox(height: 8),
+            ],
             const Text(
               'Sur un ordinateur : Google Agenda → ⚙️ Paramètres → ton agenda → '
               '« Intégrer l\'agenda » → copie l\'« Adresse secrète au format iCal ».',
@@ -533,6 +652,7 @@ class _AgendaPageState extends State<AgendaPage> {
 
   Future<void> _refresh() async {
     m._icsAt = null;
+    m._gCache.clear();
     await Future.wait([m._loadIcs(force: true), if (m.ecole != null) m.ecole!.load(force: true)]);
     m.store.changed();
   }
@@ -637,6 +757,8 @@ class _AgendaPageState extends State<AgendaPage> {
                       if (m.ecole?.lastError case final e? when !hide.contains(AgendaSource.ecole))
                         'École Directe : $e',
                       if (m.icsError case final e? when !hide.contains(AgendaSource.google)) e,
+                      if (m.googleError case final e? when !hide.contains(AgendaSource.google))
+                        e,
                     ];
                     final days = wide
                         ? [for (var i = 0; i < 7; i++) week.add(Duration(days: i))]
@@ -1113,7 +1235,16 @@ Future<void> editPersonalEvent(
     showDragHandle: true,
     builder: (c) => _EventEditor(event: e, isNew: existing == null, module: m),
   );
-  if (saved == true) await m.savePersonal(e);
+  if (saved != true) return;
+  if (e.toGoogle) {
+    try {
+      await m.addToGoogle(e);
+    } catch (err) {
+      if (context.mounted) showError(context, err);
+    }
+  } else {
+    await m.savePersonal(e);
+  }
 }
 
 class _EventEditor extends StatefulWidget {
@@ -1237,6 +1368,14 @@ class _EventEditorState extends State<_EventEditor> {
               value: e.weekly,
               onChanged: (v) => setState(() => e.weekly = v),
             ),
+            if (widget.isNew && GoogleAuth.accounts.isNotEmpty)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Ajouter dans Google Agenda'),
+                subtitle: const Text('Visible aussi sur ton téléphone et sur Google'),
+                value: e.toGoogle,
+                onChanged: (v) => setState(() => e.toGoogle = v),
+              ),
             TextField(
               controller: _place,
               decoration: const InputDecoration(

@@ -1,6 +1,7 @@
 import 'package:enough_mail/enough_mail.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
 
@@ -70,13 +71,22 @@ class MailModule extends HubModule {
 
   String hostOf(String email) => store.getJson<String>('host.$email') ?? imapHostFor(email);
 
+  /// Boîte connectée avec « Se connecter avec Google ».
+  bool isGoogle(String email) => store.getJson<bool>('google.$email') == true;
+
   Future<T> _withImap<T>(String email, Future<T> Function(ImapClient c) action) async {
-    final pass = await store.readSecret('pw.$email');
-    if (pass == null) throw 'Mot de passe manquant';
     final client = ImapClient();
     try {
-      await client.connectToServer(hostOf(email), 993, isSecure: true);
-      await client.login(email, pass);
+      if (isGoogle(email)) {
+        final token = await GoogleAuth.accessToken(email);
+        await client.connectToServer('imap.gmail.com', 993, isSecure: true);
+        await client.authenticateWithOAuth2(email, token);
+      } else {
+        final pass = await store.readSecret('pw.$email');
+        if (pass == null) throw 'Mot de passe manquant';
+        await client.connectToServer(hostOf(email), 993, isSecure: true);
+        await client.login(email, pass);
+      }
       await client.selectInbox();
       return await action(client);
     } finally {
@@ -143,9 +153,10 @@ class MailModule extends HubModule {
     required String body,
     MimeMessage? replyTo,
   }) async {
-    final pass = await store.readSecret('pw.$from');
+    final google = isGoogle(from);
+    final pass = google ? await GoogleAuth.accessToken(from) : await store.readSecret('pw.$from');
     if (pass == null) throw 'Mot de passe manquant';
-    final (host, port) = smtpFor(hostOf(from));
+    final (host, port) = google ? ('smtp.gmail.com', 465) : smtpFor(hostOf(from));
     final message = MessageBuilder.buildSimpleTextMessage(
       MailAddress(null, from),
       to
@@ -166,7 +177,8 @@ class MailModule extends HubModule {
         await client.startTls();
         await client.ehlo();
       }
-      await client.authenticate(from, pass, AuthMechanism.login);
+      await client.authenticate(
+          from, pass, google ? AuthMechanism.xoauth2 : AuthMechanism.login);
       await client.sendMessage(message);
     } finally {
       try {
@@ -266,7 +278,51 @@ class MailModule extends HubModule {
   }
 
   Future<void> _addAccount(BuildContext context) async {
-    final open = await showDialog<bool>(
+    if (GoogleAuth.available) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (c) => SimpleDialog(
+          title: const Text('Ajouter une boîte mail'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, 'google'),
+              child: const ListTile(
+                leading: Icon(Icons.g_mobiledata_rounded, size: 36),
+                title: Text('Se connecter avec Google'),
+                subtitle: Text('Gmail : une page Google s\'ouvre, tu acceptes, c\'est tout'),
+              ),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, 'other'),
+              child: const ListTile(
+                leading: Icon(Icons.alternate_email_rounded),
+                title: Text('Autre boîte mail'),
+                subtitle: Text('Orange, Free, SFR, iCloud… (adresse + mot de passe)'),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || !context.mounted) return;
+      if (choice == 'google') {
+        try {
+          final email = await GoogleAuth.signIn();
+          await store.setJson('google.$email', true);
+          await store.setJson('accounts', {...accounts, email}.toList());
+          await load(force: true);
+          store.changed();
+        } catch (e) {
+          if (context.mounted) showError(context, e);
+        }
+        return;
+      }
+      return _addOther(context, gmailHelp: false);
+    }
+    return _addOther(context);
+  }
+
+  Future<void> _addOther(BuildContext context, {bool gmailHelp = true}) async {
+    final open = !gmailHelp ? false : await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Boîte Gmail ?'),
@@ -375,6 +431,7 @@ class MailModule extends HubModule {
             onSelected: (v) async {
               if (v == '+') return _addAccount(context);
               await store.writeSecret('pw.$v', null);
+              await store.setJson('google.$v', null);
               await store.setJson('accounts', accounts.where((x) => x != v).toList());
               await load(force: true);
               store.changed();

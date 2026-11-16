@@ -50,9 +50,9 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 |---|---|
 | **Instagram** | Carte Instagram → **Connecter** → connecte-toi sur la page Instagram qui s'ouvre. Elle se ferme toute seule. |
 | **Discord** | Carte Discord → **Connecter** → **Continuer** → connecte-toi sur la page Discord. Elle se ferme toute seule. |
-| **Mails (Gmail)** | Carte Mails → **Ajouter** → **Ouvrir la page Google** → crée un mot de passe d'application nommé « Mon Hub » → copie les 16 lettres → reviens et colle-les avec ton adresse. *(La validation en 2 étapes doit être activée sur ton compte Google.)* |
+| **Mails (Gmail)** | Carte Mails → **Ajouter** → **Se connecter avec Google** → choisis ton compte → **Autoriser**. *(Si Google affiche « appli non validée » : Paramètres avancés → Accéder à Mon Hub.)* Autres boîtes (Orange, Free…) : adresse + mot de passe. |
 | **École Directe** | Carte École Directe → **Se connecter** → identifiant + mot de passe. Réponds à la question de sécurité la première fois. |
-| **Agenda** | Les cours École Directe y apparaissent tout seuls. Bouton **+ Ajouter** (ou clic sur un créneau vide) pour tes évènements. Pour Google : bouton 🔗 en haut de l'Agenda, puis sur ordinateur : Google Agenda → ⚙️ Paramètres → ton agenda → *Intégrer l'agenda* → copie l'**Adresse secrète au format iCal** → colle-la. |
+| **Agenda** | Les cours École Directe y apparaissent tout seuls. Bouton 🔗 en haut de l'Agenda → **Se connecter avec Google** → Autoriser : tes évènements Google s'affichent, et tu peux en ajouter directement dans Google Agenda. Bouton **+ Ajouter** (ou clic sur un créneau vide) pour tes évènements. |
 | **Roblox** | Carte Roblox → **Ajouter un compte** → ton pseudo (pas de mot de passe). |
 | **Livres** | Bibliothèque → **Ajouter un livre** → cherche le titre. |
 
