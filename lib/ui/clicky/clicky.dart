@@ -17,6 +17,7 @@ import '../../core/claude_bridge.dart';
 import '../../core/hub_controller.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import 'claude_code.dart';
 import 'ollama.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
@@ -203,7 +204,9 @@ class ClickyController extends ChangeNotifier {
   bool get alwaysShow => _opt('show', true);
 
   /// 'claude' (clé API) ou 'ollama' (local, gratuit).
-  String get provider => _opt('provider', 'claude');
+  /// 'claudecode' (ton abonnement Claude Pro via Claude Code), 'claude'
+  /// (clé API) ou 'ollama' (local, gratuit).
+  String get provider => _opt('provider', ClaudeCode.supported ? 'claudecode' : 'claude');
 
   /// Windows : Clicky au-dessus de tout l'écran et de toutes les applis.
   bool get everywhere => _opt('everywhere', true);
@@ -233,7 +236,11 @@ class ClickyController extends ChangeNotifier {
   Future<bool> refreshReady() async {
     bool r;
     try {
-      r = provider == 'ollama' || await ClaudeApi.hasKey();
+      r = switch (provider) {
+        'ollama' => true,
+        'claudecode' => await ClaudeCode.find() != null,
+        _ => await ClaudeApi.hasKey(),
+      };
     } catch (_) {
       r = false;
     }
@@ -599,7 +606,8 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
     }
     _set(ClickyState.thinking, status: 'Je regarde…', reply: '');
     final useOllama = provider == 'ollama';
-    if (!useOllama && !await ClaudeApi.hasKey()) {
+    final usePro = provider == 'claudecode';
+    if (usePro ? await ClaudeCode.find() == null : (!useOllama && !await ClaudeApi.hasKey())) {
       _needsSetup();
       return;
     }
@@ -611,7 +619,19 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
         if (clean != reply) _set(state, status: '', reply: clean);
       }
 
-      if (useOllama) {
+      if (usePro) {
+        // Ton abonnement Claude, via ton Claude Code.
+        raw = await ClaudeCode.ask(
+          system: _system(shots),
+          question: _withMemory(q),
+          imagesB64: [for (final s in shots) s.png64],
+          imageLabels: [
+            for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}) :',
+          ],
+          onText: streamed,
+          onStatus: (s) => _set(ClickyState.thinking, status: s),
+        );
+      } else if (useOllama) {
         raw = await Ollama.chat(
           system: _system(shots),
           memory: _memory,
@@ -643,7 +663,7 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
           system: _system(shots),
           history: history,
           tools: _tools,
-          confirm: _confirm,
+          confirm: confirmAction,
           onStatus: (s) => _set(ClickyState.thinking, status: s),
           onText: streamed,
         );
@@ -681,15 +701,25 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
     }
   }
 
+  /// Claude Code ne garde pas la conversation : on lui rappelle les
+  /// derniers échanges dans la question.
+  String _withMemory(String q) {
+    if (_memory.isEmpty) return q;
+    final past = [for (final (u, a) in _memory) 'Toi : $u\nClicky : $a'].join('\n\n');
+    return 'Nos derniers échanges :\n$past\n\nNouvelle question : $q';
+  }
+
   void _needsSetup() {
     panelOpen = true;
     onInteractive?.call(true);
     _set(
       ClickyState.idle,
       status: '',
-      reply:
-          'Pour que je puisse t\'aider, choisis mon cerveau dans le module Claude '
-          '→ Réglages (icône clé) : une clé API Claude, ou Ollama, gratuit et sur ton PC.',
+      reply: provider == 'claudecode'
+          ? 'Pour utiliser ton abonnement Claude, installe Claude Code puis connecte-toi : '
+                'module Claude → Réglages (icône clé).'
+          : 'Pour que je puisse t\'aider, choisis mon cerveau dans le module Claude '
+                '→ Réglages (icône clé) : ton abonnement Claude Pro, une clé API, ou Ollama.',
     );
   }
 
@@ -704,10 +734,15 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
       );
       return;
     }
-    if (provider != 'claude' || !await ClaudeApi.hasKey()) {
+    final usePro = provider == 'claudecode';
+    if (usePro
+        ? await ClaudeCode.find() == null
+        : (provider != 'claude' || !await ClaudeApi.hasKey())) {
       _set(
         ClickyState.idle,
-        reply: 'Le mode agent a besoin de Claude (clé API) pour utiliser tes modules.',
+        reply:
+            'Le mode agent a besoin de Claude (ton abonnement Claude Pro ou une clé API) '
+            'pour utiliser tes modules.',
       );
       return;
     }
@@ -716,15 +751,21 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
     unawaited(speak('C\'est parti, je m\'en occupe.'));
     _fadeSoon();
     try {
-      final r = await ClaudeApi.chat(
-        system: _system(const [], agent: true),
-        history: [
-          {'role': 'user', 'content': task},
-        ],
-        tools: _tools,
-        confirm: _confirm,
-        effort: 'high',
-      );
+      final r = usePro
+          ? await ClaudeCode.ask(
+              system: _system(const [], agent: true),
+              question: task,
+              effort: 'high',
+            )
+          : await ClaudeApi.chat(
+              system: _system(const [], agent: true),
+              history: [
+                {'role': 'user', 'content': task},
+              ],
+              tools: _tools,
+              confirm: confirmAction,
+              effort: 'high',
+            );
       final text = parsePoint(r).$1;
       agentsRunning--;
       _set(state, reply: 'Agent : $text');
@@ -737,7 +778,9 @@ Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu par
     _fadeSoon();
   }
 
-  Future<bool> _confirm(HubTool tool, Map<String, dynamic> args) async {
+  /// Demande la permission avant une action qui envoie ou modifie quelque
+  /// chose (aussi utilisée par le pont quand Claude Code agit).
+  Future<bool> confirmAction(HubTool tool, Map<String, dynamic> args) async {
     onInteractive?.call(true);
     try {
       final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));

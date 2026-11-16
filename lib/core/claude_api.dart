@@ -259,8 +259,7 @@ class ClaudeApi {
   }
 
   /// Actions qui changent quelque chose : on demande la permission avant.
-  static bool isWriteAction(HubTool t) =>
-      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter').hasMatch(t.name);
+  static bool isWriteAction(HubTool t) => ClaudeBridge.isWriteAction(t);
 }
 
 class MissingKey implements Exception {

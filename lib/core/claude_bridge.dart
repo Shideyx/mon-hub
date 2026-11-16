@@ -41,6 +41,10 @@ class ClaudeBridge {
 
   List<HubTool> get tools => [for (final m in hub.enabled) ...m.tools];
 
+  /// Demande la permission avant une action qui envoie ou modifie quelque
+  /// chose, quand c'est Claude Code (Clicky) qui l'appelle via /mcp.
+  static Future<bool> Function(HubTool tool, Map<String, dynamic> args)? confirm;
+
   Future<void> start() async {
     if (!supported || _server != null) return;
     final dir = folder;
@@ -79,6 +83,7 @@ class ClaudeBridge {
     if (req.headers.value('authorization') != 'Bearer $key') {
       return reply(401, {'error': 'Clé invalide'});
     }
+    if (req.uri.path == '/mcp') return _mcp(req, res);
     if (req.method == 'GET' && req.uri.path == '/tools') {
       return reply(200, {
         'tools': [for (final t in tools) t.toJson()],
@@ -99,6 +104,111 @@ class ClaudeBridge {
     }
     return reply(404, {'error': 'Introuvable'});
   }
+
+  /// Serveur MCP minimal (HTTP « streamable », réponses JSON) : c'est par là
+  /// que Claude Code, lancé par Clicky avec ton abonnement Claude, utilise
+  /// les actions de Mon Hub (agenda, notes, messages…).
+  Future<void> _mcp(HttpRequest req, HttpResponse res) async {
+    if (req.method == 'DELETE') {
+      res.statusCode = 200;
+      return res.close();
+    }
+    if (req.method != 'POST') {
+      res.statusCode = 405;
+      res.headers.set('allow', 'POST');
+      return res.close();
+    }
+    Object? body;
+    try {
+      body = jsonDecode(await utf8.decodeStream(req));
+    } catch (_) {
+      res.statusCode = 400;
+      res.write(jsonEncode(_rpcError(null, -32700, 'JSON invalide')));
+      return res.close();
+    }
+    final batch = body is List;
+    final messages = batch ? body : [body];
+    final replies = <Map<String, dynamic>>[];
+    for (final m in messages) {
+      if (m is! Map) continue;
+      final reply = await _rpc(m.cast<String, dynamic>());
+      if (reply != null) replies.add(reply);
+    }
+    if (replies.isEmpty) {
+      res.statusCode = 202; // que des notifications
+      return res.close();
+    }
+    res.statusCode = 200;
+    res.write(jsonEncode(batch ? replies : replies.first));
+    return res.close();
+  }
+
+  static Map<String, dynamic> _rpcError(Object? id, int code, String message) => {
+    'jsonrpc': '2.0',
+    'id': id,
+    'error': {'code': code, 'message': message},
+  };
+
+  Future<Map<String, dynamic>?> _rpc(Map<String, dynamic> m) async {
+    final id = m['id'];
+    final method = m['method'];
+    if (id == null) return null; // notification (ex. « initialized »)
+    final params = (m['params'] as Map?)?.cast<String, dynamic>() ?? const {};
+    Map<String, dynamic> ok(Object result) => {'jsonrpc': '2.0', 'id': id, 'result': result};
+    switch (method) {
+      case 'initialize':
+        return ok({
+          'protocolVersion': params['protocolVersion'] ?? '2025-06-18',
+          'capabilities': {
+            'tools': {'listChanged': false},
+          },
+          'serverInfo': {'name': 'monhub', 'version': '1.0.0'},
+          'instructions':
+              'Actions de l\'appli Mon Hub de la personne : agenda, École Directe, mails, '
+              'Discord, Instagram, livres, Roblox, Google Drive.',
+        });
+      case 'ping':
+        return ok({});
+      case 'tools/list':
+        return ok({
+          'tools': [
+            for (final t in tools)
+              {
+                'name': t.name,
+                'description': t.description,
+                'inputSchema': t.toJson()['inputSchema'],
+              },
+          ],
+        });
+      case 'tools/call':
+        final name = '${params['name']}';
+        final tool = tools.where((t) => t.name == name).firstOrNull;
+        if (tool == null) return _rpcError(id, -32602, 'Action inconnue : $name');
+        final args = (params['arguments'] as Map?)?.cast<String, dynamic>() ?? {};
+        Map<String, dynamic> result(String text, {bool error = false}) => ok({
+          'content': [
+            {'type': 'text', 'text': text},
+          ],
+          'isError': error,
+        });
+        try {
+          final ask = confirm;
+          if (ask != null && isWriteAction(tool) && !await ask(tool, args)) {
+            return result('La personne a refusé cette action.', error: true);
+          }
+          final out = plain(await tool.run(args));
+          return result(out is String ? out : jsonEncode(out));
+        } catch (e) {
+          return result('$e', error: true);
+        }
+      default:
+        return _rpcError(id, -32601, 'Méthode inconnue : $method');
+    }
+  }
+
+  /// Actions qui changent quelque chose : on demande la permission avant.
+  static bool isWriteAction(HubTool t) =>
+      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter').hasMatch(t.name);
 
   /// Convertit le résultat en JSON simple (dates en texte).
   static Object? plain(Object? v) => switch (v) {

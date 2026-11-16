@@ -6,6 +6,7 @@ import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import '../../ui/clicky/clicky.dart';
+import '../../ui/clicky/claude_code.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
 import '../../ui/web_login.dart';
@@ -37,7 +38,7 @@ class ClaudeModule extends HubModule {
   Widget buildSummary(BuildContext context) => ListenableBuilder(
     listenable: ClaudeApi.store,
     builder: (context, _) => FutureBuilder(
-      future: ClaudeApi.hasKey().then((k) => k || ClickyController.instance.provider == 'ollama'),
+      future: ClickyController.instance.refreshReady(),
       builder: (context, snap) {
         final ready = snap.data == true;
         return Center(
@@ -227,23 +228,31 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 Text('Cerveau de Clicky', style: text.titleSmall),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
+                  segments: [
+                    if (ClaudeCode.supported)
+                      const ButtonSegment(
+                        value: 'claudecode',
+                        icon: Icon(Icons.workspace_premium_rounded),
+                        label: Text('Claude Pro'),
+                      ),
+                    const ButtonSegment(
                       value: 'claude',
-                      icon: Icon(Icons.auto_awesome_rounded),
-                      label: Text('Claude (clé API)'),
+                      icon: Icon(Icons.key_rounded),
+                      label: Text('Clé API'),
                     ),
-                    ButtonSegment(
+                    const ButtonSegment(
                       value: 'ollama',
                       icon: Icon(Icons.computer_rounded),
-                      label: Text('Local gratuit (Ollama)'),
+                      label: Text('Ollama'),
                     ),
                   ],
                   selected: {c.provider},
                   onSelectionChanged: (v) => c.setOption('provider', v.first),
                 ),
                 const SizedBox(height: 12),
-                if (c.provider == 'claude') ...[
+                if (c.provider == 'claudecode')
+                  const _ClaudeProSection()
+                else if (c.provider == 'claude') ...[
                   const Text(
                     'Le plus malin : voit et comprend très bien l\'écran, utilise tes modules '
                     '(agenda, notes, messages…) et le mode agent. Clé API personnelle, payée à '
@@ -435,6 +444,121 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   }
 }
 
+/// Cerveau « Claude Pro » : ton abonnement Claude, via ton Claude Code.
+class _ClaudeProSection extends StatefulWidget {
+  const _ClaudeProSection();
+
+  @override
+  State<_ClaudeProSection> createState() => _ClaudeProSectionState();
+}
+
+class _ClaudeProSectionState extends State<_ClaudeProSection> {
+  Future<(bool, String)>? _status;
+  bool _installed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  void _check() {
+    setState(() {
+      _status = ClaudeCode.status().then((s) async {
+        final path = await ClaudeCode.find();
+        if (mounted) setState(() => _installed = path != null);
+        return s;
+      });
+    });
+    unawaited(ClickyController.instance.refreshReady());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Clicky utilise ton abonnement Claude (Pro, Max…) au lieu d\'une clé payante : '
+          'il passe par Claude Code, l\'outil officiel d\'Anthropic. Tu te connectes '
+          'toi-même sur la page d\'Anthropic ; Mon Hub ne voit jamais ta connexion. '
+          'Les questions comptent dans les limites de ton abonnement.',
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder(
+          future: _status,
+          builder: (context, snap) {
+            final s = snap.data;
+            final ok = s?.$1 == true;
+            return Row(
+              children: [
+                Icon(
+                  s == null
+                      ? Icons.hourglass_empty_rounded
+                      : ok
+                      ? Icons.check_circle_rounded
+                      : Icons.error_outline_rounded,
+                  size: 18,
+                  color: s == null ? null : (ok ? Colors.green : Colors.orange),
+                ),
+                const SizedBox(width: 6),
+                Expanded(child: Text(s?.$2 ?? 'Recherche de Claude Code…')),
+                IconButton(
+                  tooltip: 'Revérifier',
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: _check,
+                ),
+              ],
+            );
+          },
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            if (!_installed)
+              FilledButton.icon(
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('Installer Claude Code'),
+                onPressed: () async {
+                  if (!await ClaudeCode.install() && context.mounted) {
+                    await openLink(context, 'https://code.claude.com/docs/en/setup');
+                  }
+                },
+              ),
+            if (_installed)
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.login_rounded, size: 18),
+                label: const Text('Se connecter'),
+                onPressed: ClaudeCode.openLogin,
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          !_installed
+              ? '1. « Installer Claude Code » (une fenêtre s\'ouvre et installe le programme '
+                    'officiel). 2. Reviens ici et appuie sur ↻. 3. « Se connecter » : ta page '
+                    'Claude s\'ouvre, connecte-toi avec ton compte Pro.'
+              : 'Pas encore connecté ? « Se connecter » ouvre la connexion officielle '
+                    'd\'Anthropic dans ton navigateur. Ensuite, appuie sur ↻.',
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue: ClaudeCode.model,
+          decoration: const InputDecoration(labelText: 'Modèle', border: OutlineInputBorder()),
+          items: [
+            for (final e in ClaudeCode.models.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) => v == null ? null : ClaudeCode.setModel(v),
+        ),
+      ],
+    );
+  }
+}
+
 /// Discussion directe avec Claude (sans passer par claude.ai).
 class _ChatTab extends StatefulWidget {
   const _ChatTab({required this.module});
@@ -453,10 +577,21 @@ class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
+  static const _system =
+      'Tu es Claude, intégré à Mon Hub, l\'appli personnelle d\'un·e élève. '
+      'Réponds en français, clairement. Pour les devoirs, explique et guide '
+      'plutôt que de donner directement la réponse.';
+
+  /// Abonnement Claude Pro (via Claude Code) si c'est le cerveau choisi et
+  /// qu'il est installé ; sinon la clé API.
+  Future<bool> _usePro() async =>
+      ClickyController.instance.provider == 'claudecode' && await ClaudeCode.find() != null;
+
   Future<void> _send(String text) async {
-    if (!await ClaudeApi.hasKey()) {
+    final pro = await _usePro();
+    if (!pro && !await ClaudeApi.hasKey()) {
       if (mounted) await ClaudeModule.showSettings(context);
-      if (!await ClaudeApi.hasKey()) return;
+      if (!await _usePro() && !await ClaudeApi.hasKey()) return;
     }
     setState(() {
       shown.add((true, text, DateTime.now()));
@@ -464,14 +599,22 @@ class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
     });
     history.add({'role': 'user', 'content': text});
     try {
-      final r = await ClaudeApi.chat(
-        system:
-            'Tu es Claude, intégré à Mon Hub, l\'appli personnelle d\'un·e élève. '
-            'Réponds en français, clairement. Pour les devoirs, explique et guide '
-            'plutôt que de donner directement la réponse.',
-        history: history,
-        effort: 'medium',
-      );
+      final String r;
+      if (await _usePro()) {
+        // Claude Code ne garde pas la conversation : on la lui redonne.
+        final past = [
+          for (final m in history.take(history.length - 1))
+            if (m['content'] is String)
+              '${m['role'] == 'user' ? 'Moi' : 'Claude'} : ${m['content']}',
+        ];
+        r = await ClaudeCode.ask(
+          system: _system,
+          question: past.isEmpty ? text : '${past.join('\n\n')}\n\nMoi : $text',
+        );
+        history.add({'role': 'assistant', 'content': r});
+      } else {
+        r = await ClaudeApi.chat(system: _system, history: history, effort: 'medium');
+      }
       if (mounted) setState(() => shown.add((false, r, DateTime.now())));
     } catch (e) {
       // On retire la question pour pouvoir la renvoyer.

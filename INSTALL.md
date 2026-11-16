@@ -61,7 +61,8 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 ## 3 ter. Clicky, ton compagnon à côté du curseur
 
 1. Carte **Claude** → **Configurer Clicky** → choisis son cerveau :
-   - **Claude (clé API)** : le plus malin (voit très bien l'écran, utilise tes modules, mode agent). Crée une clé sur https://console.anthropic.com/settings/keys (payée à l'usage, quelques centimes par question) et colle-la.
+   - **Claude Pro** (conseillé si tu as un abonnement Claude Pro / Max) : Clicky utilise ton abonnement via **Claude Code**, l'outil officiel d'Anthropic. Dans les réglages : **Installer Claude Code** (une fenêtre s'ouvre et l'installe), puis **Se connecter** (la page officielle de Claude s'ouvre dans ton navigateur), puis ↻. Mon Hub ne voit jamais ta connexion ; les questions comptent dans les limites de ton abonnement.
+   - **Clé API** : crée une clé sur https://console.anthropic.com/settings/keys (payée à l'usage, quelques centimes par question) et colle-la.
    - **Local gratuit (Ollama)** : sans clé ni compte, rien ne sort du PC. Installe https://ollama.com/download puis, dans un terminal : `ollama pull qwen2.5vl`. Il faut un PC assez puissant.
 2. **Maintiens Ctrl + Alt et parle**, relâche pour envoyer (appui court = écrire). Sur téléphone : touche la bulle bleue.
 3. Sur Windows, **Clicky partout** (activé par défaut) : Clicky suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.

@@ -83,7 +83,10 @@ void main() {
   testWidgets('sans Clicky configuré, rien de Clicky ne s\'affiche et l\'appli marche', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      // Cerveau « clé API » sans clé : Clicky n'est pas configuré.
+      'mod.claude.clicky.provider': '"claude"',
+    });
     await ModuleStore.init();
     final hub = HubController(buildModules());
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
