@@ -26,7 +26,12 @@ class WebLoginPage extends StatefulWidget {
     this.cookieName,
     this.cookieUrl,
     this.captureAuthorizationHeader = false,
+    this.returnAllCookies = false,
   });
+
+  /// Une fois [cookieName] présent, renvoie tous les cookies du site sous
+  /// forme d'en-tête `Cookie` (nécessaire pour envoyer des messages).
+  final bool returnAllCookies;
 
   final String title;
   final String url;
@@ -94,7 +99,13 @@ class _WebLoginPageState extends State<WebLoginPage> {
       webViewController: _c,
     );
     final v = cookie?.value?.toString() ?? '';
-    if (v.isNotEmpty && v != '""') _finish(v);
+    if (v.isEmpty || v == '""') return;
+    if (!widget.returnAllCookies) return _finish(v);
+    final all = await CookieManager.instance().getCookies(
+      url: WebUri(widget.cookieUrl ?? widget.url),
+      webViewController: _c,
+    );
+    _finish(all.map((c) => '${c.name}=${c.value}').join('; '));
   }
 
   @override

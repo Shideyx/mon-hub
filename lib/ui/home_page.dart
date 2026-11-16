@@ -9,10 +9,13 @@ import 'settings_page.dart';
 import 'widgets.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.controller, required this.notifications});
+  const HomePage({super.key, required this.controller, required this.notifications, this.onOpen});
 
   final HubController controller;
   final NotificationCenter notifications;
+
+  /// Ouvre la section d'un module (fourni par le squelette de l'appli).
+  final ValueChanged<HubModule>? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +47,7 @@ class HomePage extends StatelessWidget {
                         mainAxisSpacing: 16,
                       ),
                       itemCount: modules.length,
-                      itemBuilder: (context, i) => ModuleCard(module: modules[i]),
+                      itemBuilder: (context, i) => ModuleCard(module: modules[i], onOpen: onOpen),
                     ),
                   ),
               ],
@@ -190,9 +193,10 @@ class _HeaderChip extends StatelessWidget {
 }
 
 class ModuleCard extends StatefulWidget {
-  const ModuleCard({super.key, required this.module});
+  const ModuleCard({super.key, required this.module, this.onOpen});
 
   final HubModule module;
+  final ValueChanged<HubModule>? onOpen;
 
   @override
   State<ModuleCard> createState() => _ModuleCardState();
@@ -232,10 +236,12 @@ class _ModuleCardState extends State<ModuleCard> {
                 ),
               ),
               InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)),
-                ),
+                onTap: () => widget.onOpen != null
+                    ? widget.onOpen!(m)
+                    : Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)),
+                      ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

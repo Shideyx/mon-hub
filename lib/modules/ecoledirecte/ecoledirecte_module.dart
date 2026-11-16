@@ -11,6 +11,8 @@ class EcoleDirecteModule extends HubModule {
   final client = EdClient();
   List<EdLesson> _cache = [];
   List<EdGrade> grades = [];
+  List<EdHomework> homework = [];
+  List<EdMessage> messages = [];
   Future<List<EdLesson>>? _loading;
   String? lastError;
 
@@ -19,9 +21,9 @@ class EcoleDirecteModule extends HubModule {
   @override
   String get name => 'École Directe';
   @override
-  String get description => 'Ton emploi du temps scolaire';
+  String get description => 'Emploi du temps, devoirs, notes et messagerie';
   @override
-  IconData get icon => Icons.school_outlined;
+  IconData get icon => Icons.school_rounded;
   @override
   Color get color => const Color(0xFF0B6FB8);
   @override
@@ -61,7 +63,14 @@ class EcoleDirecteModule extends HubModule {
         try {
           grades = await client.grades();
         } catch (_) {}
-        badge.value = _cache.where((l) => l.cancelled && l.end.isAfter(now)).length;
+        try {
+          homework = await client.homework();
+        } catch (_) {}
+        try {
+          messages = await client.messages();
+        } catch (_) {}
+        badge.value = messages.where((m) => !m.read).length +
+            homework.where((h) => !h.done && h.due.difference(now).inDays <= 1).length;
         return _cache;
       } catch (e) {
         lastError = '$e';
@@ -86,6 +95,19 @@ class EcoleDirecteModule extends HubModule {
           id: 'note:${g.id}',
           title: '📝 Nouvelle note en ${g.subject}',
           body: '${g.value}/${g.outOf}${g.title.isEmpty ? '' : ' · ${g.title}'}',
+        ),
+      for (final m in messages)
+        if (!m.read)
+          HubNotification(
+            id: 'msg:${m.id}',
+            title: '📨 École Directe · ${m.from}',
+            body: m.subject,
+          ),
+      for (final h in homework)
+        HubNotification(
+          id: 'devoir:${h.id}',
+          title: '${h.isTest ? '⚠️ Contrôle' : '📚 Devoir'} en ${h.subject}',
+          body: 'Pour ${dayLabel(h.due).toLowerCase()}',
         ),
       for (final l in _cache)
         if (l.cancelled && l.end.isAfter(now))
@@ -173,97 +195,188 @@ class EcoleDirecteModule extends HubModule {
   @override
   Widget buildPage(BuildContext context) {
     _ctx = context;
-    return Scaffold(
-      appBar: AppBar(title: Text(name), actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: () => load(force: true).then((_) => store.changed()),
-        ),
-        Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.manage_accounts_outlined),
-            onPressed: () => _configure(context),
-          ),
-        ),
-      ]),
-      body: ListenableBuilder(
-        listenable: store,
-        builder: (context, _) {
-          if (!configured) {
-            return Center(
-              child: FilledButton.icon(
-                icon: const Icon(Icons.login),
-                label: const Text('Se connecter'),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(name),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: () => load(force: true).then((_) => store.changed()),
+            ),
+            Builder(
+              builder: (context) => IconButton(
+                tooltip: 'Compte',
+                icon: const Icon(Icons.manage_accounts_rounded),
                 onPressed: () => _configure(context),
               ),
-            );
-          }
-          return FutureBuilder(
-            future: load(),
-            initialData: _cache,
-            builder: (context, snap) {
-              final lessons = snap.data ?? [];
-              final children = <Widget>[
-                if (lastError != null)
-                  MaterialBanner(
-                    content: Text(lastError!),
-                    actions: [
-                      TextButton(
-                        onPressed: () => openLink(context, 'https://www.ecoledirecte.com'),
-                        child: const Text('Ouvrir le site'),
+            ),
+          ],
+          bottom: const TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              Tab(text: 'Emploi du temps'),
+              Tab(text: 'Devoirs'),
+              Tab(text: 'Notes'),
+              Tab(text: 'Messages'),
+            ],
+          ),
+        ),
+        body: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) {
+            if (!configured) {
+              return EmptyHint('Connecte ton compte École Directe',
+                  icon: icon, action: ('Se connecter', () => _configure(context)));
+            }
+            return FutureBuilder(
+              future: load(),
+              initialData: _cache,
+              builder: (context, snap) {
+                final waiting = snap.connectionState == ConnectionState.waiting;
+                Widget wrap(List<Widget> children, String empty) => ListView(children: [
+                      if (lastError != null) ErrorBanner(lastError!),
+                      if (waiting && children.isEmpty)
+                        const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
+                      ...children,
+                      if (!waiting && children.isEmpty) Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: EmptyHint(empty),
                       ),
-                    ],
-                  ),
-              ];
-              String? lastDay;
-              for (final l in lessons) {
-                final d = dayLabel(l.start);
-                if (d != lastDay) {
-                  children.add(Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                    child: Text(d, style: Theme.of(context).textTheme.titleMedium),
-                  ));
-                  lastDay = d;
-                }
-                children.add(ListTile(
-                  leading: Text('${hhmm(l.start)}\n${hhmm(l.end)}'),
-                  title: Text(l.subject,
-                      style: l.cancelled
-                          ? const TextStyle(decoration: TextDecoration.lineThrough)
-                          : null),
-                  subtitle: Text([
-                    if (l.cancelled) 'ANNULÉ',
-                    if (l.room.isNotEmpty) l.room,
-                    if (l.teacher.isNotEmpty) l.teacher,
-                  ].join(' · ')),
-                ));
-              }
-              if (lessons.isEmpty && lastError == null) {
-                children.add(const EmptyHint('Aucun cours cette semaine'));
-              }
-              if (grades.isNotEmpty) {
-                children.add(Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
-                  child: Text('Dernières notes', style: Theme.of(context).textTheme.titleMedium),
-                ));
-                for (final g in grades.take(15)) {
-                  children.add(ListTile(
-                    leading: HubAvatar(label: g.subject, color: color, size: 36),
-                    title: Text(g.subject),
-                    subtitle: Text([
-                      if (g.title.isNotEmpty) g.title,
-                      if (g.date != null) dayLabel(g.date!),
-                    ].join(' · ')),
-                    trailing: Text('${g.value}/${g.outOf}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  ));
-                }
-              }
-              return ListView(children: children);
-            },
-          );
-        },
+                    ]);
+                return TabBarView(children: [
+                  wrap(_lessonTiles(context), 'Aucun cours cette semaine'),
+                  wrap(_homeworkTiles(context), 'Aucun devoir à venir 🎉'),
+                  wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
+                  wrap(_messageTiles(context), 'Aucun message'),
+                ]);
+              },
+            );
+          },
+        ),
       ),
     );
   }
+
+  Widget _dayHeader(BuildContext context, String d) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Text(d,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+      );
+
+  List<Widget> _lessonTiles(BuildContext context) {
+    final out = <Widget>[];
+    String? lastDay;
+    for (final l in _cache) {
+      final d = dayLabel(l.start);
+      if (d != lastDay) {
+        out.add(_dayHeader(context, d));
+        lastDay = d;
+      }
+      out.add(ListTile(
+        leading: SizedBox(
+          width: 52,
+          child: Text('${hhmm(l.start)}\n${hhmm(l.end)}',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        title: Text(l.subject,
+            style: l.cancelled ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
+        subtitle: Text([
+          if (l.cancelled) 'ANNULÉ',
+          if (l.room.isNotEmpty) l.room,
+          if (l.teacher.isNotEmpty) l.teacher,
+        ].join(' · ')),
+      ));
+    }
+    return out;
+  }
+
+  List<Widget> _homeworkTiles(BuildContext context) {
+    final out = <Widget>[];
+    String? lastDay;
+    for (final h in homework) {
+      final d = 'Pour ${dayLabel(h.due).toLowerCase()}';
+      if (d != lastDay) {
+        out.add(_dayHeader(context, d));
+        lastDay = d;
+      }
+      out.add(Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: ExpansionTile(
+          shape: const Border(),
+          leading: Icon(
+            h.done ? Icons.check_circle_rounded : (h.isTest ? Icons.warning_rounded : Icons.circle_outlined),
+            color: h.done ? Colors.green : (h.isTest ? Colors.orange : color),
+          ),
+          title: Text(h.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(h.content.split('\n').first, maxLines: 1, overflow: TextOverflow.ellipsis),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: [SelectableText(h.content)],
+        ),
+      ));
+    }
+    return out;
+  }
+
+  List<Widget> _gradeTiles(BuildContext context) => [
+        for (final g in grades)
+          ListTile(
+            leading: HubAvatar(label: g.subject, color: color, size: 38),
+            title: Text(g.subject),
+            subtitle: Text([
+              if (g.title.isNotEmpty) g.title,
+              if (g.date != null) dayLabel(g.date!),
+            ].join(' · ')),
+            trailing: Text('${g.value}/${g.outOf}',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          ),
+      ];
+
+  List<Widget> _messageTiles(BuildContext context) => [
+        for (final m in messages)
+          ListTile(
+            leading: HubAvatar(label: m.from, color: m.read ? Colors.blueGrey : color),
+            title: Text(m.from,
+                style: TextStyle(fontWeight: m.read ? FontWeight.w500 : FontWeight.w800)),
+            subtitle: Text(m.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: m.date == null
+                ? null
+                : Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
+            onTap: () async {
+              m.read = true;
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: Text(m.from)),
+                    body: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        Text(m.subject,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800)),
+                        const Divider(height: 28),
+                        FutureBuilder(
+                          future: client.messageContent(m.id),
+                          builder: (c, snap) => snap.hasError
+                              ? ErrorBanner('${snap.error}')
+                              : !snap.hasData
+                                  ? const LoadingHint()
+                                  : SelectableText(snap.data!,
+                                      style: const TextStyle(height: 1.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+              store.changed();
+            },
+          ),
+      ];
 }

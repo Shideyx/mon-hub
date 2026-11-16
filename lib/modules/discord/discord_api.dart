@@ -65,16 +65,49 @@ class DiscordApi {
   final http.Client _http;
   static const _base = 'https://discord.com/api/v10';
 
-  Future<dynamic> _get(String path) async {
-    final r = await _http.get(Uri.parse('$_base$path'), headers: {
-      'Authorization': token,
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
-    });
+  Map<String, String> get _headers => {
+        'Authorization': token,
+        'Content-Type': 'application/json',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
+      };
+
+  dynamic _check(http.Response r) {
     if (r.statusCode == 401) throw 'Jeton Discord invalide ou expiré';
     if (r.statusCode == 429) throw 'Discord demande de ralentir, réessaie plus tard';
     if (r.statusCode >= 400) throw 'Discord : erreur ${r.statusCode}';
-    return jsonDecode(utf8.decode(r.bodyBytes));
+    return r.body.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
+  }
+
+  Future<dynamic> _post(String path, Object body) async => _check(await _http
+      .post(Uri.parse('$_base$path'), headers: _headers, body: jsonEncode(body)));
+
+  /// Envoie un message dans une conversation.
+  Future<DiscordMessage> send(String channelId, String content) async {
+    final nonce = (BigInt.from(DateTime.now().millisecondsSinceEpoch - 1420070400000) << 22).toString();
+    final j = await _post('/channels/$channelId/messages',
+        {'content': content, 'nonce': nonce, 'tts': false, 'flags': 0});
+    return DiscordMessage.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Tes amis (pour démarrer une nouvelle conversation).
+  Future<List<DiscordUser>> friends() async {
+    final list = await _get('/users/@me/relationships') as List;
+    return [
+      for (final r in list)
+        if (r['type'] == 1) DiscordUser.fromJson(r['user'] as Map<String, dynamic>)
+    ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  /// Ouvre (ou retrouve) la conversation privée avec un ami.
+  Future<String> openDm(String userId) async {
+    final j = await _post('/users/@me/channels', {'recipients': [userId]});
+    return (j as Map<String, dynamic>)['id'] as String;
+  }
+
+  Future<dynamic> _get(String path) async {
+    final r = await _http.get(Uri.parse('$_base$path'), headers: _headers);
+    return _check(r);
   }
 
   Future<DiscordUser> me() async =>

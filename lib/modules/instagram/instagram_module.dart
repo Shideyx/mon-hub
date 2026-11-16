@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -67,15 +68,35 @@ class IgThread {
 /// On s'authentifie avec le cookie de session de ton navigateur, ce qui évite
 /// les vérifications de connexion d'Instagram à chaque démarrage.
 class InstagramApi {
-  InstagramApi(this.sessionId, [http.Client? client]) : _http = client ?? http.Client();
+  /// [auth] : soit la valeur du cookie `sessionid`, soit l'en-tête Cookie
+  /// complet récupéré par la connexion intégrée (permet d'envoyer).
+  InstagramApi(String auth, [http.Client? client])
+      : _http = client ?? http.Client(),
+        _cookies = _parse(auth);
 
-  final String sessionId;
   final http.Client _http;
+  final Map<String, String> _cookies;
 
-  String get _userId => Uri.decodeComponent(sessionId).split(':').first;
+  static Map<String, String> _parse(String auth) {
+    if (!auth.contains('=')) return {'sessionid': auth};
+    return {
+      for (final part in auth.split(';'))
+        if (part.contains('='))
+          part.split('=').first.trim(): part.substring(part.indexOf('=') + 1).trim(),
+    };
+  }
+
+  String get sessionId => _cookies['sessionid'] ?? '';
+  String get _userId =>
+      _cookies['ds_user_id'] ?? Uri.decodeComponent(sessionId).split(':').first;
+  String? get _csrf => _cookies['csrftoken'];
 
   Map<String, String> get _headers => {
-        'Cookie': 'sessionid=$sessionId; ds_user_id=$_userId',
+        'Cookie': {
+          ..._cookies,
+          'ds_user_id': _userId,
+        }.entries.map((e) => '${e.key}=${e.value}').join('; '),
+        'X-CSRFToken': ?_csrf,
         'X-IG-App-ID': '936619743392459',
         'X-Requested-With': 'XMLHttpRequest',
         'Referer': 'https://www.instagram.com/direct/inbox/',
@@ -92,6 +113,30 @@ class InstagramApi {
     if (r.statusCode == 429) throw 'Instagram demande de ralentir';
     if (r.statusCode >= 400) throw 'Instagram : erreur ${r.statusCode}';
     return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// Envoie un message texte dans une conversation.
+  Future<void> send(String threadId, String text) async {
+    if (_csrf == null) {
+      throw 'Pour envoyer, reconnecte Instagram avec le bouton « Connecter » '
+          '(connexion intégrée)';
+    }
+    final ctx = '${DateTime.now().microsecondsSinceEpoch}${DateTime.now().millisecond}';
+    final r = await _http.post(
+      Uri.parse('https://www.instagram.com/api/v1/direct_v2/threads/broadcast/text/'),
+      headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'action': 'send_item',
+        'client_context': ctx,
+        'mutation_token': ctx,
+        'offline_threading_id': ctx,
+        'thread_ids': '[$threadId]',
+        'text': text,
+      },
+    );
+    if (r.statusCode >= 400 || r.body.startsWith('<')) {
+      throw 'Instagram a refusé l\'envoi (code ${r.statusCode})';
+    }
   }
 
   Future<(IgUser, List<IgThread>)> inbox() async {
@@ -196,6 +241,7 @@ class InstagramModule extends HubModule {
               url: 'https://www.instagram.com/accounts/login/',
               cookieName: 'sessionid',
               cookieUrl: 'https://www.instagram.com',
+              returnAllCookies: true,
             ),
           ) ??
           '';
@@ -343,46 +389,95 @@ class InstagramModule extends HubModule {
       );
 }
 
-class _ThreadPage extends StatelessWidget {
+class _ThreadPage extends StatefulWidget {
   const _ThreadPage({required this.module, required this.thread});
   final InstagramModule module;
   final IgThread thread;
 
   @override
+  State<_ThreadPage> createState() => _ThreadPageState();
+}
+
+class _ThreadPageState extends State<_ThreadPage> {
+  List<IgMessage>? msgs;
+  String? error;
+  Timer? _timer;
+
+  InstagramModule get module => widget.module;
+  IgThread get thread => widget.thread;
+
+  Future<void> _load() async {
+    try {
+      final api = await module._client();
+      final m = await api!.thread(thread.id);
+      if (mounted) setState(() => msgs = m);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final names = {for (final u in thread.users) u.id: u.display};
     return Scaffold(
-      appBar: AppBar(title: Text(thread.title), actions: [
-        IconButton(
-          tooltip: 'Répondre dans Instagram',
-          icon: const Icon(Icons.open_in_new_rounded),
-          onPressed: () =>
-              openLink(context, 'https://www.instagram.com/direct/t/${thread.id}/'),
-        ),
-      ]),
-      body: FutureBuilder(
-        future: module._client().then((api) => api!.thread(thread.id)),
-        builder: (context, snap) {
-          if (snap.hasError) return EmptyHint('${snap.error}');
-          if (!snap.hasData) return const LoadingHint();
-          final msgs = snap.data!;
-          return ListView.builder(
-            reverse: true,
-            padding: const EdgeInsets.all(12),
-            itemCount: msgs.length,
-            itemBuilder: (context, i) {
-              final m = msgs[i];
-              final mine = m.userId == module.me?.id;
-              return ChatBubble(
-                text: m.text,
-                author: mine || thread.users.length < 2 ? null : names[m.userId],
-                time: hhmm(m.at),
-                mine: mine,
-                color: module.color,
-              );
+      appBar: AppBar(
+        title: Row(children: [
+          HubAvatar(
+              url: thread.users.length == 1 ? thread.users.first.pic : null,
+              label: thread.title,
+              color: module.color,
+              size: 32),
+          const SizedBox(width: 10),
+          Expanded(child: Text(thread.title, overflow: TextOverflow.ellipsis)),
+        ]),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: error != null && msgs == null
+                ? EmptyHint(error!)
+                : msgs == null
+                    ? const LoadingHint()
+                    : ListView.builder(
+                        reverse: true,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: msgs!.length,
+                        itemBuilder: (context, i) {
+                          final m = msgs![i];
+                          final mine = m.userId == module.me?.id;
+                          return ChatBubble(
+                            text: m.text,
+                            author: mine || thread.users.length < 2 ? null : names[m.userId],
+                            time: '${dayLabel(m.at)} ${hhmm(m.at)}',
+                            mine: mine,
+                            color: module.color,
+                          );
+                        },
+                      ),
+          ),
+          ChatComposer(
+            color: module.color,
+            hint: 'Écrire à ${thread.title}',
+            onSend: (text) async {
+              final api = await module._client();
+              await api!.send(thread.id, text);
+              await _load();
             },
-          );
-        },
+          ),
+        ],
       ),
     );
   }

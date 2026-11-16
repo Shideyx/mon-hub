@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
@@ -6,33 +7,54 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
 
+enum BookStatus {
+  read('Lu', Icons.check_circle_rounded, Color(0xFF2EAD6B)),
+  reading('En cours', Icons.auto_stories_rounded, Color(0xFFF29D38)),
+  toRead('À lire', Icons.bookmark_rounded, Color(0xFF5B8DEF));
+
+  const BookStatus(this.label, this.icon, this.color);
+  final String label;
+  final IconData icon;
+  final Color color;
+}
+
 class Book {
   Book({
     required this.id,
     required this.title,
     this.author = '',
     this.coverUrl,
-    DateTime? finishedOn,
+    this.status = BookStatus.read,
+    DateTime? addedOn,
+    this.finishedOn,
     this.rating = 0,
-    this.notes = '',
-  }) : finishedOn = finishedOn ?? DateTime.now();
+    this.takeaway = '',
+    this.pages,
+  }) : addedOn = addedOn ?? DateTime.now();
 
   final String id;
   String title;
   String author;
   String? coverUrl;
-  DateTime finishedOn;
+  BookStatus status;
+  DateTime addedOn;
+  DateTime? finishedOn;
   int rating; // 0 à 5
-  String notes;
+  /// Ce que tu veux retenir du livre.
+  String takeaway;
+  int? pages;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'author': author,
         'coverUrl': coverUrl,
-        'finishedOn': finishedOn.toIso8601String(),
+        'status': status.name,
+        'addedOn': addedOn.toIso8601String(),
+        'finishedOn': finishedOn?.toIso8601String(),
         'rating': rating,
-        'notes': notes,
+        'takeaway': takeaway,
+        'pages': pages,
       };
 
   factory Book.fromJson(Map<String, dynamic> j) => Book(
@@ -40,32 +62,37 @@ class Book {
         title: j['title'] as String,
         author: j['author'] as String? ?? '',
         coverUrl: j['coverUrl'] as String?,
+        status: BookStatus.values.asNameMap()[j['status']] ?? BookStatus.read,
+        addedOn: DateTime.tryParse(j['addedOn'] as String? ?? '') ??
+            DateTime.tryParse(j['finishedOn'] as String? ?? ''),
         finishedOn: DateTime.tryParse(j['finishedOn'] as String? ?? ''),
         rating: j['rating'] as int? ?? 0,
-        notes: j['notes'] as String? ?? '',
+        // Compatibilité avec l'ancien champ « notes ».
+        takeaway: j['takeaway'] as String? ?? j['notes'] as String? ?? '',
+        pages: j['pages'] as int?,
       );
 }
 
-/// Tous les livres lus. Stockage local + recherche via Open Library
-/// (API publique gratuite, sans compte).
+/// Bibliothèque : tous tes livres (lus, en cours, à lire), avec couvertures,
+/// étoiles et ce que tu veux en retenir. Recherche via Open Library.
 class BooksModule extends HubModule {
   @override
   String get id => 'books';
   @override
-  String get name => 'Mes livres';
+  String get name => 'Bibliothèque';
   @override
-  String get description => 'Tous les livres que tu as lus';
+  String get description => 'Tes livres lus, en cours et à lire';
   @override
-  IconData get icon => Icons.menu_book_outlined;
+  IconData get icon => Icons.menu_book_rounded;
   @override
-  Color get color => const Color(0xFF8E6C3F);
+  Color get color => const Color(0xFFB7793F);
   @override
   ApiAccess get access => ApiAccess.local;
 
   List<Book> get books {
     final raw = store.getJson<List<dynamic>>('books') ?? const [];
     final list = raw.map((e) => Book.fromJson(e as Map<String, dynamic>)).toList();
-    list.sort((a, b) => b.finishedOn.compareTo(a.finishedOn));
+    list.sort((a, b) => (b.finishedOn ?? b.addedOn).compareTo(a.finishedOn ?? a.addedOn));
     return list;
   }
 
@@ -73,8 +100,10 @@ class BooksModule extends HubModule {
       store.setJson('books', list.map((b) => b.toJson()).toList());
 
   Future<void> upsert(Book b) {
-    final list = books..removeWhere((x) => x.id == b.id);
-    return save(list..add(b));
+    final list = books;
+    final i = list.indexWhere((x) => x.id == b.id);
+    i < 0 ? list.add(b) : list[i] = b;
+    return save(list);
   }
 
   Future<void> remove(Book b) => save(books..removeWhere((x) => x.id == b.id));
@@ -85,28 +114,31 @@ class BooksModule extends HubModule {
         builder: (context, _) {
           final all = books;
           if (all.isEmpty) {
-            return const EmptyHint('Ajoute ton premier livre', icon: Icons.add);
+            return EmptyHint('Ta bibliothèque est vide',
+                icon: Icons.auto_stories_rounded,
+                action: ('Ajouter un livre', () => addBook(context, this)));
           }
-          final year = DateTime.now().year;
-          final thisYear = all.where((b) => b.finishedOn.year == year).length;
+          final reading = all.where((b) => b.status == BookStatus.reading).toList();
+          final shown = [...reading, ...all.where((b) => b.status != BookStatus.reading)];
+          final read = all.where((b) => b.status == BookStatus.read).length;
+          final toRead = all.where((b) => b.status == BookStatus.toRead).length;
           return Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${all.length} livres lus · $thisYear en $year',
-                    style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
+                Text('$read lus · ${reading.length} en cours · $toRead à lire',
+                    style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 10),
                 Expanded(
-                  child: ListView(
+                  child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final b in all.take(8))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _Cover(book: b, width: 80),
-                        ),
-                    ],
+                    itemCount: shown.length.clamp(0, 12),
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, i) => AspectRatio(
+                      aspectRatio: 0.66,
+                      child: BookCover(book: shown[i], showStatus: true),
+                    ),
                   ),
                 ),
               ],
@@ -116,278 +148,712 @@ class BooksModule extends HubModule {
       );
 
   @override
-  Widget buildPage(BuildContext context) => _BooksPage(module: this);
+  Widget buildPage(BuildContext context) => _LibraryPage(module: this);
 }
 
-class _Cover extends StatelessWidget {
-  const _Cover({required this.book, required this.width});
+// ---------------------------------------------------------------------------
+// Couverture
+// ---------------------------------------------------------------------------
+
+class BookCover extends StatelessWidget {
+  const BookCover({super.key, required this.book, this.showStatus = false, this.radius = 10});
+
   final Book book;
-  final double width;
+  final bool showStatus;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
+    final hue = (book.title.hashCode % 360).abs().toDouble();
     final fallback = Container(
-      width: width,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.all(4),
-      alignment: Alignment.center,
-      child: Text(book.title,
-          textAlign: TextAlign.center,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            HSLColor.fromAHSL(1, hue, 0.45, 0.42).toColor(),
+            HSLColor.fromAHSL(1, (hue + 40) % 360, 0.5, 0.28).toColor(),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(book.title,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, height: 1.15)),
+          const Spacer(),
+          Text(book.author,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 10)),
+        ],
+      ),
     );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        width: width,
-        child: book.coverUrl == null
-            ? fallback
-            : Image.network(book.coverUrl!,
-                fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            book.coverUrl == null
+                ? fallback
+                : Image.network(book.coverUrl!,
+                    fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback),
+            // Reflet « reliure » à gauche.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    Colors.black.withValues(alpha: 0.25),
+                    Colors.white.withValues(alpha: 0.08),
+                  ]),
+                ),
+              ),
+            ),
+            if (showStatus && book.status != BookStatus.read)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: book.status.color, shape: BoxShape.circle),
+                  child: Icon(book.status.icon, size: 12, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _BooksPage extends StatefulWidget {
-  const _BooksPage({required this.module});
+class StarRating extends StatelessWidget {
+  const StarRating({super.key, required this.value, this.onChanged, this.size = 16});
+  final int value;
+  final ValueChanged<int>? onChanged;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 1; i <= 5; i++)
+            GestureDetector(
+              onTap: onChanged == null ? null : () => onChanged!(i == value ? 0 : i),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: onChanged == null ? 0 : 3),
+                child: Icon(i <= value ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: size, color: const Color(0xFFFFB400)),
+              ),
+            ),
+        ],
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Page bibliothèque
+// ---------------------------------------------------------------------------
+
+class _LibraryPage extends StatefulWidget {
+  const _LibraryPage({required this.module});
   final BooksModule module;
 
   @override
-  State<_BooksPage> createState() => _BooksPageState();
+  State<_LibraryPage> createState() => _LibraryPageState();
 }
 
-class _BooksPageState extends State<_BooksPage> {
+class _LibraryPageState extends State<_LibraryPage> {
+  BookStatus? filter;
   String query = '';
+  String sort = 'date';
 
   @override
   Widget build(BuildContext context) {
     final m = widget.module;
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(m.name)),
+      appBar: AppBar(
+        title: const Text('Ma bibliothèque'),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Trier',
+            icon: const Icon(Icons.sort_rounded),
+            initialValue: sort,
+            onSelected: (v) => setState(() => sort = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'date', child: Text('Plus récents')),
+              PopupMenuItem(value: 'rating', child: Text('Mieux notés')),
+              PopupMenuItem(value: 'title', child: Text('Titre (A → Z)')),
+              PopupMenuItem(value: 'author', child: Text('Auteur')),
+            ],
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(context, null),
-        icon: const Icon(Icons.add),
-        label: const Text('Ajouter'),
+        onPressed: () => addBook(context, m),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Ajouter un livre'),
       ),
       body: ListenableBuilder(
         listenable: m.store,
         builder: (context, _) {
+          final all = m.books;
           final q = query.toLowerCase();
-          final list = m.books
+          final list = all
+              .where((b) => filter == null || b.status == filter)
               .where((b) =>
+                  q.isEmpty ||
                   b.title.toLowerCase().contains(q) ||
                   b.author.toLowerCase().contains(q))
               .toList();
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Chercher dans mes livres'),
-                  onChanged: (v) => setState(() => query = v),
+          switch (sort) {
+            case 'rating':
+              list.sort((a, b) => b.rating.compareTo(a.rating));
+            case 'title':
+              list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+            case 'author':
+              list.sort((a, b) => a.author.toLowerCase().compareTo(b.author.toLowerCase()));
+          }
+          int count(BookStatus s) => all.where((b) => b.status == s).length;
+          final year = DateTime.now().year;
+          final thisYear = all
+              .where((b) => b.status == BookStatus.read && b.finishedOn?.year == year)
+              .length;
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Row(children: [
+                    _Stat(value: '${count(BookStatus.read)}', label: 'lus', color: BookStatus.read.color),
+                    _Stat(value: '$thisYear', label: 'en $year', color: m.color),
+                    _Stat(value: '${count(BookStatus.reading)}', label: 'en cours', color: BookStatus.reading.color),
+                    _Stat(value: '${count(BookStatus.toRead)}', label: 'à lire', color: BookStatus.toRead.color),
+                  ]),
                 ),
               ),
-              Expanded(
-                child: list.isEmpty
-                    ? const EmptyHint('Aucun livre pour l\'instant')
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 80),
-                        itemCount: list.length,
-                        itemBuilder: (context, i) {
-                          final b = list[i];
-                          return ListTile(
-                            leading: SizedBox(
-                                height: 56, child: _Cover(book: b, width: 40)),
-                            title: Text(b.title),
-                            subtitle: Text([
-                              if (b.author.isNotEmpty) b.author,
-                              'fini le ${b.finishedOn.day}/${two(b.finishedOn.month)}/${b.finishedOn.year}',
-                            ].join(' · ')),
-                            trailing: Text('★' * b.rating),
-                            onTap: () => _edit(context, b),
-                          );
-                        },
-                      ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search_rounded),
+                        hintText: 'Chercher un titre ou un auteur'),
+                    onChanged: (v) => setState(() => query = v),
+                  ),
+                ),
               ),
+              SliverToBoxAdapter(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    _FilterChip(
+                        label: 'Tous (${all.length})',
+                        selected: filter == null,
+                        onTap: () => setState(() => filter = null)),
+                    for (final s in BookStatus.values)
+                      _FilterChip(
+                        label: '${s.label} (${count(s)})',
+                        icon: s.icon,
+                        color: s.color,
+                        selected: filter == s,
+                        onTap: () => setState(() => filter = s),
+                      ),
+                  ]),
+                ),
+              ),
+              if (list.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyHint('Aucun livre ici pour l\'instant',
+                      icon: Icons.auto_stories_rounded),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                  sliver: SliverGrid.builder(
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 160,
+                      childAspectRatio: 0.5,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) {
+                      final b = list[i];
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => BookDetailPage(module: m, book: b)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Hero(
+                                tag: 'cover-${b.id}',
+                                child: BookCover(book: b, showStatus: true),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(b.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700, height: 1.2)),
+                            Text(b.author,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            const SizedBox(height: 2),
+                            if (b.status == BookStatus.read)
+                              StarRating(value: b.rating, size: 14)
+                            else
+                              Text(b.status.label,
+                                  style: TextStyle(
+                                      color: b.status.color,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
             ],
           );
         },
       ),
     );
   }
-
-  Future<void> _edit(BuildContext context, Book? book) async {
-    final result = await showModalBottomSheet<Object>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _BookEditor(book: book),
-    );
-    if (result is Book) await widget.module.upsert(result);
-    if (result == 'delete' && book != null) await widget.module.remove(book);
-  }
 }
 
-class _BookEditor extends StatefulWidget {
-  const _BookEditor({this.book});
-  final Book? book;
+class _Stat extends StatelessWidget {
+  const _Stat({required this.value, required this.label, required this.color});
+  final String value;
+  final String label;
+  final Color color;
 
   @override
-  State<_BookEditor> createState() => _BookEditorState();
+  Widget build(BuildContext context) => Expanded(
+        child: Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: color)),
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
+          ]),
+        ),
+      );
 }
 
-class _BookEditorState extends State<_BookEditor> {
-  late final title = TextEditingController(text: widget.book?.title);
-  late final author = TextEditingController(text: widget.book?.author);
-  late final notes = TextEditingController(text: widget.book?.notes);
-  late String? cover = widget.book?.coverUrl;
-  late int rating = widget.book?.rating ?? 0;
-  late DateTime finished = widget.book?.finishedOn ?? DateTime.now();
-  List<Map<String, dynamic>> results = [];
-  bool searching = false;
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.color,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Color? color;
 
-  Future<void> _search() async {
-    if (title.text.trim().isEmpty) return;
-    setState(() => searching = true);
-    try {
-      final uri = Uri.https('openlibrary.org', '/search.json', {
-        'q': '${title.text} ${author.text}'.trim(),
-        'limit': '8',
-        'fields': 'title,author_name,cover_i',
-      });
-      final res = await http.get(uri);
-      final docs = (jsonDecode(res.body)['docs'] as List).cast<Map<String, dynamic>>();
-      setState(() => results = docs);
-    } catch (e) {
-      if (mounted) showError(context, e);
-    } finally {
-      if (mounted) setState(() => searching = false);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilterChip(
+          avatar: icon == null ? null : Icon(icon, size: 16, color: color),
+          label: Text(label),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) => onTap(),
+        ),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Fiche d'un livre
+// ---------------------------------------------------------------------------
+
+class BookDetailPage extends StatefulWidget {
+  const BookDetailPage({super.key, required this.module, required this.book});
+  final BooksModule module;
+  final Book book;
+
+  @override
+  State<BookDetailPage> createState() => _BookDetailPageState();
+}
+
+class _BookDetailPageState extends State<BookDetailPage> {
+  late final Book b = widget.book;
+  late final takeaway = TextEditingController(text: b.takeaway);
+
+  Future<void> _save() => widget.module.upsert(b);
+
+  void _setStatus(BookStatus s) {
+    setState(() {
+      b.status = s;
+      if (s == BookStatus.read) b.finishedOn ??= DateTime.now();
+      if (s != BookStatus.read) b.finishedOn = null;
+    });
+    _save();
+  }
+
+  @override
+  void dispose() {
+    if (takeaway.text != b.takeaway) {
+      b.takeaway = takeaway.text;
+      _save();
     }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-          16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.book == null ? 'Nouveau livre' : 'Modifier',
-                style: Theme.of(context).textTheme.titleLarge),
-            TextField(
-                controller: title,
-                decoration: InputDecoration(
-                  labelText: 'Titre',
-                  suffixIcon: IconButton(
-                    tooltip: 'Chercher la couverture (Open Library)',
-                    icon: searching
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.travel_explore),
-                    onPressed: _search,
-                  ),
-                )),
-            TextField(
-                controller: author,
-                decoration: const InputDecoration(labelText: 'Auteur')),
-            if (results.isNotEmpty)
-              SizedBox(
-                height: 130,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final r in results)
-                      InkWell(
-                        onTap: () => setState(() {
-                          title.text = r['title'] as String? ?? title.text;
-                          final a = r['author_name'] as List?;
-                          if (a != null && a.isNotEmpty) author.text = a.first as String;
-                          cover = r['cover_i'] == null
-                              ? null
-                              : 'https://covers.openlibrary.org/b/id/${r['cover_i']}-M.jpg';
-                          results = [];
-                        }),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: _Cover(
-                            width: 70,
-                            book: Book(
-                              id: '',
-                              title: r['title'] as String? ?? '?',
-                              coverUrl: r['cover_i'] == null
-                                  ? null
-                                  : 'https://covers.openlibrary.org/b/id/${r['cover_i']}-S.jpg',
-                            ),
-                          ),
-                        ),
-                      ),
+    final theme = Theme.of(context);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Modifier',
+            icon: const Icon(Icons.edit_rounded),
+            onPressed: () async {
+              final r = await askFields(context,
+                  title: 'Modifier',
+                  labels: ['Titre', 'Auteur', 'Lien de la couverture (facultatif)'],
+                  initial: [b.title, b.author, b.coverUrl ?? '']);
+              if (r == null || r[0].isEmpty) return;
+              setState(() {
+                b.title = r[0];
+                b.author = r[1];
+                b.coverUrl = r[2].isEmpty ? null : r[2];
+              });
+              _save();
+            },
+          ),
+          IconButton(
+            tooltip: 'Supprimer',
+            icon: const Icon(Icons.delete_outline_rounded),
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: Text('Supprimer « ${b.title} » ?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Supprimer')),
                   ],
                 ),
-              ),
-            const SizedBox(height: 8),
-            Row(
+              );
+              if (ok != true) return;
+              await widget.module.remove(b);
+              if (context.mounted) Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // En-tête : couverture sur fond flouté.
+          SizedBox(
+            height: 380,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                for (var i = 1; i <= 5; i++)
-                  IconButton(
-                    icon: Icon(i <= rating ? Icons.star : Icons.star_border,
-                        color: Colors.amber),
-                    onPressed: () => setState(() => rating = i == rating ? 0 : i),
+                if (b.coverUrl != null)
+                  ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    child: Image.network(b.coverUrl!,
+                        fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox()),
+                  )
+                else
+                  Container(color: widget.module.color.withValues(alpha: 0.4)),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        theme.colorScheme.surface.withValues(alpha: 0.2),
+                        theme.colorScheme.surface,
+                      ],
+                    ),
                   ),
-                const Spacer(),
-                TextButton.icon(
-                  icon: const Icon(Icons.event),
-                  label: Text('${finished.day}/${two(finished.month)}/${finished.year}'),
-                  onPressed: () async {
-                    final d = await showDatePicker(
-                        context: context,
-                        initialDate: finished,
-                        firstDate: DateTime(1990),
-                        lastDate: DateTime.now().add(const Duration(days: 1)));
-                    if (d != null) setState(() => finished = d);
-                  },
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 60, bottom: 20),
+                    child: AspectRatio(
+                      aspectRatio: 0.66,
+                      child: Hero(tag: 'cover-${b.id}', child: BookCover(book: b, radius: 14)),
+                    ),
+                  ),
                 ),
               ],
             ),
-            TextField(
-                controller: notes,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Notes / avis')),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                if (widget.book != null)
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, 'delete'),
-                    child: const Text('Supprimer'),
-                  ),
-                const Spacer(),
-                FilledButton(
-                  onPressed: () {
-                    if (title.text.trim().isEmpty) return;
-                    Navigator.pop(
-                      context,
-                      Book(
-                        id: widget.book?.id ??
-                            DateTime.now().microsecondsSinceEpoch.toString(),
-                        title: title.text.trim(),
-                        author: author.text.trim(),
-                        coverUrl: cover,
-                        finishedOn: finished,
-                        rating: rating,
-                        notes: notes.text.trim(),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(b.title,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                    if (b.author.isNotEmpty)
+                      Text(b.author,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 20),
+                    SegmentedButton<BookStatus>(
+                      segments: [
+                        for (final s in BookStatus.values)
+                          ButtonSegment(value: s, label: Text(s.label), icon: Icon(s.icon)),
+                      ],
+                      selected: {b.status},
+                      onSelectionChanged: (v) => _setStatus(v.first),
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: StarRating(
+                        value: b.rating,
+                        size: 36,
+                        onChanged: (v) {
+                          setState(() => b.rating = v);
+                          _save();
+                        },
                       ),
-                    );
-                  },
-                  child: const Text('Enregistrer'),
+                    ),
+                    if (b.status == BookStatus.read)
+                      TextButton.icon(
+                        icon: const Icon(Icons.event_rounded),
+                        label: Text(b.finishedOn == null
+                            ? 'Date de fin de lecture'
+                            : 'Fini le ${b.finishedOn!.day} ${frMonths[b.finishedOn!.month - 1]} ${b.finishedOn!.year}'),
+                        onPressed: () async {
+                          final d = await showDatePicker(
+                            context: context,
+                            initialDate: b.finishedOn ?? DateTime.now(),
+                            firstDate: DateTime(1990),
+                            lastDate: DateTime.now().add(const Duration(days: 1)),
+                          );
+                          if (d == null) return;
+                          setState(() => b.finishedOn = d);
+                          _save();
+                        },
+                      ),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Icon(Icons.lightbulb_rounded, color: widget.module.color),
+                      const SizedBox(width: 8),
+                      Text('À retenir',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ]),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: takeaway,
+                      minLines: 4,
+                      maxLines: 12,
+                      decoration: const InputDecoration(
+                        hintText: 'Les idées, citations ou passages que tu veux garder…',
+                      ),
+                      onChanged: (v) => b.takeaway = v,
+                      onEditingComplete: _save,
+                    ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-              ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ajout d'un livre (recherche Open Library)
+// ---------------------------------------------------------------------------
+
+Future<void> addBook(BuildContext context, BooksModule m) => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _AddBookSheet(module: m),
+    );
+
+class _AddBookSheet extends StatefulWidget {
+  const _AddBookSheet({required this.module});
+  final BooksModule module;
+
+  @override
+  State<_AddBookSheet> createState() => _AddBookSheetState();
+}
+
+class _AddBookSheetState extends State<_AddBookSheet> {
+  final q = TextEditingController();
+  List<Map<String, dynamic>> results = [];
+  bool loading = false;
+  BookStatus status = BookStatus.read;
+  String? error;
+
+  Future<void> _search() async {
+    if (q.text.trim().isEmpty) return;
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final uri = Uri.https('openlibrary.org', '/search.json', {
+        'q': q.text.trim(),
+        'limit': '20',
+        'fields': 'title,author_name,cover_i,number_of_pages_median,first_publish_year',
+        'lang': 'fr',
+      });
+      final res = await http.get(uri);
+      setState(() => results =
+          (jsonDecode(res.body)['docs'] as List).cast<Map<String, dynamic>>());
+    } catch (e) {
+      setState(() => error = 'Recherche impossible : $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _add(Book b) async {
+    await widget.module.upsert(b);
+    if (!mounted) return;
+    Navigator.pop(context);
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => BookDetailPage(module: widget.module, book: b)));
+  }
+
+  Book _fromResult(Map<String, dynamic> r) => Book(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        title: r['title'] as String? ?? '?',
+        author: ((r['author_name'] as List?)?.cast<String>() ?? const []).take(2).join(', '),
+        coverUrl: r['cover_i'] == null
+            ? null
+            : 'https://covers.openlibrary.org/b/id/${r['cover_i']}-L.jpg',
+        pages: r['number_of_pages_median'] as int?,
+        status: status,
+        finishedOn: status == BookStatus.read ? DateTime.now() : null,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(children: [
+                TextField(
+                  controller: q,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _search(),
+                  decoration: InputDecoration(
+                    hintText: 'Titre, auteur…',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: loading
+                        ? const Padding(padding: EdgeInsets.all(14), child: LoadingHint())
+                        : IconButton(icon: const Icon(Icons.arrow_forward_rounded), onPressed: _search),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<BookStatus>(
+                  segments: [
+                    for (final s in BookStatus.values)
+                      ButtonSegment(value: s, label: Text(s.label), icon: Icon(s.icon)),
+                  ],
+                  selected: {status},
+                  onSelectionChanged: (v) => setState(() => status = v.first),
+                ),
+              ]),
+            ),
+            if (error != null) ErrorBanner(error!),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(8),
+                children: [
+                  for (final r in results)
+                    ListTile(
+                      leading: SizedBox(
+                        width: 40,
+                        height: 60,
+                        child: BookCover(
+                          radius: 4,
+                          book: Book(
+                            id: '',
+                            title: r['title'] as String? ?? '?',
+                            coverUrl: r['cover_i'] == null
+                                ? null
+                                : 'https://covers.openlibrary.org/b/id/${r['cover_i']}-S.jpg',
+                          ),
+                        ),
+                      ),
+                      title: Text(r['title'] as String? ?? '?'),
+                      subtitle: Text([
+                        ...((r['author_name'] as List?)?.cast<String>() ?? const []).take(2),
+                        if (r['first_publish_year'] != null) '${r['first_publish_year']}',
+                      ].join(' · ')),
+                      trailing: const Icon(Icons.add_circle_outline_rounded),
+                      onTap: () => _add(_fromResult(r)),
+                    ),
+                  if (q.text.isNotEmpty && !loading)
+                    ListTile(
+                      leading: const Icon(Icons.edit_note_rounded),
+                      title: Text('Ajouter « ${q.text} » à la main'),
+                      onTap: () => _add(Book(
+                        id: DateTime.now().microsecondsSinceEpoch.toString(),
+                        title: q.text.trim(),
+                        status: status,
+                        finishedOn: status == BookStatus.read ? DateTime.now() : null,
+                      )),
+                    ),
+                ],
+              ),
             ),
           ],
         ),

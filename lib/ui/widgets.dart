@@ -274,3 +274,73 @@ String timeAgo(DateTime d) {
   if (diff.inDays < 7) return '${diff.inDays} j';
   return '${d.day}/${two(d.month)}';
 }
+
+/// Zone de saisie + bouton d'envoi, en bas d'une conversation.
+class ChatComposer extends StatefulWidget {
+  const ChatComposer({super.key, required this.onSend, required this.color, this.hint = 'Message…'});
+
+  final Future<void> Function(String text) onSend;
+  final Color color;
+  final String hint;
+
+  @override
+  State<ChatComposer> createState() => _ChatComposerState();
+}
+
+class _ChatComposerState extends State<ChatComposer> {
+  final ctrl = TextEditingController();
+  bool sending = false;
+
+  Future<void> _send() async {
+    final text = ctrl.text.trim();
+    if (text.isEmpty || sending) return;
+    setState(() => sending = true);
+    try {
+      await widget.onSend(text);
+      ctrl.clear();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: ctrl,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: widget.hint,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              style: IconButton.styleFrom(backgroundColor: widget.color),
+              onPressed: sending ? null : _send,
+              icon: sending
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

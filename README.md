@@ -5,7 +5,9 @@ temps, École Directe, mails, Discord, Instagram, comptes Roblox, livres lus et
 raccourcis Google Drive. Chaque bloc est un **module** qu'on peut masquer,
 réordonner, retirer ou remplacer.
 
-![Capture](docs/capture.png)
+![Accueil](docs/capture.png)
+
+![Bibliothèque](docs/bibliotheque.png)
 
 ## Sur quels appareils ?
 
@@ -24,12 +26,12 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | Module | Accès | Ce qui marche |
 |---|---|---|
 | **Agenda** | ✅ Officiel (iCal) | Affiche Google Agenda (ou tout agenda .ics) sur 14 jours, récurrences comprises. Lien : Google Agenda → Paramètres → ton agenda → « Adresse secrète au format iCal ». |
-| **École Directe** | ⚠️ Non officiel | Connexion + question de sécurité + emploi du temps de la semaine. École Directe n'a pas d'API publique : on imite leur site, ça peut casser après une de leurs mises à jour (correctif dans `ed_client.dart`). |
-| **Mails** | ✅ Standard (IMAP) | Derniers mails et non lus, plusieurs boîtes. Gmail : créer un **mot de passe d'application** (myaccount.google.com/apppasswords, validation en 2 étapes requise). Outlook/Hotmail : Microsoft a coupé les mots de passe en IMAP, il faudra une connexion OAuth (évolution prévue). |
-| **Discord** | ⚠️ Jeton utilisateur | Tes MP (liste, conversations, non lus) + alerte à chaque nouveau message, avec ton jeton Discord (lecture seule). Discord interdit officiellement l'automatisation d'un compte : risque de suspension faible mais réel. Serveurs : widget public officiel. |
-| **Instagram** | ⚠️ API privée | Tes conversations et messages + alerte à chaque nouveau message, via l'API interne d'instagram.com (comme les projets de github.com/topics/instagram-api) avec ton cookie `sessionid`. Lecture seule. |
+| **École Directe** | ⚠️ Non officiel | Emploi du temps, devoirs (avec contenu), notes, messagerie (lecture). Alertes : nouvelle note, nouveau devoir, nouveau message, cours annulé. Pas d'API publique : peut casser après une mise à jour d'École Directe. |
+| **Mails** | ✅ Standard (IMAP/SMTP) | Lire les mails en entier, répondre, écrire, plusieurs boîtes. Gmail : **mot de passe d'application** (l'appli ouvre la bonne page). Outlook/Hotmail : pas encore (Microsoft impose OAuth). |
+| **Discord** | ⚠️ Jeton utilisateur | Lire et **écrire** tes MP, démarrer une conversation avec un ami, alerte à chaque nouveau message. Connexion intégrée (la vraie page discord.com). Discord interdit officiellement l'automatisation d'un compte : risque de suspension faible mais réel. Serveurs : widget public officiel. |
+| **Instagram** | ⚠️ API privée | Lire et **répondre** à tes conversations, alerte à chaque nouveau message, via l'API interne d'instagram.com (comme les projets de github.com/topics/instagram-api). Connexion intégrée. Pas de fil d'actu ni de stories. |
 | **Roblox** | ⚠️ Semi-public | Plusieurs comptes : avatar, nombre d'amis, statut (en ligne / en jeu). Utilise les API publiques du site Roblox, sans mot de passe. |
-| **Mes livres** | ✅ Local | Liste de tous tes livres lus, note, date, avis, recherche de couverture via Open Library. |
+| **Bibliothèque** | ✅ Local | Étagère visuelle avec couvertures, statut *Lu / En cours / À lire*, étoiles, note « À retenir », statistiques, recherche Open Library. |
 | **Google Drive** | Raccourcis | Liens vers tes documents Drive (emploi du temps PDF, etc.). |
 
 ## Notifications

@@ -109,6 +109,75 @@ class EdClient {
     return list;
   }
 
+  static String _b64(String? s) {
+    if (s == null || s.isEmpty) return '';
+    try {
+      return utf8.decode(base64.decode(s), allowMalformed: true);
+    } catch (_) {
+      return s;
+    }
+  }
+
+  static String htmlToText(String html) => html
+      .replaceAll(RegExp(r'<br\s*/?>|</p>|</div>|</li>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]+>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&quot;', '"')
+      .replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n')
+      .trim();
+
+  /// Année scolaire au format « 2026-2027 ».
+  static String schoolYear([DateTime? d]) {
+    final n = d ?? DateTime.now();
+    final start = n.month >= 8 ? n.year : n.year - 1;
+    return '$start-${start + 1}';
+  }
+
+  /// Messages reçus dans la messagerie École Directe.
+  Future<List<EdMessage>> messages() async {
+    final r = await _post(
+        '/eleves/$accountId/messages.awp?force=false&typeRecuperation=received&idClasseur=0'
+        '&orderBy=date&order=desc&query=&onlyRead=&page=0&itemsPerPage=30&getAll=0&verbe=get',
+        {'anneeMessages': schoolYear()});
+    if (r['code'] != 200) throw 'Messagerie indisponible (code ${r['code']})';
+    final list = r['data']?['messages']?['received'] as List? ?? [];
+    return list.map((e) => EdMessage.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Contenu d'un message (texte).
+  Future<String> messageContent(int id) async {
+    final r = await _post('/eleves/$accountId/messages/$id.awp?verbe=get&mode=destinataire',
+        {'anneeMessages': schoolYear()});
+    if (r['code'] != 200) throw 'Message indisponible (code ${r['code']})';
+    return htmlToText(_b64(r['data']?['content'] as String?));
+  }
+
+  /// Devoirs à venir, avec leur contenu.
+  Future<List<EdHomework>> homework() async {
+    final r = await _post('/Eleves/$accountId/cahierdetexte.awp?verbe=get', {});
+    if (r['code'] != 200) throw 'Cahier de texte indisponible (code ${r['code']})';
+    final days = (r['data'] as Map<String, dynamic>? ?? {}).keys.toList()..sort();
+    final out = <EdHomework>[];
+    for (final day in days.take(7)) {
+      final d = await _post('/Eleves/$accountId/cahierdetexte/$day.awp?verbe=get', {});
+      for (final m in (d['data']?['matieres'] as List? ?? [])) {
+        final todo = m['aFaire'];
+        if (todo == null) continue;
+        out.add(EdHomework(
+          '${todo['idDevoir'] ?? '$day${m['matiere']}'}',
+          DateTime.tryParse(day) ?? DateTime.now(),
+          m['matiere'] as String? ?? '',
+          htmlToText(_b64(todo['contenu'] as String?)),
+          todo['effectue'] == true,
+          m['interrogation'] == true,
+        ));
+      }
+    }
+    return out;
+  }
+
   Future<List<EdLesson>> timetable(DateTime from, DateTime to) async {
     String d(DateTime x) => x.toIso8601String().substring(0, 10);
     final r = await _post('/E/$accountId/emploidutemps.awp?verbe=get',
@@ -119,6 +188,38 @@ class EdClient {
         .toList()
       ..sort((a, b) => a.start.compareTo(b.start));
   }
+}
+
+class EdMessage {
+  EdMessage(this.id, this.subject, this.from, this.date, this.read);
+  final int id;
+  final String subject;
+  final String from;
+  final DateTime? date;
+  bool read;
+
+  factory EdMessage.fromJson(Map<String, dynamic> j) {
+    final f = j['from'] as Map<String, dynamic>? ?? const {};
+    final name = (f['name'] as String?) ??
+        [f['civilite'], f['prenom'], f['nom']].whereType<String>().join(' ').trim();
+    return EdMessage(
+      j['id'] as int? ?? 0,
+      j['subject'] as String? ?? '(sans objet)',
+      name.isEmpty ? '?' : name,
+      DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
+      j['read'] == true,
+    );
+  }
+}
+
+class EdHomework {
+  EdHomework(this.id, this.due, this.subject, this.content, this.done, this.isTest);
+  final String id;
+  final DateTime due;
+  final String subject;
+  final String content;
+  final bool done;
+  final bool isTest;
 }
 
 class EdGrade {

@@ -74,7 +74,8 @@ void main() {
     final hub = HubController(buildModules());
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
     expect(find.textContaining('👋'), findsOneWidget);
-    expect(find.text('Agenda'), findsOneWidget);
+    expect(find.text('Agenda'), findsWidgets);
+    expect(find.text('Accueil'), findsOneWidget);
   });
 }
 

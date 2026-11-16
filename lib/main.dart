@@ -4,7 +4,7 @@ import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
 import 'core/module_store.dart';
 import 'core/notifications.dart';
-import 'ui/home_page.dart';
+import 'ui/app_shell.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -30,7 +30,7 @@ class HubApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
-      home: HomePage(controller: controller, notifications: notifications),
+      home: AppShell(controller: controller, notifications: notifications),
     );
   }
 }
