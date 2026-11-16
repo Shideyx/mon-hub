@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'dart:ui' as ui;
+
+import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
@@ -24,12 +27,35 @@ class IgUser {
       );
 }
 
+/// Cherche la première image (la plus grande) n'importe où dans un objet
+/// renvoyé par Instagram.
+String? findIgImage(Object? node, [int depth = 0]) {
+  if (depth > 8 || node == null) return null;
+  if (node is Map) {
+    final iv = node['image_versions2'];
+    if (iv is Map && iv['candidates'] is List && (iv['candidates'] as List).isNotEmpty) {
+      return (iv['candidates'] as List).first['url'] as String?;
+    }
+    for (final v in node.values) {
+      final r = findIgImage(v, depth + 1);
+      if (r != null) return r;
+    }
+  } else if (node is List) {
+    for (final v in node) {
+      final r = findIgImage(v, depth + 1);
+      if (r != null) return r;
+    }
+  }
+  return null;
+}
+
 class IgMessage {
-  IgMessage(this.id, this.userId, this.text, this.at);
+  IgMessage(this.id, this.userId, this.text, this.at, [this.image]);
   final String id;
   final String userId;
   final String text;
   final DateTime at;
+  final String? image;
 
   factory IgMessage.fromJson(Map<String, dynamic> j) {
     final type = j['item_type'] as String? ?? '';
@@ -45,13 +71,65 @@ class IgMessage {
       _ => j['text'] as String? ?? 'Nouveau message',
     };
     final ts = int.tryParse('${j['timestamp']}') ?? 0;
+    final image = type == 'text' || type == 'like' ? null : findIgImage(j);
     return IgMessage(
       '${j['item_id']}',
       '${j['user_id']}',
-      text,
+      image != null && (type == 'media' || type == 'raven_media') ? '' : text,
       DateTime.fromMicrosecondsSinceEpoch(ts),
+      image,
     );
   }
+}
+
+class IgPost {
+  IgPost(this.id, this.code, this.user, this.images, this.caption, this.likes, this.comments,
+      this.liked, this.isVideo, this.at);
+  final String id;
+  final String code;
+  final IgUser user;
+  final List<String> images;
+  final String caption;
+  int likes;
+  final int comments;
+  bool liked;
+  final bool isVideo;
+  final DateTime at;
+
+  factory IgPost.fromJson(Map<String, dynamic> m) {
+    final carousel = m['carousel_media'] as List?;
+    final images = carousel != null
+        ? [for (final c in carousel) findIgImage(c)].whereType<String>().toList()
+        : [findIgImage({'x': m['image_versions2'] == null ? null : {'image_versions2': m['image_versions2']}})]
+            .whereType<String>()
+            .toList();
+    return IgPost(
+      '${m['id'] ?? m['pk']}',
+      '${m['code'] ?? ''}',
+      IgUser.fromJson(m['user'] as Map<String, dynamic>),
+      images,
+      (m['caption'] as Map?)?['text'] as String? ?? '',
+      m['like_count'] as int? ?? 0,
+      m['comment_count'] as int? ?? 0,
+      m['has_liked'] == true,
+      m['media_type'] == 2,
+      DateTime.fromMillisecondsSinceEpoch(((m['taken_at'] ?? 0) as int) * 1000),
+    );
+  }
+}
+
+class IgStoryUser {
+  IgStoryUser(this.reelId, this.user, this.seen);
+  final String reelId;
+  final IgUser user;
+  final bool seen;
+}
+
+class IgStoryItem {
+  IgStoryItem(this.image, this.isVideo, this.at);
+  final String image;
+  final bool isVideo;
+  final DateTime at;
 }
 
 class IgThread {
@@ -137,6 +215,108 @@ class InstagramApi {
     if (r.statusCode >= 400 || r.body.startsWith('<')) {
       throw 'Instagram a refusé l\'envoi (code ${r.statusCode})';
     }
+  }
+
+  /// Envoie une photo (JPEG/PNG) dans une conversation.
+  Future<void> sendPhoto(String threadId, List<int> bytes, int width, int height) async {
+    if (_csrf == null) {
+      throw 'Pour envoyer, reconnecte Instagram avec le bouton « Connecter »';
+    }
+    final uploadId = '${DateTime.now().millisecondsSinceEpoch}';
+    final name = 'fb_uploader_$uploadId';
+    final up = await _http.post(
+      Uri.parse('https://www.instagram.com/rupload_igphoto/$name'),
+      headers: {
+        ..._headers,
+        'Content-Type': 'image/jpeg',
+        'Offset': '0',
+        'X-Entity-Name': name,
+        'X-Entity-Length': '${bytes.length}',
+        'X-Entity-Type': 'image/jpeg',
+        'X-Instagram-Rupload-Params': jsonEncode({
+          'media_type': 1,
+          'upload_id': uploadId,
+          'upload_media_height': height,
+          'upload_media_width': width,
+        }),
+      },
+      body: bytes,
+    );
+    if (up.statusCode >= 400) throw 'Instagram a refusé la photo (code ${up.statusCode})';
+    final ctx = '${DateTime.now().microsecondsSinceEpoch}';
+    final r = await _http.post(
+      Uri.parse('https://www.instagram.com/api/v1/direct_v2/threads/broadcast/configure_photo/'),
+      headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'action': 'send_item',
+        'thread_ids': '[$threadId]',
+        'upload_id': uploadId,
+        'allow_full_aspect_ratio': 'true',
+        'client_context': ctx,
+        'mutation_token': ctx,
+        'offline_threading_id': ctx,
+      },
+    );
+    if (r.statusCode >= 400 || r.body.startsWith('<')) {
+      throw 'Instagram a refusé l\'envoi de la photo (code ${r.statusCode})';
+    }
+  }
+
+  Future<Map<String, dynamic>> _post(String path, Map<String, String> body) async {
+    final r = await _http.post(Uri.parse('https://www.instagram.com/api/v1$path'),
+        headers: {..._headers, 'Content-Type': 'application/x-www-form-urlencoded'}, body: body);
+    if (r.statusCode == 401 || r.statusCode == 403 || r.body.startsWith('<')) {
+      throw 'Session Instagram expirée : reconnecte ton compte';
+    }
+    if (r.statusCode >= 400) throw 'Instagram : erreur ${r.statusCode}';
+    return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// Fil d'actualité (publications des comptes que tu suis).
+  Future<List<IgPost>> timeline() async {
+    Map<String, dynamic> j;
+    try {
+      j = await _post('/feed/timeline/', {'is_async_ads_rti': '0', 'is_async_ads_double_request': '0'});
+    } catch (_) {
+      j = await _get('/feed/timeline/');
+    }
+    final items = (j['feed_items'] as List?) ?? (j['items'] as List?) ?? const [];
+    final out = <IgPost>[];
+    for (final it in items) {
+      final m = (it is Map && it['media_or_ad'] != null) ? it['media_or_ad'] : it;
+      if (m is! Map<String, dynamic> || m['user'] == null) continue;
+      if (m['injected'] != null || m['ad_id'] != null) continue; // pas de pubs
+      out.add(IgPost.fromJson(m));
+    }
+    return out;
+  }
+
+  Future<void> like(String mediaId) => _post('/web/likes/$mediaId/like/', {});
+  Future<void> unlike(String mediaId) => _post('/web/likes/$mediaId/unlike/', {});
+
+  /// Bandeau des stories.
+  Future<List<IgStoryUser>> storiesTray() async {
+    final j = await _get('/feed/reels_tray/');
+    return [
+      for (final t in (j['tray'] as List? ?? []))
+        if (t['user'] != null)
+          IgStoryUser('${t['id']}', IgUser.fromJson(t['user'] as Map<String, dynamic>),
+              (t['seen'] ?? 0) != 0 && (t['seen'] ?? 0) >= (t['latest_reel_media'] ?? 0)),
+    ];
+  }
+
+  /// Images des stories d'un compte.
+  Future<List<IgStoryItem>> stories(String reelId) async {
+    final j = await _get('/feed/reels_media/?reel_ids=$reelId');
+    final reel = (j['reels'] as Map?)?[reelId] ?? (j['reels_media'] as List?)?.firstOrNull;
+    return [
+      for (final it in (reel?['items'] as List? ?? []))
+        IgStoryItem(
+          findIgImage(it) ?? '',
+          (it['video_versions'] as List?)?.isNotEmpty == true,
+          DateTime.fromMillisecondsSinceEpoch(((it['taken_at'] ?? 0) as int) * 1000),
+        ),
+    ].where((e) => e.image.isNotEmpty).toList();
   }
 
   Future<(IgUser, List<IgThread>)> inbox() async {
@@ -344,49 +524,390 @@ class InstagramModule extends HubModule {
       );
 
   @override
-  Widget buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(name), actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => load(force: true).then((_) => store.changed()),
-          ),
-          IconButton(
-            tooltip: 'Ouvrir Instagram',
-            icon: const Icon(Icons.open_in_new_rounded),
-            onPressed: () => openLink(context, 'https://www.instagram.com/direct/inbox/'),
-          ),
-        ]),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) {
-            if (!connected) {
-              return EmptyHint(
-                  'Connecte ton compte Instagram pour lire tes messages ici '
-                  'et recevoir une alerte à chaque nouveau message.',
-                  icon: icon,
-                  action: ('Connecter mon compte', () => connect(context)));
-            }
-            return FutureBuilder(
-              future: load(),
-              initialData: _threads,
-              builder: (context, snap) => ListView(
-                children: [
-                  if (me != null)
-                    ListTile(
-                      leading: HubAvatar(url: me!.pic, label: me!.username, color: color),
-                      title: Text('@${me!.username}'),
-                      subtitle: const Text('Connecté'),
-                      trailing: TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
-                    ),
-                  if (lastError != null) ErrorBanner(lastError!),
-                  const Divider(),
-                  for (final t in snap.data ?? <IgThread>[]) _threadTile(context, t),
-                ],
+  Widget buildPage(BuildContext context) => DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(name),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: () => load(force: true).then((_) => store.changed()),
               ),
-            );
-          },
+              IconButton(
+                tooltip: 'Ouvrir Instagram',
+                icon: const Icon(Icons.open_in_new_rounded),
+                onPressed: () => openLink(context, 'https://www.instagram.com/'),
+              ),
+            ],
+            bottom: const TabBar(tabs: [Tab(text: 'Fil d\'actu'), Tab(text: 'Messages')]),
+          ),
+          body: ListenableBuilder(
+            listenable: store,
+            builder: (context, _) {
+              if (!connected) {
+                return EmptyHint(
+                    'Connecte ton compte Instagram pour voir ton fil, tes stories et '
+                    'tes messages ici.',
+                    icon: icon,
+                    action: ('Connecter mon compte', () => connect(context)));
+              }
+              return TabBarView(children: [
+                _FeedTab(module: this),
+                FutureBuilder(
+                  future: load(),
+                  initialData: _threads,
+                  builder: (context, snap) => ListView(
+                    children: [
+                      if (me != null)
+                        ListTile(
+                          leading: HubAvatar(url: me!.pic, label: me!.username, color: color),
+                          title: Text('@${me!.username}'),
+                          subtitle: const Text('Connecté'),
+                          trailing:
+                              TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
+                        ),
+                      if (lastError != null) ErrorBanner(lastError!),
+                      const Divider(),
+                      for (final t in snap.data ?? <IgThread>[]) _threadTile(context, t),
+                    ],
+                  ),
+                ),
+              ]);
+            },
+          ),
         ),
       );
+}
+
+class _FeedTab extends StatefulWidget {
+  const _FeedTab({required this.module});
+  final InstagramModule module;
+
+  @override
+  State<_FeedTab> createState() => _FeedTabState();
+}
+
+class _FeedTabState extends State<_FeedTab> with AutomaticKeepAliveClientMixin {
+  late Future<(List<IgStoryUser>, List<IgPost>)> future = _load();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<(List<IgStoryUser>, List<IgPost>)> _load() async {
+    final api = await widget.module._client();
+    if (api == null) return (<IgStoryUser>[], <IgPost>[]);
+    List<IgStoryUser> tray = [];
+    try {
+      tray = await api.storiesTray();
+    } catch (_) {}
+    final posts = await api.timeline();
+    return (tray, posts);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final color = widget.module.color;
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => future = _load());
+        await future;
+      },
+      child: FutureBuilder(
+        future: future,
+        builder: (context, snap) {
+          if (snap.hasError) return ListView(children: [ErrorBanner('${snap.error}')]);
+          if (!snap.hasData) return const LoadingHint();
+          final (tray, posts) = snap.data!;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView.builder(
+                itemCount: posts.length + 1,
+                itemBuilder: (context, i) {
+                  if (i == 0) {
+                    if (tray.isEmpty) return const SizedBox(height: 8);
+                    return SizedBox(
+                      height: 104,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        itemCount: tray.length,
+                        itemBuilder: (context, j) {
+                          final t = tray[j];
+                          return GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                fullscreenDialog: true,
+                                builder: (_) => _StoryViewer(module: widget.module, story: t),
+                              ),
+                            ),
+                            child: SizedBox(
+                              width: 76,
+                              child: Column(children: [
+                                Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: t.seen
+                                        ? null
+                                        : const LinearGradient(colors: [
+                                            Color(0xFFFEDA75),
+                                            Color(0xFFFA7E1E),
+                                            Color(0xFFD62976),
+                                            Color(0xFF962FBF),
+                                          ]),
+                                    color: t.seen ? Colors.grey.shade400 : null,
+                                  ),
+                                  child: HubAvatar(
+                                      url: t.user.pic, label: t.user.username, color: color, size: 58),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(t.user.username,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11)),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }
+                  return _PostCard(module: widget.module, post: posts[i - 1]);
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PostCard extends StatefulWidget {
+  const _PostCard({required this.module, required this.post});
+  final InstagramModule module;
+  final IgPost post;
+
+  @override
+  State<_PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<_PostCard> {
+  int page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.post;
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: HubAvatar(url: p.user.pic, label: p.user.username, color: widget.module.color, size: 36),
+            title: Text(p.user.username, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(timeAgo(p.at)),
+          ),
+          if (p.images.isNotEmpty)
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(children: [
+                PageView(
+                  onPageChanged: (i) => setState(() => page = i),
+                  children: [
+                    for (final url in p.images)
+                      GestureDetector(
+                        onTap: () => showPhoto(context, url),
+                        onDoubleTap: _toggleLike,
+                        child: Image.network(url, fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_rounded))),
+                      ),
+                  ],
+                ),
+                if (p.isVideo)
+                  const Center(
+                    child: Icon(Icons.play_circle_fill_rounded, size: 64, color: Colors.white70),
+                  ),
+                if (p.images.length > 1)
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                      child: Text('${page + 1}/${p.images.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                  ),
+              ]),
+            ),
+          Row(children: [
+            IconButton(
+              icon: Icon(p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  color: p.liked ? Colors.red : null),
+              onPressed: _toggleLike,
+            ),
+            Text('${p.likes}'),
+            const SizedBox(width: 12),
+            IconButton(
+              tooltip: 'Commentaires / vidéo (ouvre Instagram)',
+              icon: const Icon(Icons.mode_comment_outlined),
+              onPressed: () => openLink(context, 'https://www.instagram.com/p/${p.code}/'),
+            ),
+            Text('${p.comments}'),
+          ]),
+          if (p.caption.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: '${p.user.username} ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: p.caption),
+                ]),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleLike() async {
+    final p = widget.post;
+    setState(() {
+      p.liked = !p.liked;
+      p.likes += p.liked ? 1 : -1;
+    });
+    try {
+      final api = await widget.module._client();
+      p.liked ? await api!.like(p.id) : await api!.unlike(p.id);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          p.liked = !p.liked;
+          p.likes += p.liked ? 1 : -1;
+        });
+        showError(context, e);
+      }
+    }
+  }
+}
+
+class _StoryViewer extends StatefulWidget {
+  const _StoryViewer({required this.module, required this.story});
+  final InstagramModule module;
+  final IgStoryUser story;
+
+  @override
+  State<_StoryViewer> createState() => _StoryViewerState();
+}
+
+class _StoryViewerState extends State<_StoryViewer> {
+  late final Future<List<IgStoryItem>> future =
+      widget.module._client().then((api) => api!.stories(widget.story.reelId));
+  int index = 0;
+  Timer? timer;
+
+  void _next(int count) {
+    if (index < count - 1) {
+      setState(() => index++);
+      _arm(count);
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  void _arm(int count) {
+    timer?.cancel();
+    timer = Timer(const Duration(seconds: 6), () => _next(count));
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: FutureBuilder(
+        future: future,
+        builder: (context, snap) {
+          if (snap.hasError) return EmptyHint('${snap.error}');
+          if (!snap.hasData) return const LoadingHint();
+          final items = snap.data!;
+          if (items.isEmpty) return const EmptyHint('Story indisponible');
+          if (timer == null) _arm(items.length);
+          final it = items[index];
+          return GestureDetector(
+            onTapUp: (d) {
+              final left = d.localPosition.dx < MediaQuery.sizeOf(context).width / 3;
+              if (left && index > 0) {
+                setState(() => index--);
+                _arm(items.length);
+              } else if (!left) {
+                _next(items.length);
+              }
+            },
+            child: Stack(fit: StackFit.expand, children: [
+              Image.network(it.image, fit: BoxFit.contain),
+              if (it.isVideo)
+                Center(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Vidéo : ouvrir dans Instagram'),
+                    onPressed: () => openLink(context,
+                        'https://www.instagram.com/stories/${widget.story.user.username}/'),
+                  ),
+                ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(children: [
+                    Row(children: [
+                      for (var i = 0; i < items.length; i++)
+                        Expanded(
+                          child: Container(
+                            height: 3,
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            color: i <= index ? Colors.white : Colors.white30,
+                          ),
+                        ),
+                    ]),
+                    ListTile(
+                      leading: HubAvatar(
+                          url: widget.story.user.pic,
+                          label: widget.story.user.username,
+                          color: widget.module.color,
+                          size: 32),
+                      title: Text(widget.story.user.username,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: Text(timeAgo(it.at), style: const TextStyle(color: Colors.white70)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ]),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _ThreadPage extends StatefulWidget {
@@ -443,6 +964,14 @@ class _ThreadPageState extends State<_ThreadPage> {
           const SizedBox(width: 10),
           Expanded(child: Text(thread.title, overflow: TextOverflow.ellipsis)),
         ]),
+        actions: [
+          IconButton(
+            tooltip: 'Appel vocal / vidéo (ouvre Instagram)',
+            icon: const Icon(Icons.call_rounded),
+            onPressed: () =>
+                openLink(context, 'https://www.instagram.com/direct/t/${thread.id}/'),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -460,6 +989,7 @@ class _ThreadPageState extends State<_ThreadPage> {
                           final mine = m.userId == module.me?.id;
                           return ChatBubble(
                             text: m.text,
+                            images: [?m.image],
                             author: mine || thread.users.length < 2 ? null : names[m.userId],
                             time: '${dayLabel(m.at)} ${hhmm(m.at)}',
                             mine: mine,
@@ -471,6 +1001,18 @@ class _ThreadPageState extends State<_ThreadPage> {
           ChatComposer(
             color: module.color,
             hint: 'Écrire à ${thread.title}',
+            onAttach: () async {
+              final file = await openFile(acceptedTypeGroups: const [
+                XTypeGroup(label: 'Photos', extensions: ['jpg', 'jpeg', 'png']),
+              ]);
+              if (file == null) return;
+              final bytes = await file.readAsBytes();
+              final codec = await ui.instantiateImageCodec(bytes);
+              final frame = await codec.getNextFrame();
+              final api = await module._client();
+              await api!.sendPhoto(thread.id, bytes, frame.image.width, frame.image.height);
+              await _load();
+            },
             onSend: (text) async {
               final api = await module._client();
               await api!.send(thread.id, text);

@@ -352,26 +352,43 @@ class EcoleDirecteModule extends HubModule {
                 MaterialPageRoute(
                   builder: (_) => Scaffold(
                     appBar: AppBar(title: Text(m.from)),
-                    body: ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        Text(m.subject,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w800)),
-                        const Divider(height: 28),
-                        FutureBuilder(
-                          future: client.messageContent(m.id),
-                          builder: (c, snap) => snap.hasError
-                              ? ErrorBanner('${snap.error}')
-                              : !snap.hasData
-                                  ? const LoadingHint()
-                                  : SelectableText(snap.data!,
-                                      style: const TextStyle(height: 1.5)),
+                    body: Column(children: [
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.all(20),
+                          children: [
+                            Text(m.subject,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w800)),
+                            const Divider(height: 28),
+                            FutureBuilder(
+                              future: client.messageContent(m.id),
+                              builder: (c, snap) => snap.hasError
+                                  ? ErrorBanner('${snap.error}')
+                                  : !snap.hasData
+                                      ? const LoadingHint()
+                                      : SelectableText(snap.data!,
+                                          style: const TextStyle(height: 1.5)),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      Builder(
+                        builder: (c) => ChatComposer(
+                          color: color,
+                          hint: 'Répondre à ${m.from}',
+                          onSend: (text) async {
+                            await client.reply(m, text);
+                            if (c.mounted) {
+                              ScaffoldMessenger.of(c).showSnackBar(
+                                  const SnackBar(content: Text('Réponse envoyée ✉️')));
+                            }
+                          },
+                        ),
+                      ),
+                    ]),
                   ),
                 ),
               );

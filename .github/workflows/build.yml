@@ -50,6 +50,8 @@ jobs:
   macos:
     needs: test
     runs-on: macos-latest
+    # Mac est bonus : le navigateur intégré (bêta) n'y compile pas encore.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -75,3 +77,30 @@ jobs:
         with:
           name: MonHub-Linux
           path: build/linux/x64/release/bundle/
+
+  # Publie les fichiers sur la page « Releases » avec des liens fixes :
+  # https://github.com/<compte>/mon-hub/releases/latest
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Préparer les fichiers
+        run: |
+          cd dist
+          (cd MonHub-Windows && zip -qr ../MonHub-Windows.zip .)
+          cp MonHub-Android/app-release.apk MonHub-Android.apk
+      - name: Publier la release « latest »
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --repo "${{ github.repository }}" --cleanup-tag -y || true
+          gh release create latest dist/MonHub-Windows.zip dist/MonHub-Android.apk \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Mon Hub (dernière version)" \
+            --notes "PC Windows : MonHub-Windows.zip · Téléphone Android : MonHub-Android.apk · Guide : INSTALL.md"

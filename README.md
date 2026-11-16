@@ -9,6 +9,8 @@ réordonner, retirer ou remplacer.
 
 ![Bibliothèque](docs/bibliotheque.png)
 
+> 📥 **Installer : voir [INSTALL.md](INSTALL.md)** · [Télécharger la dernière version](https://github.com/Shideyx/mon-hub/releases/latest)
+
 ## Sur quels appareils ?
 
 Écrite en **Flutter** : un seul code pour **Windows, Android, iPhone/iPad,

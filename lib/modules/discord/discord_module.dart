@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
@@ -450,7 +451,13 @@ class _ConversationPageState extends State<_ConversationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text(widget.title), actions: [
+        IconButton(
+          tooltip: 'Appel vocal / vidéo (ouvre Discord)',
+          icon: const Icon(Icons.call_rounded),
+          onPressed: () => openLink(context, 'https://discord.com/channels/@me/${widget.channelId}'),
+        ),
+      ]),
       body: Column(
         children: [
           Expanded(
@@ -467,6 +474,7 @@ class _ConversationPageState extends State<_ConversationPage> {
                           final mine = m.author.id == module.me?.id;
                           return ChatBubble(
                             text: m.content,
+                            images: m.images,
                             author: mine ? null : m.author.name,
                             time: '${dayLabel(m.at)} ${hhmm(m.at)}',
                             mine: mine,
@@ -478,6 +486,15 @@ class _ConversationPageState extends State<_ConversationPage> {
           ChatComposer(
             color: module.color,
             hint: 'Écrire à ${widget.title}',
+            onAttach: () async {
+              final file = await openFile(acceptedTypeGroups: const [
+                XTypeGroup(label: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp']),
+              ]);
+              if (file == null) return;
+              final api = await module._client();
+              final sent = await api!.sendFile(widget.channelId, file.name, await file.readAsBytes());
+              setState(() => msgs = [sent, ...?msgs]);
+            },
             onSend: (text) async {
               final api = await module._client();
               final sent = await api!.send(widget.channelId, text);

@@ -146,6 +146,7 @@ class ChatBubble extends StatelessWidget {
     required this.mine,
     required this.color,
     this.author,
+    this.images = const [],
   });
 
   final String text;
@@ -153,6 +154,9 @@ class ChatBubble extends StatelessWidget {
   final bool mine;
   final Color color;
   final String? author;
+
+  /// Photos jointes au message.
+  final List<String> images;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +186,26 @@ class ChatBubble extends StatelessWidget {
               if (author != null)
                 Text(author!,
                     style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
-              Text(text, style: TextStyle(color: fg)),
+              for (final url in images)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
+                  child: GestureDetector(
+                    onTap: () => showPhoto(context, url),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 280, maxWidth: 320),
+                        child: Image.network(url,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (c, child, p) => p == null
+                                ? child
+                                : const SizedBox(width: 200, height: 150, child: LoadingHint()),
+                            errorBuilder: (_, _, _) => Icon(Icons.broken_image_rounded, color: fg)),
+                      ),
+                    ),
+                  ),
+                ),
+              if (text.isNotEmpty) Text(text, style: TextStyle(color: fg)),
               const SizedBox(height: 2),
               Text(time, style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 10)),
             ],
@@ -277,9 +300,18 @@ String timeAgo(DateTime d) {
 
 /// Zone de saisie + bouton d'envoi, en bas d'une conversation.
 class ChatComposer extends StatefulWidget {
-  const ChatComposer({super.key, required this.onSend, required this.color, this.hint = 'Message…'});
+  const ChatComposer({
+    super.key,
+    required this.onSend,
+    required this.color,
+    this.hint = 'Message…',
+    this.onAttach,
+  });
 
   final Future<void> Function(String text) onSend;
+
+  /// Si fourni : bouton 📎 pour envoyer une photo.
+  final Future<void> Function()? onAttach;
   final Color color;
   final String hint;
 
@@ -314,6 +346,23 @@ class _ChatComposerState extends State<ChatComposer> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            if (widget.onAttach != null)
+              IconButton(
+                tooltip: 'Envoyer une photo',
+                icon: const Icon(Icons.add_photo_alternate_rounded),
+                onPressed: sending
+                    ? null
+                    : () async {
+                        setState(() => sending = true);
+                        try {
+                          await widget.onAttach!();
+                        } catch (e) {
+                          if (context.mounted) showError(context, e);
+                        } finally {
+                          if (mounted) setState(() => sending = false);
+                        }
+                      },
+              ),
             Expanded(
               child: TextField(
                 controller: ctrl,
@@ -344,3 +393,29 @@ class _ChatComposerState extends State<ChatComposer> {
     );
   }
 }
+
+/// Affiche une photo en plein écran (zoom avec les doigts / la molette).
+Future<void> showPhoto(BuildContext context, String url) => Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (c) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                tooltip: 'Ouvrir / enregistrer',
+                icon: const Icon(Icons.open_in_new_rounded),
+                onPressed: () => openLink(c, url),
+              ),
+            ],
+          ),
+          body: InteractiveViewer(
+            maxScale: 6,
+            child: Center(child: Image.network(url, fit: BoxFit.contain)),
+          ),
+        ),
+      ),
+    );

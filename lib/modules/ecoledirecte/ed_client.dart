@@ -154,6 +154,43 @@ class EdClient {
     return htmlToText(_b64(r['data']?['content'] as String?));
   }
 
+  /// Répond à l'expéditeur d'un message.
+  Future<void> reply(EdMessage original, String text) async {
+    final f = original.sender;
+    if (f['id'] == null) throw 'Impossible de répondre à ce message';
+    final html = '<p>${const HtmlEscape().convert(text).replaceAll('\n', '<br>')}</p>';
+    final subject = original.subject.toLowerCase().startsWith('re')
+        ? original.subject
+        : 'RE : ${original.subject}';
+    final r = await _post('/eleves/$accountId/messages.awp?verbe=post', {
+      'message': {
+        'groupesDestinataires': [
+          {
+            'destinataires': [
+              {
+                ...f,
+                'type': f['role'] ?? f['type'] ?? 'P',
+                'isSelected': true,
+                'to_cc_cci': 'to',
+              }
+            ],
+            'selected': true,
+          }
+        ],
+        'content': base64.encode(utf8.encode(html)),
+        'subject': subject,
+        'files': [],
+        'parentID': original.id,
+      },
+      'anneeMessages': schoolYear(),
+    });
+    if (r['code'] != 200) {
+      throw (r['message'] as String?)?.isNotEmpty == true
+          ? r['message'] as String
+          : 'Envoi refusé par École Directe (code ${r['code']})';
+    }
+  }
+
   /// Devoirs à venir, avec leur contenu.
   Future<List<EdHomework>> homework() async {
     final r = await _post('/Eleves/$accountId/cahierdetexte.awp?verbe=get', {});
@@ -191,12 +228,15 @@ class EdClient {
 }
 
 class EdMessage {
-  EdMessage(this.id, this.subject, this.from, this.date, this.read);
+  EdMessage(this.id, this.subject, this.from, this.date, this.read, [this.sender = const {}]);
   final int id;
   final String subject;
   final String from;
   final DateTime? date;
   bool read;
+
+  /// Fiche brute de l'expéditeur (sert à lui répondre).
+  final Map<String, dynamic> sender;
 
   factory EdMessage.fromJson(Map<String, dynamic> j) {
     final f = j['from'] as Map<String, dynamic>? ?? const {};
@@ -208,6 +248,7 @@ class EdMessage {
       name.isEmpty ? '?' : name,
       DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
       j['read'] == true,
+      f,
     );
   }
 }

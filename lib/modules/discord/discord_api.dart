@@ -20,17 +20,28 @@ class DiscordUser {
 }
 
 class DiscordMessage {
-  DiscordMessage(this.id, this.author, this.content, this.at);
+  DiscordMessage(this.id, this.author, this.content, this.at, [this.images = const []]);
   final String id;
   final DiscordUser author;
   final String content;
   final DateTime at;
+  final List<String> images;
 
   factory DiscordMessage.fromJson(Map<String, dynamic> j) {
     var content = j['content'] as String? ?? '';
-    final attachments = (j['attachments'] as List?)?.length ?? 0;
-    if (content.isEmpty && attachments > 0) content = '📎 Pièce jointe';
-    if (content.isEmpty && (j['sticker_items'] as List?)?.isNotEmpty == true) {
+    final atts = (j['attachments'] as List?) ?? const [];
+    final images = <String>[
+      for (final a in atts)
+        if ('${a['content_type'] ?? ''}'.startsWith('image/') ||
+            RegExp(r'\.(png|jpe?g|gif|webp)$', caseSensitive: false).hasMatch('${a['filename']}'))
+          '${a['proxy_url'] ?? a['url']}',
+      for (final e in (j['embeds'] as List?) ?? const [])
+        if (e['type'] == 'image' || e['type'] == 'gifv')
+          '${e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['url']}',
+    ];
+    if (content.isEmpty && atts.length > images.length) content = '📎 Pièce jointe';
+
+    if (content.isEmpty && images.isEmpty && (j['sticker_items'] as List?)?.isNotEmpty == true) {
       content = '🖼️ Sticker';
     }
     return DiscordMessage(
@@ -38,6 +49,7 @@ class DiscordMessage {
       DiscordUser.fromJson(j['author'] as Map<String, dynamic>),
       content,
       DateTime.tryParse(j['timestamp'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      images,
     );
   }
 }
@@ -88,6 +100,22 @@ class DiscordApi {
     final j = await _post('/channels/$channelId/messages',
         {'content': content, 'nonce': nonce, 'tts': false, 'flags': 0});
     return DiscordMessage.fromJson(j as Map<String, dynamic>);
+  }
+
+  /// Envoie une photo (ou n'importe quel fichier) dans une conversation.
+  Future<DiscordMessage> sendFile(String channelId, String filename, List<int> bytes,
+      {String content = ''}) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$_base/channels/$channelId/messages'))
+      ..headers.addAll({..._headers}..remove('Content-Type'))
+      ..fields['payload_json'] = jsonEncode({
+        'content': content,
+        'attachments': [
+          {'id': 0, 'filename': filename}
+        ],
+      })
+      ..files.add(http.MultipartFile.fromBytes('files[0]', bytes, filename: filename));
+    final res = await http.Response.fromStream(await _http.send(req));
+    return DiscordMessage.fromJson(_check(res) as Map<String, dynamic>);
   }
 
   /// Tes amis (pour démarrer une nouvelle conversation).
