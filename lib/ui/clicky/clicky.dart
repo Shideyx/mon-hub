@@ -39,6 +39,7 @@ import 'extensions.dart';
 import 'holo.dart';
 import 'hud.dart';
 import 'assistant.dart';
+import 'autonomy.dart';
 import 'flight.dart';
 import 'journal.dart';
 import 'mind.dart';
@@ -997,6 +998,7 @@ class ClickyController extends ChangeNotifier {
   /// La boîte de texte est ouverte : saisie, écoute, réflexion, réponse
   /// (elle se referme toute seule quelques secondes après la réponse).
   bool get boxOpen =>
+      idea != null ||
       panelOpen ||
       state != ClickyState.idle ||
       reply.isNotEmpty ||
@@ -1115,7 +1117,14 @@ class ClickyController extends ChangeNotifier {
   }
 
   bool get _calm =>
-      state == ClickyState.idle && !panelOpen && board == null && holo == null && marks.isEmpty && target == null && !_keepReply;
+      state == ClickyState.idle &&
+      !panelOpen &&
+      board == null &&
+      holo == null &&
+      marks.isEmpty &&
+      target == null &&
+      !_keepReply &&
+      idea == null;
 
   Future<void> _presenceTick() async {
     final mind = ClickyMind.instance;
@@ -1293,6 +1302,214 @@ class ClickyController extends ChangeNotifier {
     } finally {
       _noticing = false;
     }
+  }
+
+  // ---------- Autonomie : il décide, propose, et fait après ton accord ----------
+
+  /// L'idée en attente de ta réponse.
+  ClickyIdea? idea;
+  Timer? _ideaTimeout;
+  Timer? _autonomy;
+  bool _deciding = false;
+  int _lastIdle = 0;
+  DateTime _startedAt = DateTime.now();
+
+  /// Il propose une idée (à l'oral et dans sa boîte, avec Oui / Non).
+  Future<void> proposeIdea(ClickyIdea i) async {
+    if (handledElsewhere) {
+      await ClickyDesktop.send('idea64 ${base64Encode(utf8.encode(jsonEncode(i.toJson())))}');
+      return;
+    }
+    if (!active || !_calm) return;
+    idea = i;
+    _keepReply = true;
+    onInteractive?.call(true);
+    unawaited(ClickyChime.play());
+    _set(ClickyState.speaking, status: 'Une idée', reply: i.say);
+    if (voice) await speak(i.say);
+    if (idea == i && state == ClickyState.speaking) _set(ClickyState.idle);
+    // Sans réponse au bout d'une minute et demie : « plus tard ».
+    _ideaTimeout?.cancel();
+    _ideaTimeout = Timer(const Duration(seconds: 90), () {
+      if (idea == i) unawaited(answerIdea(null));
+    });
+  }
+
+  /// Ta réponse : oui (il le fait), non (il retient), null (plus tard).
+  Future<void> answerIdea(bool? yes) async {
+    final i = idea;
+    if (i == null) return;
+    idea = null;
+    _ideaTimeout?.cancel();
+    _keepReply = false;
+    if (!panelOpen && board == null) onInteractive?.call(false);
+    final mind = ClickyMind.instance;
+    if (yes != null) unawaited(mind.recordDecision(i.tool, yes));
+    if (yes != true) {
+      final r = yes == false ? 'D\'accord, je laisse tomber.' : '';
+      _set(ClickyState.idle, status: '', reply: r);
+      if (r.isNotEmpty) unawaited(speak(r));
+      _fadeSoon();
+      return;
+    }
+    await _runIdea(i);
+  }
+
+  Future<void> _runIdea(ClickyIdea i) async {
+    if (i.tool == 'agent') {
+      unawaited(_runAgent('${i.args['tache'] ?? ''}'.trim()));
+      return;
+    }
+    final tool = _tools.where((t) => t.name == i.tool).firstOrNull;
+    if (tool == null) {
+      _set(ClickyState.idle, status: '', reply: 'Je n\'ai finalement pas accès à ça. Désolé !');
+      _fadeSoon();
+      return;
+    }
+    _set(ClickyState.thinking, status: 'C\'est parti…', reply: '');
+    try {
+      final r = await tool.run(i.args);
+      // Le briefing : en grand, et lu à voix haute.
+      if (i.tool == 'assistant_briefing' && r is String) {
+        await presentTopo('Briefing', r);
+        return;
+      }
+      var say = Autonomy.plainResult(r);
+      if ((r is Map || r is List) && say == 'C\'est fait.' && await AiText.hasGemini()) {
+        try {
+          say = (await AiText.ask(
+            'Tu viens de faire ceci pour la personne : ${i.say}\nRésultat (données) : ${jsonEncode(ClaudeBridge.plain(r))}\n'
+            'Dis-lui le résultat en une ou deux phrases courtes, à l\'oral, sans liste.',
+            system: 'Tu es Clicky, un assistant chaleureux. Français, très court.',
+            geminiOnly: true,
+          )).trim();
+        } catch (_) {}
+      }
+      _set(ClickyState.speaking, status: '', reply: say);
+      await speak(say);
+      if (state == ClickyState.speaking) _set(ClickyState.idle);
+      _fadeSoon();
+    } catch (e) {
+      _set(ClickyState.idle, status: '', reply: 'Ça n\'a pas marché : $e');
+      _fadeSoon();
+    }
+  }
+
+  /// Mon Hub (qui a les modules) réfléchit toutes les minutes : faut-il
+  /// prendre une initiative ? (Il ne fait rien sans ton accord.)
+  void startAutonomy() {
+    _autonomy?.cancel();
+    _startedAt = DateTime.now();
+    _autonomy = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(autonomyTick()));
+  }
+
+  void stopAutonomy() {
+    _autonomy?.cancel();
+    _autonomy = null;
+  }
+
+  /// Un tour de réflexion. [now]/[idleSeconds] : pour les tests.
+  Future<ClickyIdea?> autonomyTick({DateTime? now, int? idleSeconds, bool propose = true}) async {
+    final n = now ?? DateTime.now();
+    final mind = ClickyMind.instance;
+    if (_deciding || !active || idea != null) return null;
+    final windows = DriveRunner.supported;
+    final idle = idleSeconds ?? (windows ? Win.idleSeconds() : 0);
+    final back = _lastIdle >= 20 * 60 && idle < 60;
+    _lastIdle = idle;
+    try {
+      await mind.load();
+    } catch (_) {}
+    if (!mind.on || !mind.autonomy) return null;
+    // Tu reviens après une absence : il te le dit (et prend des nouvelles).
+    if (back) {
+      final hello = mind.welcomeBack(now: n, name: callName);
+      final loop = mind.dueLoops(n).firstOrNull;
+      if (loop != null && hello.contains(loop.text)) unawaited(mind.markAsked(loop));
+      if (propose) unawaited(think(hello));
+      return null;
+    }
+    if (idle > 120 || n.difference(_startedAt).inMinutes < 8 || !mind.ideaAllowed(n)) return null;
+    if (windows && (Win.foregroundFullscreen() || isSensitiveTitle(Win.foregroundTitle()))) return null;
+    _deciding = true;
+    try {
+      final i = await decideIdea(n);
+      if (i == null) return null;
+      final key = '${i.tool}|${jsonEncode(i.args)}';
+      if (mind.ideaSeen(key)) return null;
+      await mind.ideaProposed(key, n);
+      if (propose) await proposeIdea(i);
+      return i;
+    } catch (_) {
+      return null;
+    } finally {
+      _deciding = false;
+    }
+  }
+
+  /// Il décide : Gemini (gratuit) regarde la situation ; sans clé, des
+  /// règles simples.
+  Future<ClickyIdea?> decideIdea(DateTime n) async {
+    final mind = ClickyMind.instance;
+    final tools = _tools;
+    final names = {for (final t in tools) t.name};
+    final skip = mind.skipTools(n);
+    if (await AiText.hasGemini()) {
+      final a = Assistant.instance..useTools(
+        call: (name, args) async => tools.where((t) => t.name == name).firstOrNull?.run(args),
+        tools: () => names,
+      );
+      final situation = Assistant.briefingText(await a.collect(n), name: callName);
+      final fg = DriveRunner.supported ? Win.foregroundTitle() : '';
+      final r = await AiText.ask(
+        Autonomy.prompt(
+          situation: situation,
+          tools: [for (final t in tools) if (!skip.contains(t.name)) t],
+          name: callName,
+          window: ClickyController.privateApp.hasMatch(fg.toLowerCase()) ? '' : fg,
+          memory: [
+            for (final e in mind.episodes.take(4)) '- souvenir : ${e.text}',
+          ].join('\n'),
+          likes: mind.likes,
+          dislikes: mind.dislikes,
+          now: n,
+        ),
+        system: 'Tu es Clicky, un assistant personnel autonome, prudent et utile. Tu réponds seulement en JSON.',
+        geminiOnly: true,
+      );
+      final i = Autonomy.parse(AiText.json(r), names);
+      if (i != null && !skip.contains(i.tool)) return i;
+      return null;
+    }
+    // Sans IA : quelques décisions évidentes.
+    final ctx = <String, Object?>{};
+    Future<Object?> call(String name, [Map<String, dynamic> args = const {}]) async {
+      try {
+        return await tools.where((t) => t.name == name).firstOrNull?.run(args);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final rev = await call('revision_paquets');
+    if (rev is Map) {
+      ctx['cartes'] = rev['a_revoir_aujourdhui'];
+      final decks = [for (final d in (rev['paquets'] as List?) ?? const []) if (d is Map) '${d['nom']}'];
+      for (final t in (rev['controles'] as List?) ?? const []) {
+        if (t is! Map) continue;
+        final d = t['date'] is DateTime ? t['date'] as DateTime : DateTime.tryParse('${t['date']}');
+        final subject = '${t['matiere'] ?? ''}';
+        if (d == null || subject.isEmpty) continue;
+        final days = DateTime(d.year, d.month, d.day).difference(DateTime(n.year, n.month, n.day)).inDays;
+        if (days >= 0 && days <= 3 && !decks.any((x) => x.contains(subject))) {
+          ctx['controle'] = subject;
+          break;
+        }
+      }
+    }
+    final pr = await call('assistant_priorites');
+    if (pr is Map) ctx['trop'] = pr['trop_de_choses'] == true;
+    return Autonomy.rules(ctx, n, available: names, skip: skip);
   }
 
   /// Affiche un petit message dans la boîte.
@@ -1668,6 +1885,15 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     if (agent != null) {
       unawaited(_runAgent(q.substring(agent.end).trim()));
       return;
+    }
+    // « Oui », « vas-y », « non merci » : c'est la réponse à son idée.
+    final pending = idea;
+    if (pending != null) {
+      final yes = Autonomy.answer(q);
+      if (yes != null) {
+        await answerIdea(yes);
+        return;
+      }
     }
     // Sa « conscience » : humeur, souvenirs, choses dont prendre des nouvelles.
     unawaited(ClickyMind.instance.onUserMessage(q).catchError((Object _) {}));
@@ -3214,6 +3440,8 @@ class _ClickyLayerState extends State<ClickyLayer> {
           call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
           tools: () => {for (final t in c.hubTools) t.name},
         );
+      // Clicky autonome : il réfléchit et propose (rien sans ton accord).
+      c.startAutonomy();
       final r = Routines.instance
         // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
         // autres routines par le cerveau de Clicky.
@@ -3279,6 +3507,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
     if (widget.hub != null) {
       Routines.instance.stop();
       Assistant.instance.stop();
+      c.stopAutonomy();
       ClipboardVault.stop();
     }
     super.dispose();
@@ -3511,6 +3740,54 @@ class _PointerWithLabel extends StatelessWidget {
         ),
     ],
   );
+  }
+}
+
+/// Oui / Non / Plus tard, sous une idée de Clicky.
+class _IdeaButtons extends StatelessWidget {
+  const _IdeaButtons({required this.c, required this.accent});
+  final ClickyController c;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final i = c.idea!;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (i.why.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text('Pourquoi : ${i.why}', style: Theme.of(context).textTheme.bodySmall),
+            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton(onPressed: () => c.answerIdea(null), child: const Text('Plus tard')),
+              OutlinedButton(onPressed: () => c.answerIdea(false), child: const Text('Non')),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: accent),
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Oui, vas-y'),
+                onPressed: () => c.answerIdea(true),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Tu peux aussi me répondre « oui » ou « non » à voix haute.',
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -4123,6 +4400,8 @@ class ClickyBox extends StatelessWidget {
                         style: text.bodyMedium?.copyWith(height: 1.35),
                       ),
                     ),
+                  // Son idée : il attend ton accord (ou dis « oui » / « non »).
+                  if (c.idea != null) _IdeaButtons(c: c, accent: accent),
                 ],
               ),
             ),

@@ -1001,6 +1001,19 @@ class Assistant extends ChangeNotifier {
       },
     ),
     HubTool(
+      name: 'assistant_ajouter_plan_journee',
+      description: 'Assistant personnel : prépare le plan de la journée (tâches importantes dans les créneaux libres '
+          'après les cours) et l\'ajoute directement à l\'agenda. Seulement quand la personne a dit oui.',
+      run: (_) async {
+        final plan = await planDay(DateTime.now());
+        if (plan.isEmpty) return 'Rien à placer (ou plus de créneau libre aujourd\'hui).';
+        await _get('agenda_ajouter_plan', {'plan': jsonEncode(plan)});
+        proposals.removeWhere((p) => p.id == 'plan');
+        notifyListeners();
+        return 'C\'est dans ton agenda : ${[for (final p in plan) '${p['debut']!.substring(11, 16)} ${p['titre']}'].join(', ')}.';
+      },
+    ),
+    HubTool(
       name: 'assistant_objectifs',
       description: 'Mes objectifs personnels : action = lister, ajouter, fini ou supprimer (avec texte).',
       params: {
