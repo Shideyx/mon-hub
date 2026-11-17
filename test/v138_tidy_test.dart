@@ -7,6 +7,7 @@ import 'package:hub/core/module_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hub/core/tidy.dart';
 import 'package:hub/modules/drive/drive_tidy.dart';
+import 'package:hub/ui/google_setup.dart';
 
 void main() {
   test('ranger un dossier : par type, par matière, doublons à part, puis tout annuler', () async {
@@ -89,6 +90,17 @@ void main() {
     expect(GoogleAuth.clientSecret, 'GOCSPX-secret');
     await GoogleAuth.setClient('', '');
     expect(GoogleAuth.available, isFalse);
+  });
+
+  test('clé Google : on lit le fichier JSON téléchargé chez Google', () {
+    final (id, secret) = GoogleSetupPage.parseJson(
+      '{"installed":{"client_id":"42-abc.apps.googleusercontent.com","project_id":"mon-hub","client_secret":"GOCSPX-x","redirect_uris":["http://localhost"]}}',
+    );
+    expect(id, '42-abc.apps.googleusercontent.com');
+    expect(secret, 'GOCSPX-x');
+    expect(() => GoogleSetupPage.parseJson('{"truc": 1}'), throwsA(isA<String>()));
+    expect(GoogleSetupPage.steps, hasLength(5));
+    expect(GoogleSetupPage.steps[1].$3, contains('docs.googleapis.com'));
   });
 
   test('Drive : chaque type de fichier a son dossier', () {
