@@ -196,6 +196,33 @@ class Win {
   /// La fenêtre au premier plan (celle où tu travailles).
   static HWND foreground() => GetForegroundWindow();
 
+  /// Rectangle de la fenêtre au premier plan (x, y, largeur, hauteur).
+  static (int, int, int, int)? foregroundRect() {
+    final r = calloc<RECT>();
+    try {
+      final h = GetForegroundWindow();
+      if (!GetWindowRect(h, r).value) return null;
+      final w = r.ref.right - r.ref.left, hh = r.ref.bottom - r.ref.top;
+      if (w <= 0 || hh <= 0) return null;
+      return (r.ref.left, r.ref.top, w, hh);
+    } finally {
+      calloc.free(r);
+    }
+  }
+
+  /// La fenêtre au premier plan couvre tout un écran (jeu, vidéo en grand) :
+  /// Clicky se fait discret.
+  static bool foregroundFullscreen() {
+    final f = foregroundRect();
+    if (f == null) return false;
+    final t = foregroundTitle();
+    if (t.isEmpty || t == 'Program Manager') return false;
+    for (final m in monitors()) {
+      if (f.$1 <= m.$1 && f.$2 <= m.$2 && f.$1 + f.$3 >= m.$1 + m.$3 && f.$2 + f.$4 >= m.$2 + m.$4) return true;
+    }
+    return false;
+  }
+
   /// Titre de la fenêtre au premier plan (« Document1 - Word »).
   static String foregroundTitle() {
     try {
