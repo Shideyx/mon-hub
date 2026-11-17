@@ -74,3 +74,17 @@
   Google s'active dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart` : 5 liens directs dont
   `flows/enableapi` pour toutes les API, puis le fichier JSON « Application de bureau » ; `GoogleAuth.setClient`).
   Une fois les secrets GitHub remplis, chaque utilisateur se connecte en un clic (l'ID de construction prime).
+- Réponses **sans IA** d'abord (demande de la personne : limiter Claude) : `ui/clicky/quick.dart` (`QuickAnswers` :
+  heure, date, calculs `Calc`, minuteur/rappel, son, musique, devoirs, contrôle, emploi du temps, notes, météo,
+  révisions, ranger, YouTube, document, liste, ouvrir) branché dans `ClickyController.ask` (`_handleQuick`, réglage
+  `quick`). Phrases reconnues **entières** (tests : les vraies questions doivent partir vers l'IA). Ajouter ici
+  tout ce qu'un algorithme sait faire.
+- Contrôles : `RevisionsModule.autoPrepare` (dans `poll`) prépare tout seul fiche + cartes + quiz (un paquet
+  `📝 Matière`, `Deck.sheet/quiz/testId`), une fois par contrôle (`testKey`), réglage `autoPrep`. Fiche : `fiche_view.dart`.
+- Widgets du bureau : `DesktopWidgets.inWidgetWindow` ; `HubModule.liveWidget` (pas de rechargement toutes les
+  3 min) ; YouTube y est le vrai m.youtube.com (`YouTubeMini`).
+- Médias : `ui/media_view.dart` (`WebVideo` = vidéo MP4 lue par WebView2, sans paquet ; `MediaViewer` plein écran ;
+  `MediaThumb`). Vocaux : `VoiceNotePlayer` télécharge d'abord le son (`DeviceFileSource`), sinon `WebAudio`.
+- Instagram : onglet Reels (`InstagramApi.reels`, `_ReelsTab`, une seule vidéo jouée à la fois), vidéos des posts,
+  stories et messages (`igMedia`, `findIgVideo`). Discord : conversation façon Discord (`_DiscordLine`, messages
+  regroupés, `_DaySeparator`, `DiscordEmbed`, vidéos).

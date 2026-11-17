@@ -46,6 +46,8 @@ class DiscordMessage {
     this.audioLength,
     this.waveform = const [],
     this.reactions = const [],
+    this.videos = const [],
+    this.embeds = const [],
   ]);
   final String id;
   final DiscordUser author;
@@ -58,6 +60,12 @@ class DiscordMessage {
   final Duration? audioLength;
   final List<double> waveform;
   final List<DiscordReaction> reactions;
+
+  /// Vidéos jointes.
+  final List<String> videos;
+
+  /// Aperçus de liens (titre, description, image, site).
+  final List<DiscordEmbed> embeds;
 
   bool get isVoice => audioUrl != null;
 
@@ -101,7 +109,21 @@ class DiscordMessage {
           RegExp(r'\.(ogg|mp3|m4a|wav|opus)$', caseSensitive: false).hasMatch('${a['filename']}');
     }).firstOrNull;
     final secs = (audio?['duration_secs'] as num?)?.toDouble();
-    final others = atts.length - images.length - (audio == null ? 0 : 1);
+    final videos = <String>[
+      for (final a in atts)
+        if ('${a['content_type'] ?? ''}'.startsWith('video/') ||
+            RegExp(r'\.(mp4|mov|webm)$', caseSensitive: false).hasMatch('${a['filename']}'))
+          '${a['url'] ?? a['proxy_url']}',
+      for (final e in (j['embeds'] as List?) ?? const [])
+        if (e is Map && (e['type'] == 'gifv' || e['type'] == 'video') && (e['video']?['url'] ?? e['video']?['proxy_url']) is String)
+          '${e['video']?['proxy_url'] ?? e['video']?['url']}',
+    ];
+    final embeds = <DiscordEmbed>[
+      for (final e in (j['embeds'] as List?) ?? const [])
+        if (e is Map && e['type'] != 'image' && e['type'] != 'gifv' && (e['title'] != null || e['description'] != null))
+          DiscordEmbed.fromJson(e.cast<String, dynamic>()),
+    ];
+    final others = atts.length - images.length - (audio == null ? 0 : 1) - videos.length;
     if (content.isEmpty && others > 0) content = '📎 Pièce jointe';
 
     if (content.isEmpty &&
@@ -137,8 +159,30 @@ class DiscordMessage {
               (r['emoji'] as Map?)?['animated'] == true,
             ),
       ],
+      videos,
+      embeds,
     );
   }
+}
+
+/// L'aperçu d'un lien (site, titre, description, image).
+class DiscordEmbed {
+  DiscordEmbed({this.title, this.description, this.url, this.image, this.site, this.color});
+  final String? title;
+  final String? description;
+  final String? url;
+  final String? image;
+  final String? site;
+  final int? color;
+
+  factory DiscordEmbed.fromJson(Map<String, dynamic> e) => DiscordEmbed(
+    title: e['title'] as String?,
+    description: e['description'] as String?,
+    url: e['url'] as String?,
+    image: (e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['image']?['proxy_url'] ?? e['image']?['url']) as String?,
+    site: (e['provider']?['name'] ?? e['author']?['name']) as String?,
+    color: (e['color'] as num?)?.toInt(),
+  );
 }
 
 class DiscordDm {

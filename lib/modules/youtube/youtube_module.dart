@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/browser.dart';
+import '../../core/desktop_widgets.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
 import '../../ui/web_login.dart';
@@ -269,8 +270,13 @@ class YouTubeModule extends HubModule {
     ),
   ];
 
+  /// Sur le bureau, le widget est un vrai YouTube : il ne se recharge pas.
   @override
-  Widget buildSummary(BuildContext context) => _YouTubeSummary(module: this);
+  bool get liveWidget => true;
+
+  @override
+  Widget buildSummary(BuildContext context) =>
+      DesktopWidgets.inWidgetWindow ? YouTubeMini(module: this) : _YouTubeSummary(module: this);
 
   @override
   Widget buildPage(BuildContext context) => YouTubePage(module: this, url: home);
@@ -517,6 +523,125 @@ class _YouTubePageState extends State<YouTubePage> {
               icon: m.icon,
               action: ('Ouvrir YouTube', () => Browser.open(widget.url)),
             ),
+    );
+  }
+}
+
+/// Le vrai YouTube dans le widget du bureau (version mobile, faite pour les
+/// petites fenêtres) : tu regardes ta vidéo et tu navigues sans rien ouvrir
+/// d'autre.
+class YouTubeMini extends StatefulWidget {
+  const YouTubeMini({super.key, required this.module, this.url = 'https://m.youtube.com/'});
+  final YouTubeModule module;
+  final String url;
+
+  static const mobileUa =
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) '
+      'Chrome/131.0.0.0 Mobile Safari/537.36';
+
+  @override
+  State<YouTubeMini> createState() => _YouTubeMiniState();
+}
+
+class _YouTubeMiniState extends State<YouTubeMini> {
+  InAppWebViewController? _c;
+  final _search = TextEditingController();
+  Timer? _watch;
+  String? _lastId;
+  double _progress = 0;
+
+  @override
+  void dispose() {
+    _watch?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _go(String url) => _c?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+
+  void _attach(InAppWebViewController c) {
+    _c = c;
+    // Retient les vidéos regardées (sur l'appareil seulement).
+    _watch = Timer.periodic(const Duration(seconds: 5), (_) async {
+      try {
+        final id = YouTubeSearch.videoId('${await c.getUrl() ?? ''}');
+        if (id == null || id == _lastId) return;
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final title = await c.getTitle() ?? '';
+        _lastId = id;
+        await widget.module.remember(id, title);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.module.color;
+    return Column(
+      children: [
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Retour',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                onPressed: () async {
+                  if (await _c?.canGoBack() ?? false) await _c?.goBack();
+                },
+              ),
+              IconButton(
+                tooltip: 'Accueil YouTube',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.home_rounded, size: 18, color: c),
+                onPressed: () => _go(widget.url),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _search,
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Rechercher',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                    filled: true,
+                  ),
+                  onSubmitted: (q) {
+                    if (q.trim().isEmpty) return;
+                    _go('https://m.youtube.com/results?search_query=${Uri.encodeQueryComponent(q.trim())}');
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+          ),
+        ),
+        if (_progress < 1) LinearProgressIndicator(value: _progress, minHeight: 2, color: c),
+        Expanded(
+          child: InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              userAgent: YouTubeMini.mobileUa,
+              javaScriptEnabled: true,
+              mediaPlaybackRequiresUserGesture: false,
+              allowsInlineMediaPlayback: true,
+              domStorageEnabled: true,
+              databaseEnabled: true,
+              thirdPartyCookiesEnabled: true,
+            ),
+            onWebViewCreated: _attach,
+            onProgressChanged: (_, p) {
+              if (mounted) setState(() => _progress = p / 100);
+            },
+            onPermissionRequest: (_, req) async =>
+                PermissionResponse(resources: req.resources, action: PermissionResponseAction.GRANT),
+          ),
+        ),
+      ],
     );
   }
 }

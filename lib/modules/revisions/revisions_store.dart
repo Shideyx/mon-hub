@@ -3,17 +3,56 @@ import 'package:flutter/foundation.dart';
 import '../../core/hub_files.dart';
 import 'fsrs.dart';
 
+/// Une question de quiz préparée (la bonne réponse et trois pièges).
+class QuizQuestion {
+  QuizQuestion(this.question, this.answer, this.wrong);
+  final String question;
+  final String answer;
+  final List<String> wrong;
+
+  Map<String, dynamic> toJson() => {'q': question, 'a': answer, 'w': wrong};
+  factory QuizQuestion.fromJson(Map j) => QuizQuestion(
+    '${j['q'] ?? ''}',
+    '${j['a'] ?? ''}',
+    [for (final w in (j['w'] as List?) ?? const []) '$w'],
+  );
+}
+
 /// Un paquet de cartes (une matière, un chapitre…).
 class Deck {
-  Deck({required this.id, required this.name, this.color = 0xFF7C5CFF, DateTime? created, List<StudyCard>? cards})
-    : created = created ?? DateTime.now(),
-      cards = cards ?? [];
+  Deck({
+    required this.id,
+    required this.name,
+    this.color = 0xFF7C5CFF,
+    DateTime? created,
+    List<StudyCard>? cards,
+    this.sheet,
+    List<QuizQuestion>? quiz,
+    this.testId,
+    this.testDate,
+    this.sheetDoc,
+  }) : created = created ?? DateTime.now(),
+       cards = cards ?? [],
+       quiz = quiz ?? [];
 
   final String id;
   String name;
   int color;
   final DateTime created;
   final List<StudyCard> cards;
+
+  /// La fiche de révision (Markdown), préparée par Clicky.
+  String? sheet;
+
+  /// Le quiz préparé (QCM avec de vrais pièges).
+  final List<QuizQuestion> quiz;
+
+  /// Le contrôle d'École Directe pour lequel ce paquet a été préparé.
+  String? testId;
+  DateTime? testDate;
+
+  /// La fiche, aussi en Google Doc.
+  String? sheetDoc;
 
   /// Cartes à revoir maintenant (sans les nouvelles).
   List<StudyCard> dueReviews(DateTime now) => [
@@ -38,6 +77,11 @@ class Deck {
     'color': color,
     'created': created.millisecondsSinceEpoch,
     'cards': [for (final c in cards) c.toJson()],
+    'sheet': ?sheet,
+    if (quiz.isNotEmpty) 'quiz': [for (final q in quiz) q.toJson()],
+    'test': ?testId,
+    if (testDate != null) 'testDate': testDate!.millisecondsSinceEpoch,
+    'sheetDoc': ?sheetDoc,
   };
 
   factory Deck.fromJson(Map j) => Deck(
@@ -49,6 +93,14 @@ class Deck {
       for (final c in (j['cards'] as List?) ?? const [])
         if (c is Map) StudyCard.fromJson(c),
     ],
+    sheet: j['sheet'] as String?,
+    quiz: [
+      for (final q in (j['quiz'] as List?) ?? const [])
+        if (q is Map) QuizQuestion.fromJson(q),
+    ],
+    testId: j['test'] as String?,
+    testDate: j['testDate'] == null ? null : DateTime.fromMillisecondsSinceEpoch((j['testDate'] as num).toInt()),
+    sheetDoc: j['sheetDoc'] as String?,
   );
 }
 
@@ -169,6 +221,12 @@ class RevisionsStore extends ChangeNotifier {
     if (i >= 0) d.cards[i] = card;
     await _save();
   }
+
+  /// Enregistre les changements d'un paquet (fiche, quiz…).
+  Future<void> saveDeck() => _save();
+
+  /// Le paquet préparé pour un contrôle.
+  Deck? forTest(String testId) => decks.where((d) => d.testId == testId).firstOrNull;
 
   Future<void> removeCard(String deckId, String cardId) async {
     deck(deckId)?.cards.removeWhere((c) => c.id == cardId);

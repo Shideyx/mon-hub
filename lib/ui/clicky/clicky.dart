@@ -44,6 +44,7 @@ import 'marks.dart';
 import 'neural_voice.dart';
 import 'ocr.dart';
 import 'pc.dart';
+import 'quick.dart';
 import 'ollama.dart';
 import 'pointer.dart';
 import 'routines.dart';
@@ -246,6 +247,7 @@ class ClickyController extends ChangeNotifier {
     'pc',
     'micEngine',
     'instant',
+    'quick',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -1414,6 +1416,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     try {
       if (await _handleCommand(q)) return;
       if (await _handleSkill(q)) return;
+      // Tout ce qu'un algorithme sait faire : réponse immédiate, sans l'IA.
+      if (await _handleQuick(q)) return;
       if (liveReady && !needsClassic(q) && await _liveAsk(q)) return;
       await _askAi(q);
     } finally {
@@ -1542,6 +1546,56 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         await speak(reply);
         _fadeSoon();
     }
+    return true;
+  }
+
+  /// Minuteurs lancés par « mets un minuteur de 10 minutes ».
+  final _quickTimers = <Timer>[];
+
+  /// Réponses instantanées sans l'IA (heure, calcul, devoirs, musique…).
+  Future<bool> _handleQuick(String q) async {
+    if (!quick) return false;
+    final tools = _tools;
+    final QuickReply? r;
+    try {
+      r = await QuickAnswers.answer(
+        q,
+        tools: {for (final t in tools) t.name},
+        call: (name, args) async {
+          final t = tools.where((x) => x.name == name).firstOrNull;
+          if (t == null) return null;
+          if (ClaudeBridge.isWriteAction(t) && !await confirmAction(t, args)) throw 'D\'accord, je ne touche à rien.';
+          return t.run(args);
+        },
+      );
+    } catch (e) {
+      _set(ClickyState.idle, status: '', reply: '$e');
+      _fadeSoon();
+      return true;
+    }
+    if (r == null) return false;
+    final media = r.media;
+    if (media != null && DriveRunner.supported) Win.mediaKey(media);
+    final d = r.timer;
+    if (d != null) {
+      final label = r.timerLabel;
+      _quickTimers.add(Timer(d, () {
+        unawaited(ClickyChime.play());
+        final say = label.isEmpty ? 'C\'est l\'heure ! Ton minuteur est terminé.' : 'C\'est l\'heure : $label.';
+        notify?.call('Clicky : minuteur', say);
+        _set(ClickyState.speaking, status: '', reply: say);
+        unawaited(speak(say).then((_) {
+          if (state == ClickyState.speaking) _set(ClickyState.idle);
+          _fadeSoon();
+        }));
+      }));
+    }
+    unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
+    unawaited(history.add(threadId, ChatMsg(mine: false, text: r.text), app: _appKey));
+    _set(ClickyState.speaking, status: '', reply: r.text);
+    await speak(r.text);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
     return true;
   }
 
@@ -1920,6 +1974,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Réglage « Réponse instantanée » (activé par défaut quand il y a une
   /// clé Gemini).
   bool get instant => _opt('instant', true);
+
+  /// Réponses instantanées sans l'IA (heure, calculs, devoirs, musique…).
+  bool get quick => _opt('quick', true);
 
   /// Gemini Live peut servir maintenant.
   bool get liveReady =>

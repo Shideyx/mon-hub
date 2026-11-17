@@ -61,6 +61,10 @@ abstract class HubModule {
   /// « Mon Hub » de l'appli Claude sur PC). Par défaut : aucune.
   List<HubTool> get tools => const [];
 
+  /// Le widget du bureau vit tout seul (vidéo, page web) : la fenêtre ne
+  /// le recharge pas toutes les 3 minutes.
+  bool get liveWidget => false;
+
   /// Appelé une fois au démarrage, après l'initialisation du stockage.
   void attach() => store.bind(id);
 }

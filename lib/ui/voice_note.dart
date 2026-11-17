@@ -1,3 +1,7 @@
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -85,7 +89,14 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
       _playing = this;
       if (p.source == null) {
         setState(() => _loading = true);
-        await p.setSource(UrlSource(widget.url));
+        // Le son est d'abord téléchargé (plus fiable que la lecture en
+        // direct sur Windows), sinon lu depuis internet.
+        final file = await _download(widget.url);
+        if (file != null) {
+          await p.setSource(DeviceFileSource(file));
+        } else {
+          await p.setSource(UrlSource(widget.url));
+        }
         await p.setPlaybackRate(_rate);
       }
       await p.resume();
@@ -93,6 +104,29 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
       if (mounted) setState(() => _failed = true);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Copie locale d'un vocal (gardée le temps de la session).
+  static final _cache = <String, String>{};
+
+  static Future<String?> _download(String url) async {
+    final known = _cache[url];
+    if (known != null && File(known).existsSync()) return known;
+    try {
+      final r = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+      if (r.statusCode != 200 || r.bodyBytes.isEmpty) return null;
+      final type = r.headers['content-type'] ?? '';
+      final ext = type.contains('ogg') || url.contains('.ogg')
+          ? 'ogg'
+          : type.contains('mpeg') || url.contains('.mp3')
+              ? 'mp3'
+              : 'm4a';
+      final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}monhub-vocal-${url.hashCode.abs()}.$ext');
+      await f.writeAsBytes(r.bodyBytes);
+      return _cache[url] = f.path;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -115,12 +149,8 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
         ? 0.0
         : (_pos.inMilliseconds / len.inMilliseconds).clamp(0.0, 1.0);
     if (_failed) {
-      return TextButton.icon(
-        style: TextButton.styleFrom(foregroundColor: fg),
-        icon: const Icon(Icons.open_in_new_rounded, size: 18),
-        label: const Text('Vocal : ouvrir dans le navigateur'),
-        onPressed: () => openLink(context, widget.url),
-      );
+      // Dernier recours : le navigateur intégré de Mon Hub lit le son.
+      return SizedBox(width: 280, height: 54, child: WebAudio(url: widget.url));
     }
     return SizedBox(
       width: 260,
@@ -315,6 +345,25 @@ class ReactionChips extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Un son lu par le navigateur intégré (si le lecteur de Windows refuse le
+/// format).
+class WebAudio extends StatelessWidget {
+  const WebAudio({super.key, required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = const HtmlEscape(HtmlEscapeMode.attribute).convert(url);
+    return InAppWebView(
+      initialData: InAppWebViewInitialData(
+        data: '<!doctype html><html><body style="margin:0;background:transparent">'
+            '<audio src="$a" controls style="width:100%"></audio></body></html>',
+      ),
+      initialSettings: InAppWebViewSettings(transparentBackground: true, mediaPlaybackRequiresUserGesture: false),
     );
   }
 }

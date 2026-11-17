@@ -9,6 +9,9 @@ import '../../core/nav.dart';
 import '../../ui/web_login.dart';
 import '../../ui/call_page.dart';
 import '../../ui/summary.dart';
+import '../../ui/media_view.dart';
+import '../../ui/voice_note.dart';
+import '../docs/doc_format.dart';
 import '../../ui/widgets.dart';
 import 'discord_api.dart';
 import 'discord_phone.dart';
@@ -1000,50 +1003,29 @@ class _ConversationPageState extends State<_ConversationPage> {
                     ? const LoadingHint()
                     : ListView.builder(
                         reverse: true,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
                         itemCount: msgs!.length,
                         itemBuilder: (context, i) {
                           final m = msgs![i];
-                          final mine = m.author.id == module.me?.id;
-                          return ChatBubble(
-                            text: m.content,
-                            images: m.images,
-                            extra: m.isVoice
-                                ? VoiceNotePlayer(
-                                    url: m.audioUrl!,
-                                    duration: m.audioLength,
-                                    waveform: m.waveform,
-                                    color: module.color,
-                                    onColor: mine
-                                        ? Colors.white
-                                        : Theme.of(context).colorScheme.onSurface,
-                                  )
-                                : null,
-                            reactions: [
-                              for (final r in m.reactions)
-                                Reaction(r.label, const [], count: r.count, mine: r.me),
+                          final older = i + 1 < msgs!.length ? msgs![i + 1] : null;
+                          final newDay = older == null || !DateUtils.isSameDay(older.at, m.at);
+                          // Messages qui se suivent de la même personne : regroupés.
+                          final grouped = !newDay &&
+                              older.author.id == m.author.id &&
+                              m.at.difference(older.at).inMinutes < 7;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (newDay) _DaySeparator(day: m.at),
+                              _DiscordLine(
+                                module: module,
+                                channelId: widget.channelId,
+                                message: m,
+                                grouped: grouped,
+                                mine: m.author.id == module.me?.id,
+                                onChanged: _load,
+                              ),
                             ],
-                            onWho: (r) async {
-                              final dr = m.reactions.firstWhere((x) => x.label == r.emoji);
-                              final api = await module._client();
-                              final users = await api!.reactors(widget.channelId, m.id, dr);
-                              return [for (final u in users) u.name];
-                            },
-                            onDoubleTap: m.reactions.any((r) => r.me && r.name == '❤️')
-                                ? null
-                                : () async {
-                                    try {
-                                      final api = await module._client();
-                                      await api!.react(widget.channelId, m.id);
-                                      await _load();
-                                    } catch (e) {
-                                      if (context.mounted) showError(context, e);
-                                    }
-                                  },
-                            author: mine ? null : m.author.name,
-                            time: '${dayLabel(m.at)} ${hhmm(m.at)}',
-                            mine: mine,
-                            color: module.color,
                           );
                         },
                       ),
@@ -1075,3 +1057,296 @@ class _ConversationPageState extends State<_ConversationPage> {
     );
   }
 }
+
+/// « Aujourd'hui », « Hier », « mardi 12 novembre » entre les messages.
+class _DaySeparator extends StatelessWidget {
+  const _DaySeparator({required this.day});
+  final DateTime day;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final d = DateTime(day.year, day.month, day.day);
+    final diff = DateTime(now.year, now.month, now.day).difference(d).inDays;
+    final label = diff == 0
+        ? 'Aujourd\'hui'
+        : diff == 1
+            ? 'Hier'
+            : '${frDays[day.weekday - 1]} ${day.day} ${frMonths[day.month - 1]}${day.year == now.year ? '' : ' ${day.year}'}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(label, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
+          ),
+          Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un message, comme dans Discord : avatar et nom (sauf s'il suit un message
+/// de la même personne), texte mis en forme, photos, vidéos, vocal, aperçus
+/// de liens, réactions.
+class _DiscordLine extends StatefulWidget {
+  const _DiscordLine({
+    required this.module,
+    required this.channelId,
+    required this.message,
+    required this.grouped,
+    required this.mine,
+    required this.onChanged,
+  });
+
+  final DiscordModule module;
+  final String channelId;
+  final DiscordMessage message;
+  final bool grouped;
+  final bool mine;
+  final Future<void> Function() onChanged;
+
+  /// Une couleur par personne (comme les rôles de Discord).
+  static Color nameColor(String id) {
+    const palette = [
+      Color(0xFF5865F2),
+      Color(0xFFEB459E),
+      Color(0xFF57F287),
+      Color(0xFFFEE75C),
+      Color(0xFFED4245),
+      Color(0xFF3BA55C),
+      Color(0xFFFAA61A),
+      Color(0xFF9B59B6),
+    ];
+    return palette[id.hashCode.abs() % palette.length];
+  }
+
+  @override
+  State<_DiscordLine> createState() => _DiscordLineState();
+}
+
+class _DiscordLineState extends State<_DiscordLine> {
+  bool hover = false;
+
+  DiscordMessage get m => widget.message;
+
+  Future<void> _heart() async {
+    if (m.reactions.any((r) => r.me && r.name == '❤️')) return;
+    try {
+      final api = await widget.module._client();
+      await api!.react(widget.channelId, m.id);
+      await widget.onChanged();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  /// Gras, italique, barré, `code` et liens (Markdown de Discord).
+  List<InlineSpan> _rich(String text, Color link) {
+    final linked = text.replaceAllMapped(
+      RegExp(r'(?<!\]\()(https?://[^\s)>]+)'),
+      (x) => '[${x[1]}](${x[1]})',
+    );
+    return [
+      for (final r in DocFormat.inline(linked))
+        if (r.attrs['link'] is String)
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: InkWell(
+              onTap: () => openLink(context, r.attrs['link'] as String),
+              child: Text(r.text, style: TextStyle(color: link, decoration: TextDecoration.underline)),
+            ),
+          )
+        else
+          TextSpan(
+            text: r.text,
+            style: TextStyle(
+              fontWeight: r.attrs['bold'] == true ? FontWeight.w800 : null,
+              fontStyle: r.attrs['italic'] == true ? FontStyle.italic : null,
+              decoration: r.attrs['strike'] == true ? TextDecoration.lineThrough : null,
+              fontFamily: r.attrs['code'] == true ? 'Consolas' : null,
+              backgroundColor: r.attrs['code'] == true ? link.withValues(alpha: 0.12) : null,
+            ),
+          ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = widget.module.color;
+    final nameColor = widget.mine ? color : _DiscordLine.nameColor(m.author.id);
+    final media = [
+      for (final u in m.images) MediaItem(image: u),
+      for (final v in m.videos) MediaItem(video: v),
+    ];
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.grouped)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  widget.mine ? 'Toi' : m.author.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: nameColor, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(hhmm(m.at), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        if (m.content.isNotEmpty && !m.isVoice)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text.rich(TextSpan(style: theme.textTheme.bodyMedium?.copyWith(height: 1.4), children: _rich(m.content, color))),
+          ),
+        if (m.isVoice)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(24)),
+              child: VoiceNotePlayer(
+                url: m.audioUrl!,
+                duration: m.audioLength,
+                waveform: m.waveform,
+                color: color,
+                onColor: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        if (media.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var k = 0; k < media.length; k++)
+                  MediaThumb(
+                    items: media,
+                    index: k,
+                    width: media.length == 1 ? 340 : 200,
+                    height: media.length == 1 ? 240 : 160,
+                  ),
+              ],
+            ),
+          ),
+        for (final e in m.embeds) _EmbedCard(embed: e),
+        if (m.reactions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: ReactionChips(
+              reactions: [for (final r in m.reactions) Reaction(r.label, const [], count: r.count, mine: r.me)],
+              onWho: (r) async {
+                final dr = m.reactions.firstWhere((x) => x.label == r.emoji);
+                final api = await widget.module._client();
+                final users = await api!.reactors(widget.channelId, m.id, dr);
+                return [for (final u in users) u.name];
+              },
+            ),
+          ),
+      ],
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: GestureDetector(
+        onDoubleTap: _heart,
+        child: Container(
+          margin: EdgeInsets.only(top: widget.grouped ? 0 : 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: hover ? theme.colorScheme.onSurface.withValues(alpha: 0.04) : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 48,
+                child: widget.grouped
+                    ? (hover
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(hhmm(m.at), style: theme.textTheme.labelSmall?.copyWith(fontSize: 10)),
+                          )
+                        : null)
+                    : Align(
+                        alignment: Alignment.topLeft,
+                        child: HubAvatar(url: m.author.avatarUrl, label: m.author.name, color: nameColor, size: 38),
+                      ),
+              ),
+              Expanded(child: body),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// L'aperçu d'un lien (YouTube, un site…), avec la barre de couleur.
+class _EmbedCard extends StatelessWidget {
+  const _EmbedCard({required this.embed});
+  final DiscordEmbed embed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bar = embed.color == null ? theme.colorScheme.outline : Color(0xFF000000 | embed.color!);
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      constraints: const BoxConstraints(maxWidth: 440),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: bar, width: 4)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: InkWell(
+        onTap: embed.url == null ? null : () => openLink(context, embed.url!),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (embed.site != null) Text(embed.site!, style: theme.textTheme.labelSmall),
+            if (embed.title != null)
+              Text(embed.title!, style: theme.textTheme.titleSmall?.copyWith(color: const Color(0xFF00A8FC), fontWeight: FontWeight.w700)),
+            if (embed.description != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(embed.description!, maxLines: 4, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+              ),
+            if (embed.image != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(embed.image!, height: 180, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox()),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Un message tel qu'affiché dans une conversation (tests, aperçus).
+@visibleForTesting
+Widget discordMessageForTest(DiscordModule module, DiscordMessage m, {bool grouped = false, bool mine = false, bool newDay = false}) =>
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (newDay) _DaySeparator(day: m.at),
+        _DiscordLine(module: module, channelId: '1', message: m, grouped: grouped, mine: mine, onChanged: () async {}),
+      ],
+    );
