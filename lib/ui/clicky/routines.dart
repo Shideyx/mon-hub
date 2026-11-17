@@ -33,6 +33,7 @@ class Routine {
     this.weekday = 1,
     this.enabled = true,
     this.speak = true,
+    this.catchUp = 3,
     this.lastRun,
     List<RoutineRun>? runs,
   }) : runs = runs ?? [];
@@ -52,6 +53,13 @@ class Routine {
 
   /// Lire le résultat à voix haute.
   bool speak;
+
+  /// Heures de rattrapage si le PC était éteint à l'heure prévue (le topo
+  /// du matin se fait à l'allumage, jusqu'à midi).
+  int catchUp;
+
+  /// Topo du matin / du soir (affiché en grand par Clicky).
+  bool get isTopo => id.startsWith('topo-');
   DateTime? lastRun;
   final List<RoutineRun> runs;
 
@@ -90,7 +98,7 @@ class Routine {
     final at = DateTime(now.year, now.month, now.day, hour, minute);
     return okDay &&
         !now.isBefore(at) &&
-        now.difference(at) < const Duration(hours: 3) &&
+        now.difference(at) < Duration(hours: catchUp) &&
         (last == null || last.isBefore(at));
   }
 
@@ -104,6 +112,7 @@ class Routine {
     'wd': weekday,
     'on': enabled,
     'speak': speak,
+    'catch': catchUp,
     if (lastRun != null) 'last': lastRun!.millisecondsSinceEpoch,
     'runs': [for (final r in runs) r.toJson()],
   };
@@ -118,6 +127,7 @@ class Routine {
     weekday: (j['wd'] as num?)?.toInt() ?? 1,
     enabled: j['on'] != false,
     speak: j['speak'] != false,
+    catchUp: (j['catch'] as num?)?.toInt() ?? 3,
     lastRun: j['last'] == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch((j['last'] as num).toInt()),
@@ -126,6 +136,49 @@ class Routine {
         if (r is Map) RoutineRun.fromJson(r),
     ],
   );
+
+  /// Le topo du matin : actualités, mails importants, École Directe…
+  static Routine topoMorning() => Routine(
+    id: 'topo-matin',
+    name: 'Topo du matin',
+    every: 'daily',
+    hour: 7,
+    minute: 0,
+    catchUp: 5,
+    prompt: topoMorningPrompt,
+  );
+
+  static Routine topoEvening() => Routine(
+    id: 'topo-soir',
+    name: 'Topo du soir',
+    every: 'daily',
+    hour: 20,
+    minute: 30,
+    prompt: topoEveningPrompt,
+  );
+
+  static const topoMorningPrompt =
+      'Fais mon TOPO DU MATIN, comme JARVIS, parlé et sans markdown, 10 à 18 phrases courtes, dans cet ordre : '
+      '1) bonjour + date + météo et quoi mettre (outil carnet_meteo) ; '
+      '2) actualités : les 3 infos importantes en France puis les 3 dans le monde (outil actualites, zone tout), '
+      'une phrase chacune ; '
+      '3) mes mails importants non lus (outil mails_lister) : seulement ceux qui comptent vraiment (école, '
+      'rendez-vous, comptes, personnes proches), pas les pubs ni les newsletters ; '
+      '4) École Directe : mes cours d\'aujourd\'hui (cours annulés en premier), les devoirs pour aujourd\'hui et '
+      'demain (contrôles d\'abord), mes nouvelles notes et mes messages non lus (outils ecole_devoirs, '
+      'ecole_notes, ecole_messages, agenda_lire) ; '
+      '5) mes tâches du carnet ; '
+      'termine par une phrase d\'encouragement. Si une source ne répond pas, dis-le en une phrase et continue.';
+
+  static const topoEveningPrompt =
+      'Fais mon TOPO DU SOIR, comme JARVIS, parlé et sans markdown, 8 à 15 phrases courtes : '
+      '1) bilan de ma journée (outil carnet_bilan_du_soir) ; '
+      '2) les devoirs pour demain et après-demain, contrôles d\'abord, et ce qu\'il me reste à faire '
+      '(ecole_devoirs) ; mes nouvelles notes du jour (ecole_notes) ; '
+      '3) mon emploi du temps de demain (agenda_lire) et la météo de demain (carnet_meteo) ; '
+      '4) les 3 actus importantes de la journée en France et dans le monde (actualites) ; '
+      '5) mails importants arrivés aujourd\'hui (mails_lister), seulement ceux qui comptent ; '
+      'termine par une phrase pour bien finir la journée.';
 
   /// Modèles prêts à l'emploi.
   static List<Routine> templates() => [
@@ -189,7 +242,10 @@ class Routines extends ChangeNotifier {
     encode: (v) => [for (final r in v) r.toJson()],
   );
 
-  List<Routine> get list => _file.value;
+  List<Routine> get list => [
+    for (final r in _file.value)
+      if (!r.id.startsWith('_')) r,
+  ];
   Timer? _timer;
   final _busy = <String>{};
 
@@ -207,9 +263,37 @@ class Routines extends ChangeNotifier {
     return list;
   }
 
+  /// Les topos (matin et soir) existent dès le départ, activés ; on peut
+  /// les désactiver ou changer leur heure (ils ne sont recréés qu'une fois).
+  Future<void> ensureTopos() async {
+    await _file.load();
+    final seeded = _file.value.any((r) => r.id == '_topos');
+    if (seeded) return;
+    await _file.update((l) {
+      if (!l.any((r) => r.id == 'topo-matin')) l.add(Routine.topoMorning());
+      if (!l.any((r) => r.id == 'topo-soir')) l.add(Routine.topoEvening());
+      // Marqueur invisible : les topos ont été proposés une fois.
+      l.add(Routine(id: '_topos', name: '', prompt: '', enabled: false));
+      return l;
+    });
+    notifyListeners();
+  }
+
+  /// Active / désactive un topo.
+  Future<void> setTopo(String id, bool on) async {
+    await ensureTopos();
+    final r =
+        list.where((x) => x.id == id).firstOrNull ??
+        (id == 'topo-matin' ? Routine.topoMorning() : Routine.topoEvening());
+    r.enabled = on;
+    await save(r);
+  }
+
+  bool topoOn(String id) => list.where((x) => x.id == id).firstOrNull?.enabled ?? false;
+
   void start() {
     _timer?.cancel();
-    unawaited(load());
+    unawaited(load().then((_) => ensureTopos()));
     _timer = Timer.periodic(const Duration(minutes: 1), (_) => _tick());
   }
 

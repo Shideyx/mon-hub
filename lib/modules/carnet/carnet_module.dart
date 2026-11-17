@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
+import '../../core/news.dart';
 import '../../ui/widgets.dart';
 import '../claude/claude_module.dart';
 import 'carnet_store.dart';
@@ -359,6 +360,25 @@ class CarnetModule extends HubModule {
         await c.load();
         final v = '${a['ville'] ?? ''}'.trim();
         return Weather.forCity(v.isEmpty ? city : v);
+      },
+    ),
+    HubTool(
+      name: 'actualites',
+      description:
+          'Les dernières actualités (franceinfo, Le Monde, France 24…) : zone=france, monde, sport, '
+          'tech ou tout. Pour le topo du matin / du soir ou « quoi de neuf dans le monde ? ».',
+      params: {
+        'zone': ('string', 'france, monde, sport, tech ou tout'),
+        'nombre': ('integer', 'nombre de titres par zone (8 par défaut)'),
+      },
+      run: (a) async {
+        final n = ((a['nombre'] as num?)?.toInt() ?? 8).clamp(1, 20);
+        final z = '${a['zone'] ?? 'tout'}'.toLowerCase();
+        final zones = z == 'tout' ? const ['france', 'monde'] : [z];
+        return {
+          for (final zone in zones)
+            zone: [for (final i in await News.latest(zone, max: n)) i.toJson()],
+        };
       },
     ),
     HubTool(

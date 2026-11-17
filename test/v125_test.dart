@@ -1,0 +1,83 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hub/core/hub_files.dart';
+import 'package:hub/core/news.dart';
+import 'package:hub/ui/clicky/neural_voice.dart';
+import 'package:hub/ui/clicky/routines.dart';
+
+void main() {
+  test('actualités : lecture d\'un flux RSS', () {
+    const xml = '''<rss><channel>
+<item><title><![CDATA[Grève : les trains perturbés]]></title><description><![CDATA[<p>La SNCF prévoit &amp; annonce…</p>]]></description>
+<pubDate>Tue, 17 Nov 2026 06:12:00 +0100</pubDate><link>https://exemple.fr/a</link></item>
+<item><title>Sommet du G20</title><pubDate>Tue, 17 Nov 2026 05:00:00 GMT</pubDate></item>
+</channel></rss>''';
+    final l = News.parse(xml, 'franceinfo');
+    expect(l.length, 2);
+    expect(l.first.title, 'Grève : les trains perturbés');
+    expect(l.first.summary, 'La SNCF prévoit & annonce…');
+    expect(l.first.at!.toUtc(), DateTime.utc(2026, 11, 17, 5, 12));
+    expect(l.last.at!.toUtc(), DateTime.utc(2026, 11, 17, 5));
+    expect(l.first.toJson()['source'], 'franceinfo');
+  });
+
+  test('voix Microsoft : jeton, SSML, messages', () {
+    final g = EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 2, 41));
+    expect(
+      g,
+      EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 4, 59)),
+      reason: 'même tranche de 5 min',
+    );
+    expect(g, isNot(EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 5, 1))));
+    expect(RegExp(r'^[0-9A-F]{64}$').hasMatch(g), isTrue);
+    final x = EdgeVoice.ssml("C'est <bon> & prêt", 'fr-FR-HenriNeural', rate: 1.2);
+    expect(x, contains('Microsoft Server Speech Text to Speech Voice (fr-FR, HenriNeural)'));
+    expect(x, contains('C&apos;est &lt;bon&gt; &amp; prêt'));
+    expect(x, contains("rate='+20%'"));
+    final head = utf8.encode('X-RequestId:1\r\nPath:audio\r\n');
+    final msg = Uint8List.fromList([0, head.length, ...head, 1, 2, 3]);
+    final (h, data) = EdgeVoice.splitBinary(msg);
+    expect(h, contains('Path:audio'));
+    expect(data, [1, 2, 3]);
+    expect(EdgeVoice.forLanguage('fr-FR', 'fr-FR-DeniseNeural'), 'fr-FR-DeniseNeural');
+    expect(EdgeVoice.forLanguage('en-US', 'fr-FR-DeniseNeural'), startsWith('en-'));
+    final w = GeminiVoice.wav(Uint8List.fromList([0, 0, 1, 0]));
+    expect(String.fromCharCodes(w.sublist(0, 4)), 'RIFF');
+    expect(w.length, 48);
+  });
+
+  test('topos : créés une fois, désactivables, rattrapage du matin jusqu\'à midi', () async {
+    final dir = await Directory.systemTemp.createTemp('topos');
+    HubFiles.overrideRoot = dir.path;
+    try {
+      final r = Routines.instance;
+      await r.ensureTopos();
+      expect(r.list.map((x) => x.id), containsAll(['topo-matin', 'topo-soir']));
+      expect(r.topoOn('topo-matin'), isTrue);
+      await r.setTopo('topo-matin', false);
+      expect(r.topoOn('topo-matin'), isFalse);
+      await r.remove('topo-soir');
+      await r.ensureTopos();
+      expect(
+        r.list.any((x) => x.id == 'topo-soir'),
+        isFalse,
+        reason: 'pas recréé après suppression',
+      );
+      expect(r.list.any((x) => x.id.startsWith('_')), isFalse);
+    } finally {
+      HubFiles.overrideRoot = null;
+      await dir.delete(recursive: true);
+    }
+    final m = Routine.topoMorning();
+    expect(m.isTopo, isTrue);
+    expect(m.due(DateTime(2026, 11, 17, 6, 59)), isFalse);
+    expect(m.due(DateTime(2026, 11, 17, 11, 30)), isTrue, reason: 'PC allumé tard');
+    expect(m.due(DateTime(2026, 11, 17, 12, 30)), isFalse);
+    expect(Routine.topoMorningPrompt, contains('actualites'));
+    expect(Routine.topoMorningPrompt, contains('mails_lister'));
+    expect(Routine.topoMorningPrompt, contains('ecole_devoirs'));
+  });
+}
