@@ -4,7 +4,6 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:material_ui/material_ui.dart';
 import 'package:win32/win32.dart';
 
@@ -150,7 +149,7 @@ class _WidgetWindowState extends State<_WidgetWindow> {
       darkTheme: buildTheme(Brightness.dark),
       locale: const Locale('fr', 'FR'),
       supportedLocales: const [Locale('fr', 'FR'), Locale('en')],
-      localizationsDelegates: const [...GlobalMaterialLocalizations.delegates, FlutterQuillLocalizations.delegate],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: Builder(
         builder: (context) {
           final text = Theme.of(context).textTheme;

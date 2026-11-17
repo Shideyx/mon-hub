@@ -56,9 +56,11 @@
   (`ytInitialData`, cookie `SOCS=CAI`), historique « Reprendre » local.
 - IA simple sans outils (corriger, résumer, faire des cartes) : `core/ai_text.dart` (`AiText.ask` : clé Gemini
   d'abord — lit photos et PDF —, sinon le cerveau de Clicky ; `AiText.json` ; `AiText.override` pour les tests).
-- Word de Mon Hub : `modules/docs/` (flutter_quill ; `DocFormat` Delta ↔ Markdown ↔ .docx écrit/lu à la main,
-  `DocPdf` police Arial de Windows ; `DocStore` un fichier chiffré par document ; Google Docs via l'export/
-  l'import .docx du Drive). `FlutterQuillLocalizations.delegate` doit rester dans les `MaterialApp`.
+- Documents = **le vrai Google Docs** (la personne ne veut pas d'éditeur maison) : `modules/docs/docs_module.dart`
+  ouvre docs.google.com dans `HubWebView` ; `GoogleDocs` (API Drive/Docs) pour Clicky (`doc_creer` Markdown →
+  .docx converti en Google Doc, `doc_lire` export texte, `doc_ecrire` via Docs API batchUpdate, `doc_exporter`).
+  `DocFormat` (Delta ↔ Markdown ↔ .docx) sert à ces conversions ; `DocStore` = anciens documents v1.37 (bandeau
+  pour les envoyer sur Google Docs ou en .docx). flutter_quill et pdf retirés.
 - Révisions : `modules/revisions/` (FSRS-5 dans `fsrs.dart`, `RevisionsStore`, quiz/écrire/associer/minuteur,
   cartes faites par l'IA, plan avant les contrôles ED dans l'agenda).
 - Google : portée `drive` complète (ranger le Drive, Google Docs) ; les comptes connectés avant la v1.37 n'ont
@@ -68,6 +70,7 @@
   écran `ui/tidy_page.dart` (Réglages → Rangement). Outils `pc_ranger_apercu/pc_ranger/pc_ranger_annuler`,
   `drive_ranger_*` (« ranger » = action à autoriser dans `ClaudeBridge.isWriteAction` et `PcControl.isWrite`).
 - Compte Google demandé par Clicky après la visite guidée (et une fois aux anciens comptes) : `ui/google_welcome.dart`.
-- ⚠️ Les secrets GitHub GOOGLE_CLIENT_ID/SECRET sont **vides** (vu dans le journal de construction v1.37) : la
-  connexion Google s'active donc dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart`,
-  `GoogleAuth.setClient`, gardé dans les préférences ; un ID fourni à la construction reste prioritaire).
+- ⚠️ Les secrets GitHub GOOGLE_CLIENT_ID/SECRET étaient **vides** (journal de construction v1.37) : la connexion
+  Google s'active dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart` : 5 liens directs dont
+  `flows/enableapi` pour toutes les API, puis le fichier JSON « Application de bureau » ; `GoogleAuth.setClient`).
+  Une fois les secrets GitHub remplis, chaque utilisateur se connecte en un clic (l'ID de construction prime).

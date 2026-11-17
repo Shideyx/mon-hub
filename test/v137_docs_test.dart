@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hub/modules/docs/doc_format.dart';
-import 'package:hub/modules/docs/doc_pdf.dart';
 
 void main() {
   const md = '''# Exposé sur la photosynthèse
@@ -68,9 +67,4 @@ La **photosynthèse** permet aux plantes de fabriquer du _glucose_ avec la [lumi
     expect(() => DocFormat.fromDocx(DocFormat.toDocx([{'insert': '\n'}]).sublist(0, 10)), throwsA(anything));
   });
 
-  test('PDF : fabriqué avec une vraie police (accents)', () async {
-    final pdf = await DocPdf.build(DocFormat.fromMarkdown(md), title: 'Exposé');
-    expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
-    File('${Directory.systemTemp.path}/expose_test.pdf').writeAsBytesSync(pdf);
-  });
 }

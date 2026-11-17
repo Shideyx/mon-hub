@@ -1,19 +1,65 @@
+import 'dart:convert';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
 import '../core/google_auth.dart';
 import '../core/module_store.dart';
+import '../core/updater.dart';
 import 'widgets.dart';
 
-/// Activer la connexion Google (une seule fois) : Mon Hub n'a pas de
-/// serveur, donc il utilise TON « identifiant client » Google, créé
-/// gratuitement en 5 minutes sur console.cloud.google.com.
+/// Activer la connexion Google, **une seule fois, par le créateur** de Mon
+/// Hub : 5 liens directs sur Google Cloud (gratuit), puis on choisit le
+/// fichier téléchargé. Ensuite, chaque utilisateur se connecte en un clic.
 class GoogleSetupPage extends StatefulWidget {
   const GoogleSetupPage({super.key});
 
   static Future<void> open(BuildContext context) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const GoogleSetupPage()));
+
+  /// Les API utiles à Mon Hub, activées d'un seul clic.
+  static const apis = 'drive.googleapis.com,docs.googleapis.com,calendar-json.googleapis.com,gmail.googleapis.com';
+
+  static const steps = [
+    (
+      'Crée le projet',
+      'Nom : « Mon Hub » → Créer.',
+      'https://console.cloud.google.com/projectcreate',
+    ),
+    (
+      'Active les API (un clic)',
+      'Vérifie que « Mon Hub » est choisi en haut → Suivant → Activer.',
+      'https://console.cloud.google.com/flows/enableapi?apiid=$apis',
+    ),
+    (
+      'Écran de connexion',
+      'Commencer → nom « Mon Hub » et ton adresse → Externe → ton adresse → J\'accepte → Créer.',
+      'https://console.cloud.google.com/auth/branding',
+    ),
+    (
+      'Publie-le',
+      '« Publier l\'application » → Confirmer (sinon la connexion expire tous les 7 jours).',
+      'https://console.cloud.google.com/auth/audience',
+    ),
+    (
+      'Crée la clé de l\'appli',
+      'Type « Application de bureau » → Créer → « Télécharger le fichier JSON ».',
+      'https://console.cloud.google.com/auth/clients/create',
+    ),
+  ];
+
+  /// Lit l'ID et le secret dans le fichier JSON de Google
+  /// ({"installed": {"client_id": …, "client_secret": …}}).
+  static (String, String) parseJson(String text) {
+    final j = jsonDecode(text);
+    if (j is! Map) throw 'Ce fichier n\'est pas une clé Google';
+    final c = (j['installed'] ?? j['web'] ?? j) as Map;
+    final id = '${c['client_id'] ?? ''}';
+    if (!id.endsWith('.apps.googleusercontent.com')) throw 'Ce fichier n\'est pas une clé Google (client_secret….json)';
+    return (id, '${c['client_secret'] ?? ''}');
+  }
 
   @override
   State<GoogleSetupPage> createState() => _GoogleSetupPageState();
@@ -25,45 +71,10 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
   bool busy = false;
   String? done;
 
-  static const steps = [
-    (
-      'Crée un projet « Mon Hub »',
-      'Sur Google Cloud (gratuit, avec ton compte Google).',
-      'https://console.cloud.google.com/projectcreate',
-    ),
-    (
-      'Active les API Drive, Agenda et Gmail',
-      'Ouvre chaque lien et clique sur « Activer ».',
-      'https://console.cloud.google.com/apis/library/drive.googleapis.com',
-    ),
-    (
-      'Agenda',
-      '',
-      'https://console.cloud.google.com/apis/library/calendar-json.googleapis.com',
-    ),
-    (
-      'Gmail',
-      '',
-      'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
-    ),
-    (
-      'Écran de connexion',
-      '« Commencer » : nom « Mon Hub », ton adresse, public « Externe ». Puis dans « Audience », '
-          'clique « Publier l\'application » (sinon la connexion expire tous les 7 jours).',
-      'https://console.cloud.google.com/auth/overview',
-    ),
-    (
-      'Crée l\'identifiant client',
-      'Type d\'application : « Application de bureau », nom « Mon Hub ». Copie l\'ID client et le code '
-          'secret, puis colle-les ci-dessous.',
-      'https://console.cloud.google.com/auth/clients/create',
-    ),
-  ];
-
-  Future<void> _save() async {
+  Future<void> _connect() async {
     setState(() => busy = true);
     try {
-      await GoogleAuth.setClient(id.text, secret.text);
+      if (GoogleAuth.builtInId.isEmpty) await GoogleAuth.setClient(id.text, secret.text);
       final email = await GoogleAuth.signIn();
       await (ModuleStore()..bind('drive')).setJson('account', email);
       setState(() => done = email);
@@ -74,13 +85,50 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
     }
   }
 
+  Future<void> _pickJson() async {
+    final f = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Clé Google (client_secret….json)', extensions: ['json']),
+      ],
+    );
+    if (f == null) return;
+    try {
+      final (i, s) = GoogleSetupPage.parseJson(await f.readAsString());
+      id.text = i;
+      secret.text = s;
+      await _connect();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  Widget _copy(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Expanded(child: SelectableText(label, style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Consolas'))),
+        TextButton.icon(
+          icon: const Icon(Icons.copy_rounded, size: 16),
+          label: const Text('Nom'),
+          onPressed: () => Clipboard.setData(ClipboardData(text: label)),
+        ),
+        TextButton.icon(
+          icon: const Icon(Icons.copy_rounded, size: 16),
+          label: const Text('Valeur'),
+          onPressed: value.isEmpty ? null : () => Clipboard.setData(ClipboardData(text: value)),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final builtIn = GoogleAuth.builtInId.isNotEmpty;
+    final connected = done ?? GoogleAuth.driveAccount;
     var n = 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('Activer la connexion Google')),
+      appBar: AppBar(title: const Text('Connexion Google')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -90,76 +138,94 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
               borderRadius: BorderRadius.circular(22),
               gradient: const LinearGradient(colors: [Color(0xFF4285F4), Color(0xFF34A853)]),
             ),
-            child: const Text(
-              'Mon Hub n\'a aucun serveur : pour parler à Google (Drive, Docs, agenda, Gmail), il utilise ton propre '
-              '« identifiant client », gratuit. Ça se fait une seule fois, en 5 minutes, puis Clicky pourra ranger '
-              'ton Drive et ouvrir tes Google Docs.',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, height: 1.4),
+            child: Text(
+              builtIn
+                  ? 'La connexion Google est prête : un clic et c\'est fait. Drive, Google Docs, agenda, Gmail.'
+                  : 'À faire une seule fois (5 étapes, gratuit). Mon Hub n\'a aucun serveur : il parle à Google avec '
+                        'sa propre clé, que tu crées ici. Ensuite, tout le monde se connecte en un clic.',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, height: 1.4),
             ),
           ),
-          if (builtIn) ...[
-            const SizedBox(height: 16),
-            const Text('✅ La connexion Google est déjà activée dans cette version de Mon Hub.'),
-          ] else ...[
-            const SizedBox(height: 16),
-            for (final (title, text, url) in steps)
-              Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  leading: text.isEmpty
-                      ? const SizedBox(width: 32)
-                      : CircleAvatar(radius: 16, child: Text('${++n}', style: const TextStyle(fontWeight: FontWeight.w800))),
-                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: text.isEmpty ? null : Text(text),
-                  trailing: FilledButton.tonal(onPressed: () => Browser.open(url), child: const Text('Ouvrir')),
-                ),
-              ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: id,
-              decoration: const InputDecoration(labelText: 'ID client (…apps.googleusercontent.com)'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: secret,
-              decoration: InputDecoration(
-                labelText: 'Code secret du client',
-                suffixIcon: IconButton(
-                  tooltip: 'Coller',
-                  icon: const Icon(Icons.content_paste_rounded),
-                  onPressed: () async {
-                    final t = (await Clipboard.getData('text/plain'))?.text ?? '';
-                    secret.text = t.trim();
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              icon: busy
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.login_rounded),
-              label: Text(busy ? 'Termine dans ton navigateur…' : 'Enregistrer et me connecter'),
-              onPressed: busy ? null : _save,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Google affichera « Google n\'a pas validé cette application » : c\'est normal, c\'est la tienne. '
-              'Clique sur « Paramètres avancés » puis « Accéder à Mon Hub ».',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-          if (done != null) ...[
-            const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          if (connected != null && GoogleAuth.available && GoogleAuth.canWriteDrive(connected))
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
                 color: const Color(0xFF23A55A).withValues(alpha: 0.14),
               ),
-              child: Text('✅ $done est connecté. Dis à Clicky « range mon Drive » !', style: theme.textTheme.titleSmall),
+              child: Text('✅ $connected est connecté. Dis à Clicky « range mon Drive » !', style: theme.textTheme.titleSmall),
+            )
+          else if (builtIn)
+            FilledButton.icon(
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+              icon: const Text('G', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              label: Text(busy ? 'Termine dans ton navigateur…' : 'Se connecter avec Google'),
+              onPressed: busy ? null : _connect,
             ),
+          if (!builtIn) ...[
+            for (final (title, text, url) in GoogleSetupPage.steps)
+              Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  leading: CircleAvatar(radius: 16, child: Text('${++n}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(text),
+                  trailing: FilledButton.tonal(onPressed: () => Browser.open(url), child: const Text('Ouvrir')),
+                ),
+              ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+              icon: busy
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.upload_file_rounded),
+              label: Text(busy ? 'Termine dans ton navigateur…' : '6. Choisis le fichier téléchargé et connecte-toi'),
+              onPressed: busy ? null : _pickJson,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Google affichera « Google n\'a pas validé cette application » : normal, c\'est la tienne. '
+              '« Paramètres avancés » → « Accéder à Mon Hub » → Continuer.',
+              style: theme.textTheme.bodySmall,
+            ),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Ou colle l\'ID et le code secret à la main'),
+              children: [
+                TextField(controller: id, decoration: const InputDecoration(labelText: 'ID client (…apps.googleusercontent.com)')),
+                const SizedBox(height: 10),
+                TextField(controller: secret, decoration: const InputDecoration(labelText: 'Code secret du client')),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(onPressed: busy ? null : _connect, child: const Text('Enregistrer et me connecter')),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+            if (GoogleAuth.available) ...[
+              const Divider(height: 32),
+              Text('Pour que tout le monde se connecte en un clic',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text(
+                'Ajoute ces deux valeurs dans les secrets GitHub de Mon Hub (une fois) : les prochaines versions '
+                'auront la connexion Google déjà prête, et chaque utilisateur n\'aura plus qu\'à cliquer '
+                '« Se connecter avec Google ».',
+              ),
+              const SizedBox(height: 8),
+              _copy('GOOGLE_CLIENT_ID', GoogleAuth.clientId),
+              _copy('GOOGLE_CLIENT_SECRET', GoogleAuth.clientSecret),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.key_rounded),
+                  label: const Text('Ouvrir les secrets GitHub'),
+                  onPressed: () => Browser.open('https://github.com/${Updater.repo}/settings/secrets/actions/new'),
+                ),
+              ),
+            ],
           ],
         ],
       ),

@@ -11,8 +11,7 @@ import '../../core/ai_text.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
 import '../../ui/widgets.dart';
-import '../docs/doc_format.dart';
-import '../docs/docs_store.dart';
+import '../docs/docs_module.dart';
 import '../ecoledirecte/ed_client.dart';
 import '../ecoledirecte/ecoledirecte_module.dart';
 import '../schedule/schedule_module.dart';
@@ -232,21 +231,19 @@ class RevisionsModule extends HubModule {
     HubTool(
       name: 'revision_generer',
       description:
-          'Clicky crée des cartes de révision à partir d\'un texte de cours ou d\'un document du Word de Mon Hub.',
+          'Clicky crée des cartes de révision à partir d\'un texte de cours ou d\'un Google Doc.',
       params: {
         'paquet': ('string', 'Nom du paquet'),
         'texte': ('string', 'Le cours (facultatif si document)'),
-        'document': ('string', 'id ou titre d\'un document du Word de Mon Hub (facultatif)'),
+        'document': ('string', 'id ou titre d\'un Google Doc (facultatif)'),
         'nombre': ('integer', 'Nombre de cartes (défaut 15)'),
       },
       required: ['paquet'],
       run: (a) async {
         var text = '${a['texte'] ?? ''}';
         if (text.trim().isEmpty && a['document'] != null) {
-          await DocStore.instance.load();
-          final doc = DocStore.instance.find('${a['document']}');
-          if (doc == null) throw 'Document introuvable';
-          text = DocFormat.toMarkdown(await DocStore.instance.read(doc.id));
+          final doc = await GoogleDocs.find('${a['document']}');
+          text = await GoogleDocs.text('${doc['id']}');
         }
         if (text.trim().isEmpty) throw 'Donne le texte du cours ou un document';
         final cards = await generate(text: text, count: ((a['nombre'] as num?)?.toInt() ?? 15).clamp(3, 60));
@@ -1171,7 +1168,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
     try {
       var t = '';
       if (source == 'texte') t = text.text;
-      if (source == 'document' && docId != null) t = DocFormat.toMarkdown(await DocStore.instance.read(docId!));
+      if (source == 'document' && docId != null) t = await GoogleDocs.text(docId!);
       final list = await widget.module.generate(
         text: t,
         images: source == 'photo' ? images : const [],
@@ -1260,7 +1257,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(value: 'texte', icon: Icon(Icons.notes_rounded), label: Text('Texte')),
-                        ButtonSegment(value: 'document', icon: Icon(Icons.description_rounded), label: Text('Document')),
+                        ButtonSegment(value: 'document', icon: Icon(Icons.description_rounded), label: Text('Google Doc')),
                         ButtonSegment(value: 'photo', icon: Icon(Icons.photo_camera_rounded), label: Text('Photos')),
                         ButtonSegment(value: 'pdf', icon: Icon(Icons.picture_as_pdf_rounded), label: Text('PDF')),
                       ],
@@ -1275,19 +1272,26 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                         onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(hintText: 'Colle ton cours ici…'),
                       ),
-                      'document' => FutureBuilder(
-                        future: DocStore.instance.load(),
-                        builder: (context, snap) => DropdownButtonFormField<String>(
-                          initialValue: docId,
-                          isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Document du Word de Mon Hub'),
-                          items: [
-                            for (final d in snap.data ?? const <HubDoc>[])
-                              DropdownMenuItem(value: d.id, child: Text(d.title, overflow: TextOverflow.ellipsis)),
-                          ],
-                          onChanged: (v) => setState(() => docId = v),
-                        ),
-                      ),
+                      'document' => !GoogleDocs.connected
+                          ? const Text('Connecte ton compte Google (Réglages → Connexion Google) pour choisir un Google Doc.')
+                          : FutureBuilder(
+                              future: GoogleDocs.list(size: 30),
+                              builder: (context, snap) => snap.hasError
+                                  ? Text('${snap.error}')
+                                  : DropdownButtonFormField<String>(
+                                      initialValue: docId,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(labelText: 'Un de tes Google Docs'),
+                                      items: [
+                                        for (final d in snap.data ?? const <Map<String, dynamic>>[])
+                                          DropdownMenuItem(
+                                            value: '${d['id']}',
+                                            child: Text('${d['name']}', overflow: TextOverflow.ellipsis),
+                                          ),
+                                      ],
+                                      onChanged: (v) => setState(() => docId = v),
+                                    ),
+                            ),
                       'photo' => OutlinedButton.icon(
                         icon: const Icon(Icons.add_photo_alternate_rounded),
                         label: Text(images.isEmpty ? 'Choisir les photos du cours' : '${images.length} photo(s) choisie(s)'),

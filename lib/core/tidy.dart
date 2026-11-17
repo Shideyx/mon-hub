@@ -196,7 +196,7 @@ class PcTidy {
         for (final group in byHash.values.where((l) => l.length > 1)) {
           final dated = [
             for (final f in group) (f, (await f.stat()).modified),
-          ]..sort((a, b) => a.$2.compareTo(b.$2));
+          ]..sort((a, b) => originalFirst(a.$1.uri.pathSegments.last, a.$2, b.$1.uri.pathSegments.last, b.$2));
           for (final (f, _) in dated.skip(1)) {
             dup.add(f.path);
             moves.add(TidyMove(f.path, 'Doublons', 'Copie de ${dated.first.$1.uri.pathSegments.last}'));
@@ -220,6 +220,19 @@ class PcTidy {
       }
     }
     return TidyPlan(dir.path, moves, skipped: skipped);
+  }
+
+  /// Ordre des copies d'un même fichier : l'original d'abord (le plus
+  /// ancien ; à date égale, celui qui n'a pas « (1) », « - Copie »… dans son
+  /// nom, puis le nom le plus court).
+  static int originalFirst(String nameA, DateTime a, String nameB, DateTime b) {
+    final byDate = a.compareTo(b);
+    if (byDate != 0) return byDate;
+    bool copy(String n) => RegExp(r'\(\d+\)|copie|copy|\bcopi', caseSensitive: false).hasMatch(n);
+    final byCopy = (copy(nameA) ? 1 : 0).compareTo(copy(nameB) ? 1 : 0);
+    if (byCopy != 0) return byCopy;
+    final byLength = nameA.length.compareTo(nameB.length);
+    return byLength != 0 ? byLength : nameA.compareTo(nameB);
   }
 
   /// Un nom libre dans [dir] (« photo (2).jpg » si « photo.jpg » existe).
