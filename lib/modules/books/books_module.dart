@@ -11,6 +11,8 @@ import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
 import 'book_finder.dart';
+import 'read_finder.dart';
+import 'reader_page.dart';
 
 enum BookStatus {
   read('Lu', Icons.check_circle_rounded, Color(0xFF2EAD6B)),
@@ -36,6 +38,7 @@ class Book {
     this.rating = 0,
     this.takeaway = '',
     this.pages,
+    this.read,
   }) : addedOn = addedOn ?? DateTime.now();
 
   final String id;
@@ -54,6 +57,9 @@ class Book {
   String takeaway;
   int? pages;
 
+  /// Où le lire dans Mon Hub (trouvé tout seul) et où tu en es.
+  ReadLink? read;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
@@ -66,6 +72,7 @@ class Book {
         'rating': rating,
         'takeaway': takeaway,
         'pages': pages,
+        if (read != null) 'read': read!.toJson(),
       };
 
   factory Book.fromJson(Map<String, dynamic> j) => Book(
@@ -82,6 +89,78 @@ class Book {
         // Compatibilité avec l'ancien champ « notes ».
         takeaway: j['takeaway'] as String? ?? j['notes'] as String? ?? '',
         pages: j['pages'] as int?,
+        read: j['read'] is Map ? ReadLink.fromJson((j['read'] as Map).cast<String, dynamic>()) : null,
+      );
+}
+
+/// Le manga ou le livre à lire, retrouvé sur internet, et l'endroit où tu
+/// t'es arrêté (chapitre + page).
+class ReadLink {
+  ReadLink({
+    required this.source,
+    required this.id,
+    required this.title,
+    this.textUrl,
+    this.webUrl,
+    this.chapterId,
+    this.chapterLabel,
+    this.page = 0,
+    this.total,
+    this.at,
+  });
+
+  /// `mangadex`, `gutenberg` ou `archive` (voir [ReadMatch]).
+  final String source;
+  final String id;
+  final String title;
+  final String? textUrl;
+  final String? webUrl;
+  String? chapterId;
+  String? chapterLabel;
+  /// Manga : page du chapitre. Livre en texte : paragraphe où tu en es.
+  int page;
+
+  /// Livre en texte : nombre de paragraphes (pour le pourcentage).
+  int? total;
+  DateTime? at;
+
+  bool get isManga => source == 'mangadex';
+
+  factory ReadLink.fromMatch(ReadMatch m) =>
+      ReadLink(source: m.source, id: m.id, title: m.title, textUrl: m.textUrl, webUrl: m.webUrl);
+
+  /// Où tu en es, en clair (« Chapitre 12 · page 5 »).
+  String get progress {
+    if (at == null) return '';
+    if (isManga) return [?chapterLabel, 'page ${page + 1}'].join(' · ');
+    if (source == 'gutenberg' && (total ?? 0) > 0) return '${(100 * page / total!).round()} % lu';
+    return '';
+  }
+
+  Map<String, dynamic> toJson() => {
+        'source': source,
+        'id': id,
+        'title': title,
+        if (textUrl != null) 'textUrl': textUrl,
+        if (webUrl != null) 'webUrl': webUrl,
+        if (chapterId != null) 'chapterId': chapterId,
+        if (chapterLabel != null) 'chapterLabel': chapterLabel,
+        'page': page,
+        if (total != null) 'total': total,
+        if (at != null) 'at': at!.toIso8601String(),
+      };
+
+  factory ReadLink.fromJson(Map<String, dynamic> j) => ReadLink(
+        source: '${j['source'] ?? ''}',
+        id: '${j['id'] ?? ''}',
+        title: '${j['title'] ?? ''}',
+        textUrl: j['textUrl'] as String?,
+        webUrl: j['webUrl'] as String?,
+        chapterId: j['chapterId'] as String?,
+        chapterLabel: j['chapterLabel'] as String?,
+        page: (j['page'] as num?)?.toInt() ?? 0,
+        total: (j['total'] as num?)?.toInt(),
+        at: DateTime.tryParse('${j['at'] ?? ''}'),
       );
 }
 
@@ -121,6 +200,9 @@ class BooksModule extends HubModule {
   Future<void> remove(Book b) => save(books..removeWhere((x) => x.id == b.id));
 
   final finder = BookFinder();
+
+  /// Retrouve où lire le manga ou le livre (scans, livres libres).
+  ReadFinder readFinder = ReadFinder();
 
   /// Retrouve le livre à partir de son titre et complète ce qui manque
   /// (couverture, auteur, pages). Renvoie true si quelque chose a changé.
@@ -267,6 +349,33 @@ class BooksModule extends HubModule {
               'titre': b.title,
               if (b.author.isNotEmpty) 'auteur': b.author,
               'couverture': b.coverUrl != null,
+            };
+          },
+        ),
+        HubTool(
+          name: 'livre_ou_lire',
+          description: 'Trouve où lire gratuitement un manga (scans) ou un livre libre de droits, et le relie '
+              'au livre de la bibliothèque (bouton « Lire » sur sa fiche).',
+          params: {'titre': ('string', 'Titre du manga ou du livre (« tome 3 », « chapitre 12 » acceptés)')},
+          required: ['titre'],
+          run: (a) async {
+            final title = '${a['titre']}'.trim();
+            final found = await readFinder.find(title);
+            if (found.isEmpty) {
+              return {'trouve': false, 'conseil': 'Rien en lecture libre ; les mangas sous licence sont sur MANGA Plus (officiel).'};
+            }
+            final best = found.first;
+            final b = books.where((x) => ReadQuery.parse(x.title).title.toLowerCase() == ReadQuery.parse(title).title.toLowerCase()).firstOrNull;
+            if (b != null && b.read == null && ReadFinder.confident(found)) {
+              b.read = ReadLink.fromMatch(best);
+              await upsert(b);
+            }
+            return {
+              'trouve': true,
+              'titre': best.title,
+              'ou': best.sourceLabel,
+              if (b != null) 'relie_au_livre': b.title,
+              'autres': [for (final m in found.skip(1).take(3)) '${m.title} (${m.sourceLabel})'],
             };
           },
         ),
@@ -862,7 +971,13 @@ class _BookDetailPageState extends State<BookDetailPage> {
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleMedium
                               ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    // Se met à jour quand le lecteur enregistre où tu en es.
+                    ListenableBuilder(
+                      listenable: widget.module.store,
+                      builder: (_, _) => _ReadButton(module: widget.module, book: b, onDone: () => setState(() {})),
+                    ),
+                    const SizedBox(height: 16),
                     SegmentedButton<BookStatus>(
                       segments: [
                         for (final s in BookStatus.values)
@@ -927,6 +1042,48 @@ class _BookDetailPageState extends State<BookDetailPage> {
         ],
       ),
     );
+  }
+}
+
+/// « Lire » / « Reprendre » : trouve tout seul les scans du manga ou le
+/// livre libre et l'ouvre dans Mon Hub.
+class _ReadButton extends StatelessWidget {
+  const _ReadButton({required this.module, required this.book, required this.onDone});
+  final BooksModule module;
+  final Book book;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final link = book.read;
+    final started = link?.at != null;
+    final where = link == null
+        ? 'Je trouve les scans ou le livre tout seul'
+        : [
+            link.isManga ? 'Scans' : link.source == 'gutenberg' ? 'Livre libre' : 'Livre scanné',
+            if (link.progress.isNotEmpty) link.progress,
+          ].join(' · ');
+    Future<void> go({bool choose = false}) async {
+      await openReading(context, module, book, choose: choose);
+      onDone();
+    }
+
+    return Column(children: [
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: module.color,
+          minimumSize: const Size(220, 52),
+          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        icon: Icon(started ? Icons.play_arrow_rounded : Icons.chrome_reader_mode_rounded),
+        label: Text(started ? 'Reprendre la lecture' : 'Lire'),
+        onPressed: go,
+      ),
+      const SizedBox(height: 4),
+      Text(where, style: Theme.of(context).textTheme.labelMedium, textAlign: TextAlign.center),
+      if (link != null)
+        TextButton(onPressed: () => go(choose: true), child: const Text('Ce n\'est pas le bon ?')),
+    ]);
   }
 }
 
