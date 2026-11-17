@@ -86,6 +86,23 @@ class NotificationCenter extends ChangeNotifier {
       .map((s) => HubNotification.fromJson(jsonDecode(s) as Map<String, dynamic>))
       .toList();
 
+  /// Alertes à montrer **dans la fenêtre** (bandeaux en haut à droite).
+  final banners = StreamController<HubNotification>.broadcast();
+
+  /// Publie une alerte : historique (cloche), bandeau dans la fenêtre et
+  /// notification du système.
+  Future<void> post(HubNotification n, {bool system = true}) async {
+    final prefs = ModuleStore.prefs;
+    await prefs.setStringList(
+      _historyKey,
+      [jsonEncode(n.toJson()), ...prefs.getStringList(_historyKey) ?? const <String>[]].take(100).toList(),
+    );
+    unread++;
+    notifyListeners();
+    if (!banners.isClosed) banners.add(n);
+    if (system) await show(n);
+  }
+
   int unread = 0;
   void markRead() {
     unread = 0;
@@ -161,17 +178,8 @@ class NotificationCenter extends ChangeNotifier {
       await prefs.setStringList(_seenKey, seen);
       await prefs.setStringList(_seededKey, seeded.toList());
 
-      if (fresh.isNotEmpty) {
-        final hist = [
-          ...fresh.map((n) => jsonEncode(n.toJson())),
-          ...prefs.getStringList(_historyKey) ?? const <String>[],
-        ];
-        await prefs.setStringList(_historyKey, hist.take(100).toList());
-        unread += fresh.length;
-        for (final n in fresh) {
-          await show(n);
-        }
-        notifyListeners();
+      for (final n in fresh.reversed) {
+        await post(n);
       }
     } finally {
       _polling = false;
@@ -207,6 +215,7 @@ class NotificationCenter extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    unawaited(banners.close());
     super.dispose();
   }
 }

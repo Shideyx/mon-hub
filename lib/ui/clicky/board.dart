@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -249,17 +250,33 @@ class ClickyBoardView extends StatelessWidget {
             ),
           ),
           Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final b in board.blocks)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: BoardBlockView(block: b, onAsk: onAsk),
-                    ),
-                ],
+            // Façon tableau dessiné à la main : papier, écriture manuscrite,
+            // et chaque bloc qui se dessine l'un après l'autre.
+            child: CustomPaint(
+              painter: _PaperPainter(dark: Theme.of(context).brightness == Brightness.dark),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  textTheme: Theme.of(context).textTheme.apply(
+                    fontFamily: sketchFont,
+                    fontFamilyFallback: sketchFallback,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (i, b) in board.blocks.indexed)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: DrawIn(
+                            delay: Duration(milliseconds: 250 + i * 700),
+                            child: BoardBlockView(block: b, onAsk: onAsk),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -1175,4 +1192,86 @@ class _QuizState extends State<_Quiz> {
       ),
     );
   }
+}
+
+
+/// Écriture « à la main » (polices installées avec Windows, puis Mac).
+const sketchFont = 'Segoe Print';
+const sketchFallback = ['Ink Free', 'Comic Sans MS', 'Bradley Hand', 'Chalkboard SE', 'Noteworthy'];
+
+/// Un élément qui « se dessine » : il apparaît après [delay], comme si un
+/// crayon le traçait de gauche à droite.
+class DrawIn extends StatefulWidget {
+  const DrawIn({super.key, required this.child, this.delay = Duration.zero});
+  final Widget child;
+  final Duration delay;
+
+  @override
+  State<DrawIn> createState() => _DrawInState();
+}
+
+class _DrawInState extends State<DrawIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer(widget.delay, () {
+      if (mounted) _a.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _a,
+    child: widget.child,
+    builder: (context, child) {
+      final t = Curves.easeOutCubic.transform(_a.value);
+      return Opacity(
+        opacity: t,
+        child: ClipRect(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (r) => LinearGradient(
+                colors: const [Colors.black, Colors.black, Colors.transparent],
+                stops: [0, t, (t + 0.08).clamp(0.0, 1.0)],
+              ).createShader(r),
+              child: Transform.translate(offset: Offset(0, (1 - t) * 6), child: child),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// Papier légèrement quadrillé (ardoise en mode sombre).
+class _PaperPainter extends CustomPainter {
+  _PaperPainter({required this.dark});
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRect(Offset.zero & s, Paint()..color = dark ? const Color(0xFF1F2522) : const Color(0xFFFFFDF6));
+    final line = Paint()
+      ..color = (dark ? Colors.white : const Color(0xFF7FA7D9)).withValues(alpha: dark ? 0.05 : 0.12)
+      ..strokeWidth = 1;
+    for (var y = 22.0; y < s.height; y += 22) {
+      canvas.drawLine(Offset(0, y), Offset(s.width, y), line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PaperPainter old) => old.dark != dark;
 }

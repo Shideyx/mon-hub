@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
@@ -332,11 +333,33 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
                 const SizedBox(height: 6),
                 LinearProgressIndicator(value: progress <= 0 ? null : progress, minHeight: 6),
               ],
-              if (error != null)
+              if (error != null) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
-                  child: Text(error!, style: text.bodyMedium?.copyWith(color: Colors.redAccent)),
+                  child: SelectableText(error!, style: text.bodyMedium?.copyWith(color: Colors.redAccent)),
                 ),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    if (Whisper.folder != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.description_rounded, size: 16),
+                        label: const Text('Voir le détail'),
+                        onPressed: () => launchUrl(Uri.file('${Whisper.folder}${Platform.pathSeparator}installation.log')),
+                      ),
+                    if (ClickyController.instance.voiceOut.geminiKey.trim().isNotEmpty)
+                      TextButton.icon(
+                        icon: const Icon(Icons.cloud_rounded, size: 16),
+                        label: const Text('Utiliser Gemini à la place'),
+                        onPressed: () async {
+                          await ClickyController.instance.setOption('micEngine', 'gemini');
+                          ClickyController.instance.micProblem = null;
+                          if (context.mounted) Navigator.pop(context, true);
+                        },
+                      ),
+                  ],
+                ),
+              ],
             ],
           ],
         ),

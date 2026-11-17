@@ -115,11 +115,12 @@ class _HubAppState extends State<HubApp> {
         // pour Claude Code.
         ClaudeBridge.appTools = () => ClickyController.instance.localTools;
         // Alertes de Clicky (agent terminé…).
-        ClickyController.instance.notify = (title, body) => n.show(
+        ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(
             id: 'clicky:${DateTime.now().millisecondsSinceEpoch}',
             title: title,
             body: body,
+            moduleId: 'claude',
           ),
         );
       }

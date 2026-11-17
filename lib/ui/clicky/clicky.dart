@@ -23,7 +23,9 @@ import '../../core/session.dart';
 import '../../core/version.dart';
 import '../chat_history.dart';
 import '../widgets.dart';
+import 'act.dart';
 import 'board.dart';
+import 'buddies.dart';
 import 'capture.dart';
 import 'clicky_desktop.dart';
 import 'claude_code.dart';
@@ -504,14 +506,14 @@ class ClickyController extends ChangeNotifier {
   // ---------- Voix ----------
 
   late final ClickyEars ears = Whisper.supported
-      ? SmartEars(ClickyEars.create(), WhisperEars(), () => micEngine)
+      ? SmartEars(ClickyEars.create(), WhisperEars(), GeminiEars(() => voiceOut.geminiKey), () => micEngine)
       : ClickyEars.create();
 
   /// Reconnaissance vocale : 'auto' (Windows, et Whisper dès que Windows ne
   /// marche pas), 'windows' ou 'whisper' (sur le PC, sans internet).
   String get micEngine {
     final v = _opt('micEngine', 'auto');
-    return const ['auto', 'windows', 'whisper'].contains(v) ? v : 'auto';
+    return const ['auto', 'windows', 'whisper', 'gemini'].contains(v) ? v : 'auto';
   }
   final voiceOut = ClickyVoice();
   late final WakeWord _wake = WakeWord(_onWake);
@@ -745,6 +747,14 @@ class ClickyController extends ChangeNotifier {
   Future<void> _sendTranscript() async {
     if (state != ClickyState.listening) return;
     final t = transcript.trim();
+    final e = ears;
+    final failed = e is SmartEars && e.active is RecordingEars ? (e.active as RecordingEars).lastError : null;
+    if (t.isEmpty && failed != null) {
+      // La transcription (Whisper / Gemini) a échoué : on dit pourquoi.
+      _micFailed(EarsProblem('Je n\'ai pas pu transcrire ce que tu as dit : $failed', code: 'transcription'));
+      _wake.resume();
+      return;
+    }
     if (t.isEmpty) {
       _set(
         ClickyState.idle,
@@ -1239,7 +1249,9 @@ class ClickyController extends ChangeNotifier {
       'micro_active': mic,
       'micro_panne': micProblem?.message,
       'micro_code': micProblem?.code,
-      if (e is SmartEars) 'micro_moteur': e.active is WhisperEars ? 'Whisper (sur le PC)' : 'Windows',
+      if (e is SmartEars) 'micro_moteur': e.active is RecordingEars ? (e.active as RecordingEars).name : 'Windows',
+      if (e is SmartEars && e.active is RecordingEars && (e.active as RecordingEars).lastError != null)
+        'micro_derniere_erreur': (e.active as RecordingEars).lastError,
       if (e is SmartEars && e.windows is WindowsEars) 'micro_lancement': (e.windows as WindowsEars).launch.label,
       'micro_reglage': micEngine,
       'micro_langue': e.language,
@@ -1304,7 +1316,7 @@ $_boardGuide
 ${HoloScene.guide}
 ${annotate ? '''
 Dessiner sur l'écran (comme au tableau) : tu peux ajouter des annotations, en pixels de la capture$shotsNote : [ARROW:x1,y1->x2,y2:légende] (flèche), [CIRCLE:x,y,rayon:légende] (entoure un élément), [UNDERLINE:x,y,largeur] (souligne un texte, y = bas du texte), [LABEL:x,y:texte] (étiquette). Au plus 4, seulement si ça aide à comprendre.''' : ''}
-${driveOn && desktopMode ? DriveRunner.guide : ''}
+${driveOn && DriveRunner.supported ? actGuide : ''}
 
 Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].''';
   }
@@ -1348,6 +1360,15 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     target = null;
     showHistory = false;
     clearMarks();
+    // « Prends la main et … » : Clicky agit tout de suite.
+    final take = RegExp(
+      r'^\s*(?:(?:hey|ok|dis)\s+)?(?:clicky[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
+      caseSensitive: false,
+    ).firstMatch(q);
+    if (take != null && DriveRunner.supported) {
+      unawaited(act(take.group(1)!.trim()));
+      return;
+    }
     final agent = _agentRe.firstMatch(q);
     if (agent != null) {
       unawaited(_runAgent(q.substring(agent.end).trim()));
@@ -1654,7 +1675,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         holo = newHolo;
         onInteractive?.call(true);
       }
-      final (noPlan, plan) = DrivePlan.extract(spokenAll);
+      final (noAct, actGoal) = extractAct(spokenAll);
+      final (noPlan, plan) = DrivePlan.extract(noAct);
       final parts = stepsMode ? splitSteps(noPlan) : [noPlan.replaceAll(stepRe, ' ')];
       if (newBoard != null) _showBoard(newBoard);
       // Historique + journal + leçon enregistrée.
@@ -1697,7 +1719,11 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       stepIndex = 0;
       _stepShots = shots;
       await _present(parts.first, shots, liveSpoken: live);
-      if (plan != null && id == _askId) await _drive(plan, shots);
+      if (actGoal != null && id == _askId) {
+        await act(actGoal);
+      } else if (plan != null && id == _askId) {
+        await _drive(plan, shots);
+      }
     } on ClaudeCodeCancelled {
       return;
     } catch (e) {
@@ -1844,6 +1870,293 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     _fadeSoon();
   }
 
+  // ---------- Clicky agit : il prend la souris et le clavier ----------
+
+  /// Une tâche « Clicky agit » est en cours.
+  bool acting = false;
+
+  /// Journal de la tâche en cours (montré dans la boîte).
+  List<ActLog> actLog = const [];
+
+  static final _actRe = RegExp(r'\[AGIR\]([\s\S]*?)\[/AGIR\]', caseSensitive: false);
+
+  /// Sépare la réponse et le but [AGIR]…[/AGIR].
+  static (String, String?) extractAct(String raw) {
+    final m = _actRe.firstMatch(raw);
+    if (m == null) return (raw, null);
+    final goal = m.group(1)!.trim();
+    return (raw.replaceAll(_actRe, '').trim(), goal.isEmpty ? null : goal);
+  }
+
+  /// Comment l'IA déclenche « Clicky agit ».
+  static const actGuide = '''
+Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l'écran à sa place (ouvrir un site et y chercher quelque chose, cliquer, remplir, faire défiler, ranger des fenêtres, regarder une vidéo, écrire un message dans une appli…), dis en une phrase ce que tu vas faire, puis ajoute à la fin [AGIR]le but précis, avec tous les détails utiles[/AGIR]. Tu prendras alors la souris et le clavier toi-même, étape par étape, en regardant l'écran. Pour une simple commande système (son, fichiers, logiciels), préfère les outils pc_.''';
+
+  /// Une question rapide à l'IA (sans outils), avec les captures.
+  Future<String> _askRaw(String system, String prompt, List<ClickyShot> shots) async {
+    final labels = [for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}, ${shots[i].width} × ${shots[i].height} px) :'];
+    switch (provider) {
+      case 'claudecode':
+        return ClaudeCode.ask(
+          system: system,
+          question: prompt,
+          imagesB64: [for (final s in shots) s.png64],
+          imageLabels: labels,
+          withTools: false,
+        );
+      case 'ollama':
+        return Ollama.chat(
+          system: system,
+          memory: const [],
+          question: prompt,
+          imagesB64: [for (final s in shots) s.png64],
+        );
+      default:
+        return ClaudeApi.chat(
+          system: system,
+          history: [
+            {
+              'role': 'user',
+              'content': [
+                for (var i = 0; i < shots.length; i++) ...[
+                  {'type': 'text', 'text': labels[i]},
+                  {
+                    'type': 'image',
+                    'source': {'type': 'base64', 'media_type': 'image/png', 'data': shots[i].png64},
+                  },
+                ],
+                {'type': 'text', 'text': prompt},
+              ],
+            },
+          ],
+        );
+    }
+  }
+
+  /// Clicky prend la main pour atteindre [goal] : il regarde l'écran, fait
+  /// une action (en volant jusqu'à l'endroit), regarde de nouveau…
+  /// Échap ou bouger la souris l'arrête.
+  Future<void> act(String goal) async {
+    if (!DriveRunner.supported || goal.trim().isEmpty) return;
+    if (!desktopMode) {
+      // Dans la fenêtre Mon Hub : c'est Clicky partout qui agit (il voit
+      // tout l'écran et passe au-dessus des fenêtres).
+      await ClickyDesktop.launch();
+      final sent = await ClickyDesktop.send('act64 ${base64Encode(utf8.encode(goal))}');
+      if (!sent) {
+        _set(ClickyState.idle, reply: 'Pour que je prenne la souris, active « Clicky partout » dans mes réglages.');
+      }
+      return;
+    }
+    if (acting) return;
+    // Permission (sauf réglage « Contrôle du PC : sans demander »).
+    if (pcControl == 'off') {
+      _set(ClickyState.idle, reply: 'Le contrôle du PC est désactivé dans mes réglages.');
+      return;
+    }
+    if (pcControl == 'ask') {
+      onInteractive?.call(true);
+      final ok = await _confirmAct(goal);
+      onInteractive?.call(panelOpen || board != null);
+      if (!ok) {
+        _set(ClickyState.idle, status: 'D\'accord, je ne touche à rien.');
+        _fadeSoon();
+        return;
+      }
+    }
+    acting = true;
+    actLog = const [];
+    final id = ++_askId;
+    closePanel();
+    unawaited(ClickyChime.play());
+    _set(ClickyState.thinking, status: 'Je prends la main… (Échap pour m\'arrêter)', reply: '');
+    final log = <ActLog>[];
+    var result = '';
+    (int, int)? expected;
+    try {
+      Win.releaseModifiers();
+      for (var i = 1; i <= 30; i++) {
+        if (id != _askId) {
+          result = 'Arrêté.';
+          break;
+        }
+        if (Win.down(0x1B)) {
+          result = 'Arrêté (Échap).';
+          break;
+        }
+        final now = Win.cursor();
+        if (expected != null && now != null && ((now.$1 - expected.$1).abs() > 12 || (now.$2 - expected.$2).abs() > 12)) {
+          result = 'Tu as bougé la souris : je te rends la main.';
+          break;
+        }
+        _set(ClickyState.thinking, status: 'Étape $i : je regarde l\'écran…');
+        final (shots, _, hidden) = await _look();
+        if (hidden) {
+          result = 'Une fenêtre sensible (mots de passe, banque) est ouverte : je m\'arrête par sécurité.';
+          break;
+        }
+        if (shots.isEmpty) {
+          result = 'Je ne vois pas l\'écran.';
+          break;
+        }
+        final windows = Win.windowList().take(25).map((w) => '- id ${w.$1} : ${w.$2}${w.$3.isEmpty ? '' : ' (${w.$3})'}').join('\n');
+        final prompt = [
+          'But : $goal',
+          'Fenêtre au premier plan : « ${Win.foregroundTitle()} ».',
+          'Fenêtres ouvertes :\n$windows',
+          if (log.isNotEmpty) 'Déjà fait :\n${[for (final (k, l) in log.indexed) '${k + 1}. $l'].join('\n')}',
+          'Étape $i : quelle est la prochaine action ? (JSON seul)',
+        ].join('\n\n');
+        String raw;
+        try {
+          raw = await _askRaw(ActStep.guide(screens: shots.length), prompt, shots);
+        } on ClaudeCodeCancelled {
+          result = 'Arrêté.';
+          break;
+        }
+        if (id != _askId) {
+          result = 'Arrêté.';
+          break;
+        }
+        final step = ActStep.parse(raw);
+        if (step == null) {
+          log.add(ActLog(const ActStep('?', {}), 'réponse illisible'));
+          if (log.where((l) => l.step.action == '?').length >= 3) {
+            result = 'Je n\'arrive pas à décider quoi faire.';
+            break;
+          }
+          continue;
+        }
+        if (step.done) {
+          result = step.s('message').isEmpty ? 'C\'est fait.' : step.s('message');
+          break;
+        }
+        _set(ClickyState.pointing, status: 'Étape $i : ${step.thought.isEmpty ? step.describe : step.thought}');
+        final r = await _doStep(step, shots);
+        log.add(ActLog(step, r));
+        actLog = List.of(log);
+        expected = Win.cursor();
+        // Laisse l'appli réagir (page qui charge, menu qui s'ouvre).
+        await Future<void>.delayed(Duration(milliseconds: step.action == 'ouvrir' ? 1800 : 700));
+      }
+      if (result.isEmpty) result = 'J\'ai fait 30 actions sans finir : je m\'arrête là.';
+    } catch (e) {
+      result = 'Je me suis arrêté : $e';
+    } finally {
+      acting = false;
+      target = null;
+    }
+    actLog = List.of(log);
+    notify?.call('Clicky a agi', '$goal\n$result');
+    _set(ClickyState.speaking, status: '', reply: result);
+    await speak(result);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
+  }
+
+  /// Fait une action : Clicky vole jusqu'au point, la vraie souris suit.
+  Future<String> _doStep(ActStep s, List<ClickyShot> shots) async {
+    Future<(int, int)?> flyTo((Offset, int)? pt, String label) async {
+      if (pt == null || shots.isEmpty) return null;
+      final shot = shots[(pt.$2 - 1).clamp(0, shots.length - 1)];
+      final p = shot.toLayer(pt.$1);
+      target = p;
+      targetLabel = label;
+      notifyListeners();
+      final x = p.dx.round(), y = p.dy.round();
+      await Win.glide(x, y);
+      return (x, y);
+    }
+
+    switch (s.action) {
+      case 'clic' || 'double_clic' || 'clic_droit' || 'deplacer':
+        final at = await flyTo(s.point, s.s('libelle'));
+        if (at == null) return 'pas de point';
+        if (s.action == 'deplacer') return 'ok';
+        Win.click(at.$1, at.$2, right: s.action == 'clic_droit', double: s.action == 'double_clic');
+        return 'ok';
+      case 'ecrire':
+        if (isSensitiveTitle(Win.foregroundTitle())) return 'refusé : fenêtre sensible';
+        Win.releaseModifiers();
+        Win.typeText(s.s('texte'));
+        return 'ok';
+      case 'touches':
+        Win.releaseModifiers();
+        return Win.pressCombo(s.s('touches')) ? 'ok' : 'touche inconnue';
+      case 'defiler':
+        if (s.point != null) await flyTo(s.point, '');
+        final n = (s.n('crans') ?? -3).toInt().clamp(-25, 25);
+        s.args['horizontal'] == true ? Win.hscroll(n) : Win.scroll(n);
+        return 'ok';
+      case 'glisser':
+        final a = s.point;
+        final x2 = s.n('x2'), y2 = s.n('y2');
+        if (a == null || x2 == null || y2 == null || shots.isEmpty) return 'points manquants';
+        final shot = shots[(a.$2 - 1).clamp(0, shots.length - 1)];
+        final p1 = shot.toLayer(a.$1), p2 = shot.toLayer(Offset(x2.toDouble(), y2.toDouble()));
+        target = p1;
+        notifyListeners();
+        await Win.drag(p1.dx.round(), p1.dy.round(), p2.dx.round(), p2.dy.round());
+        target = p2;
+        notifyListeners();
+        return 'ok';
+      case 'ouvrir':
+        return PcControl.open(s.s('cible'));
+      case 'fenetre':
+        final wid = s.n('id')?.toInt();
+        if (wid == null) return 'id manquant';
+        return Win.windowAction(wid, s.s('faire').isEmpty ? 'activer' : s.s('faire')) ? 'ok' : 'fenêtre introuvable';
+      case 'commande':
+        final tool = PcControl.tools().where((t) => t.name == 'pc_commande').firstOrNull;
+        if (tool == null) return 'commandes indisponibles';
+        final args = {'commande': s.s('commande'), 'pourquoi': s.s('pourquoi')};
+        if (!await confirmAction(tool, args)) return 'refusé par la personne';
+        return jsonEncode(await tool.run(args));
+      case 'attendre':
+        await Future<void>.delayed(Duration(milliseconds: (s.n('ms') ?? 1000).toInt().clamp(200, 8000)));
+        return 'ok';
+      default:
+        return 'action inconnue';
+    }
+  }
+
+  Future<bool> _confirmAct(String goal) async {
+    final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+    if (ctx == null || !ctx.mounted) return false;
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.mouse_rounded),
+        title: const Text('Clicky prend la main'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(goal, style: Theme.of(c).textTheme.titleSmall),
+              const SizedBox(height: 10),
+              const Text(
+                'Je vais bouger la souris, cliquer, faire défiler et écrire tout seul, en regardant l\'écran. '
+                'Échap ou bouger la souris m\'arrête tout de suite. Je ne tape rien dans une fenêtre de mot de '
+                'passe ou de banque.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Non')),
+          FilledButton.icon(
+            icon: const Icon(Icons.check_rounded),
+            onPressed: () => Navigator.pop(c, true),
+            label: const Text('Oui, vas-y'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   /// Claude Code ne garde pas la conversation : on lui rappelle les
   /// derniers échanges dans la question.
   static String _withMemory(String q, List<(String, String)> memory) {
@@ -1868,7 +2181,23 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
 
   /// Une tâche faite par l'agent (mode « Agent, … » et routines). Renvoie le
   /// compte rendu.
-  Future<String> runTask(String task) async {
+  Future<String> runTask(String task) async =>
+      _plain(ClickyBoard.strip(DrivePlan.extract(await runTaskRaw(task)).$1));
+
+  /// Un compagnon travaille : compté dans « agents au travail ».
+  Future<String> runBuddyTask(String task) async {
+    agentsRunning++;
+    notifyListeners();
+    try {
+      return await runTaskRaw(task);
+    } finally {
+      agentsRunning--;
+      notifyListeners();
+    }
+  }
+
+  /// Le travail d'un agent, texte brut (avec les outils de Mon Hub).
+  Future<String> runTaskRaw(String task) async {
     final usePro = provider == 'claudecode';
     if (usePro
         ? await ClaudeCode.find() == null
@@ -1892,7 +2221,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
             webSearch: webSearch,
             effort: 'high',
           );
-    return _plain(ClickyBoard.strip(DrivePlan.extract(r).$1));
+    return r;
   }
 
   /// Tâche de fond : Clicky reste disponible pendant que l'agent travaille.
@@ -2078,6 +2407,14 @@ class _ClickyLayerState extends State<ClickyLayer> {
     HardwareKeyboard.instance.addHandler(c.onKey);
     ClaudeApi.store.addListener(_settingsChanged);
     _settingsChanged();
+    // Compagnons : ils travaillent avec les actions de Mon Hub (directement,
+    // ou par le pont local pour Clicky partout).
+    Buddies.instance
+      ..runner = c.runBuddyTask
+      ..onDone = (title, body) {
+        c.notify?.call(title, body);
+        if (c.state == ClickyState.idle) unawaited(c.speak('$title. ${body.split('\n').first}'));
+      };
     if (widget.hub != null) {
       // Routines (briefing du matin…) : faites par Mon Hub, qui a les modules.
       final r = Routines.instance
@@ -3144,6 +3481,28 @@ class _ToolsMenu extends StatelessWidget {
                     : 'J\'enregistre la leçon (questions, réponses et captures).',
               );
             }
+          case 'buddies':
+            final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+            if (ctx != null && ctx.mounted) {
+              await showDialog<void>(
+                context: ctx,
+                builder: (d) => Dialog(
+                  child: SizedBox(
+                    width: 640,
+                    height: 640,
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(d)),
+                        ),
+                        const Expanded(child: BuddiesView()),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
           case 'review':
             await c.ask('qu\'est-ce que je dois réviser');
           case 'quiz':
@@ -3153,6 +3512,13 @@ class _ToolsMenu extends StatelessWidget {
         }
       },
       itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'buddies',
+          child: ListTile(
+            leading: Icon(Icons.cloud_rounded),
+            title: Text('Mes compagnons'),
+          ),
+        ),
         const PopupMenuItem(
           value: 'new',
           child: ListTile(

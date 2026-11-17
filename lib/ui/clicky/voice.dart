@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../../core/claude_bridge.dart';
 import 'neural_voice.dart';
 
 /// Une voix du système (Windows : Paul, Hortense, Julie…).
@@ -156,76 +157,139 @@ class ClickyVoice {
       (engine == 'edge' || engine == 'gemini') &&
       (_neuralDownUntil == null || DateTime.now().isAfter(_neuralDownUntil!));
 
-  Future<Uint8List> synth(String text) {
-    if (engine == 'gemini') {
-      return GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice).catchError(
-        // Quota gratuit épuisé : la voix Microsoft prend le relais.
-        (Object _) => EdgeVoice.synthesize(
+  /// Gemini a échoué (quota gratuit épuisé…) : voix Microsoft un moment.
+  DateTime? _geminiDownUntil;
+
+  /// La voix d'une réponse, choisie une fois pour toute la réponse : jamais
+  /// deux voix différentes en même temps.
+  String _pickEngine() {
+    if (!_neural) return 'system';
+    if (engine == 'gemini' && (_geminiDownUntil == null || DateTime.now().isAfter(_geminiDownUntil!))) {
+      return 'gemini';
+    }
+    return 'edge';
+  }
+
+  Future<Uint8List> _synthWith(String eng, String text) => eng == 'gemini'
+      ? GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice)
+      : EdgeVoice.synthesize(
           text,
           voice: EdgeVoice.forLanguage(language, neuralVoice),
           rate: rate,
           pitch: pitch,
-        ),
-      );
-    }
-    return EdgeVoice.synthesize(
-      text,
-      voice: EdgeVoice.forLanguage(language, neuralVoice),
-      rate: rate,
-      pitch: pitch,
-    );
-  }
+        );
+
+  /// Synthèse avec la voix choisie (sans mélanger : l'échec remonte).
+  Future<Uint8List> synth(String text) => _synthWith(_pickEngine(), text);
 
   int _file = 0;
 
-  /// Joue un son (MP3 ou WAV) et attend la fin.
+  /// Durée d'un WAV (d'après son en-tête), pour savoir quand il finit.
+  static Duration? wavDuration(Uint8List b) {
+    if (b.length < 44 || b[0] != 0x52 || b[1] != 0x49) return null;
+    final d = ByteData.sublistView(b);
+    final byteRate = d.getUint32(28, Endian.little);
+    if (byteRate == 0) return null;
+    return Duration(microseconds: ((b.length - 44) * 1000000 / byteRate).round());
+  }
+
+  /// Joue un son (MP3 ou WAV) et attend **vraiment** la fin (l'évènement
+  /// « terminé » de Windows arrive parfois trop tôt ou jamais : on se fie
+  /// aussi à la durée du son).
   Future<void> _play(Uint8List bytes, int gen) async {
     final p = _player ??= AudioPlayer();
+    final wav = bytes.length > 4 && bytes[0] == 0x52;
     final f = File(
-      '${Directory.systemTemp.path}${Platform.pathSeparator}monhub-voix-${_file++ % 4}.${engine == 'gemini' && bytes.length > 4 && bytes[0] == 0x52 ? 'wav' : 'mp3'}',
+      '${Directory.systemTemp.path}${Platform.pathSeparator}monhub-voix-${_file++ % 4}.${wav ? 'wav' : 'mp3'}',
     );
     await f.writeAsBytes(bytes, flush: true);
     if (gen != _generation) return;
-    final end = p.onPlayerComplete.first;
-    await p.play(DeviceFileSource(f.path));
-    await end.timeout(const Duration(minutes: 2), onTimeout: () {});
+    // Jamais par-dessus la voix de Windows.
+    try {
+      await _tts?.stop();
+    } catch (_) {}
+    var finished = false;
+    final sub = p.onPlayerComplete.listen((_) => finished = true);
+    final started = DateTime.now();
+    try {
+      await p.play(DeviceFileSource(f.path));
+      var dur = wavDuration(bytes);
+      if (dur == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        try {
+          dur = await p.getDuration().timeout(const Duration(seconds: 1));
+        } catch (_) {}
+      }
+      final max = (dur ?? const Duration(seconds: 90)) + const Duration(milliseconds: 1500);
+      final min = dur ?? Duration.zero;
+      while (gen == _generation) {
+        final elapsed = DateTime.now().difference(started);
+        if (elapsed >= max) break;
+        if (finished && elapsed >= min - const Duration(milliseconds: 250)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+      }
+    } finally {
+      await sub.cancel();
+    }
   }
 
   Future<void> _run(int gen) async {
     _running = true;
+    await VoiceLock.acquire();
     try {
       await _apply();
+      var eng = _pickEngine();
       Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
-        if (_neural) {
+        if (eng != 'system') {
           try {
-            final audio = await (next ?? synth(s));
+            final audio = await (next ?? _synthWith(eng, s));
             next = null;
-            // On prépare la phrase suivante pendant que celle-ci se lit.
-            if (_queue.isNotEmpty) next = synth(_queue.first);
             if (gen != _generation) break;
-            await _play(audio, gen);
-            if (next != null) {
-              // La phrase préparée sera prise au prochain tour.
-              final first = _queue.isEmpty ? null : _queue.first;
-              if (first == null) next = null;
+            // On prépare la phrase suivante (même voix) pendant la lecture.
+            if (_queue.isNotEmpty) {
+              final n = _synthWith(eng, _queue.first);
+              n.then((_) {}, onError: (Object _) {});
+              next = n;
             }
+            await _play(audio, gen);
             neuralError = null;
             continue;
           } catch (e) {
             neuralError = '$e';
             next = null;
-            // Service indisponible : voix de Windows pendant 10 minutes.
+            try {
+              await _player?.stop();
+            } catch (_) {}
+            if (gen != _generation) break;
+            if (eng == 'gemini') {
+              // Gemini indisponible : la voix Microsoft lit la suite de la
+              // réponse (on ne revient pas en arrière au milieu).
+              _geminiDownUntil = DateTime.now().add(const Duration(minutes: 10));
+              eng = 'edge';
+              try {
+                await _play(await _synthWith(eng, s), gen);
+                continue;
+              } catch (_) {}
+            }
+            // Plus de voix en ligne : voix de Windows pendant 10 minutes.
             _neuralDownUntil = DateTime.now().add(const Duration(minutes: 10));
+            eng = 'system';
           }
         }
+        // Voix de Windows : rien d'autre ne joue en même temps.
+        try {
+          await _player?.stop();
+        } catch (_) {}
+        if (gen != _generation) break;
         try {
           await _engine.speak(s);
         } catch (_) {}
       }
     } catch (_) {
     } finally {
+      VoiceLock.release();
       if (gen == _generation) {
         _running = false;
         _drained?.complete();
@@ -237,6 +301,7 @@ class ClickyVoice {
   /// Essaie la voix choisie (bouton « Écouter » des réglages).
   Future<String?> test(String text) async {
     _neuralDownUntil = null;
+    _geminiDownUntil = null;
     neuralError = null;
     await say(text);
     return neuralError;
@@ -322,6 +387,67 @@ class ClickyChime {
       final p = _p ??= AudioPlayer();
       await p.stop();
       await p.play(DeviceFileSource(path));
+    } catch (_) {}
+  }
+}
+
+
+/// Une seule voix à la fois sur le PC, même quand Mon Hub et « Clicky
+/// partout » parlent en même temps : celui qui parle tient un petit verrou
+/// (fichier voix.lock), l'autre attend son tour.
+class VoiceLock {
+  VoiceLock._();
+
+  static Timer? _beat;
+  static int _depth = 0;
+
+  static File? get _file {
+    final d = ClaudeBridge.folder;
+    return d == null || kIsWeb ? null : File('$d${Platform.pathSeparator}voix.lock');
+  }
+
+  static bool _heldByOther(File f) {
+    try {
+      if (!f.existsSync()) return false;
+      final parts = f.readAsStringSync().split(' ');
+      final owner = int.tryParse(parts.first);
+      final at = int.tryParse(parts.length > 1 ? parts[1] : '');
+      if (owner == null || at == null || owner == pid) return false;
+      // Verrou abandonné (programme fermé) au bout de 3 s sans nouvelles.
+      return DateTime.now().millisecondsSinceEpoch - at < 3000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static void _write(File f) {
+    try {
+      f.writeAsStringSync('$pid ${DateTime.now().millisecondsSinceEpoch}', flush: true);
+    } catch (_) {}
+  }
+
+  /// Attend que l'autre programme ait fini de parler (40 s au plus).
+  static Future<void> acquire() async {
+    _depth++;
+    final f = _file;
+    if (f == null) return;
+    final until = DateTime.now().add(const Duration(seconds: 40));
+    while (_heldByOther(f) && DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    _write(f);
+    _beat ??= Timer.periodic(const Duration(milliseconds: 900), (_) => _write(f));
+  }
+
+  static void release() {
+    if (_depth > 0) _depth--;
+    if (_depth > 0) return;
+    _beat?.cancel();
+    _beat = null;
+    final f = _file;
+    if (f == null) return;
+    try {
+      if (f.existsSync() && f.readAsStringSync().startsWith('$pid ')) f.deleteSync();
     } catch (_) {}
   }
 }

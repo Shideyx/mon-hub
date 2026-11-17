@@ -111,11 +111,31 @@ class MusicModule extends HubModule {
       },
       required: ['action'],
       run: (a) async {
-        if (!spotify.connected) {
-          return 'Spotify n\'est pas connecté : module Musique → réglages.';
-        }
         final q = '${a['requete'] ?? ''}'.trim();
-        final String r = switch ('${a['action']}'.toLowerCase()) {
+        final action = '${a['action']}'.toLowerCase();
+        // Sans API (pas connecté, ou Spotify refuse) : on ouvre la recherche
+        // dans l'appli Spotify, où il reste à appuyer sur lecture.
+        Future<String> openInApp() async {
+          if (q.isEmpty) return 'Spotify n\'est pas connecté : module Musique → réglages.';
+          await launchUrl(Uri.parse('spotify:search:${Uri.encodeComponent(q)}'));
+          return 'J\'ai ouvert « $q » dans Spotify (sans compte connecté, Mon Hub ne peut pas lancer la lecture lui-même).';
+        }
+
+        if (!spotify.connected) return openInApp();
+        try {
+          return await _spotifyAction(action, q, a);
+        } catch (e) {
+          if (SpotifyApi.isBlocked(e) && const ['chercher_jouer', 'jouer', 'album', 'artiste', 'playlist'].contains(action)) {
+            return openInApp();
+          }
+          rethrow;
+        }
+      },
+    ),
+  ];
+
+  Future<String> _spotifyAction(String action, String q, Map<String, dynamic> a) async {
+        final String r = switch (action) {
           'chercher_jouer' || 'jouer' => q.isEmpty ? 'Quel morceau ?' : await spotify.searchPlay(q),
           'playlist' => q.isEmpty ? 'Quelle playlist ?' : await spotify.playPlaylist(q),
           'file' => q.isEmpty ? 'Quel morceau ?' : await spotify.queue(q),
@@ -156,9 +176,7 @@ class MusicModule extends HubModule {
         };
         unawaited(Future<void>.delayed(const Duration(seconds: 1), player.refresh));
         return r;
-      },
-    ),
-  ];
+  }
 
   @override
   Widget buildSummary(BuildContext context) => NowPlayingTile(module: this);
@@ -977,14 +995,7 @@ class _MusicPage extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               NowPlayingStage(p: module.player),
-              module.spotify.connected
-                  ? _SpotifyPicker(module: module)
-                  : EmptyHint(
-                      'Connecte ton compte Spotify pour chercher et lancer n\'importe quel morceau, '
-                      'album, artiste ou playlist, et choisir où ça joue.',
-                      icon: Icons.search_rounded,
-                      action: ('Connecter Spotify', () => module.showSettings(context)),
-                    ),
+              module.spotify.connected ? _SpotifyPicker(module: module) : _FreePicker(module: module),
               _TrackList(
                 key: const ValueKey('liked'),
                 module: module,
@@ -1814,7 +1825,7 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
                   a.sub,
                   a.image,
                   true,
-                  () => _openList(a.name, () => api.artistTopTracks(a.id), playUri: a.uri),
+                  () => _openList(a.name, () => api.artistTracks(a.name), playUri: a.uri),
                 ),
             ]),
           ),
@@ -1899,7 +1910,16 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
           FutureBuilder(
             future: _results,
             builder: (context, snap) {
-              if (snap.hasError) return ErrorBanner('${snap.error}');
+              if (snap.hasError) {
+                // L'API Spotify refuse (pas Premium…) : recherche sans compte.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ErrorBanner('${snap.error}'),
+                    _FreeResults(module: widget.module, query: search.text.trim()),
+                  ],
+                );
+              }
               if (!snap.hasData) return const Padding(padding: EdgeInsets.all(32), child: LoadingHint());
               return _resultsView(snap.data!);
             },
@@ -1930,4 +1950,149 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
       ],
     );
   }
+}
+
+
+/// Choisir sa musique **sans** l'API Spotify (pas de compte connecté, ou
+/// Spotify refuse) : recherche Deezer (publique), extrait de 30 s, et le
+/// morceau s'ouvre dans ton appli Spotify ou le lecteur web.
+class _FreePicker extends StatefulWidget {
+  const _FreePicker({required this.module});
+  final MusicModule module;
+
+  @override
+  State<_FreePicker> createState() => _FreePickerState();
+}
+
+class _FreePickerState extends State<_FreePicker> {
+  final search = TextEditingController();
+  String query = '';
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+        child: TextField(
+          controller: search,
+          onChanged: (q) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 450), () => setState(() => query = q.trim()));
+          },
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search_rounded),
+            hintText: 'Un titre, un artiste…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Sans compte Spotify connecté : touche un morceau pour l\'ouvrir dans ton appli Spotify.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            TextButton(onPressed: () => widget.module.showSettings(context), child: const Text('Connecter Spotify')),
+          ],
+        ),
+      ),
+      if (query.isNotEmpty) _FreeResults(key: ValueKey(query), module: widget.module, query: query),
+    ],
+  );
+}
+
+class _FreeResults extends StatefulWidget {
+  const _FreeResults({super.key, required this.module, required this.query});
+  final MusicModule module;
+  final String query;
+
+  @override
+  State<_FreeResults> createState() => _FreeResultsState();
+}
+
+class _FreeResultsState extends State<_FreeResults> {
+  late final Future<List<MusicTrack>> future = widget.module.deezer.search(widget.query);
+  AudioPlayer? _preview;
+  String? _playing;
+
+  @override
+  void dispose() {
+    unawaited(_preview?.dispose());
+    super.dispose();
+  }
+
+  /// Ouvre le morceau dans l'appli Spotify (recherche précise), sinon le
+  /// lecteur web.
+  Future<void> _open(MusicTrack t) async {
+    final q = '${t.title} ${t.artist}';
+    final ok = await launchUrl(Uri.parse('spotify:search:${Uri.encodeComponent(q)}'));
+    if (!ok && mounted) {
+      await openLink(context, 'https://open.spotify.com/search/${Uri.encodeComponent(q)}');
+    }
+  }
+
+  Future<void> _togglePreview(MusicTrack t) async {
+    final p = _preview ??= AudioPlayer();
+    if (_playing == t.id) {
+      await p.stop();
+      setState(() => _playing = null);
+      return;
+    }
+    setState(() => _playing = t.id);
+    await p.stop();
+    await p.play(UrlSource(t.preview!));
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder(
+    future: future,
+    builder: (context, snap) {
+      if (snap.hasError) return ErrorBanner('${snap.error}');
+      if (!snap.hasData) return const Padding(padding: EdgeInsets.all(24), child: LoadingHint());
+      final list = snap.data!;
+      if (list.isEmpty) return const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Rien trouvé'));
+      return Column(
+        children: [
+          for (final t in list)
+            ListTile(
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(width: 46, height: 46, child: CoverImage(url: t.cover, color: widget.module.player.accent)),
+              ),
+              title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text('${t.artist} · ${t.album}', maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (t.preview != null)
+                    IconButton(
+                      tooltip: 'Extrait de 30 s',
+                      icon: Icon(_playing == t.id ? Icons.stop_circle_rounded : Icons.play_circle_outline_rounded),
+                      onPressed: () => _togglePreview(t),
+                    ),
+                  IconButton(
+                    tooltip: 'Ouvrir dans Spotify',
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    onPressed: () => _open(t),
+                  ),
+                ],
+              ),
+              onTap: () => _open(t),
+            ),
+        ],
+      );
+    },
+  );
 }

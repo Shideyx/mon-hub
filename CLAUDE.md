@@ -24,3 +24,8 @@
   locales : JsonFile chiffré via `lib/core/vault.dart` ; secrets : `ModuleStore.writeSecret`.
 - École Directe : API non officielle (`ed_client.dart`), décodage des messages dans
   `EdClient.decodeContent` / `htmlToText` ; cloud : `EdClient.cloud`.
+- Clicky agit (`act.dart` + `ClickyController.act`) : boucle capture → action JSON → exécution
+  (`Win.glide/click/drag/windowList/windowAction`), déclenchée par `[AGIR]…[/AGIR]` ou « prends la
+  main ». Compagnons : `buddies.dart`. Voix : une seule à la fois (`VoiceLock`).
+- Spotify : depuis février 2026, appli en mode développement = Premium du créateur obligatoire,
+  `/me/library` pour les j'aime, plus de « top tracks » ; sans API → recherche Deezer + `spotify:search:`.

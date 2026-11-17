@@ -903,8 +903,9 @@ class _MicEngineState extends State<_MicEngine> {
             const SizedBox(height: 4),
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'auto', label: Text('Automatique')),
+                ButtonSegment(value: 'auto', label: Text('Auto')),
                 ButtonSegment(value: 'whisper', label: Text('Whisper (PC)')),
+                ButtonSegment(value: 'gemini', label: Text('Gemini')),
                 ButtonSegment(value: 'windows', label: Text('Windows')),
               ],
               selected: {c.micEngine},
@@ -915,7 +916,8 @@ class _MicEngineState extends State<_MicEngine> {
               switch (c.micEngine) {
                 'whisper' => 'Whisper, sur ton PC, sans internet : le texte s\'écrit quand tu as fini de parler.',
                 'windows' => 'La reconnaissance de Windows (comme Win + H) : le texte s\'écrit pendant que tu parles.',
-                _ => 'Windows d\'abord ; s\'il ne marche pas, Whisper prend le relais tout seul.',
+                'gemini' => 'Gemini (ta clé gratuite, rubrique Voix) : rien à installer, mais le son part chez Google.',
+                _ => 'Windows d\'abord ; s\'il ne marche pas, Whisper (ou Gemini si tu as une clé) prend le relais tout seul.',
               },
               style: text.bodySmall,
             ),

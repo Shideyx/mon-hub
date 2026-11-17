@@ -162,19 +162,42 @@ class SpotifyApi {
       _access = null;
       throw 'Spotify : session expirée, réessaie';
     }
-    if (r.statusCode == 403) {
-      final msg = _msg(r);
-      throw msg.toLowerCase().contains('premium')
-          ? 'Cette commande demande Spotify Premium (sinon, utilise l\'appli Spotify)'
-          : 'Spotify refuse : $msg (ton compte est-il ajouté dans « User Management » de ton appli ?)';
-    }
-    if (r.statusCode == 429) throw 'Spotify demande de patienter un peu';
+    if (r.statusCode == 403) throw explain403(_msg(r));
+    if (r.statusCode == 429) throw 'Spotify demande de patienter un peu (code 429)';
     if (r.statusCode == 404 && path.contains('/me/player')) {
       throw 'Spotify : no active device (404)';
     }
-    if (r.statusCode >= 400) throw 'Spotify : ${_msg(r)}';
+    if (r.statusCode == 404) {
+      throw 'Spotify (code 404) : ${_msg(r)}. Cette fonction a peut-être été retirée par Spotify '
+          'pour les applis en mode développement (février 2026).';
+    }
+    if (r.statusCode >= 400) throw 'Spotify (code ${r.statusCode}) : ${_msg(r)}';
     return r;
   }
+
+  /// Refus 403 expliqué. Depuis février 2026, Spotify exige que le compte
+  /// qui a créé l'appli (developer.spotify.com) ait Premium, et limite
+  /// l'appli à 5 comptes déclarés dans « User Management ».
+  static String explain403(String msg) {
+    final low = msg.toLowerCase();
+    if (low.contains('premium') && (low.contains('owner') || low.contains('subscription'))) {
+      return 'Spotify refuse (code 403) : depuis février 2026, le compte Spotify qui a créé l\'appli sur '
+          'developer.spotify.com doit avoir Premium. Sans Premium, Mon Hub cherche avec Deezer et ouvre '
+          'les morceaux dans ton appli Spotify.';
+    }
+    if (low.contains('premium')) {
+      return 'Cette commande demande Spotify Premium (code 403). Sans Premium, le morceau s\'ouvre dans l\'appli Spotify.';
+    }
+    if (low.contains('regist') || low.contains('dashboard') || low.contains('user may not')) {
+      return 'Spotify refuse ton compte (code 403) : ajoute l\'adresse e-mail de ton compte Spotify dans '
+          '« User Management » de ton appli sur developer.spotify.com (5 comptes au plus).';
+    }
+    return 'Spotify refuse (code 403) : $msg';
+  }
+
+  /// L'API ne peut pas servir (compte du créateur sans Premium…) : Mon Hub
+  /// passe au mode sans API.
+  static bool isBlocked(Object e) => '$e'.contains('code 403') && '$e'.contains('février 2026');
 
   static String _msg(http.Response r) {
     try {
@@ -415,11 +438,14 @@ class SpotifyApi {
     );
   }
 
-  /// Les titres les plus écoutés d'un artiste.
-  Future<List<MusicTrack>> artistTopTracks(String id) async {
-    final j = await _get('/artists/$id/top-tracks?market=from_token');
+  /// Des titres d'un artiste (l'adresse « meilleurs titres » a été retirée
+  /// par Spotify en 2026 : on passe par la recherche).
+  Future<List<MusicTrack>> artistTracks(String name) async {
+    final j = await _get(
+      '/search?q=${Uri.encodeQueryComponent('artist:"$name"')}&type=track&limit=10',
+    );
     return [
-      for (final t in (j['tracks'] as List?) ?? const [])
+      for (final t in ((j['tracks'] as Map?)?['items'] as List?) ?? const [])
         if (t is Map) track(t),
     ];
   }
@@ -564,14 +590,26 @@ class SpotifyApi {
   Future<void> next() => _player('POST', '/me/player/next');
   Future<void> previous() => _player('POST', '/me/player/previous');
 
+  /// Titre liké ? (nouvelle bibliothèque `/me/library` depuis 2026, ancienne
+  /// adresse en secours).
   Future<bool> isLiked(String trackId) async {
-    final r = await _req('GET', '/me/tracks/contains?ids=$trackId');
+    http.Response r;
+    try {
+      r = await _req('GET', '/me/library/contains?uris=${Uri.encodeQueryComponent('spotify:track:$trackId')}');
+    } catch (_) {
+      r = await _req('GET', '/me/tracks/contains?ids=$trackId');
+    }
     final j = jsonDecode(r.body);
     return j is List && j.isNotEmpty && j.first == true;
   }
 
-  Future<void> setLiked(String trackId, bool like) =>
-      _req(like ? 'PUT' : 'DELETE', '/me/tracks?ids=$trackId');
+  Future<void> setLiked(String trackId, bool like) async {
+    try {
+      await _req(like ? 'PUT' : 'DELETE', '/me/library?uris=${Uri.encodeQueryComponent('spotify:track:$trackId')}');
+    } catch (_) {
+      await _req(like ? 'PUT' : 'DELETE', '/me/tracks?ids=$trackId');
+    }
+  }
 }
 
 /// Résultats d'une recherche Spotify.
@@ -687,6 +725,15 @@ class DeezerApi {
       year: '${j['release_date'] ?? ''}'.split('-').first,
       label: j['label'] as String?,
     );
+  }
+
+  /// Recherche publique (sans compte) : titres, avec extrait de 30 s.
+  Future<List<MusicTrack>> search(String query, {int limit = 25}) async {
+    final j = await _get('/search?q=${Uri.encodeQueryComponent(query)}&limit=$limit');
+    return [
+      for (final t in (j['data'] as List?) ?? const [])
+        if (t is Map) track(t),
+    ];
   }
 
   /// Identifiant d'un profil Deezer (lien deezer.com/fr/profile/123… ou nombre).
