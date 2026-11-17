@@ -116,11 +116,37 @@ class AppSession extends ChangeNotifier {
     _open(acc);
   }
 
+  /// Après 5 essais ratés, on attend de plus en plus longtemps (30 s, 1 min,
+  /// 2 min… jusqu'à 15 min) : deviner un mot de passe devient impossible.
+  static Duration lockFor(int fails) {
+    if (fails < 5) return Duration.zero;
+    final s = 30 * (1 << (fails - 5).clamp(0, 5));
+    return Duration(seconds: s.clamp(30, 900));
+  }
+
   Future<void> signIn(String login, String password, {bool remember = true}) async {
-    final acc = accounts[normalize(login)];
+    final id = normalize(login);
+    final failKey = 'app.fails.$id';
+    final rec = ModuleStore.global.getStringList(failKey) ?? const [];
+    final fails = rec.isEmpty ? 0 : int.tryParse(rec.first) ?? 0;
+    final last = rec.length > 1 ? DateTime.tryParse(rec[1]) : null;
+    final wait = lockFor(fails);
+    if (last != null && wait > Duration.zero) {
+      final left = wait - DateTime.now().difference(last);
+      if (left > Duration.zero) {
+        throw 'Trop d\'essais ratés : réessaie dans '
+            '${left.inMinutes >= 1 ? '${left.inMinutes + 1} min' : '${left.inSeconds + 1} s'}.';
+      }
+    }
+    final acc = accounts[id];
     if (acc == null || _hash(acc.salt, password) != acc.hash) {
+      await ModuleStore.global.setStringList(failKey, [
+        '${fails + 1}',
+        DateTime.now().toIso8601String(),
+      ]);
       throw 'Identifiant ou mot de passe incorrect';
     }
+    await ModuleStore.global.remove(failKey);
     if (remember) {
       await ModuleStore.global.setString(_currentKey, acc.login);
     } else {

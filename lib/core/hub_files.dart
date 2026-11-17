@@ -7,9 +7,10 @@ import 'package:path_provider/path_provider.dart';
 
 import 'claude_bridge.dart';
 import 'module_store.dart';
+import 'vault.dart';
 
 /// Fichiers de données du compte Mon Hub connecté (historiques des chats,
-/// journal de Clicky, routines…).
+/// journal de Clicky, routines…), chiffrés sur le disque (voir [Vault]).
 ///
 /// Sur PC, ils vivent dans le dossier de Mon Hub (`%APPDATA%\MonHub\data`),
 /// que « Clicky partout » lit et écrit aussi : les deux programmes voient
@@ -92,7 +93,18 @@ class JsonFile<T> extends ChangeNotifier {
       if (!await f.exists()) return value;
       final stamp = (await f.stat()).modified;
       if (stamp == _stamp && _value != null) return value;
-      final raw = await f.readAsString();
+      final stored = await f.readAsString();
+      String raw;
+      try {
+        // Chiffré sur le disque (coffre local), ou ancien fichier en clair.
+        raw = await Vault.open(stored);
+      } catch (_) {
+        // Clé perdue ou fichier abîmé : on garde une copie au lieu de
+        // l'écraser à la prochaine sauvegarde.
+        await f.copy('${f.path}.illisible-${DateTime.now().millisecondsSinceEpoch}');
+        _stamp = stamp;
+        return value;
+      }
       _value = raw.trim().isEmpty ? empty() : decode(jsonDecode(raw));
       _stamp = stamp;
     } catch (_) {
@@ -108,7 +120,7 @@ class JsonFile<T> extends ChangeNotifier {
     if (f == null) return;
     try {
       final tmp = File('${f.path}.tmp');
-      await tmp.writeAsString(jsonEncode(encode(value)), flush: true);
+      await tmp.writeAsString(await Vault.seal(jsonEncode(encode(value))), flush: true);
       await tmp.rename(f.path);
       _stamp = (await f.stat()).modified;
     } catch (_) {}

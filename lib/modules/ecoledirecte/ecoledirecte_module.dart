@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io' show File;
+import 'dart:io' show Directory, File, Platform;
 import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
@@ -363,7 +363,70 @@ class EcoleDirecteModule extends HubModule {
       required: ['id'],
       run: (a) => withSession(() => client.messageContent((a['id'] as num).toInt())),
     ),
+    HubTool(
+      name: 'ecole_cloud',
+      description:
+          'Fichiers et dossiers de mon cloud École Directe. Sans dossier : la racine ; '
+          'sinon l\'id d\'un dossier donné par un appel précédent.',
+      params: {'dossier': ('string', 'id du dossier (facultatif)')},
+      run: (a) async {
+        final id = '${a['dossier'] ?? ''}'.trim();
+        final n = await withSession(() => client.cloud(folderId: id.isEmpty ? null : id));
+        return {
+          'dossier': n.name,
+          'contenu': [
+            for (final c in n.children)
+              {
+                'id': c.id,
+                'nom': c.name,
+                'type': c.folder ? 'dossier' : 'fichier',
+                if (!c.folder) 'taille': fileSize(c.size),
+                if (c.date != null) 'date': c.date,
+              },
+          ],
+        };
+      },
+    ),
+    HubTool(
+      name: 'ecole_cloud_telecharger',
+      description:
+          'Télécharge un fichier de mon cloud École Directe dans Téléchargements\\École Directe '
+          '(id donné par ecole_cloud) et renvoie où il est.',
+      params: {
+        'id': ('string', 'id du fichier'),
+        'nom': ('string', 'nom du fichier'),
+      },
+      required: ['id'],
+      run: (a) async {
+        final id = '${a['id']}';
+        final name = '${a['nom'] ?? ''}'.trim().isEmpty
+            ? id.split(RegExp(r'[\\/]')).last
+            : '${a['nom']}'.trim();
+        final f = EdCloudNode(id: id, name: name, folder: false);
+        final bytes = await withSession(() => client.cloudFile(f));
+        return 'Enregistré : ${await saveDownload(name, bytes)}';
+      },
+    ),
   ];
+
+  /// Enregistre un fichier dans Téléchargements\École Directe (sans écraser).
+  static Future<String> saveDownload(String name, List<int> bytes) async {
+    final env = Platform.environment;
+    final home = env['USERPROFILE'] ?? env['HOME'] ?? Directory.systemTemp.path;
+    final sep = Platform.pathSeparator;
+    final dir = Directory([home, 'Downloads', 'École Directe'].join(sep));
+    await dir.create(recursive: true);
+    final safe = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final dot = safe.lastIndexOf('.');
+    final base = dot > 0 ? safe.substring(0, dot) : safe;
+    final ext = dot > 0 ? safe.substring(dot) : '';
+    var f = File('${dir.path}$sep$safe');
+    for (var i = 2; await f.exists(); i++) {
+      f = File('${dir.path}$sep$base ($i)$ext');
+    }
+    await f.writeAsBytes(bytes, flush: true);
+    return f.path;
+  }
 
   List<HubNotification> _lastItems = const [];
 
@@ -510,7 +573,7 @@ class EcoleDirecteModule extends HubModule {
   Widget buildPage(BuildContext context) {
     _ctx = context;
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: Text(name),
@@ -535,6 +598,7 @@ class EcoleDirecteModule extends HubModule {
               Tab(text: 'Devoirs'),
               Tab(text: 'Notes'),
               Tab(text: 'Messages'),
+              Tab(text: 'Cloud'),
             ],
           ),
         ),
@@ -569,6 +633,7 @@ class EcoleDirecteModule extends HubModule {
                     wrap(_homeworkTiles(context), 'Aucun devoir à venir 🎉'),
                     wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
                     _MessagesTab(module: this),
+                    _CloudTab(module: this),
                   ],
                 );
               },
@@ -921,5 +986,205 @@ class _MessagePageState extends State<_MessagePage> {
         ],
       ),
     );
+  }
+}
+
+
+/// Taille lisible (« 1,2 Mo »).
+String fileSize(int bytes) {
+  if (bytes <= 0) return '';
+  const units = ['o', 'Ko', 'Mo', 'Go'];
+  var v = bytes.toDouble();
+  var i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return '${i == 0 ? v.toInt() : v.toStringAsFixed(1).replaceAll('.', ',')} ${units[i]}';
+}
+
+/// Le cloud École Directe : dossiers et fichiers, à ouvrir ou enregistrer.
+class _CloudTab extends StatefulWidget {
+  const _CloudTab({required this.module});
+  final EcoleDirecteModule module;
+
+  @override
+  State<_CloudTab> createState() => _CloudTabState();
+}
+
+class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin {
+  /// Chemin parcouru : la racine, puis chaque dossier ouvert.
+  final _path = <EdCloudNode>[];
+  Future<EdCloudNode>? _future;
+  String? _downloading;
+
+  EcoleDirecteModule get m => widget.module;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load(null);
+  }
+
+  Future<EdCloudNode> _load(EdCloudNode? folder) async {
+    if (folder != null && folder.loaded && folder.children.isNotEmpty) return folder;
+    final n = await m.withSession(() => m.client.cloud(folderId: folder?.id));
+    return n;
+  }
+
+  void _open(EdCloudNode folder) {
+    setState(() {
+      _future = _load(folder).then((n) {
+        _path.add(n);
+        return n;
+      });
+    });
+  }
+
+  void _up(int index) {
+    setState(() {
+      _path.removeRange(index + 1, _path.length);
+      final n = _path[index];
+      _future = Future.value(n);
+    });
+  }
+
+  Future<void> _download(EdCloudNode f, {required bool open}) async {
+    setState(() => _downloading = f.id);
+    try {
+      final bytes = await m.withSession(() => m.client.cloudFile(f));
+      String path;
+      if (open) {
+        path = await EcoleDirecteModule.saveDownload(f.name, bytes);
+      } else {
+        final loc = await getSaveLocation(suggestedName: f.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'));
+        if (loc == null) return;
+        await File(loc.path).writeAsBytes(bytes, flush: true);
+        path = loc.path;
+      }
+      if (open) {
+        await launchUrl(Uri.file(path));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Enregistré : $path'),
+            action: SnackBarAction(label: 'Ouvrir', onPressed: () => launchUrl(Uri.file(path))),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => _downloading = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return FutureBuilder(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return ListView(
+            children: [
+              ErrorBanner('${snap.error}'),
+              Center(
+                child: TextButton.icon(
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Réessayer'),
+                  onPressed: () => setState(() {
+                    _path.clear();
+                    _future = _load(null);
+                  }),
+                ),
+              ),
+            ],
+          );
+        }
+        if (!snap.hasData) return const LoadingHint();
+        if (_path.isEmpty) _path.add(snap.data!);
+        final here = _path.last;
+        final text = Theme.of(context).textTheme;
+        return RefreshIndicator(
+          onRefresh: () async {
+            final again = m.withSession(() => m.client.cloud(folderId: _path.length == 1 ? null : here.id));
+            final n = await again;
+            setState(() {
+              _path[_path.length - 1] = n;
+              _future = Future.value(n);
+            });
+          },
+          child: ListView(
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _path.length; i++) ...[
+                      if (i > 0) const Icon(Icons.chevron_right_rounded, size: 18),
+                      TextButton.icon(
+                        icon: Icon(i == 0 ? Icons.cloud_rounded : Icons.folder_rounded, size: 18),
+                        label: Text(i == 0 ? 'Mon cloud' : _path[i].name),
+                        onPressed: i == _path.length - 1 ? null : () => _up(i),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (here.children.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: EmptyHint('Ce dossier est vide', icon: Icons.folder_open_rounded),
+                ),
+              for (final c in here.children)
+                ListTile(
+                  leading: Icon(
+                    c.folder ? Icons.folder_rounded : _fileIcon(c.name),
+                    color: c.folder ? m.color : null,
+                  ),
+                  title: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    [
+                      if (!c.folder && c.size > 0) fileSize(c.size),
+                      if (c.date != null) dayLabel(c.date!),
+                    ].join(' · '),
+                    style: text.labelSmall,
+                  ),
+                  trailing: c.folder
+                      ? const Icon(Icons.chevron_right_rounded)
+                      : _downloading == c.id
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : IconButton(
+                          tooltip: 'Enregistrer sous…',
+                          icon: const Icon(Icons.download_rounded),
+                          onPressed: () => _download(c, open: false),
+                        ),
+                  onTap: c.folder ? () => _open(c) : () => _download(c, open: true),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static IconData _fileIcon(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    return switch (ext) {
+      'pdf' => Icons.picture_as_pdf_rounded,
+      'doc' || 'docx' || 'odt' || 'txt' || 'rtf' => Icons.description_rounded,
+      'xls' || 'xlsx' || 'ods' || 'csv' => Icons.table_chart_rounded,
+      'ppt' || 'pptx' || 'odp' => Icons.slideshow_rounded,
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'bmp' => Icons.image_rounded,
+      'mp3' || 'wav' || 'm4a' || 'ogg' => Icons.audio_file_rounded,
+      'mp4' || 'mov' || 'avi' || 'mkv' => Icons.video_file_rounded,
+      'zip' || 'rar' || '7z' => Icons.folder_zip_rounded,
+      _ => Icons.insert_drive_file_rounded,
+    };
   }
 }

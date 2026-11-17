@@ -307,24 +307,140 @@ class EdClient {
 
   static int? _int(Object? v) => v is int ? v : int.tryParse('${v ?? ''}');
 
-  static String _b64(String? s) {
-    if (s == null || s.isEmpty) return '';
+  /// Texte lisible à partir du HTML d'École Directe : sans balises ni mise
+  /// en forme Word, accents (`&eacute;`, `&#233;`…) remis, sauts de ligne
+  /// gardés.
+  static String htmlToText(String html) {
+    var s = html.replaceAll('\r\n', '\n');
+    // Copié-collé depuis Word : commentaires conditionnels, styles, XML.
+    s = s.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+    s = s.replaceAll(
+      RegExp(r'<(style|script|head|xml|title)\b[^>]*>.*?</\1\s*>', caseSensitive: false, dotAll: true),
+      '',
+    );
+    // Les retours à la ligne du code HTML ne comptent pas, les balises si.
+    // Les blocs (paragraphes, listes…) mettent un \u0001 : plusieurs à la
+    // suite ne font qu'un saut de ligne.
+    const block = '\u0001';
+    s = s.replaceAll(RegExp(r'\s*\n\s*'), ' ');
+    s = s.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+    s = s.replaceAll(RegExp(r'<li\b[^>]*>', caseSensitive: false), '$block• ');
+    s = s.replaceAll(
+      RegExp(r'</?(p|div|li|tr|h[1-6]|ul|ol|table|blockquote)\b[^>]*>', caseSensitive: false),
+      block,
+    );
+    s = s.replaceAll(RegExp(r'</t[dh]\s*>', caseSensitive: false), '  ');
+    s = s.replaceAll(RegExp(r'<[^>]*>'), '');
+    s = decodeEntities(s);
+    // HTML échappé deux fois (« &lt;p&gt; ») : on recommence une fois.
+    if (RegExp(r'<(p|br|div|span|/p|/div|strong|b|i|u|a|font|li)\b', caseSensitive: false).hasMatch(s)) {
+      return htmlToText(s.replaceAll(block, '<br>'));
+    }
+    s = s.replaceAll(RegExp('[ \\t]*$block[$block \\t]*'), '\n');
+    final lines = [
+      for (final l in s.split('\n')) l.replaceAll(RegExp(r'[ \t ]+'), ' ').trim(),
+    ];
+    return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  }
+
+  static final Map<String, String> _entities = () {
+    final m = <String, String>{
+      'nbsp': ' ', 'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'",
+      'rsquo': '’', 'lsquo': '‘', 'rdquo': '”', 'ldquo': '“',
+      'laquo': '«', 'raquo': '»', 'hellip': '…', 'ndash': '–', 'mdash': '—',
+      'euro': '€', 'deg': '°', 'bull': '•', 'middot': '·', 'copy': '©', 'reg': '®',
+      'trade': '™', 'times': '×', 'divide': '÷', 'sup2': '²', 'sup3': '³',
+      'frac12': '½', 'frac14': '¼', 'frac34': '¾', 'para': '¶', 'sect': '§',
+      'oelig': 'œ', 'OElig': 'Œ', 'aelig': 'æ', 'AElig': 'Æ', 'ccedil': 'ç',
+      'Ccedil': 'Ç', 'szlig': 'ß', 'iexcl': '¡', 'iquest': '¿', 'pound': '£',
+      'cent': '¢', 'yen': '¥', 'plusmn': '±', 'micro': 'µ', 'shy': '', 'zwnj': '',
+      'zwj': '', 'lrm': '', 'rlm': '', 'thinsp': ' ', 'ensp': ' ', 'emsp': ' ',
+      'rarr': '→', 'larr': '←', 'harr': '↔', 'uarr': '↑', 'darr': '↓',
+      'le': '≤', 'ge': '≥', 'ne': '≠', 'infin': '∞', 'check': '✓', 'ordm': 'º', 'ordf': 'ª',
+    };
+    // Lettres accentuées : agrave, Eacute, ocirc, uuml, ntilde…
+    const marks = {
+      'grave': 'àèìòùÀÈÌÒÙ',
+      'acute': 'áéíóúýÁÉÍÓÚÝ',
+      'circ': 'âêîôûÂÊÎÔÛ',
+      'uml': 'äëïöüÿÄËÏÖÜŸ',
+      'tilde': 'ãõñÃÕÑ',
+    };
+    const bases = {
+      'grave': 'aeiouAEIOU',
+      'acute': 'aeiouyAEIOUY',
+      'circ': 'aeiouAEIOU',
+      'uml': 'aeiouyAEIOUY',
+      'tilde': 'aonAON',
+    };
+    for (final e in marks.entries) {
+      final b = bases[e.key]!;
+      for (var i = 0; i < b.length; i++) {
+        m['${b[i]}${e.key}'] = e.value[i];
+      }
+    }
+    return m;
+  }();
+
+  /// Remplace les entités HTML (`&eacute;`, `&#233;`, `&#xE9;`…).
+  static String decodeEntities(String s) => s.replaceAllMapped(
+    RegExp(r'&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,8});'),
+    (m) {
+      final e = m[1]!;
+      if (e.startsWith('#')) {
+        final hex = e.length > 1 && (e[1] == 'x' || e[1] == 'X');
+        final code = int.tryParse(hex ? e.substring(2) : e.substring(1), radix: hex ? 16 : 10);
+        if (code == null || code == 0 || code > 0x10FFFF) return m[0]!;
+        // Windows-1252 glissé dans le HTML (&#146; = ’).
+        const cp1252 = {
+          128: '€', 130: '‚', 132: '„', 133: '…', 145: '‘', 146: '’',
+          147: '“', 148: '”', 149: '•', 150: '–', 151: '—', 156: 'œ', 140: 'Œ',
+        };
+        return cp1252[code] ?? String.fromCharCode(code);
+      }
+      return _entities[e] ?? _entities[e.toLowerCase()] ?? m[0]!;
+    },
+  );
+
+  /// Octets → texte : UTF-8, sinon l'ancien encodage Windows (Latin-1).
+  static String decodeBytes(List<int> bytes) => _utf8(bytes) ?? latin1.decode(bytes, allowInvalid: true);
+
+  static String? _utf8(List<int> bytes) {
     try {
-      return utf8.decode(base64.decode(s), allowMalformed: true);
-    } catch (_) {
-      return s;
+      return utf8.decode(bytes);
+    } on FormatException {
+      return null;
     }
   }
 
-  static String htmlToText(String html) => html
-      .replaceAll(RegExp(r'<br\s*/?>|</p>|</div>|</li>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'<[^>]+>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&quot;', '"')
-      .replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n')
-      .trim();
+  /// Le texte a l'air d'être du vrai texte (pas des octets au hasard).
+  static bool _looksText(String s) {
+    if (s.isEmpty) return false;
+    final bad = s.runes.where((r) => (r < 32 && r != 9 && r != 10 && r != 13) || r == 0xFFFD).length;
+    return bad <= s.length * 0.02;
+  }
+
+  /// Contenu d'un message ou d'un devoir : du HTML en base64 (parfois avec
+  /// des retours à la ligne), ou directement du HTML / du texte.
+  static String decodeContent(String? raw) {
+    var s = (raw ?? '').trim();
+    if (s.isEmpty) return '';
+    final compact = s.replaceAll(RegExp(r'\s+'), '');
+    if (compact.length >= 8 && RegExp(r'^[A-Za-z0-9+/_-]+={0,2}$').hasMatch(compact)) {
+      try {
+        final bytes = base64.decode(
+          base64.normalize(compact.replaceAll('-', '+').replaceAll('_', '/')),
+        );
+        // Un vrai contenu codé : du HTML, ou un texte UTF-8 propre assez
+        // long (un mot comme « Rappeler » n'est pas du base64).
+        final u = _utf8(bytes);
+        final t = u ?? latin1.decode(bytes, allowInvalid: true);
+        final html = t.contains('<') && t.contains('>');
+        if (_looksText(t) && (html || (u != null && (t.contains(' ') || compact.length >= 24)))) s = t;
+      } catch (_) {}
+    }
+    return htmlToText(s);
+  }
 
   /// Année scolaire au format « 2026-2027 ».
   static String schoolYear([DateTime? d]) {
@@ -411,10 +527,10 @@ class EdClient {
   Future<String> messageContent(int id) async => (await message(id)).text;
 
   /// Télécharge une pièce jointe (octets du fichier).
-  Future<List<int>> attachment(EdAttachment f) async {
+  Future<List<int>> attachment(EdAttachment f, {String? fileId}) async {
     await _pace();
     final uri = Uri.parse(
-      '$_base/telechargement.awp?verbe=get&fichierId=${f.id}'
+      '$_base/telechargement.awp?verbe=get&fichierId=${Uri.encodeQueryComponent(fileId ?? '${f.id}')}'
       '&leTypeDeFichier=${f.type.isEmpty ? 'PIECE_JOINTE' : f.type}&anneeMessages=$_year&v=$_v',
     );
     final res = await _http
@@ -428,6 +544,36 @@ class EdClient {
     if (head.startsWith('{"code"')) throw 'Pièce jointe indisponible';
     return res.bodyBytes;
   }
+
+  /// Cloud École Directe : un dossier et ce qu'il contient. Sans
+  /// [folderId] : la racine de ton cloud.
+  ///
+  /// Comme le site officiel (`cloud/E/{id}.awp`, compte parent :
+  /// `cloud/P/{id}`) ; les sous-dossiers pas encore chargés se demandent
+  /// avec `idFolder`.
+  Future<EdCloudNode> cloud({String? folderId}) async {
+    final who = familyId != null ? 'P/$familyId' : 'E/$accountId';
+    final q = folderId == null ? '' : '&idFolder=${Uri.encodeQueryComponent(folderId)}';
+    var r = await _post('/cloud/$who.awp?verbe=get$q', {});
+    if (r['code'] != 200 && familyId != null) {
+      // Compte parent sans cloud : celui de l'élève.
+      r = await _post('/cloud/E/$accountId.awp?verbe=get$q', {});
+    }
+    if (r['code'] != 200) {
+      throw switch (r['code']) {
+        403 || 210 => 'Le cloud n\'est pas activé pour ton compte par ton établissement.',
+        _ => 'Cloud École Directe indisponible (${explain(r)})',
+      };
+    }
+    final root = EdCloudNode.parse(r['data'], fallbackId: folderId ?? '');
+    if (folderId == null) return root;
+    // Certains serveurs renvoient tout l'arbre : on retrouve le dossier.
+    return root.find(folderId) ?? root;
+  }
+
+  /// Télécharge un fichier du cloud.
+  Future<List<int>> cloudFile(EdCloudNode f) =>
+      attachment(EdAttachment(0, f.name, 'CLOUD'), fileId: f.id);
 
   /// Répond à l'expéditeur d'un message.
   Future<void> reply(EdMessage original, String text) async {
@@ -477,7 +623,7 @@ class EdClient {
             '${todo['idDevoir'] ?? '$day${m['matiere']}'}',
             DateTime.tryParse(day) ?? DateTime.now(),
             m['matiere'] as String? ?? '',
-            htmlToText(_b64(todo['contenu'] as String?)),
+            decodeContent(todo['contenu'] as String?),
             todo['effectue'] == true,
             m['interrogation'] == true,
           ),
@@ -550,8 +696,10 @@ class EdMessage {
     }
     return EdMessage(
       j['id'] is int ? j['id'] as int : int.tryParse('${j['id']}') ?? 0,
-      (j['subject'] as String?)?.trim().isNotEmpty == true ? j['subject'] as String : '(sans objet)',
-      name.isEmpty ? '?' : name,
+      (j['subject'] as String?)?.trim().isNotEmpty == true
+          ? EdClient.decodeEntities((j['subject'] as String).trim())
+          : '(sans objet)',
+      name.isEmpty ? '?' : EdClient.decodeEntities(name),
       DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
       sent || j['read'] == true,
       f,
@@ -569,6 +717,84 @@ class EdAttachment {
   final String type;
 }
 
+/// Un fichier ou un dossier du cloud École Directe.
+class EdCloudNode {
+  EdCloudNode({
+    required this.id,
+    required this.name,
+    required this.folder,
+    this.size = 0,
+    this.date,
+    this.children = const [],
+    this.loaded = true,
+  });
+
+  /// Chemin donné par École Directe (ex. « \\E\\1234\\Maths\\cours.pdf »).
+  final String id;
+  final String name;
+  final bool folder;
+  final int size;
+  final DateTime? date;
+  final List<EdCloudNode> children;
+
+  /// Contenu déjà envoyé par École Directe (sinon : à demander).
+  final bool loaded;
+
+  EdCloudNode? find(String id) {
+    if (this.id == id) return this;
+    for (final c in children) {
+      final f = c.find(id);
+      if (f != null) return f;
+    }
+    return null;
+  }
+
+  /// Lit la réponse du serveur : une liste de nœuds (la racine en premier)
+  /// ou un seul nœud.
+  static EdCloudNode parse(Object? data, {String fallbackId = ''}) {
+    if (data is List) {
+      final nodes = [for (final e in data) if (e is Map) EdCloudNode.fromJson(e.cast<String, dynamic>())];
+      if (nodes.length == 1 && nodes.first.folder) return nodes.first;
+      return EdCloudNode(id: fallbackId, name: 'Cloud', folder: true, children: nodes);
+    }
+    if (data is Map) {
+      final m = data.cast<String, dynamic>();
+      if (m['type'] != null || m['children'] != null) return EdCloudNode.fromJson(m);
+      for (final k in ['cloud', 'arborescence', 'items', 'fichiers']) {
+        if (m[k] != null) return parse(m[k], fallbackId: fallbackId);
+      }
+    }
+    return EdCloudNode(id: fallbackId, name: 'Cloud', folder: true);
+  }
+
+  factory EdCloudNode.fromJson(Map<String, dynamic> j) {
+    final type = '${j['type'] ?? ''}'.toLowerCase();
+    final kids = j['children'];
+    final folder = type == 'folder' || type == 'dossier' || (type.isEmpty && kids is List);
+    final id = '${j['id'] ?? j['idFile'] ?? j['libelle'] ?? ''}';
+    var name = EdClient.decodeEntities('${j['libelle'] ?? j['name'] ?? ''}').trim();
+    if (name.isEmpty || name == '/' || name == '\\') {
+      name = id.split(RegExp(r'[\\/]')).where((p) => p.isNotEmpty).lastOrNull ?? 'Cloud';
+    }
+    return EdCloudNode(
+      id: id,
+      name: name,
+      folder: folder,
+      size: (j['taille'] as num?)?.toInt() ?? int.tryParse('${j['taille'] ?? ''}') ?? 0,
+      date: DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
+      children: [
+        if (kids is List)
+          for (final k in kids)
+            if (k is Map) EdCloudNode.fromJson(k.cast<String, dynamic>()),
+      ]..sort((a, b) {
+          if (a.folder != b.folder) return a.folder ? -1 : 1;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        }),
+      loaded: folder ? (j['isLoaded'] != false || (kids is List && kids.isNotEmpty)) : true,
+    );
+  }
+}
+
 /// Contenu d'un message École Directe.
 class EdMessageContent {
   EdMessageContent(this.text, this.files);
@@ -576,17 +802,14 @@ class EdMessageContent {
   final List<EdAttachment> files;
 
   factory EdMessageContent.fromJson(Map<String, dynamic> d) {
-    final raw = '${d['content'] ?? ''}';
-    // Le contenu est en base64 (HTML) ; certains établissements renvoient
-    // directement le HTML.
-    final looksB64 = RegExp(r'^[A-Za-z0-9+/=\s]+$').hasMatch(raw) && raw.length % 4 == 0;
-    final html = looksB64 ? EdClient._b64(raw) : raw;
-    return EdMessageContent(EdClient.htmlToText(html), [
+    // Le contenu est en base64 (HTML), parfois coupé en lignes ; certains
+    // établissements renvoient directement le HTML.
+    return EdMessageContent(EdClient.decodeContent('${d['content'] ?? ''}'), [
       for (final f in (d['files'] as List?) ?? const [])
         if (f is Map)
           EdAttachment(
             f['id'] is int ? f['id'] as int : int.tryParse('${f['id']}') ?? 0,
-            '${f['libelle'] ?? f['name'] ?? 'pièce jointe'}',
+            EdClient.decodeEntities('${f['libelle'] ?? f['name'] ?? 'pièce jointe'}'),
             '${f['type'] ?? 'PIECE_JOINTE'}',
           ),
     ]);

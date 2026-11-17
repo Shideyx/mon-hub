@@ -17,3 +17,8 @@
   (`clicky_diagnostic`, `clicky_reparer_micro`) et contrôle du PC (`pc.dart` : `pc_commande`,
   `pc_ouvrir`, `pc_lire`, `pc_ecrire_fichier`). Servis aussi à Claude Code via le pont local
   (`ClaudeBridge.appTools`). Permission : `ClaudeBridge.isWriteAction` + `confirmAction`.
+- Vie privée : **aucun serveur à nous**, toutes les données restent sur l'appareil. Ne jamais
+  ajouter d'envoi de données vers un serveur du créateur (statistiques, journaux…). Données
+  locales : JsonFile chiffré via `lib/core/vault.dart` ; secrets : `ModuleStore.writeSecret`.
+- École Directe : API non officielle (`ed_client.dart`), décodage des messages dans
+  `EdClient.decodeContent` / `htmlToText` ; cloud : `EdClient.cloud`.

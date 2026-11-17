@@ -96,9 +96,15 @@ class MusicModule extends HubModule {
           'Spotify (compte connecté) : action=chercher_jouer + requete (un morceau, un artiste), '
           'action=playlist + requete (une de MES playlists, quand je dis « playlist »), '
           'action=file + requete (ajouter à la file sans couper), action=volume + volume (0-100), '
-          'action=aleatoire + actif (true/false), action=appareils (où Spotify peut jouer).',
+          'action=aleatoire + actif (true/false), action=appareils (où Spotify peut jouer), '
+          'action=album + requete (jouer un album), action=artiste + requete (jouer un artiste), '
+          'action=appareil + requete (faire passer la musique sur le PC, le téléphone, une enceinte…), '
+          'action=chercher + requete (voir les résultats sans jouer).',
       params: {
-        'action': ('string', 'chercher_jouer, playlist, file, volume, aleatoire ou appareils'),
+        'action': (
+          'string',
+          'chercher_jouer, playlist, file, volume, aleatoire, appareils, album, artiste, appareil ou chercher',
+        ),
         'requete': ('string', 'morceau, artiste ou nom de playlist'),
         'volume': ('integer', 'volume de 0 à 100'),
         'actif': ('boolean', 'lecture aléatoire activée'),
@@ -113,6 +119,22 @@ class MusicModule extends HubModule {
           'chercher_jouer' || 'jouer' => q.isEmpty ? 'Quel morceau ?' : await spotify.searchPlay(q),
           'playlist' => q.isEmpty ? 'Quelle playlist ?' : await spotify.playPlaylist(q),
           'file' => q.isEmpty ? 'Quel morceau ?' : await spotify.queue(q),
+          'album' => q.isEmpty ? 'Quel album ?' : await spotify.searchPlayContext(q, 'album'),
+          'artiste' => q.isEmpty ? 'Quel artiste ?' : await spotify.searchPlayContext(q, 'artist'),
+          'appareil' => q.isEmpty ? 'Quel appareil ?' : await spotify.transferByName(q),
+          'chercher' => q.isEmpty
+              ? 'Quoi chercher ?'
+              : await () async {
+                  final r = await spotify.search(q, limit: 5);
+                  if (r.isEmpty) return 'Rien trouvé pour « $q ».';
+                  return [
+                    if (r.tracks.isNotEmpty)
+                      'Titres : ${r.tracks.map((t) => '${t.title} — ${t.artist}').join(' ; ')}',
+                    if (r.artists.isNotEmpty) 'Artistes : ${r.artists.map((a) => a.name).join(', ')}',
+                    if (r.albums.isNotEmpty) 'Albums : ${r.albums.map((a) => '${a.name} (${a.sub})').join(' ; ')}',
+                    if (r.playlists.isNotEmpty) 'Playlists : ${r.playlists.map((p) => p.name).join(', ')}',
+                  ].join('\n');
+                }(),
           'volume' => await () async {
             final v = (a['volume'] as num?)?.toInt() ?? 50;
             await spotify.volume(v);
@@ -888,7 +910,7 @@ class _MusicPage extends StatelessWidget {
   Widget build(BuildContext context) {
     module.player.ensureStarted();
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(module.name),
@@ -904,6 +926,7 @@ class _MusicPage extends StatelessWidget {
             tabAlignment: TabAlignment.start,
             tabs: [
               Tab(icon: Icon(Icons.album_rounded), text: 'En écoute'),
+              Tab(icon: Icon(Icons.search_rounded), text: 'Choisir'),
               Tab(icon: Icon(Icons.favorite_rounded), text: 'Titres likés'),
               Tab(icon: Icon(Icons.queue_music_rounded), text: 'Playlists'),
               Tab(icon: Icon(Icons.history_rounded), text: 'Récents'),
@@ -917,6 +940,14 @@ class _MusicPage extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               NowPlayingStage(p: module.player),
+              module.spotify.connected
+                  ? _SpotifyPicker(module: module)
+                  : EmptyHint(
+                      'Connecte ton compte Spotify pour chercher et lancer n\'importe quel morceau, '
+                      'album, artiste ou playlist, et choisir où ça joue.',
+                      icon: Icons.search_rounded,
+                      action: ('Connecter Spotify', () => module.showSettings(context)),
+                    ),
               _TrackList(
                 key: const ValueKey('liked'),
                 module: module,
@@ -1467,4 +1498,399 @@ class _Step extends StatelessWidget {
       ],
     ),
   );
+}
+
+
+/// « Choisir » : chercher dans tout Spotify et lancer ce qu'on veut, sur
+/// l'appareil qu'on veut.
+class _SpotifyPicker extends StatefulWidget {
+  const _SpotifyPicker({required this.module});
+  final MusicModule module;
+
+  @override
+  State<_SpotifyPicker> createState() => _SpotifyPickerState();
+}
+
+class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveClientMixin {
+  final search = TextEditingController();
+  Timer? _debounce;
+  Future<SpotifySearch>? _results;
+  Future<List<MusicTrack>>? _queue;
+  List<Map<String, dynamic>> _devices = const [];
+  String? _deviceId;
+  double? _volume;
+  Timer? _volumeTimer;
+
+  SpotifyApi get api => widget.module.spotify;
+  Color get color => widget.module.color;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadDevices());
+    _queue = api.userQueue();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _volumeTimer?.cancel();
+    search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDevices() async {
+    try {
+      final d = await api.devices();
+      if (!mounted) return;
+      final active = d.where((x) => x['is_active'] == true).firstOrNull;
+      setState(() {
+        _devices = d;
+        _deviceId = active?['id'] as String? ?? _deviceId;
+        final v = active?['volume_percent'];
+        if (v is num) _volume = v.toDouble();
+      });
+    } catch (_) {}
+  }
+
+  void _onQuery(String q) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _results = q.trim().isEmpty ? null : api.search(q.trim()));
+    });
+  }
+
+  Future<void> _act(Future<void> Function() f, [String? done]) async {
+    try {
+      await f();
+      if (done != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(done)));
+      }
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 800), () {
+        widget.module.player.refresh();
+        if (mounted) setState(() => _queue = api.userQueue());
+      }));
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  void _playTracks(MusicTrack t, List<MusicTrack> all) => _act(() async {
+    final uris = [for (final x in all) if (x.uri.isNotEmpty) x.uri];
+    try {
+      await api.play(uri: t.uri, uris: uris);
+    } catch (e) {
+      // Sans Premium : on ouvre le morceau dans l'appli Spotify.
+      if ('$e'.contains('Premium') && await launchUrl(Uri.parse(t.uri))) return;
+      rethrow;
+    }
+  });
+
+  void _openList(String title, Future<List<MusicTrack>> Function() load, {String? contextUri, String? playUri}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            actions: [
+              if (playUri != null)
+                IconButton(
+                  tooltip: 'Tout lancer',
+                  icon: const Icon(Icons.play_circle_fill_rounded),
+                  onPressed: () => _act(() => api.play(context: playUri), 'Je lance $title'),
+                ),
+            ],
+          ),
+          body: _TrackList(module: widget.module, load: load, empty: 'Rien ici', contextUri: contextUri),
+        ),
+      ),
+    );
+  }
+
+  Widget _deviceBar(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    IconData icon(String type) => switch (type.toLowerCase()) {
+      'computer' => Icons.computer_rounded,
+      'smartphone' => Icons.smartphone_rounded,
+      'speaker' => Icons.speaker_rounded,
+      'tv' => Icons.tv_rounded,
+      _ => Icons.devices_other_rounded,
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: _devices.isEmpty
+                ? Text(
+                    'Aucun appareil Spotify ouvert : lance l\'appli Spotify (PC ou téléphone).',
+                    style: text.bodySmall,
+                  )
+                : DropdownButton<String>(
+                    isExpanded: true,
+                    value: _devices.any((d) => d['id'] == _deviceId) ? _deviceId : null,
+                    hint: const Text('Où jouer ?'),
+                    items: [
+                      for (final d in _devices)
+                        DropdownMenuItem(
+                          value: '${d['id']}',
+                          child: Row(
+                            children: [
+                              Icon(icon('${d['type']}'), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text('${d['name']}', overflow: TextOverflow.ellipsis)),
+                            ],
+                          ),
+                        ),
+                    ],
+                    onChanged: (id) {
+                      if (id == null) return;
+                      setState(() => _deviceId = id);
+                      final name = _devices.firstWhere((d) => d['id'] == id)['name'];
+                      _act(() => api.transfer(id), 'La musique passe sur $name');
+                    },
+                  ),
+          ),
+          IconButton(
+            tooltip: 'Actualiser les appareils',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadDevices,
+          ),
+          if (_volume != null) ...[
+            const Icon(Icons.volume_up_rounded, size: 18),
+            SizedBox(
+              width: 120,
+              child: Slider(
+                value: _volume!.clamp(0, 100),
+                max: 100,
+                activeColor: color,
+                onChanged: (v) {
+                  setState(() => _volume = v);
+                  _volumeTimer?.cancel();
+                  _volumeTimer = Timer(
+                    const Duration(milliseconds: 300),
+                    () => _act(() => api.volume(v.round())),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _trackTile(MusicTrack t, List<MusicTrack> all) => ListTile(
+    leading: ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(width: 46, height: 46, child: CoverImage(url: t.cover, color: color)),
+    ),
+    title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+    subtitle: Text(
+      [t.artist, if (t.album.isNotEmpty) t.album].join(' · '),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    trailing: PopupMenuButton<String>(
+      tooltip: 'Plus',
+      onSelected: (v) => switch (v) {
+        'queue' => _act(() => api.addToQueue(t.uri), 'Ajouté à la file : ${t.title}'),
+        'like' => _act(() => api.setLiked(t.id, true), 'Ajouté à tes titres likés ❤️'),
+        _ => t.link == null ? null : openLink(context, t.link!),
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'queue', child: Text('Ajouter à la file d\'attente')),
+        PopupMenuItem(value: 'like', child: Text('Ajouter aux titres likés')),
+        PopupMenuItem(value: 'open', child: Text('Ouvrir dans Spotify')),
+      ],
+    ),
+    onTap: () => _playTracks(t, all),
+  );
+
+  Widget _section(String title, Widget child) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      ),
+      child,
+    ],
+  );
+
+  Widget _cards(List<(String name, String sub, String? image, bool round, VoidCallback onTap)> items) =>
+      SizedBox(
+        height: 196,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (_, i) {
+            final (name, sub, image, round, onTap) = items[i];
+            return InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onTap,
+              child: SizedBox(
+                width: 140,
+                child: Column(
+                  crossAxisAlignment: round ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(round ? 70 : 8),
+                      child: SizedBox(width: 140, height: 140, child: CoverImage(url: image, color: color)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    if (sub.isNotEmpty)
+                      Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+  Widget _resultsView(SpotifySearch r) {
+    if (r.isEmpty) return const Padding(padding: EdgeInsets.all(32), child: EmptyHint('Rien trouvé'));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (r.tracks.isNotEmpty)
+          _section('Titres', Column(children: [for (final t in r.tracks) _trackTile(t, r.tracks)])),
+        if (r.artists.isNotEmpty)
+          _section(
+            'Artistes',
+            _cards([
+              for (final a in r.artists)
+                (
+                  a.name,
+                  a.sub,
+                  a.image,
+                  true,
+                  () => _openList(a.name, () => api.artistTopTracks(a.id), playUri: a.uri),
+                ),
+            ]),
+          ),
+        if (r.albums.isNotEmpty)
+          _section(
+            'Albums',
+            _cards([
+              for (final a in r.albums)
+                (
+                  a.name,
+                  a.sub,
+                  a.image,
+                  false,
+                  () => _openList(
+                    a.name,
+                    () async => (await api.album(a.id)).tracks,
+                    contextUri: a.uri,
+                    playUri: a.uri,
+                  ),
+                ),
+            ]),
+          ),
+        if (r.playlists.isNotEmpty)
+          _section(
+            'Playlists',
+            _cards([
+              for (final p in r.playlists)
+                (
+                  p.name,
+                  p.owner,
+                  p.cover,
+                  false,
+                  () => _openList(
+                    p.name,
+                    () => api.playlistTracks(p.id),
+                    contextUri: p.uri,
+                    playUri: p.uri,
+                  ),
+                ),
+            ]),
+          ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: TextField(
+            controller: search,
+            onChanged: _onQuery,
+            onSubmitted: (q) {
+              _debounce?.cancel();
+              setState(() => _results = q.trim().isEmpty ? null : api.search(q.trim()));
+            },
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search_rounded),
+              hintText: 'Un titre, un artiste, un album, une playlist…',
+              border: const OutlineInputBorder(),
+              suffixIcon: ListenableBuilder(
+                listenable: search,
+                builder: (_, _) => search.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () {
+                          search.clear();
+                          setState(() => _results = null);
+                        },
+                      ),
+              ),
+            ),
+          ),
+        ),
+        _deviceBar(context),
+        if (_results != null)
+          FutureBuilder(
+            future: _results,
+            builder: (context, snap) {
+              if (snap.hasError) return ErrorBanner('${snap.error}');
+              if (!snap.hasData) return const Padding(padding: EdgeInsets.all(32), child: LoadingHint());
+              return _resultsView(snap.data!);
+            },
+          )
+        else
+          FutureBuilder(
+            future: _queue,
+            builder: (context, snap) {
+              final q = snap.data ?? const <MusicTrack>[];
+              return _section(
+                'À suivre',
+                q.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Text(
+                          snap.hasError
+                              ? 'File d\'attente indisponible (lance un morceau d\'abord).'
+                              : 'Cherche un morceau au-dessus : touche-le pour le lancer, ou « ⋮ » pour '
+                                    'l\'ajouter à la file. Choisir la musique depuis Mon Hub demande '
+                                    'Spotify Premium ; sans Premium, le morceau s\'ouvre dans l\'appli Spotify.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      )
+                    : Column(children: [for (final t in q.take(20)) _trackTile(t, q)]),
+              );
+            },
+          ),
+      ],
+    );
+  }
 }
