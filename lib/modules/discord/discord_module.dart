@@ -110,7 +110,7 @@ class DiscordModule extends HubModule {
                 {
                   'id': d.id,
                   'nom': d.name,
-                  if (d.last != null) 'dernier': '${d.last!.author.name} : ${d.last!.content}',
+                  if (d.last != null) 'dernier': '${d.last!.author.name} : ${d.last!.preview}',
                   'non_lu': isUnread(d),
                 },
             ];
@@ -126,7 +126,7 @@ class DiscordModule extends HubModule {
             if (api == null) throw 'Discord n\'est pas connecté';
             return [
               for (final m in (await api.messages(a['id'] as String)).reversed)
-                {'de': m.author.name, 'texte': m.content, 'date': m.at},
+                {'de': m.author.name, 'texte': m.preview, 'date': m.at},
             ];
           },
         ),
@@ -155,7 +155,7 @@ class DiscordModule extends HubModule {
           HubNotification(
             id: d.last!.id,
             title: 'Discord · ${d.last!.author.name}',
-            body: d.last!.content,
+            body: d.last!.preview,
           ),
     ];
   }
@@ -312,7 +312,7 @@ class DiscordModule extends HubModule {
       subtitle: d.last == null
           ? null
           : Text(
-              '${d.last!.author.id == me?.id ? 'Toi : ' : ''}${d.last!.content}',
+              '${d.last!.author.id == me?.id ? 'Toi : ' : ''}${d.last!.preview}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
       trailing: d.last == null
@@ -585,6 +585,38 @@ class _ConversationPageState extends State<_ConversationPage> {
                           return ChatBubble(
                             text: m.content,
                             images: m.images,
+                            extra: m.isVoice
+                                ? VoiceNotePlayer(
+                                    url: m.audioUrl!,
+                                    duration: m.audioLength,
+                                    waveform: m.waveform,
+                                    color: module.color,
+                                    onColor: mine
+                                        ? Colors.white
+                                        : Theme.of(context).colorScheme.onSurface,
+                                  )
+                                : null,
+                            reactions: [
+                              for (final r in m.reactions)
+                                Reaction(r.label, const [], count: r.count, mine: r.me),
+                            ],
+                            onWho: (r) async {
+                              final dr = m.reactions.firstWhere((x) => x.label == r.emoji);
+                              final api = await module._client();
+                              final users = await api!.reactors(widget.channelId, m.id, dr);
+                              return [for (final u in users) u.name];
+                            },
+                            onDoubleTap: m.reactions.any((r) => r.me && r.name == '❤️')
+                                ? null
+                                : () async {
+                                    try {
+                                      final api = await module._client();
+                                      await api!.react(widget.channelId, m.id);
+                                      await _load();
+                                    } catch (e) {
+                                      if (context.mounted) showError(context, e);
+                                    }
+                                  },
                             author: mine ? null : m.author.name,
                             time: '${dayLabel(m.at)} ${hhmm(m.at)}',
                             mine: mine,

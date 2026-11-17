@@ -8,19 +8,35 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_controller.dart';
+import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import '../../core/session.dart';
+import '../chat_history.dart';
+import '../widgets.dart';
 import 'board.dart';
+import 'capture.dart';
 import 'claude_code.dart';
+import 'documents.dart';
+import 'drive.dart';
 import 'ears.dart';
+import 'extensions.dart';
+import 'jarvis.dart';
+import 'journal.dart';
+import 'marks.dart';
+import 'ocr.dart';
 import 'ollama.dart';
+import 'pointer.dart';
+import 'routines.dart';
+import 'tutor.dart';
+import 'voice.dart';
+import 'wake.dart';
 import 'win.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
@@ -96,6 +112,17 @@ class ClickyController extends ChangeNotifier {
   Offset? target;
   String targetLabel = '';
 
+  /// Annotations dessinées à l'écran (coordonnées de la couche), et un
+  /// numéro qui change à chaque nouveau dessin.
+  List<ClickyMark> marks = const [];
+  int marksId = 0;
+
+  void clearMarks() {
+    if (marks.isEmpty) return;
+    marks = const [];
+    notifyListeners();
+  }
+
   /// Tableau visuel ouvert (schéma, étapes, frise, quiz…), et s'il est en
   /// train de s'écrire.
   ClickyBoard? board;
@@ -124,8 +151,11 @@ class ClickyController extends ChangeNotifier {
   static const explainScreenPrompt =
       'Explique-moi ce qu\'il y a à l\'écran comme un prof : de quoi ça parle, les notions '
       'importantes, avec un tableau visuel.';
+  static const briefingPrompt =
+      'Fais-moi le briefing : mes cours d\'aujourd\'hui (et ceux annulés), les devoirs pour demain, '
+      'mes dernières notes, mes messages non lus et mes évènements. Court et clair.';
 
-  bool get hasHistory => _memory.isNotEmpty;
+  bool get hasHistory => _memory().isNotEmpty;
 
   /// Mode discret : Clicky n'apparaît que pendant un échange.
   bool _recent = false;
@@ -139,7 +169,11 @@ class ClickyController extends ChangeNotifier {
   T _opt<T>(String k, T d) {
     final v = _shared?[k];
     if (v is T) return v;
-    return ClaudeApi.store.getJson<T>('clicky.$k') ?? d;
+    if (v is num && d is double) return v.toDouble() as T;
+    final s = ClaudeApi.store.getJson<Object>('clicky.$k');
+    if (s is T) return s;
+    if (s is num && d is double) return s.toDouble() as T;
+    return d;
   }
 
   // Réglages partagés avec « Clicky partout » (Windows). Les deux programmes
@@ -153,6 +187,29 @@ class ClickyController extends ChangeNotifier {
     'show',
     'provider',
     'everywhere',
+    'look',
+    'jarvisName',
+    'greet',
+    'wake',
+    'wakeWord',
+    'ttsVoice',
+    'ttsRate',
+    'ttsPitch',
+    'narrate',
+    'slow',
+    'quiz',
+    'codeMode',
+    'multilang',
+    'ocr',
+    'privacy',
+    'precise',
+    'steps',
+    'web',
+    'annotate',
+    'dictation',
+    'drive',
+    'journal',
+    'perApp',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -161,6 +218,13 @@ class ClickyController extends ChangeNotifier {
   static File? get _sharedFile {
     final d = ClaudeBridge.folder;
     return d == null ? null : File('$d${Platform.pathSeparator}clicky.json');
+  }
+
+  /// Recharge l'historique et le journal (démarrage, compte changé).
+  Future<void> loadMemory() async {
+    await history.load();
+    await Journal.instance.load();
+    notifyListeners();
   }
 
   /// Mon Hub (Windows) : publie les réglages du compte ouvert et suit ceux
@@ -237,13 +301,59 @@ class ClickyController extends ChangeNotifier {
   /// Toujours afficher le curseur bleu (sinon seulement pendant un échange).
   bool get alwaysShow => _opt('show', true);
 
-  /// 'claude' (clé API) ou 'ollama' (local, gratuit).
   /// 'claudecode' (ton abonnement Claude Pro via Claude Code), 'claude'
   /// (clé API) ou 'ollama' (local, gratuit).
   String get provider => _opt('provider', ClaudeCode.supported ? 'claudecode' : 'claude');
 
   /// Windows : Clicky au-dessus de tout l'écran et de toutes les applis.
   bool get everywhere => _opt('everywhere', true);
+
+  /// Apparence : 'jarvis' (affichage tête haute, majordome) ou 'classic'.
+  String get look => _opt('look', 'jarvis');
+  bool get jarvis => look == 'jarvis';
+
+  /// Comment Jarvis t'appelle (vide : ton prénom de compte Mon Hub).
+  String get jarvisName {
+    final n = _opt('jarvisName', '').trim();
+    if (n.isNotEmpty) return n;
+    return (AppSession.instance.current?.name ?? '').split(' ').first;
+  }
+
+  bool get greet => _opt('greet', true);
+  bool get wakeOn => _opt('wake', false);
+  String get wakeWord => _opt('wakeWord', 'jarvis');
+  String get ttsVoice => _opt('ttsVoice', '');
+  double get ttsRate => _opt('ttsRate', 1.0);
+  double get ttsPitch => _opt('ttsPitch', 1.0);
+
+  /// Commencer à parler pendant que la réponse s'écrit.
+  bool get narrate => _opt('narrate', true);
+
+  // Modes « prof ».
+  bool get slow => _opt('slow', false);
+  bool get quizMode => _opt('quiz', false);
+  bool get codeMode => _opt('codeMode', true);
+  bool get multilang => _opt('multilang', false);
+  bool get ocr => _opt('ocr', true);
+  bool get privacy => _opt('privacy', true);
+  bool get precise => _opt('precise', false);
+  bool get stepsMode => _opt('steps', true);
+  bool get annotate => _opt('annotate', true);
+
+  /// Recherche sur internet (outil officiel de Claude).
+  bool get webSearch => _opt('web', true);
+
+  /// Ctrl + Alt + Maj : dictée dans n'importe quelle appli.
+  bool get dictation => _opt('dictation', true);
+
+  /// Clicky peut proposer de cliquer / taper à ta place (après relecture).
+  bool get driveOn => _opt('drive', true);
+
+  /// Journal des connaissances.
+  bool get journalOn => _opt('journal', true);
+
+  /// Une mémoire séparée par appli (Clicky partout).
+  bool get perApp => _opt('perApp', true);
 
   static bool get everywhereSupported => !kIsWeb && Platform.isWindows;
 
@@ -258,6 +368,7 @@ class ClickyController extends ChangeNotifier {
       (_shared ??= {})[k] = v;
       await _writeShared();
     }
+    _applyVoice();
     await refreshReady();
     notifyListeners();
   }
@@ -266,6 +377,7 @@ class ClickyController extends ChangeNotifier {
   /// pas le cas, il reste complètement invisible et ne fait rien : le reste
   /// de Mon Hub marche exactement pareil sans lui.
   bool ready = false;
+  bool _greeted = false;
 
   Future<bool> refreshReady() async {
     bool r;
@@ -278,14 +390,47 @@ class ClickyController extends ChangeNotifier {
     } catch (_) {
       r = false;
     }
+    final here = desktopMode || !handledElsewhere;
     // Windows : prépare le micro à l'avance pour ne pas rater le début.
-    if (r && enabled && mic && (desktopMode || !handledElsewhere)) ears.warmUp();
+    if (r && enabled && mic && here) ears.warmUp();
+    // Mot d'activation (« Jarvis »).
+    if (r && enabled && mic && here && wakeOn && WakeWord.supported) {
+      unawaited(_wake.start(wakeWord));
+    } else if (_wake.running) {
+      unawaited(_wake.stop());
+    }
     if (r != ready) {
       ready = r;
       notifyListeners();
     }
+    if (r && enabled && here && !_greeted) {
+      _greeted = true;
+      unawaited(_greetOnce());
+    }
     return r;
   }
+
+  /// Jarvis te salue au premier démarrage de la journée.
+  Future<void> _greetOnce() async {
+    if (!jarvis || !greet || !voice || !_voicePlatform) return;
+    try {
+      final saved = await _stateFile.load();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (saved['greeted'] == today) return;
+      await _stateFile.save({...saved, 'greeted': today});
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (state != ClickyState.idle) return;
+    unawaited(ClickyChime.play());
+    await speak(jarvisGreeting(jarvisName, DateTime.now()));
+  }
+
+  final _stateFile = JsonFile<Map<String, dynamic>>(
+    'clicky-state.json',
+    empty: () => {},
+    decode: (j) => j is Map ? j.cast<String, dynamic>() : {},
+    encode: (v) => v,
+  );
 
   /// Clicky doit s'afficher et écouter le clavier.
   bool get active => enabled && ready;
@@ -295,6 +440,7 @@ class ClickyController extends ChangeNotifier {
       _recent ||
       panelOpen ||
       board != null ||
+      marks.isNotEmpty ||
       state != ClickyState.idle ||
       agentsRunning > 0;
 
@@ -307,9 +453,19 @@ class ClickyController extends ChangeNotifier {
   // ---------- Voix ----------
 
   final ClickyEars ears = ClickyEars.create();
-  FlutterTts? _tts;
+  final voiceOut = ClickyVoice();
+  late final WakeWord _wake = WakeWord(_onWake);
 
   bool get _voicePlatform => ClickyEars.supported;
+
+  void _applyVoice({String? lang}) {
+    voiceOut
+      ..voiceName = ttsVoice
+      ..rate = ttsRate
+      ..pitch = ttsPitch * (jarvis && ttsPitch == 1 ? 0.92 : 1)
+      ..preferMale = jarvis
+      ..language = lang ?? voiceOut.language;
+  }
 
   /// Dernier souci de micro (affiché dans la boîte, avec un bouton pour
   /// ouvrir le bon réglage).
@@ -317,7 +473,22 @@ class ClickyController extends ChangeNotifier {
 
   Timer? _autoSend;
 
-  Future<void> startListening() async {
+  /// « Jarvis ! » entendu : il écoute ta question.
+  void _onWake() {
+    if (!active || state != ClickyState.idle) {
+      _wake.resume();
+      return;
+    }
+    unawaited(ClickyChime.play());
+    _recent = true;
+    unawaited(startListening());
+  }
+
+  /// La dictée (Ctrl + Alt + Maj) : le texte sera tapé dans cette appli.
+  bool _dictating = false;
+  Object? _dictationTarget;
+
+  Future<void> startListening({bool dictate = false}) async {
     await stopSpeaking();
     if (state == ClickyState.thinking || state == ClickyState.listening) return;
     if (!mic) {
@@ -330,11 +501,19 @@ class ClickyController extends ChangeNotifier {
       _set(ClickyState.idle, status: 'Micro indisponible ici : écris ta question.');
       return;
     }
+    _wake.pause();
+    _dictating = dictate && dictation && DriveRunner.supported;
+    _dictationTarget = _dictating ? Win.foreground().address : null;
     transcript = '';
     target = null;
     micProblem = null;
+    clearMarks();
     levels.fillRange(0, levels.length, 0);
-    _set(ClickyState.listening, status: '', reply: '');
+    _set(
+      ClickyState.listening,
+      status: _dictating ? 'Dictée : parle, je tape le texte.' : '',
+      reply: '',
+    );
     final starting = ears.start(
       onText: (t) {
         if (state != ClickyState.listening) return;
@@ -350,8 +529,8 @@ class ClickyController extends ChangeNotifier {
       },
       onProblem: _micFailed,
       onFinalPhrase: () {
-        // Sans Ctrl + Alt maintenus (bouton micro) : on envoie après un
-        // petit silence.
+        // Sans Ctrl + Alt maintenus (bouton micro, mot d'activation) : on
+        // envoie après un petit silence.
         if (_holding || state != ClickyState.listening) return;
         _autoSend?.cancel();
         _autoSend = Timer(const Duration(milliseconds: 1800), () {
@@ -380,7 +559,9 @@ class ClickyController extends ChangeNotifier {
     _autoSend?.cancel();
     if (!send) {
       await ears.cancel();
+      _dictating = false;
       _set(ClickyState.idle, status: '');
+      _wake.resume();
       return;
     }
     _set(ClickyState.listening, status: 'Je finis d\'écouter…');
@@ -389,7 +570,40 @@ class ClickyController extends ChangeNotifier {
     final heard = await ears.stop();
     if (state != ClickyState.listening) return;
     if (heard.trim().isNotEmpty) transcript = heard.trim();
+    if (_dictating) return _finishDictation();
     await _sendTranscript();
+  }
+
+  /// Dictée : tape le texte dans l'appli où tu étais (si elle a toujours
+  /// le focus), sinon le montre pour le copier.
+  Future<void> _finishDictation() async {
+    _dictating = false;
+    final t = transcript.trim();
+    if (t.isEmpty) {
+      _set(ClickyState.idle, status: 'Je n\'ai rien entendu.');
+      _fadeSoon();
+      _wake.resume();
+      return;
+    }
+    final same = DriveRunner.supported && Win.foreground().address == _dictationTarget;
+    final sensitive = DriveRunner.supported && isSensitiveTitle(Win.foregroundTitle());
+    if (same && !sensitive) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      Win.releaseModifiers();
+      Win.typeText(t);
+      _set(ClickyState.idle, status: 'Dictée tapée ✓', reply: '');
+    } else {
+      await Clipboard.setData(ClipboardData(text: t));
+      _set(
+        ClickyState.idle,
+        status: sensitive
+            ? 'Fenêtre sensible : je n\'ai pas tapé le texte, il est copié (Ctrl + V).'
+            : 'La fenêtre a changé : le texte est copié, colle-le avec Ctrl + V.',
+        reply: t,
+      );
+    }
+    _fadeSoon();
+    _wake.resume();
   }
 
   Future<void> _sendTranscript() async {
@@ -403,6 +617,7 @@ class ClickyController extends ChangeNotifier {
             'dans Réglages → Clicky.',
       );
       _fadeSoon();
+      _wake.resume();
       return;
     }
     await ask(t);
@@ -426,31 +641,45 @@ class ClickyController extends ChangeNotifier {
 
   Future<void> speak(String text) async {
     if (!voice || !_voicePlatform || text.isEmpty) return;
+    _applyVoice();
+    _wake.pause();
     try {
-      final tts = _tts ??= FlutterTts();
-      await tts.setLanguage('fr-FR');
-      await tts.setSpeechRate(Platform.isAndroid || Platform.isIOS ? 0.5 : 0.55);
-      await tts.awaitSpeakCompletion(true);
-      await tts.speak(text);
+      await voiceOut.say(text);
     } catch (_) {}
+    if (state != ClickyState.listening) _wake.resume();
   }
 
   Future<void> stopSpeaking() async {
-    try {
-      await _tts?.stop();
-    } catch (_) {}
+    voiceOut.stop();
+  }
+
+  /// Arrête tout : la réponse en cours, la voix, l'écoute (Échap, « stop »).
+  Future<void> cancel() async {
+    _askId++;
+    ClaudeCode.cancelAll();
+    await stopSpeaking();
+    if (state == ClickyState.listening) await stopListening(send: false);
+    steps = const [];
+    drawing = false;
+    target = null;
+    clearMarks();
+    _set(ClickyState.idle, status: 'Arrêté.', reply: reply);
+    _fadeSoon();
+    _wake.resume();
   }
 
   // ---------- Clavier : maintenir Ctrl + Alt ----------
 
   bool _holding = false;
   bool _cancelled = false;
+  bool _holdDictate = false;
   DateTime? _holdStart;
   Timer? _holdTimer;
 
   /// Appelé quand Ctrl + Alt (sans AltGr) est enfoncé ou relâché, ou quand
-  /// une autre touche est tapée pendant l'appui ([other]).
-  void hotkey({required bool down, bool other = false}) {
+  /// une autre touche est tapée pendant l'appui ([other]). [dictate] : Maj
+  /// est aussi enfoncé (Ctrl + Alt + Maj = dictée).
+  void hotkey({required bool down, bool other = false, bool dictate = false}) {
     if (!active) return;
     if (_holding && other) {
       // Ctrl + Alt + une touche = un raccourci clavier, pas Clicky.
@@ -459,14 +688,16 @@ class ClickyController extends ChangeNotifier {
       if (state == ClickyState.listening) unawaited(stopListening(send: false));
       return;
     }
+    if (_holding && dictate) _holdDictate = true;
     if (down && !_holding) {
       _holding = true;
       _cancelled = false;
+      _holdDictate = dictate;
       _holdStart = DateTime.now();
       _recent = true;
       // Appui long = on parle. Appui court = on écrit.
       _holdTimer = Timer(const Duration(milliseconds: 350), () {
-        if (_holding && !_cancelled) unawaited(startListening());
+        if (_holding && !_cancelled) unawaited(startListening(dictate: _holdDictate));
       });
     } else if (!down && _holding) {
       _holding = false;
@@ -480,6 +711,19 @@ class ClickyController extends ChangeNotifier {
       } else {
         unawaited(stopListening());
       }
+    }
+  }
+
+  /// Échap : arrête la réponse, puis ferme la boîte, puis le tableau.
+  void escape() {
+    if (state == ClickyState.thinking || voiceOut.speaking || steps.isNotEmpty) {
+      unawaited(cancel());
+    } else if (boxOpen) {
+      closeBox();
+    } else if (board != null) {
+      closeBoard();
+    } else {
+      clearMarks();
     }
   }
 
@@ -506,11 +750,7 @@ class ClickyController extends ChangeNotifier {
     if (!active || handledElsewhere) return false;
     final k = HardwareKeyboard.instance;
     if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape) {
-      if (boxOpen) {
-        closeBox();
-      } else if (board != null) {
-        closeBoard();
-      }
+      escape();
       return false;
     }
     // AltGr (claviers français : @, €, #…) envoie aussi Ctrl + Alt : on
@@ -522,7 +762,9 @@ class ClickyController extends ChangeNotifier {
     if (_holding && e is KeyDownEvent && !_modifiers.contains(e.logicalKey)) {
       hotkey(down: true, other: true);
     } else if (both && !_holding && e is KeyDownEvent) {
-      hotkey(down: true);
+      hotkey(down: true, dictate: k.isShiftPressed);
+    } else if (_holding && both && k.isShiftPressed) {
+      hotkey(down: true, dictate: true);
     } else if (_holding && !both) {
       hotkey(down: false);
     }
@@ -538,13 +780,16 @@ class ClickyController extends ChangeNotifier {
       state != ClickyState.idle ||
       reply.isNotEmpty ||
       status.isNotEmpty ||
-      micProblem != null;
+      micProblem != null ||
+      showHistory;
 
   /// Ferme la boîte (et efface la réponse).
   void closeBox() {
     reply = '';
     status = '';
     micProblem = null;
+    showHistory = false;
+    steps = const [];
     closePanel();
   }
 
@@ -557,6 +802,7 @@ class ClickyController extends ChangeNotifier {
 
   void closePanel() {
     panelOpen = false;
+    showHistory = false;
     unawaited(stopSpeaking());
     if (state == ClickyState.listening) unawaited(stopListening(send: false));
     if (state == ClickyState.speaking || state == ClickyState.pointing) {
@@ -577,10 +823,15 @@ class ClickyController extends ChangeNotifier {
         notifyListeners();
       }
     });
-    // La bulle de réponse s'efface après quelques secondes.
+    // La bulle de réponse s'efface après quelques secondes (pas pendant une
+    // leçon en plusieurs étapes).
     _clear?.cancel();
-    _clear = Timer(const Duration(seconds: 8), () {
-      if (state == ClickyState.idle && !panelOpen && (reply.isNotEmpty || status.isNotEmpty)) {
+    _clear = Timer(Duration(seconds: slow ? 14 : 8), () {
+      if (state == ClickyState.idle &&
+          !panelOpen &&
+          steps.isEmpty &&
+          !showHistory &&
+          (reply.isNotEmpty || status.isNotEmpty)) {
         reply = '';
         status = '';
         notifyListeners();
@@ -589,6 +840,14 @@ class ClickyController extends ChangeNotifier {
   }
 
   Timer? _clear;
+
+  /// Affiche un petit message dans la boîte.
+  void showStatus(String s) {
+    status = s;
+    panelOpen = true;
+    onInteractive?.call(true);
+    notifyListeners();
+  }
 
   void _set(ClickyState s, {String? status, String? reply}) {
     state = s;
@@ -601,10 +860,128 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---------- Question → IA ----------
+  // ---------- Historique (une conversation par appli) ----------
 
-  /// Courte mémoire (texte seulement) des derniers échanges.
-  final _memory = <(String, String)>[];
+  final history = ChatHistory.clicky;
+
+  /// Historique ouvert dans la boîte.
+  bool showHistory = false;
+
+  void toggleHistory() {
+    showHistory = !showHistory;
+    if (showHistory) {
+      panelOpen = true;
+      onInteractive?.call(true);
+      unawaited(history.load().then((_) => notifyListeners()));
+    }
+    notifyListeners();
+  }
+
+  /// Appli au premier plan (Clicky partout) : chaque appli a sa mémoire.
+  String currentApp = '';
+  final _threadFor = <String, String>{};
+
+  String get _appKey => perApp && desktopMode ? currentApp : '';
+
+  /// Conversation en cours pour l'appli au premier plan.
+  String get threadId {
+    final key = _appKey;
+    final id = _threadFor[key];
+    final t = history.byId(id);
+    // Plus de 45 minutes sans échange : nouvelle conversation.
+    bool fresh(ChatThread x) => DateTime.now().difference(x.updated).inMinutes < 45;
+    if (id != null && (t == null || fresh(t))) return id;
+    // Après un redémarrage : on reprend la conversation récente de cette appli.
+    final recent = history.threads.where((x) => x.app == key && fresh(x)).firstOrNull;
+    return _threadFor[key] = recent?.id ?? ChatThread.newId();
+  }
+
+  /// Repart de zéro (« nouvelle conversation »).
+  void newConversation() {
+    _threadFor[_appKey] = ChatThread.newId();
+    steps = const [];
+    showHistory = false;
+    _set(ClickyState.idle, status: 'Nouvelle conversation.', reply: '');
+    _fadeSoon();
+  }
+
+  /// Reprend une conversation de l'historique.
+  void continueThread(ChatThread t) {
+    _threadFor[_appKey] = t.id;
+    showHistory = false;
+    final last = t.messages.where((m) => !m.mine).lastOrNull;
+    reply = last?.text ?? '';
+    transcript = t.messages.where((m) => m.mine).lastOrNull?.text ?? '';
+    panelOpen = true;
+    onInteractive?.call(true);
+    _set(ClickyState.idle, status: 'Conversation reprise : continue quand tu veux.');
+  }
+
+  /// Derniers échanges de la conversation en cours (texte seulement).
+  List<(String, String)> _memory() {
+    final t = history.byId(_threadFor[_appKey]);
+    if (t == null) return const [];
+    final out = <(String, String)>[];
+    String? q;
+    for (final m in t.messages) {
+      if (m.mine) {
+        q = m.text;
+      } else if (q != null) {
+        out.add((q, [m.text, ?m.note].join(' ')));
+        q = null;
+      }
+    }
+    return out.length > 8 ? out.sublist(out.length - 8) : out;
+  }
+
+  // ---------- Leçon en plusieurs étapes ----------
+
+  /// Étapes de la leçon en cours (vide si la réponse tient en une fois).
+  List<String> steps = const [];
+  int stepIndex = 0;
+  List<ClickyShot> _stepShots = const [];
+
+  bool get hasNextStep => steps.isNotEmpty && stepIndex < steps.length - 1;
+
+  /// Étape suivante (« suivant »), sans redemander à l'IA.
+  Future<void> nextStep() async {
+    if (!hasNextStep) {
+      steps = const [];
+      _set(ClickyState.idle, status: 'La leçon est terminée. Bravo !');
+      _fadeSoon();
+      return;
+    }
+    stepIndex++;
+    await _present(steps[stepIndex], _stepShots, step: true);
+  }
+
+  // ---------- Documents joints ----------
+
+  final docs = <ClickyDoc>[];
+
+  Future<void> attachDocuments() async {
+    try {
+      final picked = await ClickyDoc.pick();
+      if (picked.isEmpty) return;
+      docs.addAll(picked);
+      _set(
+        state,
+        status:
+            '${picked.length == 1 ? '« ${picked.first.name} » est joint' : '${picked.length} documents joints'} : '
+            'pose ta question.',
+      );
+      openPanel();
+    } catch (e) {
+      _set(state, status: '$e');
+    }
+  }
+
+  void removeDoc(ClickyDoc d) {
+    docs.remove(d);
+    notifyListeners();
+  }
+
+  // ---------- Question → IA ----------
 
   /// Capture de la fenêtre de Mon Hub (Clicky dans l'appli).
   Future<List<ClickyShot>> _captureApp() async {
@@ -633,40 +1010,62 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  List<HubTool> get _tools =>
-      toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools];
+  List<HubTool> get _tools => [
+    ...toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
+    if (toolsOverride == null) ...McpTools.cached,
+  ];
 
-  String _system(List<ClickyShot> shots, {bool agent = false}) {
+  String _system(
+    List<ClickyShot> shots, {
+    bool agent = false,
+    String foreground = '',
+    bool hiddenScreen = false,
+  }) {
     final modules = hub?.enabled ?? const <HubModule>[];
     final now = DateTime.now();
-    final where = desktopMode
+    final where = hiddenScreen
+        ? 'Pas de capture d\'écran cette fois : une fenêtre sensible (mots de passe, banque…) est ouverte, par sécurité tu ne la vois pas.'
+        : desktopMode
         ? 'Tu vois une capture de chaque écran de l\'ordinateur (toutes les applis, pas seulement Mon Hub).'
         : 'Tu vois une capture de la fenêtre de l\'appli Mon Hub.';
     final screens = [
       for (var i = 0; i < shots.length; i++)
         'Image ${i + 1} = écran ${i + 1} (${shots[i].label}, ${shots[i].width} × ${shots[i].height} pixels)',
     ].join(' ; ');
+    final name = jarvis ? 'Jarvis' : 'Clicky';
     final base =
         '''
-Tu es Clicky, un petit compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
+Tu es $name, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
-Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.''';
+${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
+Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
+${jarvis ? jarvisPersona(jarvisName) : ''}''';
     if (agent) {
       return '''$base
 
-Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 3 phrases simples, lisible à voix haute, sans markdown.''';
+Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 5 phrases simples, lisible à voix haute, sans markdown.''';
     }
+    final code = codeMode && isCodeEditorTitle(foreground);
+    final shotsNote = shots.length > 1 ? ':screenN' : '';
     return '''$base
 
 Ta réponse est lue à voix haute :
-- réponds en français, comme à l'oral, chaleureux et clair, en 1 à 4 phrases courtes ;
+- ${multilang ? 'réponds dans la langue de la question (français par défaut)' : 'réponds en français'}, comme à l'oral, ${jarvis ? 'posé et précis' : 'chaleureux et clair'}, en 1 à 4 phrases courtes ;
 - pas de markdown, pas de listes à puces, pas d'émojis ;
-- si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève : tu es un prof patient qui aide à comprendre (comparaisons de la vie de tous les jours, exemples concrets), et tu vérifies que c'est compris.
+- si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève : tu es un prof patient qui aide à comprendre (comparaisons de la vie de tous les jours, exemples concrets), et tu vérifies que c'est compris ;
+- « où est… ? » : montre-le et explique en une phrase à quoi il sert.
 ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les vraies données (agenda, notes, devoirs, messages…) ou agir ; celles qui envoient ou modifient quelque chose demandent la permission.'}
+${webSearch && provider != 'ollama' ? 'Tu peux chercher sur internet quand la question porte sur l\'actualité ou des faits récents ; cite brièvement la source à l\'oral (« d\'après … »).' : ''}
+${quizMode ? 'MODE QUIZ : au lieu de donner la réponse, pose une question à la personne pour la faire réfléchir (une seule à la fois), puis évalue sa réponse en une phrase quand elle répond.' : ''}
+${code ? 'MODE CODE : un éditeur de code est ouvert. Tu peux mettre de courts extraits de code dans le tableau (bloc "exemple"), donner le langage, expliquer l\'algorithme pas à pas, et pointer la ligne concernée.' : ''}
+${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Clicky montre une étape à la fois.' : ''}
 
 $_boardGuide
+${annotate ? '''
+Dessiner sur l'écran (comme au tableau) : tu peux ajouter des annotations, en pixels de la capture$shotsNote : [ARROW:x1,y1->x2,y2:légende] (flèche), [CIRCLE:x,y,rayon:légende] (entoure un élément), [UNDERLINE:x,y,largeur] (souligne un texte, y = bas du texte), [LABEL:x,y:texte] (étiquette). Au plus 4, seulement si ça aide à comprendre.''' : ''}
+${driveOn && desktopMode ? DriveRunner.guide : ''}
 
-Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse par une balise [POINT:x,y:libellé court${shots.length > 1 ? ':screenN' : ''}] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise, à la toute fin. Si rien n'est à montrer, termine par [POINT:none].''';
+Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].''';
   }
 
   /// Comment écrire un tableau visuel (voir board.dart).
@@ -688,9 +1087,15 @@ Blocs possibles (2 à 5 par tableau, textes très courts, adaptés à un·e él�
 Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une phrase (« regarde le schéma »). Pas de tableau pour une simple question pratique.''';
 
   static final _agentRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?agent\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|jarvis)[\s,]+)?agent\b[\s,:]*',
     caseSensitive: false,
   );
+
+  /// Numéro de la question en cours (une réponse arrêtée est ignorée).
+  int _askId = 0;
+
+  /// Dernière question envoyée (pour « répète » et l'historique).
+  String _lastQuestion = '';
 
   Future<void> ask(String question) async {
     final q = question.trim();
@@ -699,53 +1104,261 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     input.clear();
     transcript = q;
     target = null;
+    showHistory = false;
+    clearMarks();
     final agent = _agentRe.firstMatch(q);
     if (agent != null) {
       unawaited(_runAgent(q.substring(agent.end).trim()));
       return;
     }
-    _set(ClickyState.thinking, status: 'Je regarde…', reply: '');
+    try {
+      if (await _handleCommand(q)) return;
+      if (await _handleSkill(q)) return;
+      await _askAi(q);
+    } finally {
+      // Le mot d'activation se remet à écouter après chaque échange.
+      if (state != ClickyState.listening && !voiceOut.speaking) _wake.resume();
+    }
+  }
+
+  /// Commandes comprises sans l'IA.
+  Future<bool> _handleCommand(String q) async {
+    final cmd = parseCommand(q);
+    if (cmd == null) return false;
+    final (c, rest) = cmd;
+    switch (c) {
+      case ClickyCommand.next:
+        if (steps.isEmpty) return false;
+        await nextStep();
+      case ClickyCommand.repeat:
+        final last = voiceOut.lastSpoken.isNotEmpty ? voiceOut.lastSpoken : reply;
+        if (last.isEmpty) return false;
+        _set(ClickyState.speaking, status: '', reply: reply.isEmpty ? last : reply);
+        await speak(last);
+        if (state == ClickyState.speaking) _set(ClickyState.idle);
+        _fadeSoon();
+      case ClickyCommand.stop:
+        await cancel();
+      case ClickyCommand.newChat:
+        newConversation();
+      case ClickyCommand.history:
+        toggleHistory();
+      case ClickyCommand.briefing:
+        await _askAi(briefingPrompt, shown: q, withScreen: false);
+      case ClickyCommand.today || ClickyCommand.week:
+        final j = Journal.instance;
+        await j.load();
+        final l = c == ClickyCommand.today ? j.today() : j.week();
+        if (l.isEmpty) {
+          _set(
+            ClickyState.idle,
+            reply: c == ClickyCommand.today
+                ? 'On n\'a encore rien vu ensemble aujourd\'hui.'
+                : 'On n\'a rien vu ensemble cette semaine.',
+          );
+          await speak(reply);
+          _fadeSoon();
+          return true;
+        }
+        await _askAi(
+          'Voici ce qu\'on a vu ensemble ${c == ClickyCommand.today ? 'aujourd\'hui' : 'cette semaine'} '
+          '(mon journal) :\n${Journal.digest(l)}\n\nFais-m\'en un résumé clair, avec un tableau « à retenir ».',
+          shown: q,
+          withScreen: false,
+        );
+      case ClickyCommand.review:
+        final j = Journal.instance;
+        await j.load();
+        final due = j.due().take(6).toList();
+        if (due.isEmpty) {
+          _set(ClickyState.idle, reply: 'Rien à réviser pour l\'instant, tout est à jour.');
+          await speak(reply);
+          _fadeSoon();
+          return true;
+        }
+        await reviewQuiz(due, shown: q);
+      case ClickyCommand.quiz:
+        await _askAi(
+          'Interroge-moi${rest.isEmpty ? ' sur ce qu\'il y a à l\'écran ou ce qu\'on vient de voir' : ' sur $rest'} : '
+          'fais un tableau avec 3 questions de quiz.',
+          shown: q,
+        );
+      case ClickyCommand.whatDidIDo:
+        final cap = WorkflowCapture.instance;
+        final log = cap.on ? cap.stop() : cap.summary;
+        if (log.isEmpty) {
+          _set(
+            ClickyState.idle,
+            reply: WorkflowCapture.supported
+                ? 'Je n\'ai rien enregistré. Lance « Capturer mes gestes » dans la boîte de Clicky, fais ta manip, puis redemande-moi.'
+                : 'La capture des gestes ne marche que sur Windows.',
+          );
+          await speak(reply);
+          _fadeSoon();
+          return true;
+        }
+        await _askAi(
+          'Voici ce que je viens de faire (gestes enregistrés, sans le texte tapé) :\n$log\n\n'
+          'Raconte-moi étape par étape ce que j\'ai fait, et comment le refaire plus vite si possible.',
+          shown: q,
+          withScreen: false,
+        );
+      case ClickyCommand.changeVoice:
+        final all = await voiceOut.voices();
+        final wanted = normalize(rest);
+        final v = all
+            .where((x) => normalize(x.name).contains(wanted) && wanted.isNotEmpty)
+            .firstOrNull;
+        if (v == null) {
+          final fr = all
+              .where((x) => x.locale.toLowerCase().startsWith('fr'))
+              .map((x) => x.name)
+              .take(6);
+          _set(
+            ClickyState.idle,
+            reply: 'Je ne trouve pas cette voix. Voix françaises : ${fr.join(', ')}.',
+          );
+        } else {
+          await setOption('ttsVoice', v.name);
+          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix ${v.name}.');
+        }
+        await speak(reply);
+        _fadeSoon();
+    }
+    return true;
+  }
+
+  /// Raccourcis vocaux à toi.
+  Future<bool> _handleSkill(String q) async {
+    final m = VoiceSkill.match(q);
+    if (m == null) return false;
+    final (skill, rest) = m;
+    try {
+      final (say, question) = await skill.run(rest);
+      if (question != null) {
+        await _askAi(question, shown: q);
+      } else if (say != null) {
+        _set(ClickyState.speaking, status: '', reply: say);
+        await speak(say);
+        if (state == ClickyState.speaking) _set(ClickyState.idle);
+        _fadeSoon();
+      }
+    } catch (e) {
+      _set(ClickyState.idle, reply: 'Le raccourci « ${skill.phrase} » n\'a pas marché : $e');
+    }
+    return true;
+  }
+
+  /// Quiz de révision sur des notions du journal.
+  Future<void> reviewQuiz(List<JournalEntry> due, {String? shown}) async {
+    await _askAi(
+      'Fais-moi réviser ces notions (répétition espacée). Pose-moi un quiz dans un tableau '
+      '(une question par notion, avec l\'explication) :\n${Journal.digest(due)}',
+      shown: shown ?? 'Révisions',
+      withScreen: false,
+    );
+    for (final e in due) {
+      await Journal.instance.grade(e.id, true);
+    }
+  }
+
+  /// Captures (avec la protection de la vie privée) et appli au premier plan.
+  Future<(List<ClickyShot>, String, bool)> _look() async {
+    var fg = '';
+    var hidden = false;
+    if (desktopMode && DriveRunner.supported) {
+      fg = Win.foregroundTitle();
+      currentApp = appFromTitle(fg);
+      if (privacy && Win.visibleTitles().any(isSensitiveTitle)) hidden = true;
+    }
+    if (hidden) return (const <ClickyShot>[], fg, true);
+    return (await (captureOverride ?? _captureApp)(), fg, false);
+  }
+
+  /// Le cœur : question → captures → IA → réponse parlée, pointée, dessinée.
+  Future<void> _askAi(String q, {String? shown, bool withScreen = true}) async {
+    final id = ++_askId;
+    _lastQuestion = shown ?? q;
+    steps = const [];
+    _set(ClickyState.thinking, status: jarvis ? 'Analyse en cours…' : 'Je regarde…', reply: '');
     final useOllama = provider == 'ollama';
     final usePro = provider == 'claudecode';
     if (usePro ? await ClaudeCode.find() == null : (!useOllama && !await ClaudeApi.hasKey())) {
       _needsSetup();
       return;
     }
-    final shots = await (captureOverride ?? _captureApp)();
+    final lang = multilang ? detectLanguage(q) : 'fr-FR';
+    _applyVoice(lang: lang);
+    final (shots0, fg, hidden) = withScreen ? await _look() : (const <ClickyShot>[], '', false);
+    final shots = shots0;
+    if (id != _askId) return;
+
+    // Petit texte à lire : la reconnaissance de texte de Windows aide l'IA.
+    var question = q;
+    if (ocr && shots.isNotEmpty && ClickyOcr.supported && wantsOcr(q)) {
+      _set(ClickyState.thinking, status: 'Je lis le texte de l\'écran…');
+      final texts = <String>[];
+      for (final s in shots) {
+        final t = await ClickyOcr.read(base64Decode(s.png64));
+        if (t.isNotEmpty) texts.add('Écran ${shots.indexOf(s) + 1} :\n$t');
+      }
+      if (texts.isNotEmpty) {
+        final all = texts.join('\n\n');
+        question =
+            '$q\n\n(Texte lu à l\'écran par reconnaissance de caractères :\n'
+            '${all.length > 6000 ? all.substring(0, 6000) : all})';
+      }
+    }
+    if (id != _askId) return;
+    final memory = _memory();
+    final system = _system(shots, foreground: fg, hiddenScreen: hidden);
+    final docBlocks = [for (final d in docs) ...d.blocks()];
     try {
-      final String raw;
+      voiceOut.resetLive();
+      final live = narrate && voice && _voicePlatform;
       void streamed(String t) {
-        final clean = _stripTag(ClickyBoard.strip(t));
+        if (id != _askId) return;
+        final noBoard = ClickyBoard.strip(t);
+        // Leçon en étapes : on n'affiche et ne lit que la première.
+        final clean = stripClickyTags(stepsMode ? splitSteps(noBoard).first : noBoard);
         final d = ClickyBoard.writing(t);
+        if (live) voiceOut.feed(clean);
         if (clean != reply || d != drawing) {
           drawing = d;
           _set(state, status: d ? 'Je dessine au tableau…' : '', reply: clean);
         }
       }
 
+      final String raw;
       if (usePro) {
         // Ton abonnement Claude, via ton Claude Code.
         raw = await ClaudeCode.ask(
-          system: _system(shots),
-          question: _withMemory(q),
+          system: system,
+          question: _withMemory(question, memory),
           imagesB64: [for (final s in shots) s.png64],
           imageLabels: [
             for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}) :',
           ],
+          extraBlocks: docBlocks,
+          web: webSearch,
           onText: streamed,
-          onStatus: (s) => _set(ClickyState.thinking, status: s),
+          onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
         );
       } else if (useOllama) {
         raw = await Ollama.chat(
-          system: _system(shots),
-          memory: _memory,
-          question: q,
-          imagesB64: [for (final s in shots) s.png64],
+          system: system,
+          memory: memory,
+          question: [for (final d in docs) d.asText(), question].join('\n\n'),
+          imagesB64: [
+            for (final s in shots) s.png64,
+            for (final d in docs)
+              if (d.image64 != null) d.image64!,
+          ],
           onText: streamed,
         );
       } else {
-        final history = <Map<String, dynamic>>[
-          for (final (u, a) in _memory) ...[
+        final msgs = <Map<String, dynamic>>[
+          for (final (u, a) in memory) ...[
             {'role': 'user', 'content': u},
             {'role': 'assistant', 'content': a},
           ],
@@ -759,55 +1372,72 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
                   'source': {'type': 'base64', 'media_type': 'image/png', 'data': s.png64},
                 },
               ],
-              {'type': 'text', 'text': q},
+              ...docBlocks,
+              {'type': 'text', 'text': question},
             ],
           },
         ];
         raw = await ClaudeApi.chat(
-          system: _system(shots),
-          history: history,
+          system: system,
+          history: msgs,
           tools: _tools,
           confirm: confirmAction,
-          onStatus: (s) => _set(ClickyState.thinking, status: s),
+          webSearch: webSearch,
+          onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
           onText: streamed,
         );
       }
+      if (id != _askId) return;
       drawing = false;
-      final (spoken, newBoard) = ClickyBoard.extract(raw);
-      final (text, point, label, screen) = parsePoint(spoken);
+      final (spokenAll, newBoard) = ClickyBoard.extract(raw);
+      final (noPlan, plan) = DrivePlan.extract(spokenAll);
+      final parts = stepsMode ? splitSteps(noPlan) : [noPlan.replaceAll(stepRe, ' ')];
       if (newBoard != null) _showBoard(newBoard);
-      _memory.add((
-        q,
-        [
-          text.isEmpty ? '(je t\'ai montré à l\'écran)' : text,
-          if (newBoard != null) '(tableau affiché : ${newBoard.summary})',
-        ].join(' '),
-      ));
-      if (_memory.length > 6) _memory.removeAt(0);
-      final shot = shots.isEmpty ? null : shots[(screen - 1).clamp(0, shots.length - 1)];
-      if (point != null && shot != null) {
-        target = shot.toLayer(point);
-        targetLabel = label;
-        _set(ClickyState.pointing, status: '', reply: text);
-      } else {
-        _set(ClickyState.speaking, status: '', reply: text);
+      // Historique + journal + leçon enregistrée.
+      final clean = [for (final p in parts) _plain(p)].join('\n');
+      final app = _appKey;
+      final tid = threadId;
+      unawaited(history.add(tid, ChatMsg(mine: true, text: _lastQuestion), app: app));
+      unawaited(
+        history.add(
+          tid,
+          ChatMsg(
+            mine: false,
+            text: clean.isEmpty ? '(je t\'ai montré à l\'écran)' : clean,
+            note: newBoard == null ? null : '(tableau affiché : ${newBoard.summary})',
+          ),
+          app: app,
+        ),
+      );
+      if (journalOn) {
+        unawaited(
+          Journal.instance.add(
+            question: _lastQuestion,
+            answer: clean,
+            board: newBoard?.title,
+            app: currentApp,
+          ),
+        );
       }
-      await speak(text);
-      if (state == ClickyState.speaking) {
-        _set(ClickyState.idle);
-        _fadeSoon();
+      if (LessonRecorder.instance.on) {
+        unawaited(
+          LessonRecorder.instance.add(
+            _lastQuestion,
+            clean,
+            png64: shots.firstOrNull?.png64,
+            board: newBoard?.summary,
+          ),
+        );
       }
-      if (state == ClickyState.pointing) {
-        // On laisse la flèche le temps de voir, puis Clicky revient.
-        Timer(const Duration(seconds: 4), () {
-          if (state == ClickyState.pointing) {
-            target = null;
-            _set(ClickyState.idle);
-            _fadeSoon();
-          }
-        });
-      }
+      steps = parts.length > 1 ? parts : const [];
+      stepIndex = 0;
+      _stepShots = shots;
+      await _present(parts.first, shots, liveSpoken: live);
+      if (plan != null && id == _askId) await _drive(plan, shots);
+    } on ClaudeCodeCancelled {
+      return;
     } catch (e) {
+      if (id != _askId) return;
       drawing = false;
       panelOpen = true;
       onInteractive?.call(true);
@@ -815,11 +1445,146 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
   }
 
+  /// Texte sans aucune balise.
+  static String _plain(String part) => stripClickyTags(ClickyMark.extract(parsePoint(part).$1).$1);
+
+  /// Montre une réponse (ou une étape) : texte, pointage, dessins, voix.
+  Future<void> _present(
+    String part,
+    List<ClickyShot> shots, {
+    bool step = false,
+    bool liveSpoken = false,
+  }) async {
+    final id = _askId;
+    final (noPoint, point, label, screen) = parsePoint(part);
+    final (text0, rawMarks) = ClickyMark.extract(noPoint);
+    final text = stripClickyTags(text0);
+    final shot = shots.isEmpty ? null : shots[(screen - 1).clamp(0, shots.length - 1)];
+    // Dessins à l'écran.
+    final drawn = <ClickyMark>[];
+    for (final m in rawMarks) {
+      if (shots.isEmpty) break;
+      final s = shots[(m.screen - 1).clamp(0, shots.length - 1)];
+      drawn.add(m.map(s.toLayer, s.logicalPerPx));
+    }
+    marks = drawn;
+    marksId++;
+    var p = point;
+    if (p != null && shot != null && precise) {
+      _set(ClickyState.thinking, status: 'Je vise précisément…', reply: text);
+      p = await _refine(shot, p, label) ?? p;
+      if (id != _askId) return;
+    }
+    final status = steps.isEmpty
+        ? ''
+        : 'Étape ${stepIndex + 1} sur ${steps.length}${hasNextStep ? ' · dis « suivant »' : ''}';
+    if (p != null && shot != null) {
+      target = shot.toLayer(p);
+      targetLabel = label;
+      _set(ClickyState.pointing, status: status, reply: text);
+    } else {
+      target = null;
+      _set(ClickyState.speaking, status: status, reply: text);
+    }
+    if (liveSpoken && !step) {
+      voiceOut.finish(text);
+      _wake.pause();
+      await voiceOut.done();
+    } else {
+      await speak(text);
+    }
+    if (id != _askId) return;
+    if (state == ClickyState.speaking) {
+      _set(ClickyState.idle);
+      _fadeSoon();
+    }
+    if (state == ClickyState.pointing) {
+      // On laisse la flèche le temps de voir, puis Clicky revient.
+      Timer(Duration(seconds: slow ? 7 : 4), () {
+        if (state == ClickyState.pointing && id == _askId) {
+          target = null;
+          _set(ClickyState.idle);
+          _fadeSoon();
+        }
+      });
+    }
+    if (state != ClickyState.listening) _wake.resume();
+  }
+
+  /// Pointage précis : zoom + grille, une seconde question à l'IA.
+  Future<Offset?> _refine(ClickyShot shot, Offset p, String label) async {
+    try {
+      final zone = PrecisePointer.zone(p, shot.width, shot.height);
+      final img = await PrecisePointer.gridImage(shot.png64, zone);
+      if (img == null) return null;
+      const sys =
+          'Tu aides à viser précisément un élément sur une capture d\'écran. Réponds uniquement par une case.';
+      final String a;
+      if (provider == 'claudecode') {
+        a = await ClaudeCode.ask(
+          system: sys,
+          question: PrecisePointer.question(label),
+          imagesB64: [img],
+          withTools: false,
+        );
+      } else if (provider == 'ollama') {
+        a = await Ollama.chat(
+          system: sys,
+          memory: const [],
+          question: PrecisePointer.question(label),
+          imagesB64: [img],
+        );
+      } else {
+        a = await ClaudeApi.chat(
+          system: sys,
+          history: [
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'image',
+                  'source': {'type': 'base64', 'media_type': 'image/png', 'data': img},
+                },
+                {'type': 'text', 'text': PrecisePointer.question(label)},
+              ],
+            },
+          ],
+        );
+      }
+      return PrecisePointer.cellCenter(a, zone);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// « Clicky pilote » : relecture du plan, puis clics / frappe.
+  Future<void> _drive(DrivePlan plan, List<ClickyShot> shots) async {
+    if (!desktopMode || !DriveRunner.supported || shots.isEmpty) return;
+    onInteractive?.call(true);
+    final ok = await DriveRunner.review(plan);
+    onInteractive?.call(panelOpen || board != null);
+    if (!ok) {
+      _set(ClickyState.idle, status: 'D\'accord, je ne touche à rien.');
+      _fadeSoon();
+      return;
+    }
+    // La fenêtre de Clicky ne doit pas recevoir les clics.
+    closePanel();
+    final r = await DriveRunner.run(
+      plan,
+      (pt, screen) => shots[(screen - 1).clamp(0, shots.length - 1)].toLayer(pt),
+      onStatus: (s) => _set(ClickyState.thinking, status: s),
+    );
+    _set(ClickyState.idle, status: '', reply: r);
+    await speak(r);
+    _fadeSoon();
+  }
+
   /// Claude Code ne garde pas la conversation : on lui rappelle les
   /// derniers échanges dans la question.
-  String _withMemory(String q) {
-    if (_memory.isEmpty) return q;
-    final past = [for (final (u, a) in _memory) 'Toi : $u\nClicky : $a'].join('\n\n');
+  static String _withMemory(String q, List<(String, String)> memory) {
+    if (memory.isEmpty) return q;
+    final past = [for (final (u, a) in memory) 'Moi : $u\nToi : $a'].join('\n\n');
     return 'Nos derniers échanges :\n$past\n\nNouvelle question : $q';
   }
 
@@ -837,6 +1602,35 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     );
   }
 
+  /// Une tâche faite par l'agent (mode « Agent, … » et routines). Renvoie le
+  /// compte rendu.
+  Future<String> runTask(String task) async {
+    final usePro = provider == 'claudecode';
+    if (usePro
+        ? await ClaudeCode.find() == null
+        : (provider != 'claude' || !await ClaudeApi.hasKey())) {
+      throw 'Le mode agent a besoin de Claude (ton abonnement Claude Pro ou une clé API).';
+    }
+    final r = usePro
+        ? await ClaudeCode.ask(
+            system: _system(const [], agent: true),
+            question: task,
+            effort: 'high',
+            web: webSearch,
+          )
+        : await ClaudeApi.chat(
+            system: _system(const [], agent: true),
+            history: [
+              {'role': 'user', 'content': task},
+            ],
+            tools: _tools,
+            confirm: confirmAction,
+            webSearch: webSearch,
+            effort: 'high',
+          );
+    return _plain(ClickyBoard.strip(DrivePlan.extract(r).$1));
+  }
+
   /// Tâche de fond : Clicky reste disponible pendant que l'agent travaille.
   Future<void> _runAgent(String task) async {
     if (task.isEmpty) {
@@ -848,42 +1642,23 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       );
       return;
     }
-    final usePro = provider == 'claudecode';
-    if (usePro
-        ? await ClaudeCode.find() == null
-        : (provider != 'claude' || !await ClaudeApi.hasKey())) {
-      _set(
-        ClickyState.idle,
-        reply:
-            'Le mode agent a besoin de Claude (ton abonnement Claude Pro ou une clé API) '
-            'pour utiliser tes modules.',
-      );
-      return;
-    }
     agentsRunning++;
-    _set(ClickyState.idle, status: '', reply: 'C\'est parti, je m\'en occupe en arrière-plan.');
-    unawaited(speak('C\'est parti, je m\'en occupe.'));
+    _set(
+      ClickyState.idle,
+      status: '',
+      reply: jarvis
+          ? 'Bien. Je m\'en occupe en arrière-plan.'
+          : 'C\'est parti, je m\'en occupe en arrière-plan.',
+    );
+    unawaited(speak(jarvis ? 'Je m\'en occupe.' : 'C\'est parti, je m\'en occupe.'));
     _fadeSoon();
     try {
-      final r = usePro
-          ? await ClaudeCode.ask(
-              system: _system(const [], agent: true),
-              question: task,
-              effort: 'high',
-            )
-          : await ClaudeApi.chat(
-              system: _system(const [], agent: true),
-              history: [
-                {'role': 'user', 'content': task},
-              ],
-              tools: _tools,
-              confirm: confirmAction,
-              effort: 'high',
-            );
-      final text = parsePoint(ClickyBoard.strip(r)).$1;
+      final text = await runTask(task);
       agentsRunning--;
       _set(state, reply: 'Agent : $text');
-      notify?.call('Clicky : tâche terminée', text);
+      unawaited(history.add(threadId, ChatMsg(mine: true, text: 'Agent, $task'), app: _appKey));
+      unawaited(history.add(threadId, ChatMsg(mine: false, text: text), app: _appKey));
+      notify?.call('${jarvis ? 'Jarvis' : 'Clicky'} : tâche terminée', text);
       if (state == ClickyState.idle) await speak('Ton agent a fini. $text');
     } catch (e) {
       agentsRunning--;
@@ -903,7 +1678,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.auto_awesome_rounded),
-          title: const Text('Clicky veut agir'),
+          title: Text('${jarvis ? 'Jarvis' : 'Clicky'} veut agir'),
           content: SingleChildScrollView(
             child: Text(
               '${tool.description}\n\n'
@@ -923,10 +1698,6 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   }
 
   static final _tagRe = RegExp(r'\[POINT:\s*([^\]]*)\]', caseSensitive: false);
-
-  /// Retire la balise (même à moitié écrite) du texte affiché en direct.
-  static String _stripTag(String t) =>
-      t.replaceAll(_tagRe, '').replaceFirst(RegExp(r'\[[^\]]*$'), '').trim();
 
   /// Sépare le texte et la balise [POINT:x,y:libellé(:screenN)].
   /// Renvoie (texte, point, libellé, numéro d'écran à partir de 1).
@@ -970,6 +1741,21 @@ class _ClickyLayerState extends State<ClickyLayer> {
     HardwareKeyboard.instance.addHandler(c.onKey);
     ClaudeApi.store.addListener(_settingsChanged);
     _settingsChanged();
+    if (widget.hub != null) {
+      // Routines (briefing du matin…) : faites par Mon Hub, qui a les modules.
+      final r = Routines.instance
+        ..runner = c.runTask
+        ..onDone = (routine, run) {
+          c.notify?.call(routine.name, run.text);
+          if (run.ok && routine.speak && c.state == ClickyState.idle) {
+            unawaited(c.speak('${routine.name}. ${run.text}'));
+          }
+        };
+      r.start();
+      unawaited(c.loadMemory());
+      // Outils des serveurs MCP ajoutés dans les réglages.
+      unawaited(McpTools.refresh(force: true));
+    }
   }
 
   void _settingsChanged() => unawaited(c.refreshReady());
@@ -987,6 +1773,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(c.onKey);
     ClaudeApi.store.removeListener(_settingsChanged);
+    if (widget.hub != null) Routines.instance.stop();
     super.dispose();
   }
 
@@ -1065,6 +1852,17 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
 
     return Stack(
       children: [
+        // Les dessins de Clicky (flèches, cercles…), sur toute la fenêtre.
+        if (c.marks.isNotEmpty)
+          Positioned.fill(
+            child: ClickyMarksView(
+              key: ValueKey(c.marksId),
+              marks: c.marks,
+              color: c.jarvis ? jarvisCyan : clickyBlue,
+              hold: Duration(seconds: c.slow ? 7 : 4),
+              onDone: c.clearMarks,
+            ),
+          ),
         // Le petit curseur bleu de Clicky (suit la souris, vole vers la cible).
         AnimatedOpacity(
           opacity: c.buddyVisible ? 1 : 0,
@@ -1074,6 +1872,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
               _Flight(
                 to: at,
                 flying: c.target != null,
+                slow: c.slow,
                 child: IgnorePointer(child: _PointerWithLabel(c: c)),
               ),
             ],
@@ -1133,16 +1932,26 @@ class _PointerWithLabel extends StatelessWidget {
       _Pointer(c: c),
       if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
         Container(
-          margin: const EdgeInsets.only(left: 4, top: 14),
+          margin: EdgeInsets.only(left: 4, top: c.jarvis ? 22 : 14),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: clickyBlue,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
+            color: c.jarvis ? jarvisGlass : clickyBlue,
+            borderRadius: BorderRadius.circular(c.jarvis ? 4 : 12),
+            border: c.jarvis ? Border.all(color: jarvisCyan) : null,
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 8,
+                color: c.jarvis ? jarvisCyan.withValues(alpha: 0.4) : const Color(0x33000000),
+              ),
+            ],
           ),
           child: Text(
-            c.targetLabel,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            c.jarvis ? c.targetLabel.toUpperCase() : c.targetLabel,
+            style: TextStyle(
+              color: c.jarvis ? jarvisCyan : Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: c.jarvis ? 1.2 : null,
+            ),
           ),
         ),
     ],
@@ -1195,23 +2004,51 @@ class ClickyPopIn extends StatelessWidget {
 /// suit la souris, le bout du curseur bleu est dans son coin haut-gauche, et
 /// la boîte de texte s'ouvre juste à côté.
 class ClickyFollower extends StatelessWidget {
-  const ClickyFollower({super.key, required this.c, required this.interactive});
+  const ClickyFollower({
+    super.key,
+    required this.c,
+    required this.interactive,
+    this.pointerAt = Offset.zero,
+    this.marks = const [],
+  });
   final ClickyController c;
   final bool interactive;
+
+  /// Position du curseur dans la fenêtre (elle s'agrandit pendant un dessin).
+  final Offset pointerAt;
+
+  /// Dessins, déjà ramenés dans le repère de la fenêtre.
+  final List<ClickyMark> marks;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
+        if (marks.isNotEmpty)
+          Positioned.fill(
+            // Un clic dans la zone efface les dessins (ils ne gênent pas).
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => c.clearMarks(),
+              child: ClickyMarksView(
+                key: ValueKey(c.marksId),
+                marks: marks,
+                color: c.jarvis ? jarvisCyan : clickyBlue,
+                hold: Duration(seconds: c.slow ? 7 : 4),
+                onDone: c.clearMarks,
+              ),
+            ),
+          ),
         Positioned(
-          left: 0,
-          top: 0,
+          left: pointerAt.dx,
+          top: pointerAt.dy,
           child: IgnorePointer(child: _PointerWithLabel(c: c)),
         ),
         Positioned(
-          left: 22,
-          top: 22,
-          right: 4,
+          left: pointerAt.dx + 22,
+          top: pointerAt.dy + 22,
+          right: marks.isEmpty ? 4 : null,
+          width: marks.isEmpty ? null : 380,
           bottom: c.board != null ? 4 : null,
           child: IgnorePointer(
             ignoring: !interactive,
@@ -1248,10 +2085,13 @@ class ClickyFollower extends StatelessWidget {
 /// Vol du curseur : suit la souris de près, et fait un arc (courbe de
 /// Bézier) quand il part montrer quelque chose.
 class _Flight extends StatefulWidget {
-  const _Flight({required this.to, required this.flying, required this.child});
+  const _Flight({required this.to, required this.flying, required this.child, this.slow = false});
   final Offset to;
   final bool flying;
   final Widget child;
+
+  /// Mode lent : vol 1,7 × plus lent (plus facile à suivre).
+  final bool slow;
 
   @override
   State<_Flight> createState() => _FlightState();
@@ -1285,6 +2125,7 @@ class _FlightState extends State<_Flight> with SingleTickerProviderStateMixin {
     final arc = widget.flying != old.flying || (widget.to - _pos).distance > 300;
     if (arc) {
       _from = _pos;
+      _a.duration = Duration(milliseconds: widget.slow ? 1200 : 700);
       _a.forward(from: 0);
     } else if (!_a.isAnimating) {
       _pos = widget.to;
@@ -1309,6 +2150,44 @@ class _Pointer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final thinking = c.state == ClickyState.thinking;
+    if (c.jarvis) {
+      final mode = switch (c.state) {
+        ClickyState.listening => JarvisMode.listening,
+        ClickyState.thinking => JarvisMode.thinking,
+        ClickyState.speaking => JarvisMode.speaking,
+        ClickyState.pointing => JarvisMode.pointing,
+        _ => JarvisMode.idle,
+      };
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Le bout du réacteur reste au même endroit que la pointe du curseur.
+          Transform.translate(
+            offset: Offset(
+              mode == JarvisMode.pointing ? -27 : -4,
+              mode == JarvisMode.pointing ? -27 : -4,
+            ),
+            child: JarvisReactor(mode: mode, levels: c.levels, size: 34),
+          ),
+          if (c.agentsRunning > 0)
+            Positioned(
+              left: 24,
+              top: 22,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: jarvisAmber,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${c.agentsRunning}',
+                  style: const TextStyle(color: Colors.black, fontSize: 10),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -1424,8 +2303,10 @@ class _Fab extends StatelessWidget {
         onLongPressStart: (_) => c.startListening(),
         onLongPressEnd: (_) => c.stopListening(),
         child: Material(
-          color: listening ? Colors.redAccent : clickyBlue,
-          shape: const CircleBorder(),
+          color: listening ? Colors.redAccent : (c.jarvis ? jarvisGlass : clickyBlue),
+          shape: CircleBorder(
+            side: c.jarvis ? const BorderSide(color: jarvisCyan) : BorderSide.none,
+          ),
           elevation: 4,
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -1435,7 +2316,7 @@ class _Fab extends StatelessWidget {
               height: 44,
               child: Icon(
                 listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                color: Colors.white,
+                color: c.jarvis && !listening ? jarvisCyan : Colors.white,
                 size: 22,
               ),
             ),
@@ -1448,7 +2329,8 @@ class _Fab extends StatelessWidget {
 
 /// La petite boîte de texte de Clicky, ouverte là où est la souris : ce que
 /// tu dis s'y écrit pendant que tu parles, puis la réponse s'y écrit à son
-/// tour. On peut aussi y taper sa question.
+/// tour. On peut aussi y taper sa question, joindre un document, revoir
+/// l'historique, passer à l'étape suivante d'une leçon.
 class ClickyBox extends StatelessWidget {
   const ClickyBox({super.key, required this.c, this.compact = false});
   final ClickyController c;
@@ -1458,248 +2340,541 @@ class ClickyBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    final base = Theme.of(context);
+    if (!c.jarvis) return _content(context, base);
+    return Theme(
+      data: jarvisTheme(base),
+      child: Builder(
+        builder: (context) => JarvisFrame(child: _content(context, Theme.of(context))),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, ThemeData theme) {
+    final scheme = theme.colorScheme;
+    final text = theme.textTheme;
+    final jarvis = c.jarvis;
+    final accent = jarvis ? jarvisCyan : clickyBlue;
     final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
     final problem = c.micProblem;
+    final name = jarvis ? 'JARVIS' : 'Clicky';
     final title = switch (c.state) {
       _ when problem != null => 'Souci de micro',
-      ClickyState.listening => 'Je t\'écoute…',
-      ClickyState.thinking => c.reply.isEmpty ? 'Je réfléchis…' : 'Clicky',
-      _ => 'Clicky',
+      _ when c.showHistory => 'Historique',
+      ClickyState.listening => jarvis ? 'À votre écoute…' : 'Je t\'écoute…',
+      ClickyState.thinking =>
+        c.reply.isEmpty ? (jarvis ? 'Analyse en cours…' : 'Je réfléchis…') : name,
+      _ => name,
     };
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Barre du haut : état, historique, outils, voix, fermer.
+        Container(
+          color: accent.withValues(alpha: jarvis ? 0.10 : 0.12),
+          padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
+          child: Row(
+            children: [
+              if (busy)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(
+                    listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
+                    color: listening ? Colors.redAccent : accent,
+                    size: 16,
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  c.agentsRunning > 0
+                      ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
+                      : title,
+                  style: text.labelLarge?.copyWith(
+                    letterSpacing: jarvis ? 1.6 : null,
+                    color: jarvis ? jarvisCyan : null,
+                    fontWeight: jarvis ? FontWeight.w700 : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (LessonRecorder.instance.on)
+                const Tooltip(
+                  message: 'Leçon en cours d\'enregistrement',
+                  child: Icon(Icons.fiber_manual_record_rounded, color: Colors.redAccent, size: 14),
+                ),
+              if (WorkflowCapture.instance.on)
+                const Tooltip(
+                  message: 'Gestes en cours de capture',
+                  child: Icon(Icons.gesture_rounded, color: Colors.orange, size: 16),
+                ),
+              if (busy || c.voiceOut.speaking)
+                IconButton(
+                  tooltip: 'Arrêter (Échap)',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                  onPressed: c.cancel,
+                ),
+              IconButton(
+                tooltip: 'Historique des conversations',
+                visualDensity: VisualDensity.compact,
+                isSelected: c.showHistory,
+                icon: const Icon(Icons.history_rounded, size: 18),
+                onPressed: c.toggleHistory,
+              ),
+              _ToolsMenu(c: c),
+              IconButton(
+                tooltip: c.voice ? 'Couper la voix' : 'Remettre la voix',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded, size: 18),
+                onPressed: c.toggleVoice,
+              ),
+              IconButton(
+                tooltip: 'Fermer (Échap)',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: c.closeBox,
+              ),
+            ],
+          ),
+        ),
+        if (c.showHistory)
+          Flexible(child: _HistoryPeek(c: c))
+        else
+          Flexible(
+            child: SingleChildScrollView(
+              reverse: true,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Ce que tu dis, écrit en direct.
+                  if (listening) ...[
+                    if (!jarvis) _Wave(levels: c.levels) else _JarvisWave(levels: c.levels),
+                    const SizedBox(height: 8),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 120),
+                      alignment: Alignment.topLeft,
+                      child: Text(
+                        c.transcript.isEmpty ? 'Parle, j\'écris…' : c.transcript,
+                        style: text.titleMedium?.copyWith(
+                          color: c.transcript.isEmpty ? scheme.onSurfaceVariant : null,
+                        ),
+                      ),
+                    ),
+                  ] else if (c.transcript.isNotEmpty && c.state != ClickyState.idle)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '« ${c.transcript} »',
+                        style: text.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  if (problem != null) _MicHelp(c: c, problem: problem),
+                  if (c.drawing)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.draw_rounded, size: 16, color: accent),
+                          const SizedBox(width: 6),
+                          Text('Je dessine au tableau…', style: text.bodySmall),
+                        ],
+                      ),
+                    ),
+                  if (!listening && c.status.isNotEmpty && !c.drawing)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        c.status,
+                        style: text.bodySmall?.copyWith(color: jarvis ? jarvisCyan : null),
+                      ),
+                    ),
+                  // La réponse, écrite au fur et à mesure.
+                  if (!listening && c.reply.isNotEmpty)
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 120),
+                      alignment: Alignment.topLeft,
+                      child: SelectableText(
+                        c.reply,
+                        style: text.bodyMedium?.copyWith(height: 1.35),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        // Leçon en plusieurs étapes.
+        if (c.steps.isNotEmpty && !c.showHistory)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+            child: Row(
+              children: [
+                for (var i = 0; i < c.steps.length; i++)
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                      decoration: BoxDecoration(
+                        color: i <= c.stepIndex ? accent : accent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  icon: Icon(
+                    c.hasNextStep ? Icons.skip_next_rounded : Icons.check_rounded,
+                    size: 18,
+                  ),
+                  label: Text(c.hasNextStep ? 'Suivant' : 'Terminé'),
+                  onPressed: busy ? null : c.nextStep,
+                ),
+              ],
+            ),
+          ),
+        // Documents joints.
+        if (c.docs.isNotEmpty && !c.showHistory)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 2,
+              children: [
+                for (final d in c.docs)
+                  InputChip(
+                    avatar: Icon(
+                      d.image64 != null ? Icons.image_rounded : Icons.description_rounded,
+                      size: 16,
+                    ),
+                    label: Text(d.name, overflow: TextOverflow.ellipsis),
+                    visualDensity: VisualDensity.compact,
+                    onDeleted: () => c.removeDoc(d),
+                  ),
+              ],
+            ),
+          ),
+        // Raccourcis pour apprendre.
+        if ((c.panelOpen || c.reply.isNotEmpty) &&
+            c.state == ClickyState.idle &&
+            problem == null &&
+            c.steps.isEmpty &&
+            !c.showHistory &&
+            !compact)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (c.hasHistory)
+                  _QuickChip(
+                    icon: Icons.draw_rounded,
+                    label: 'Montre-moi en schéma',
+                    color: accent,
+                    onTap: () => c.ask(ClickyController.visualPrompt),
+                  ),
+                if (jarvis)
+                  _QuickChip(
+                    icon: Icons.dashboard_rounded,
+                    label: 'Briefing',
+                    color: accent,
+                    onTap: () => c.ask('briefing'),
+                  ),
+                _QuickChip(
+                  icon: Icons.school_rounded,
+                  label: 'Apprends-moi un truc',
+                  color: accent,
+                  onTap: () => c.ask(ClickyController.teachPrompt),
+                ),
+                if (!c.hasHistory)
+                  _QuickChip(
+                    icon: Icons.screen_search_desktop_rounded,
+                    label: 'Explique mon écran',
+                    color: accent,
+                    onTap: () => c.ask(ClickyController.explainScreenPrompt),
+                  ),
+                if (Journal.instance.due().isNotEmpty)
+                  _QuickChip(
+                    icon: Icons.psychology_rounded,
+                    label: 'Mes révisions (${Journal.instance.due().length})',
+                    color: accent,
+                    onTap: () => c.ask('qu\'est-ce que je dois réviser'),
+                  ),
+              ],
+            ),
+          ),
+        // Écrire (ou parler) une question.
+        if (c.panelOpen && !c.showHistory)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Joindre un document (PDF, Word, Excel, image…)',
+                  icon: const Icon(Icons.attach_file_rounded),
+                  onPressed: busy ? null : c.attachDocuments,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: c.input,
+                    focusNode: c.inputFocus,
+                    autofocus: true,
+                    enabled: !busy,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: c.ask,
+                    decoration: InputDecoration(
+                      hintText: jarvis ? 'À votre service…' : 'Demande-moi quelque chose…',
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                if (c.mic)
+                  IconButton(
+                    tooltip: listening ? 'J\'ai fini' : 'Parler',
+                    icon: Icon(listening ? Icons.stop_rounded : Icons.mic_rounded),
+                    color: listening ? Colors.redAccent : null,
+                    onPressed: busy
+                        ? null
+                        : () => listening ? c.stopListening() : c.startListening(),
+                  ),
+                IconButton(
+                  tooltip: 'Envoyer',
+                  icon: const Icon(Icons.send_rounded),
+                  onPressed: busy ? null : () => c.ask(c.input.text),
+                ),
+              ],
+            ),
+          )
+        else if (c.state == ClickyState.idle && c.reply.isNotEmpty && !c.showHistory)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 6, 6),
+              child: TextButton.icon(
+                icon: const Icon(Icons.reply_rounded, size: 16),
+                label: const Text('Répondre'),
+                onPressed: c.openPanel,
+              ),
+            ),
+          ),
+      ],
+    );
+    final box = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: compact ? 520 : 380,
+        maxHeight: c.showHistory ? 420 : (compact ? 220 : 400),
+      ),
+      child: body,
+    );
+    if (jarvis) return Material(type: MaterialType.transparency, child: box);
     return Material(
       elevation: 4,
       shadowColor: Colors.black26,
       borderRadius: BorderRadius.circular(16),
       color: scheme.surfaceContainerHigh,
       clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: compact ? 520 : 360, maxHeight: compact ? 220 : 380),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Barre du haut : état, voix, fermer.
-            Container(
-              color: clickyBlue.withValues(alpha: 0.12),
-              padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
-              child: Row(
-                children: [
-                  if (busy)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 8),
-                      child: SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: clickyBlue),
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(
-                        listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                        color: listening ? Colors.redAccent : clickyBlue,
-                        size: 16,
-                      ),
-                    ),
-                  Expanded(
-                    child: Text(
-                      c.agentsRunning > 0
-                          ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
-                          : title,
-                      style: text.labelLarge,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (c.voice &&
-                      (c.state == ClickyState.speaking || c.state == ClickyState.pointing))
-                    IconButton(
-                      tooltip: 'Arrêter de parler',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                      onPressed: c.stopSpeaking,
-                    ),
-                  IconButton(
-                    tooltip: c.voice ? 'Couper la voix de Clicky' : 'Remettre la voix de Clicky',
-                    visualDensity: VisualDensity.compact,
-                    icon: Icon(
-                      c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      size: 18,
-                    ),
-                    onPressed: c.toggleVoice,
-                  ),
-                  IconButton(
-                    tooltip: 'Fermer (Échap)',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: c.closeBox,
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                reverse: true,
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Ce que tu dis, écrit en direct.
-                    if (listening) ...[
-                      _Wave(levels: c.levels),
-                      const SizedBox(height: 8),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 120),
-                        alignment: Alignment.topLeft,
-                        child: Text(
-                          c.transcript.isEmpty ? 'Parle, j\'écris…' : c.transcript,
-                          style: text.titleMedium?.copyWith(
-                            color: c.transcript.isEmpty ? scheme.onSurfaceVariant : null,
-                          ),
-                        ),
-                      ),
-                    ] else if (c.transcript.isNotEmpty && c.state != ClickyState.idle)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(
-                          '«\u00a0${c.transcript}\u00a0»',
-                          style: text.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    if (problem != null) _MicHelp(c: c, problem: problem),
-                    if (c.drawing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.draw_rounded, size: 16, color: clickyBlue),
-                            const SizedBox(width: 6),
-                            Text('Je dessine au tableau…', style: text.bodySmall),
-                          ],
-                        ),
-                      ),
-                    if (!listening && c.status.isNotEmpty && !c.drawing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(c.status, style: text.bodySmall),
-                      ),
-                    // La réponse, écrite au fur et à mesure.
-                    if (!listening && c.reply.isNotEmpty)
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 120),
-                        alignment: Alignment.topLeft,
-                        child: SelectableText(
-                          c.reply,
-                          style: text.bodyMedium?.copyWith(height: 1.35),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            // Raccourcis pour apprendre.
-            if ((c.panelOpen || c.reply.isNotEmpty) &&
-                c.state == ClickyState.idle &&
-                problem == null &&
-                !compact)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    if (c.hasHistory)
-                      _QuickChip(
-                        icon: Icons.draw_rounded,
-                        label: 'Montre-moi en schéma',
-                        onTap: () => c.ask(ClickyController.visualPrompt),
-                      ),
-                    _QuickChip(
-                      icon: Icons.school_rounded,
-                      label: 'Apprends-moi un truc',
-                      onTap: () => c.ask(ClickyController.teachPrompt),
-                    ),
-                    if (!c.hasHistory)
-                      _QuickChip(
-                        icon: Icons.screen_search_desktop_rounded,
-                        label: 'Explique mon écran',
-                        onTap: () => c.ask(ClickyController.explainScreenPrompt),
-                      ),
-                  ],
-                ),
-              ),
-            // Écrire (ou parler) une question.
-            if (c.panelOpen)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 4, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: c.input,
-                        focusNode: c.inputFocus,
-                        autofocus: true,
-                        enabled: !busy,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: c.ask,
-                        decoration: const InputDecoration(
-                          hintText: 'Demande-moi quelque chose…',
-                          isDense: true,
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    if (c.mic)
-                      IconButton(
-                        tooltip: listening ? 'J\'ai fini' : 'Parler',
-                        icon: Icon(listening ? Icons.stop_rounded : Icons.mic_rounded),
-                        color: listening ? Colors.redAccent : null,
-                        onPressed: busy
-                            ? null
-                            : () => listening ? c.stopListening() : c.startListening(),
-                      ),
-                    IconButton(
-                      tooltip: 'Envoyer',
-                      icon: const Icon(Icons.send_rounded),
-                      onPressed: busy ? null : () => c.ask(c.input.text),
-                    ),
-                  ],
-                ),
-              )
-            else if (c.state == ClickyState.idle && c.reply.isNotEmpty)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 6, 6),
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.reply_rounded, size: 16),
-                    label: const Text('Répondre'),
-                    onPressed: c.openPanel,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
+      child: box,
     );
   }
 }
 
+/// Menu « outils » de la boîte : nouvelle conversation, document, capture
+/// de gestes, enregistrement de leçon, pilotage.
+class _ToolsMenu extends StatelessWidget {
+  const _ToolsMenu({required this.c});
+  final ClickyController c;
+
+  @override
+  Widget build(BuildContext context) {
+    final cap = WorkflowCapture.instance;
+    final rec = LessonRecorder.instance;
+    return PopupMenuButton<String>(
+      tooltip: 'Outils',
+      icon: const Icon(Icons.more_vert_rounded, size: 18),
+      onOpened: () => c.onInteractive?.call(true),
+      onSelected: (v) async {
+        switch (v) {
+          case 'new':
+            c.newConversation();
+          case 'doc':
+            await c.attachDocuments();
+          case 'capture':
+            if (cap.on) {
+              cap.stop();
+              await c.ask('qu\'est-ce que je viens de faire');
+            } else {
+              cap.start();
+              c.showStatus(
+                'Je regarde tes gestes. Fais ta manip, puis redemande « qu\'est-ce que je viens de faire ? ».',
+              );
+            }
+          case 'record':
+            if (rec.on) {
+              final path = await rec.stop();
+              c.showStatus(path == null ? '' : 'Leçon enregistrée dans : $path');
+              if (path != null) unawaited(launchUrl(Uri.file(path)));
+            } else {
+              final path = await rec.start();
+              c.showStatus(
+                path == null
+                    ? 'Impossible de créer le dossier de la leçon.'
+                    : 'J\'enregistre la leçon (questions, réponses et captures).',
+              );
+            }
+          case 'review':
+            await c.ask('qu\'est-ce que je dois réviser');
+          case 'quiz':
+            await c.setOption('quiz', !c.quizMode);
+          case 'slow':
+            await c.setOption('slow', !c.slow);
+        }
+      },
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'new',
+          child: ListTile(
+            leading: Icon(Icons.add_comment_rounded),
+            title: Text('Nouvelle conversation'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'doc',
+          child: ListTile(
+            leading: Icon(Icons.attach_file_rounded),
+            title: Text('Joindre un document'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'review',
+          child: ListTile(
+            leading: Icon(Icons.psychology_rounded),
+            title: Text('Réviser (journal)'),
+          ),
+        ),
+        CheckedPopupMenuItem(value: 'quiz', checked: c.quizMode, child: const Text('Mode quiz')),
+        CheckedPopupMenuItem(value: 'slow', checked: c.slow, child: const Text('Mode lent')),
+        if (WorkflowCapture.supported)
+          PopupMenuItem(
+            value: 'capture',
+            child: ListTile(
+              leading: const Icon(Icons.gesture_rounded),
+              title: Text(cap.on ? 'Arrêter et raconter mes gestes' : 'Capturer mes gestes'),
+            ),
+          ),
+        PopupMenuItem(
+          value: 'record',
+          child: ListTile(
+            leading: Icon(rec.on ? Icons.stop_circle_rounded : Icons.fiber_manual_record_rounded),
+            title: Text(rec.on ? 'Arrêter l\'enregistrement' : 'Enregistrer la leçon'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Historique dans la boîte : les dernières conversations, à reprendre.
+class _HistoryPeek extends StatelessWidget {
+  const _HistoryPeek({required this.c});
+  final ClickyController c;
+
+  @override
+  Widget build(BuildContext context) {
+    final threads = c.history.threads.take(30).toList();
+    if (threads.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('Pas encore d\'historique : tes échanges s\'enregistrent ici.'),
+      );
+    }
+    final text = Theme.of(context).textTheme;
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      children: [
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.add_comment_rounded, size: 18),
+          title: const Text('Nouvelle conversation'),
+          onTap: c.newConversation,
+        ),
+        for (final t in threads)
+          ListTile(
+            dense: true,
+            title: Text(t.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              [
+                if (t.app.isNotEmpty) t.app,
+                '${dayLabel(t.updated)} ${hhmm(t.updated)}',
+                '${t.messages.length ~/ 2} échange${t.messages.length > 3 ? 's' : ''}',
+              ].join(' · '),
+              style: text.labelSmall,
+            ),
+            onTap: () => c.continueThread(t),
+          ),
+      ],
+    );
+  }
+}
+
+/// Onde de Jarvis (barres fines, cyan).
+class _JarvisWave extends StatelessWidget {
+  const _JarvisWave({required this.levels});
+  final List<double> levels;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 26,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final l in [...levels.reversed, ...levels])
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 90),
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            width: 2.5,
+            height: 3.0 + 22 * l,
+            decoration: BoxDecoration(
+              color: jarvisCyan,
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: [BoxShadow(color: jarvisCyan.withValues(alpha: 0.6), blurRadius: 4)],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
 class _QuickChip extends StatelessWidget {
-  const _QuickChip({required this.icon, required this.label, required this.onTap});
+  const _QuickChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = clickyBlue,
+  });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) => ActionChip(
-    avatar: Icon(icon, size: 16, color: clickyBlue),
+    avatar: Icon(icon, size: 16, color: color),
     label: Text(label),
     visualDensity: VisualDensity.compact,
     onPressed: onTap,

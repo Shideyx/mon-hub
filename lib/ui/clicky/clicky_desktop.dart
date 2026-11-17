@@ -63,7 +63,11 @@ class ClickyDesktop {
     }
   }
 
-  /// Envoie un ordre à Clicky partout ('open', 'quit').
+  /// Pose une question à Clicky partout (il s'ouvre et répond).
+  static Future<bool> ask(String question) =>
+      send('ask ${question.replaceAll(RegExp(r'[\r\n]+'), ' ')}');
+
+  /// Envoie un ordre à Clicky partout ('open', 'quit', 'ask …').
   static Future<bool> send(String command) async {
     try {
       final s = await Socket.connect(
@@ -116,10 +120,17 @@ Future<void> runClickyDesktop() async {
     ..captureOverride = _captureScreens
     ..toolsOverride = _BridgeTools.list;
 
+  unawaited(c.loadMemory());
   lock.listen((sock) {
-    utf8.decoder.bind(sock).listen((data) {
-      if (data.contains('quit')) exit(0);
-      if (data.contains('open')) c.openPanel();
+    utf8.decoder.bind(sock).transform(const LineSplitter()).listen((line) {
+      final cmd = line.trim();
+      if (cmd == 'quit') exit(0);
+      if (cmd == 'open') c.openPanel();
+      // Question envoyée par Mon Hub (révisions du journal…).
+      if (cmd.startsWith('ask ')) {
+        c.openPanel();
+        unawaited(c.ask(cmd.substring(4)));
+      }
     }, onError: (_) {});
   });
 
@@ -329,6 +340,7 @@ class _DesktopState extends State<_Desktop> {
   Offset? _lastTarget;
 
   void _onChange() {
+    if (c.marks.isEmpty) _frame = Offset.zero;
     if (c.target != _lastTarget) {
       // Départ (ou retour) en vol, en arc.
       _flightFrom = _pos;
@@ -361,23 +373,21 @@ class _DesktopState extends State<_Desktop> {
     hwnd ??= Win.findClicky(pid);
     // Ctrl + Alt n'importe où (mais pas AltGr, qui sert à taper @, €, #).
     final both = Win.down(0x11) && Win.down(0x12) && !Win.down(0xA5);
+    // Ctrl + Alt + Maj : dictée (le texte est tapé dans l'appli ouverte).
+    final shift = Win.down(0x10);
     if (both && Win.otherKeyDown()) {
       c.hotkey(down: true, other: true);
     } else if (both && !_wasBoth) {
-      c.hotkey(down: true);
+      c.hotkey(down: true, dictate: shift);
+    } else if (both && shift) {
+      c.hotkey(down: true, dictate: true);
     } else if (!both && _wasBoth) {
       c.hotkey(down: false);
     }
     _wasBoth = both;
-    // Échap : ferme la boîte, puis le tableau.
+    // Échap : arrête la réponse, puis ferme la boîte, puis le tableau.
     final esc = Win.down(0x1B);
-    if (esc && !_wasEsc) {
-      if (c.boxOpen) {
-        c.closeBox();
-      } else if (c.board != null) {
-        c.closeBoard();
-      }
-    }
+    if (esc && !_wasEsc) c.escape();
     _wasEsc = esc;
 
     final p = Win.cursor();
@@ -437,18 +447,50 @@ class _DesktopState extends State<_Desktop> {
         : c.boxOpen
         ? _compact
         : _cursorOnly;
-    final w = (size.width * dpr).round(), hh = (size.height * dpr).round();
+    var w = (size.width * dpr).round(), hh = (size.height * dpr).round();
     // On reste dans les écrans.
     final (vx, vy, vw, vh) = Win.virtualScreen();
-    final x = want.dx.round().clamp(vx, math.max(vx, vx + vw - w)).toInt();
-    final y = want.dy.round().clamp(vy, math.max(vy, vy + vh - hh)).toInt();
-    final moved = _pos == null || (_pos!.dx - x).abs() >= 1 || (_pos!.dy - y).abs() >= 1;
+    var x = want.dx.round().clamp(vx, math.max(vx, vx + vw - w)).toInt();
+    var y = want.dy.round().clamp(vy, math.max(vy, vy + vh - hh)).toInt();
+    var inside = Offset.zero;
+    // Des dessins (flèches, cercles…) : la fenêtre couvre aussi leur zone le
+    // temps qu'ils s'affichent.
+    if (c.marks.isNotEmpty && !_interactive) {
+      var r = Rect.fromLTWH(want.dx, want.dy, w.toDouble(), hh.toDouble());
+      for (final m in c.marks) {
+        r = r.expandToInclude(m.bounds);
+      }
+      r = r.inflate(30 * dpr).intersect(Rect.fromLTWH(vx.toDouble(), vy.toDouble(), vw.toDouble(), vh.toDouble()));
+      x = r.left.floor();
+      y = r.top.floor();
+      w = r.width.ceil();
+      hh = r.height.ceil();
+      inside = (want - Offset(x.toDouble(), y.toDouble())) / dpr;
+    }
+    final origin = Offset(x.toDouble(), y.toDouble());
+    if (inside != _inside || (c.marks.isNotEmpty && origin != _frame)) {
+      _inside = inside;
+      _frame = origin;
+      if (mounted) setState(() {});
+    }
+    final moved =
+        _pos == null ||
+        (_pos!.dx - x).abs() >= 1 ||
+        (_pos!.dy - y).abs() >= 1 ||
+        _size != Size(w.toDouble(), hh.toDouble());
     if (force || moved || _hidden) {
       Win.place(h, x, y, w, hh);
-      _pos = Offset(x.toDouble(), y.toDouble());
+      _pos = origin;
+      _size = Size(w.toDouble(), hh.toDouble());
       _hidden = false;
     }
   }
+
+  /// Taille actuelle de la fenêtre, coin de la fenêtre pendant un dessin, et
+  /// position du curseur dans la fenêtre.
+  Size? _size;
+  Offset _frame = Offset.zero;
+  Offset _inside = Offset.zero;
 
   @override
   Widget build(BuildContext context) {
@@ -456,7 +498,17 @@ class _DesktopState extends State<_Desktop> {
       backgroundColor: Colors.transparent,
       body: ListenableBuilder(
         listenable: c,
-        builder: (context, _) => ClickyFollower(c: c, interactive: _interactive),
+        builder: (context, _) {
+          final dpr = _dpr;
+          return ClickyFollower(
+            c: c,
+            interactive: _interactive,
+            pointerAt: c.marks.isEmpty ? Offset.zero : _inside,
+            marks: c.marks.isEmpty
+                ? const []
+                : [for (final m in c.marks) m.map((p) => (p - _frame) / dpr, 1 / dpr)],
+          );
+        },
       ),
     );
   }

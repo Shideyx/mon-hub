@@ -203,6 +203,8 @@ class ClaudeCode {
     List<String> imageLabels = const [],
     bool withTools = true,
     String? effort,
+    bool web = false,
+    List<Map<String, dynamic>> extraBlocks = const [],
     void Function(String text)? onText,
     void Function(String status)? onStatus,
   }) async {
@@ -224,15 +226,20 @@ class ClaudeCode {
       '--output-format', 'stream-json',
       '--verbose',
       '--include-partial-messages',
-      // Aucun outil de programmation : ni commandes, ni fichiers.
-      '--tools', '',
+      // Aucun outil de programmation : ni commandes, ni fichiers. Seulement,
+      // si tu l'as permis, la recherche web d'Anthropic.
+      '--tools', web ? 'WebSearch,WebFetch' : '',
       '--permission-mode', 'dontAsk',
       '--system-prompt-file', sysFile.path,
       '--no-session-persistence',
       '--max-turns', '12',
       // Seulement les actions de Mon Hub (pas tes autres serveurs MCP).
       '--strict-mcp-config',
-      if (mcp != null) ...['--mcp-config', mcpFile.path, '--allowedTools', 'mcp__monhub'],
+      if (mcp != null) ...['--mcp-config', mcpFile.path],
+      if (mcp != null || web) ...[
+        '--allowedTools',
+        [if (mcp != null) 'mcp__monhub', if (web) ...['WebSearch', 'WebFetch']].join(','),
+      ],
       if (model.isNotEmpty) ...['--model', model],
       if (effort != null) ...['--effort', effort],
     ];
@@ -255,6 +262,7 @@ class ClaudeCode {
               'source': {'type': 'base64', 'media_type': 'image/png', 'data': imagesB64[i]},
             },
           ],
+          ...extraBlocks,
           {'type': 'text', 'text': question},
         ],
       },
@@ -264,6 +272,7 @@ class ClaudeCode {
     await p.stdin.flush();
     await p.stdin.close();
 
+    _running.add(p);
     final errors = StringBuffer();
     final errSub = p.stderr.transform(utf8.decoder).listen((s) {
       if (errors.length < 4000) errors.write(s);
@@ -296,8 +305,12 @@ class ClaudeCode {
           case 'assistant':
             for (final b in ((e['message'] as Map?)?['content'] as List?) ?? const []) {
               if (b is Map && b['type'] == 'tool_use') {
-                final n = '${b['name']}'.replaceFirst('mcp__monhub__', '').replaceAll('_', ' ');
-                onStatus?.call('J\'utilise $n…');
+                final name = '${b['name']}';
+                onStatus?.call(switch (name) {
+                  'WebSearch' => 'Je cherche sur internet…',
+                  'WebFetch' => 'Je lis une page web…',
+                  _ => 'J\'utilise ${name.replaceFirst('mcp__monhub__', '').replaceAll('_', ' ')}…',
+                });
               }
             }
           case 'system':
@@ -311,11 +324,29 @@ class ClaudeCode {
       p.kill();
       throw 'Claude Code met trop de temps à répondre, réessaie.';
     } finally {
+      _running.remove(p);
       await errSub.cancel();
     }
+    if (_cancelled.remove(p)) throw const ClaudeCodeCancelled();
     final text = (result ?? current).trim();
     if (failed || (result == null && text.isEmpty)) throw _explain('$text\n$errors');
     return text;
+  }
+
+  static final _running = <Process>{};
+  static final _cancelled = <Process>{};
+
+  /// Une réponse est en cours.
+  static bool get busy => _running.isNotEmpty;
+
+  /// Arrête toutes les réponses en cours (Échap, « stop »).
+  static void cancelAll() {
+    for (final p in [..._running]) {
+      _cancelled.add(p);
+      try {
+        p.kill();
+      } catch (_) {}
+    }
   }
 
   /// Message d'erreur compréhensible.
@@ -336,4 +367,11 @@ class ClaudeCode {
     final first = raw.trim().split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
     return first.isEmpty ? 'Claude Code n\'a pas pu répondre.' : 'Claude Code : $first';
   }
+}
+
+/// La réponse a été arrêtée (Échap, « stop »).
+class ClaudeCodeCancelled implements Exception {
+  const ClaudeCodeCancelled();
+  @override
+  String toString() => 'Réponse arrêtée.';
 }

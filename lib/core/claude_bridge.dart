@@ -39,7 +39,11 @@ class ClaudeBridge {
     await s?.close(force: true);
   }
 
-  List<HubTool> get tools => [for (final m in hub.enabled) ...m.tools];
+  List<HubTool> get tools => [for (final m in hub.enabled) ...m.tools, ...extras.value];
+
+  /// Outils en plus des modules (serveurs MCP ajoutés dans les réglages de
+  /// Clicky).
+  static final extras = ValueNotifier<List<HubTool>>(const []);
 
   /// Demande la permission avant une action qui envoie ou modifie quelque
   /// chose, quand c'est Claude Code (Clicky) qui l'appelle via /mcp.
@@ -63,9 +67,12 @@ class ClaudeBridge {
         }),
       );
       await writeInfo();
-      hub.addListener(() {
+      void refresh() {
         if (_server == server) writeInfo(); // modules activés / désactivés
-      });
+      }
+
+      hub.addListener(refresh);
+      extras.addListener(refresh);
       server.listen((req) => _handle(req, key));
     } catch (e) {
       debugPrint('Pont Claude indisponible : $e');
@@ -208,7 +215,7 @@ class ClaudeBridge {
 
   /// Actions qui changent quelque chose : on demande la permission avant.
   static bool isWriteAction(HubTool t) =>
-      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter').hasMatch(t.name);
+      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter|^mcp_').hasMatch(t.name);
 
   /// Convertit le résultat en JSON simple (dates en texte).
   static Object? plain(Object? v) => switch (v) {

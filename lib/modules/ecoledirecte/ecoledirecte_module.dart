@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io' show File;
 import 'dart:math' as math;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
@@ -42,6 +45,10 @@ class EcoleDirecteModule extends HubModule {
   List<EdGrade> grades = [];
   List<EdHomework> homework = [];
   List<EdMessage> messages = [];
+  List<EdMessage> sentMessages = [];
+
+  /// Pourquoi la messagerie n'a pas pu être lue (affiché dans l'onglet).
+  String? messagesError;
   Future<List<EdLesson>>? _loading;
   String? lastError;
 
@@ -125,11 +132,16 @@ class EcoleDirecteModule extends HubModule {
     try {
       final j = jsonDecode(raw) as Map<String, dynamic>;
       final at = DateTime.tryParse('${j['at']}');
+      // Session d'une ancienne version (sans la messagerie de la famille) :
+      // on se reconnecte une fois pour l'avoir.
+      if (!j.containsKey('family')) return;
       if (at == null || DateTime.now().difference(at) > const Duration(hours: 12)) return;
       client
         ..token = j['token'] as String?
         ..accountId = j['id'] as int?
-        ..studentName = j['name'] as String?;
+        ..studentName = j['name'] as String?
+        ..familyId = j['family'] as int?
+        ..year = j['year'] as String?;
       if (client.accountId == null) client.token = null;
     } catch (_) {}
   }
@@ -175,6 +187,8 @@ class EcoleDirecteModule extends HubModule {
         'token': client.token,
         'id': client.accountId,
         'name': client.studentName,
+        'family': client.familyId,
+        'year': client.year,
         'at': DateTime.now().toIso8601String(),
       }),
     );
@@ -201,9 +215,12 @@ class EcoleDirecteModule extends HubModule {
     } catch (_) {}
     try {
       messages = await client.messages();
+      messagesError = null;
     } on EdSessionExpired {
       rethrow;
-    } catch (_) {}
+    } catch (e) {
+      messagesError = '$e';
+    }
     // Le cahier de texte demande une requête par jour : pas plus d'une
     // fois toutes les 2 heures.
     final hw = _homeworkAt;
@@ -225,6 +242,8 @@ class EcoleDirecteModule extends HubModule {
         'token': client.token,
         'id': client.accountId,
         'name': client.studentName,
+        'family': client.familyId,
+        'year': client.year,
         'at': DateTime.now().toIso8601String(),
       }),
     );
@@ -549,7 +568,7 @@ class EcoleDirecteModule extends HubModule {
                     wrap(_lessonTiles(context), 'Aucun cours cette semaine'),
                     wrap(_homeworkTiles(context), 'Aucun devoir à venir 🎉'),
                     wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
-                    wrap(_messageTiles(context), 'Aucun message'),
+                    _MessagesTab(module: this),
                   ],
                 );
               },
@@ -653,69 +672,254 @@ class EcoleDirecteModule extends HubModule {
         ),
       ),
   ];
+}
 
-  List<Widget> _messageTiles(BuildContext context) => [
-    for (final m in messages)
-      ListTile(
-        leading: HubAvatar(label: m.from, color: m.read ? Colors.blueGrey : color),
-        title: Text(
-          m.from,
-          style: TextStyle(fontWeight: m.read ? FontWeight.w500 : FontWeight.w800),
+/// Messagerie École Directe : reçus / envoyés, lecture, pièces jointes,
+/// réponse.
+class _MessagesTab extends StatefulWidget {
+  const _MessagesTab({required this.module});
+  final EcoleDirecteModule module;
+
+  @override
+  State<_MessagesTab> createState() => _MessagesTabState();
+}
+
+class _MessagesTabState extends State<_MessagesTab> {
+  String folder = 'received';
+  Future<List<EdMessage>>? _sent;
+
+  EcoleDirecteModule get m => widget.module;
+
+  Future<void> _refresh() async {
+    if (folder == 'sent') {
+      setState(() => _sent = m.withSession(() => m.client.messages(folder: 'sent')));
+      await _sent;
+    } else {
+      await m.load(force: true, manual: true);
+      m.store.changed();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = folder == 'sent'
+        ? FutureBuilder(
+            future: _sent ??= m.withSession(() => m.client.messages(folder: 'sent')),
+            builder: (context, snap) => _list(
+              context,
+              snap.data ?? const [],
+              error: snap.hasError ? '${snap.error}' : null,
+              waiting: snap.connectionState == ConnectionState.waiting,
+            ),
+          )
+        : _list(context, m.messages, error: m.messagesError ?? m.lastError);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'received',
+                    icon: Icon(Icons.inbox_rounded),
+                    label: Text('Reçus'),
+                  ),
+                  ButtonSegment(
+                    value: 'sent',
+                    icon: Icon(Icons.send_rounded),
+                    label: Text('Envoyés'),
+                  ),
+                ],
+                selected: {folder},
+                onSelectionChanged: (v) => setState(() => folder = v.first),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Actualiser la messagerie',
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: _refresh,
+              ),
+            ],
+          ),
         ),
-        subtitle: Text(m.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: m.date == null
-            ? null
-            : Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
-        onTap: () async {
-          m.read = true;
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(m.from)),
-                body: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(20),
+        Expanded(child: list),
+      ],
+    );
+  }
+
+  Widget _list(
+    BuildContext context,
+    List<EdMessage> msgs, {
+    String? error,
+    bool waiting = false,
+  }) => RefreshIndicator(
+    onRefresh: _refresh,
+    child: ListView(
+      children: [
+        if (error != null) ErrorBanner(error),
+        if (waiting) const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
+        if (!waiting && msgs.isEmpty && error == null)
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: EmptyHint(folder == 'sent' ? 'Aucun message envoyé' : 'Aucun message'),
+          ),
+        for (final msg in msgs)
+          ListTile(
+            leading: HubAvatar(label: msg.from, color: msg.read ? Colors.blueGrey : m.color),
+            title: Text(
+              msg.from,
+              style: TextStyle(fontWeight: msg.read ? FontWeight.w500 : FontWeight.w800),
+            ),
+            subtitle: Text(msg.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (msg.date != null)
+                  Text(timeAgo(msg.date!), style: Theme.of(context).textTheme.labelSmall),
+                if (msg.hasFiles) const Icon(Icons.attach_file_rounded, size: 16),
+              ],
+            ),
+            onTap: () async {
+              msg.read = true;
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => _MessagePage(module: m, message: msg)),
+              );
+              m.store.changed();
+              if (mounted) setState(() {});
+            },
+          ),
+      ],
+    ),
+  );
+}
+
+class _MessagePage extends StatefulWidget {
+  const _MessagePage({required this.module, required this.message});
+  final EcoleDirecteModule module;
+  final EdMessage message;
+
+  @override
+  State<_MessagePage> createState() => _MessagePageState();
+}
+
+class _MessagePageState extends State<_MessagePage> {
+  late Future<EdMessageContent> content = widget.module.withSession(
+    () => widget.module.client.message(widget.message.id, sent: widget.message.sent),
+  );
+
+  Future<void> _download(EdAttachment f) async {
+    try {
+      final bytes = await widget.module.withSession(() => widget.module.client.attachment(f));
+      final name = f.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final loc = await getSaveLocation(suggestedName: name);
+      if (loc == null) return;
+      await File(loc.path).writeAsBytes(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Enregistré : ${loc.path}'),
+            action: SnackBarAction(
+              label: 'Ouvrir',
+              onPressed: () => launchUrl(Uri.file(loc.path)),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final msg = widget.message;
+    final m = widget.module;
+    return Scaffold(
+      appBar: AppBar(title: Text(msg.from)),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                Text(
+                  msg.subject,
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                if (msg.date != null)
+                  Text(
+                    '${dayLabel(msg.date!)} à ${hhmm(msg.date!)}',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                const Divider(height: 28),
+                FutureBuilder(
+                  future: content,
+                  builder: (c, snap) {
+                    if (snap.hasError) {
+                      return Column(
                         children: [
-                          Text(
-                            m.subject,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const Divider(height: 28),
-                          FutureBuilder(
-                            future: withSession(() => client.messageContent(m.id)),
-                            builder: (c, snap) => snap.hasError
-                                ? ErrorBanner('${snap.error}')
-                                : !snap.hasData
-                                ? const LoadingHint()
-                                : SelectableText(snap.data!, style: const TextStyle(height: 1.5)),
+                          ErrorBanner('${snap.error}'),
+                          TextButton.icon(
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Réessayer'),
+                            onPressed: () => setState(() {
+                              content = m.withSession(
+                                () => m.client.message(msg.id, sent: msg.sent),
+                              );
+                            }),
                           ),
                         ],
-                      ),
-                    ),
-                    Builder(
-                      builder: (c) => ChatComposer(
-                        color: color,
-                        hint: 'Répondre à ${m.from}',
-                        onSend: (text) async {
-                          await withSession(() => client.reply(m, text));
-                          if (c.mounted) {
-                            ScaffoldMessenger.of(c)
-                                .showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
-                          }
-                        },
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+                    if (!snap.hasData) return const LoadingHint();
+                    final d = snap.data!;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectableText(
+                          d.text.isEmpty ? '(message vide)' : d.text,
+                          style: const TextStyle(height: 1.5),
+                        ),
+                        if (d.files.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Text('Pièces jointes', style: Theme.of(context).textTheme.titleSmall),
+                          for (final f in d.files)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.attach_file_rounded),
+                              title: Text(f.name),
+                              trailing: const Icon(Icons.download_rounded),
+                              onTap: () => _download(f),
+                            ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
+              ],
+            ),
+          ),
+          if (!msg.sent)
+            Builder(
+              builder: (c) => ChatComposer(
+                color: m.color,
+                hint: 'Répondre à ${msg.from}',
+                onSend: (text) async {
+                  await m.withSession(() => m.client.reply(msg, text));
+                  if (c.mounted) {
+                    ScaffoldMessenger.of(c)
+                        .showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
+                  }
+                },
               ),
             ),
-          );
-          store.changed();
-        },
+        ],
       ),
-  ];
+    );
+  }
 }

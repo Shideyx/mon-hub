@@ -50,12 +50,34 @@ String? findIgImage(Object? node, [int depth = 0]) {
 }
 
 class IgMessage {
-  IgMessage(this.id, this.userId, this.text, this.at, [this.image]);
+  IgMessage(
+    this.id,
+    this.userId,
+    this.text,
+    this.at, [
+    this.image,
+    this.audioUrl,
+    this.audioLength,
+    this.waveform = const [],
+    this.reactions = const [],
+    this.isLike = false,
+  ]);
   final String id;
   final String userId;
   final String text;
   final DateTime at;
   final String? image;
+
+  /// Message vocal : adresse du son, durée et onde.
+  final String? audioUrl;
+  final Duration? audioLength;
+  final List<double> waveform;
+
+  /// Réactions : (emoji, id de la personne).
+  final List<(String, String)> reactions;
+
+  /// Le message est un simple ❤️ (bouton « J'aime » d'Instagram).
+  final bool isLike;
 
   factory IgMessage.fromJson(Map<String, dynamic> j) {
     final type = j['item_type'] as String? ?? '';
@@ -71,13 +93,62 @@ class IgMessage {
       _ => j['text'] as String? ?? 'Nouveau message',
     };
     final ts = int.tryParse('${j['timestamp']}') ?? 0;
-    final image = type == 'text' || type == 'like' ? null : findIgImage(j);
+    final image = type == 'text' || type == 'like' || type == 'voice_media' ? null : findIgImage(j);
+    final audio = ((j['voice_media'] as Map?)?['media'] as Map?)?['audio'] as Map?;
+    final ms = (audio?['duration'] as num?)?.toInt();
+    final r = j['reactions'] as Map?;
     return IgMessage(
       '${j['item_id']}',
       '${j['user_id']}',
       image != null && (type == 'media' || type == 'raven_media') ? '' : text,
       DateTime.fromMicrosecondsSinceEpoch(ts),
       image,
+      audio?['audio_src'] as String?,
+      ms == null ? null : Duration(milliseconds: ms),
+      [
+        for (final v in (audio?['waveform_data'] as List?) ?? const [])
+          if (v is num) v.toDouble(),
+      ],
+      [
+        for (final l in (r?['likes'] as List?) ?? const [])
+          if (l is Map) ('❤️', '${l['sender_id']}'),
+        for (final e in (r?['emojis'] as List?) ?? const [])
+          if (e is Map) ('${e['emoji'] ?? '❤️'}', '${e['sender_id']}'),
+      ],
+      type == 'like',
+    );
+  }
+
+  /// Le message est un vocal qu'on peut écouter.
+  bool get isVoice => audioUrl != null && audioUrl!.isNotEmpty;
+}
+
+/// Une ligne de l'activité Instagram (« X a aimé ta publication »…).
+class IgActivity {
+  IgActivity(this.text, this.at, this.pic, this.thumb, this.isLike);
+  final String text;
+  final DateTime at;
+  final String? pic;
+  final String? thumb;
+  final bool isLike;
+
+  factory IgActivity.fromJson(Map<String, dynamic> j) {
+    final a = (j['args'] as Map?) ?? const {};
+    final text = '${a['rich_text'] ?? a['text'] ?? ''}'
+        // Texte enrichi : {nom|couleur|gras|lien} → nom.
+        .replaceAllMapped(RegExp(r'\{([^|{}]*)\|[^{}]*\}'), (m) => m[1] ?? '');
+    final ts = (a['timestamp'] as num?)?.toDouble() ?? 0;
+    final media = a['media'];
+    final thumb = media is List && media.isNotEmpty && media.first is Map
+        ? (media.first as Map)['image'] as String?
+        : null;
+    final low = text.toLowerCase();
+    return IgActivity(
+      text,
+      DateTime.fromMillisecondsSinceEpoch((ts * 1000).round()),
+      a['profile_image'] as String?,
+      thumb,
+      low.contains('aim') || low.contains('like') || j['story_type'] == 60,
     );
   }
 }
@@ -391,6 +462,56 @@ class InstagramApi {
     return out;
   }
 
+  /// Personnes qui ont aimé une publication.
+  Future<List<IgUser>> likers(String mediaId) async {
+    final j = await _get('/media/$mediaId/likers/');
+    return [
+      for (final u in (j['users'] as List?) ?? const [])
+        if (u is Map) IgUser.fromJson(u.cast<String, dynamic>()),
+    ];
+  }
+
+  /// Activité : qui a aimé, commenté, s'est abonné…
+  Future<List<IgActivity>> activity() async {
+    final j = await _get('/news/inbox/?could_truncate_feed=true');
+    return [
+      for (final key in const ['new_stories', 'old_stories'])
+        for (final it in (j[key] as List?) ?? const [])
+          if (it is Map) IgActivity.fromJson(it.cast<String, dynamic>()),
+    ]..sort((a, b) => b.at.compareTo(a.at));
+  }
+
+  /// Tes propres publications (avec leurs « J'aime »).
+  Future<List<IgPost>> myPosts() async {
+    final j = await _get('/feed/user/$_userId/?count=24');
+    return [
+      for (final m in (j['items'] as List?) ?? const [])
+        if (m is Map<String, dynamic> && m['user'] != null) IgPost.fromJson(m),
+    ];
+  }
+
+  /// Met un ❤️ sur un message d'une conversation.
+  Future<void> likeMessage(String threadId, String itemId, {String emoji = '❤️'}) async {
+    _needCsrf();
+    final ctx = '${DateTime.now().microsecondsSinceEpoch}';
+    await _send(
+      '/direct_v2/threads/broadcast/reaction/',
+      form: {
+        'action': 'send_item',
+        'item_type': 'reaction',
+        'reaction_type': 'like',
+        'reaction_status': 'created',
+        'node_type': 'item',
+        'item_id': itemId,
+        'emoji': emoji,
+        'thread_ids': '[$threadId]',
+        'client_context': ctx,
+        'mutation_token': ctx,
+        'offline_threading_id': ctx,
+      },
+    );
+  }
+
   Future<void> like(String mediaId) => _post('/web/likes/$mediaId/like/', {});
   Future<void> unlike(String mediaId) => _post('/web/likes/$mediaId/unlike/', {});
 
@@ -696,7 +817,7 @@ class InstagramModule extends HubModule {
 
   @override
   Widget buildPage(BuildContext context) => DefaultTabController(
-    length: 2,
+    length: 3,
     child: Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -715,6 +836,7 @@ class InstagramModule extends HubModule {
           tabs: [
             Tab(text: 'Fil d\'actu'),
             Tab(text: 'Messages'),
+            Tab(text: 'Activité'),
           ],
         ),
       ),
@@ -753,6 +875,7 @@ class InstagramModule extends HubModule {
                   ],
                 ),
               ),
+              _ActivityTab(module: this),
             ],
           );
         },
@@ -963,7 +1086,16 @@ class _PostCardState extends State<_PostCard> {
                 ),
                 onPressed: _toggleLike,
               ),
-              Text('${p.likes}'),
+              InkWell(
+                onTap: () => showLikers(context, widget.module, p),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    '${p.likes} j\'aime',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
               const SizedBox(width: 12),
               IconButton(
                 tooltip: 'Commentaires / vidéo (ouvre Instagram)',
@@ -1178,6 +1310,18 @@ class _ThreadPageState extends State<_ThreadPage> {
     _timer = Timer.periodic(const Duration(seconds: 15), (_) => _load());
   }
 
+  /// Double-clic : ❤️ sur le message.
+  Future<void> _like(IgMessage m) async {
+    if (m.reactions.any((r) => r.$2 == module.me?.id)) return;
+    try {
+      final api = await module._client();
+      await api!.likeMessage(thread.id, m.id);
+      await _load();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -1223,9 +1367,32 @@ class _ThreadPageState extends State<_ThreadPage> {
                     itemBuilder: (context, i) {
                       final m = msgs![i];
                       final mine = m.userId == module.me?.id;
+                      String who(String id) => id == module.me?.id ? 'Toi' : (names[id] ?? '@$id');
+                      final byEmoji = <String, List<String>>{};
+                      for (final (e, id) in m.reactions) {
+                        (byEmoji[e] ??= []).add(who(id));
+                      }
                       return ChatBubble(
-                        text: m.text,
+                        text: m.isVoice ? '' : (m.isLike ? '' : m.text),
                         images: [?m.image],
+                        extra: m.isVoice
+                            ? VoiceNotePlayer(
+                                url: m.audioUrl!,
+                                duration: m.audioLength,
+                                waveform: m.waveform,
+                                color: module.color,
+                                onColor: mine
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                              )
+                            : m.isLike
+                            ? const Text('❤️', style: TextStyle(fontSize: 40))
+                            : null,
+                        reactions: [
+                          for (final e in byEmoji.entries)
+                            Reaction(e.key, e.value, mine: e.value.contains('Toi')),
+                        ],
+                        onDoubleTap: () => _like(m),
                         author: mine || thread.users.length < 2 ? null : names[m.userId],
                         time: '${dayLabel(m.at)} ${hhmm(m.at)}',
                         mine: mine,
@@ -1258,6 +1425,188 @@ class _ThreadPageState extends State<_ThreadPage> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Qui a aimé une publication.
+Future<void> showLikers(BuildContext context, InstagramModule module, IgPost p) =>
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => SizedBox(
+        height: MediaQuery.sizeOf(c).height * 0.7,
+        child: FutureBuilder(
+          future: module._client().then((api) => api!.likers(p.id)),
+          builder: (c, snap) {
+            if (snap.hasError) return EmptyHint('${snap.error}');
+            if (!snap.hasData) return const LoadingHint();
+            final users = snap.data!;
+            return ListView(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.favorite_rounded, color: Colors.red),
+                  title: Text('${p.likes} j\'aime'),
+                  subtitle: users.length < p.likes
+                      ? Text('Instagram montre ${users.length} personnes sur ${p.likes}')
+                      : null,
+                ),
+                for (final u in users)
+                  ListTile(
+                    leading: HubAvatar(url: u.pic, label: u.username, color: module.color),
+                    title: Text(u.display),
+                    subtitle: Text('@${u.username}'),
+                    onTap: () => openLink(c, 'https://www.instagram.com/${u.username}/'),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+
+/// Activité : tes publications avec leurs « J'aime », et qui a aimé,
+/// commenté, s'est abonné.
+class _ActivityTab extends StatefulWidget {
+  const _ActivityTab({required this.module});
+  final InstagramModule module;
+
+  @override
+  State<_ActivityTab> createState() => _ActivityTabState();
+}
+
+class _ActivityTabState extends State<_ActivityTab> with AutomaticKeepAliveClientMixin {
+  late Future<(List<IgPost>, List<IgActivity>, String?)> future = _load();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<(List<IgPost>, List<IgActivity>, String?)> _load() async {
+    final api = await widget.module._client();
+    if (api == null) return (<IgPost>[], <IgActivity>[], null);
+    var posts = <IgPost>[];
+    var acts = <IgActivity>[];
+    String? err;
+    try {
+      posts = await api.myPosts();
+    } catch (e) {
+      err = '$e';
+    }
+    try {
+      acts = await api.activity();
+    } catch (e) {
+      err ??= '$e';
+    }
+    return (posts, acts, err);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final color = widget.module.color;
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => future = _load());
+        await future;
+      },
+      child: FutureBuilder(
+        future: future,
+        builder: (context, snap) {
+          if (!snap.hasData) return const LoadingHint();
+          final (posts, acts, err) = snap.data!;
+          final likes = posts.fold<int>(0, (a, p) => a + p.likes);
+          return ListView(
+            children: [
+              if (err != null && posts.isEmpty && acts.isEmpty) ErrorBanner(err),
+              if (posts.isNotEmpty) ...[
+                ListTile(
+                  leading: const Icon(Icons.favorite_rounded, color: Colors.red),
+                  title: Text('$likes j\'aime sur tes ${posts.length} dernières publications'),
+                  subtitle: const Text('Touche une publication pour voir qui l\'a aimée'),
+                ),
+                SizedBox(
+                  height: 130,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    children: [
+                      for (final p in posts)
+                        Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: InkWell(
+                            onTap: () => showLikers(context, widget.module, p),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Stack(
+                                children: [
+                                  SizedBox(
+                                    width: 110,
+                                    height: 120,
+                                    child: p.images.isEmpty
+                                        ? ColoredBox(color: color.withValues(alpha: 0.2))
+                                        : Image.network(
+                                            p.images.first,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) =>
+                                                const Icon(Icons.broken_image_rounded),
+                                          ),
+                                  ),
+                                  Positioned(
+                                    left: 6,
+                                    bottom: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '❤️ ${p.likes}  💬 ${p.comments}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+              ],
+              if (acts.isEmpty && err == null)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: EmptyHint('Aucune activité récente'),
+                ),
+              for (final a in acts)
+                ListTile(
+                  leading: HubAvatar(url: a.pic, label: a.text, color: color),
+                  title: Text(a.text, maxLines: 3, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(timeAgo(a.at)),
+                  trailing: a.thumb != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            a.thumb!,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox(width: 44),
+                          ),
+                        )
+                      : (a.isLike ? const Icon(Icons.favorite_rounded, color: Colors.red) : null),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../modules/ecoledirecte/ecoledirecte_module.dart';
 import '../modules/instagram/instagram_module.dart';
 import '../modules/drive/drive_module.dart';
 import '../modules/mail/mail_module.dart';
+import '../modules/music/music_module.dart';
 import '../modules/roblox/roblox_module.dart';
 import '../modules/schedule/schedule_module.dart';
 import 'hub_module.dart';
@@ -23,6 +24,7 @@ List<HubModule> buildModules() {
     MailModule(),
     DiscordModule(),
     InstagramModule(),
+    MusicModule(),
     RobloxModule(),
     BooksModule(),
     DriveModule(),

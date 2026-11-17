@@ -193,10 +193,13 @@ class ClaudeApi {
     void Function(String status)? onStatus,
     void Function(String text)? onText,
     String effort = 'low',
+    bool webSearch = false,
   }) async {
     final defs = [
       for (final t in tools)
         {'name': t.name, 'description': t.description, 'input_schema': t.toJson()['inputSchema']},
+      // Recherche sur internet, faite par Anthropic.
+      if (webSearch) {'type': 'web_search_20250305', 'name': 'web_search', 'max_uses': 3},
     ];
     for (var round = 0; round < 8; round++) {
       final (content, stop) = await _call(
@@ -215,6 +218,8 @@ class ClaudeApi {
         for (final b in content)
           if (b is Map && b['type'] == 'tool_use') b,
       ];
+      // Recherche web encore en cours côté serveur : on la laisse finir.
+      if (stop == 'pause_turn') continue;
       if (stop != 'tool_use' || uses.isEmpty) {
         final text = [
           for (final b in content)
