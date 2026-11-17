@@ -48,6 +48,10 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 
 Les alertes (messages, notes, devoirs, compagnons, Clicky) arrivent dans la cloche de l'accueil **et** en bandeau dans la fenêtre de Mon Hub (en haut à droite), en plus de la notification de Windows.
 
+## Dépannage
+
+Réglages → *Journal des erreurs* : ce qui a planté (gardé sur le PC seulement), à copier pour corriger un souci. Clicky partout est relancé tout seul s'il se ferme.
+
 ## Confidentialité et sécurité
 
 * **Aucun serveur** : Mon Hub ne parle qu'aux services que tu utilises (École Directe, Spotify, Google…), directement depuis ton appareil. Le créateur de l'appli n'a accès à aucune donnée de personne.
@@ -73,6 +77,7 @@ Les alertes (messages, notes, devoirs, compagnons, Clicky) arrivent dans la cloc
   * **Internet** : recherche web officielle de Claude pour l'actualité, la météo… (désactivable).
   * **Mains libres** : mot d'activation « Clicky » (reconnaissance de Windows en liste fermée, sur le PC, `wake.dart`) ; **dictée partout** : Ctrl + Alt + Maj, le texte est tapé dans l'appli ouverte (ou copié si la fenêtre a changé).
   * **Contrôle du PC** : « Clicky, installe VLC », « range mes téléchargements », « mets le son à 30 % », « combien de place sur mon disque ? »… : il le fait lui-même (commandes PowerShell, fichiers, applis, réglages, `pc.dart`). Par défaut chaque commande s'affiche et attend ton « Autoriser » ; mode « Sans demander » dans les réglages (les commandes dangereuses sont toujours demandées).
+  * **Réponse instantanée** (comme le JARVIS « Mark LII ») : avec ta clé Gemini gratuite, ta voix part en direct vers **Gemini Live**, qui répond tout de suite en voix (morceau par morceau, connexion gardée ouverte et préparée au démarrage). Il garde les actions de Mon Hub, peut regarder l'écran, prendre la souris, et passe la main à Claude pour un tableau ou un schéma (`live.dart`, `pcm_player.dart`). Réglages Clicky → Voix.
   * **Clicky agit** (Clicky partout) : « prends la main et… », ou demande-lui de faire quelque chose : il regarde l'écran, vole jusqu'à l'endroit, et la vraie souris suit (clic, double-clic, défiler, glisser-déposer, écrire, raccourcis, ouvrir une appli ou un site, passer d'une fenêtre à l'autre), puis regarde de nouveau, jusqu'à 30 actions. Échap ou bouger la souris l'arrête ; jamais de saisie dans une fenêtre sensible (`act.dart`).
   * **Compagnons** (vidéo « agent buddies ») : quatre questions pour te connaître, puis de petits agents (nom, couleur, petit nuage aux yeux ^^) se proposent d'eux-mêmes ; Non / Ajuster / Oui, fais-le ; ils travaillent en arrière-plan, certains chaque jour, et te préviennent (`buddies.dart`, onglet Compagnons).
   * **Secrétaire** : il organise ton emploi du temps (créneaux libres entre les cours, planning de révisions enregistré d'un coup avec ta permission) et te conseille.

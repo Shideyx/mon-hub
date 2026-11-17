@@ -333,3 +333,21 @@ bool wantsWeb(String q) => RegExp(
   r"cherche|recherche|actualite|actu |aujourd hui|en ce moment|derniere(s)? (nouvelle|version|info)|"
   r"meteo|qui a gagne|resultat du match|prix d|combien coute|sur internet|sur le web|google",
 ).hasMatch(normalize(q));
+
+
+/// La question a-t-elle besoin de l'écran ? Une question générale (l'heure,
+/// la météo, une définition, une blague, un calcul, l'agenda…) part sans
+/// capture : la réponse arrive bien plus vite.
+bool needsScreen(String q) {
+  final n = normalize(q);
+  // Tout ce qui désigne quelque chose à l'écran.
+  if (RegExp(
+    r"\b(ca|ceci|cela|ici|la dessus|ecran|page|fenetre|image|photo|exercice|document|texte|bouton|clique|cliquer|montre|vois|regarde|lis|ce site|cette|cet|ce truc|ce mot|ce code|cette erreur|erreur|bug|aide moi|comment je fais|ou est|ou se trouve|que dois je|qu est ce que c est)\b",
+  ).hasMatch(n)) {
+    return true;
+  }
+  // Questions générales : pas besoin de regarder.
+  return !RegExp(
+    r"^(quelle heure|quel jour|quelle date|quel temps|meteo|combien|qui est|qui a|c est quoi (un|une|le|la|les)|qu est ce qu (un|une)|definition|definis|raconte|blague|traduis|traduction|calcule|convertis|donne moi|dis moi|rappelle moi|retiens|note|ajoute|mets|lance|joue|ouvre|quels? (sont )?(mes|les) (cours|devoirs|notes|messages|mails)|j ai (quoi|cours)|bonjour|salut|merci|comment (ca va|vas tu))",
+  ).hasMatch(n);
+}

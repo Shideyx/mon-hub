@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/error_log.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
@@ -344,6 +345,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 'de GitHub, qui ne reçoit rien de toi.',
               ),
             ),
+            ListTile(
+              leading: const Icon(Icons.bug_report_rounded),
+              title: const Text('Journal des erreurs'),
+              subtitle: const Text('Ce qui a planté (gardé sur ce PC uniquement) : utile pour corriger un souci.'),
+              onTap: () => _errors(context),
+            ),
             section('Mes appareils'),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -390,6 +397,42 @@ class _SettingsPageState extends State<SettingsPage> {
       },
     });
   }
+
+  static Future<void> _errors(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (c) {
+      final log = ErrorLog.read();
+      return AlertDialog(
+        title: const Text('Journal des erreurs'),
+        content: SizedBox(
+          width: 640,
+          height: 420,
+          child: log.isEmpty
+              ? const Center(child: Text('Aucune erreur notée. 🎉'))
+              : SingleChildScrollView(
+                  reverse: true,
+                  child: SelectableText(log, style: const TextStyle(fontFamily: 'Consolas', fontSize: 12)),
+                ),
+        ),
+        actions: [
+          if (log.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                ErrorLog.clear();
+                Navigator.pop(c);
+              },
+              child: const Text('Vider'),
+            ),
+          if (log.isNotEmpty)
+            TextButton(
+              onPressed: () => Clipboard.setData(ClipboardData(text: log.length > 20000 ? log.substring(log.length - 20000) : log)),
+              child: const Text('Copier'),
+            ),
+          FilledButton(onPressed: () => Navigator.pop(c), child: const Text('Fermer')),
+        ],
+      );
+    },
+  );
 
   /// Mot de passe de l'export (deux fois à la création).
   static Future<String?> _password(BuildContext context, {required bool create}) async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import 'core/claude_bridge.dart';
+import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
@@ -24,6 +25,9 @@ Future<void> main(List<String> args) async {
   // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
   if (args.contains('--clicky')) return runClickyDesktop();
   WidgetsFlutterBinding.ensureInitialized();
+  // Journal des erreurs (sur le PC) et garde-fous : une erreur ne casse
+  // plus tout l'écran.
+  ErrorLog.install('Mon Hub');
   await ModuleStore.init();
   AppSession.instance.restore();
   // Raccourcis Bureau / menu Démarrer, créés ou réparés tout seuls.
@@ -146,6 +150,8 @@ class _HubAppState extends State<HubApp> {
       // pour qu'il reprenne le bon compte.
       await ClickyController.instance.shareOptions();
       await ClickyDesktop.restart();
+      // S'il se ferme tout seul (plantage), il est relancé.
+      ClickyDesktop.watch();
     } catch (e) {
       debugPrint('Clicky : $e');
     }

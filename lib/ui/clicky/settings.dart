@@ -101,6 +101,17 @@ class ClickyMoreSettings extends StatelessWidget {
           const _TopoSettings(),
 
           head('Voix', Icons.record_voice_over_rounded),
+          if (Win.supportedHere)
+            sw(
+              'instant',
+              c.instant,
+              'Réponse instantanée (Gemini Live, comme JARVIS)',
+              c.voiceOut.geminiKey.trim().isEmpty
+                  ? 'Ajoute ta clé Gemini gratuite (voix Gemini ci-dessous) : Clicky répondra au tac au tac, en direct.'
+                  : 'Ta voix part en direct vers Gemini, qui répond tout de suite en voix (voix Gemini choisie ci-dessous). '
+                        'Pour un tableau, un schéma ou montrer où cliquer, Claude prend le relais.'
+                        '${c.liveError == null ? '' : '\nDernier souci : ${c.liveError}'}',
+            ),
           const _NeuralVoicePicker(),
           if (c.ttsEngine == 'system') const _VoicePicker(),
           sw(
