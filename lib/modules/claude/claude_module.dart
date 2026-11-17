@@ -15,8 +15,8 @@ import '../../ui/clicky/routines.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
 import '../../ui/clicky/settings.dart';
-import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
+import 'claude_ai_sync.dart';
 
 const extensionUrl =
     'https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Claude.mcpb';
@@ -171,15 +171,7 @@ class ClaudeModule extends HubModule {
             },
           ),
           RoutinesView(color: color),
-          webLoginSupported
-              ? const HubWebView(url: 'https://claude.ai/new', desktopUserAgent: true)
-              : Center(
-                  child: FilledButton.icon(
-                    icon: const Icon(Icons.open_in_new_rounded),
-                    label: const Text('Ouvrir claude.ai'),
-                    onPressed: () => openLink(context, 'https://claude.ai/new'),
-                  ),
-                ),
+          const ClaudeAiTab(),
         ],
       ),
     ),

@@ -118,7 +118,9 @@ class Updater extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 20));
       if (r.statusCode != 200) return null;
-      final info = UpdateInfo.fromRelease(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>);
+      final info = UpdateInfo.fromRelease(
+        jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>,
+      );
       if (info == null || info.number <= (current ?? 1 << 30)) return null;
       available = info;
       if (manual) postponed = false;
@@ -185,7 +187,9 @@ class Updater extends ChangeNotifier {
       _set(status: 'Vérification du fichier…', progress: null);
       if (info.sha256 != null) {
         final digest = sha256.convert(await zip.readAsBytes()).toString();
-        if (digest != info.sha256) throw 'Le fichier téléchargé est abîmé (empreinte différente) : réessaie';
+        if (digest != info.sha256) {
+          throw 'Le fichier téléchargé est abîmé (empreinte différente) : réessaie';
+        }
       }
 
       // 3. Décompression.
@@ -211,27 +215,23 @@ class Updater extends ChangeNotifier {
       final script = File('${work.path}${sep}installer.ps1');
       await script.writeAsString(installScript);
       await beforeInstall?.call();
-      await Process.start(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-WindowStyle',
-          'Hidden',
-          '-File',
-          script.path,
-          '-Src',
-          src,
-          '-Dst',
-          dst,
-          '-Exe',
-          exeName,
-          '-ParentPid',
-          '$pid',
-        ],
-        mode: ProcessStartMode.detached,
-      );
+      await Process.start('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-File',
+        script.path,
+        '-Src',
+        src,
+        '-Dst',
+        dst,
+        '-Exe',
+        exeName,
+        '-ParentPid',
+        '$pid',
+      ], mode: ProcessStartMode.detached);
       await Future<void>.delayed(const Duration(milliseconds: 600));
       exit(0);
     } catch (e) {

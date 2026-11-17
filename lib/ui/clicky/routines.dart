@@ -152,6 +152,16 @@ class Routine {
     ),
     Routine(
       id: '',
+      name: 'Bilan du soir',
+      every: 'daily',
+      hour: 21,
+      minute: 0,
+      prompt:
+          'Fais mon bilan du soir (outil carnet_bilan_du_soir) : ce que j\'ai fait aujourd\'hui, '
+          'mes dépenses, mon sport, puis ce qui m\'attend demain (agenda, devoirs, météo et quoi mettre).',
+    ),
+    Routine(
+      id: '',
       name: 'Bilan de la semaine',
       every: 'weekly',
       weekday: 5,

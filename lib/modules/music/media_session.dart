@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../core/claude_bridge.dart';
+import '../../core/powershell.dart';
+import '../../ui/clicky/win.dart';
 import 'music_models.dart';
 
 /// Ce qui joue sur le PC, lu dans Windows (les commandes multimédia du
@@ -22,40 +24,77 @@ class WindowsMediaSession {
   String _coverKey = '';
   bool _stopped = false;
 
+  /// Dernière erreur de Windows (affichée dans les réglages de la musique).
+  String? error;
+  final _errors = StringBuffer();
+
+  /// Windows ne donne rien : on lit le titre de la fenêtre Spotify.
+  bool fallback = false;
+  Timer? _fallbackTimer;
+  int _deaths = 0;
+
   Future<void> start() async {
     if (!supported || _proc != null) return;
     _stopped = false;
+    if (_deaths >= 2) return _startFallback();
     try {
       final base = ClaudeBridge.folder ?? Directory.systemTemp.path;
-      final sep = Platform.pathSeparator;
-      final f = File('$base${sep}musique-en-cours.ps1');
-      await f.parent.create(recursive: true);
-      if (!await f.exists() || await f.readAsString() != script) await f.writeAsString(script);
-      final thumb = '$base${sep}musique-pochette.bin';
-      final p = await Process.start('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        f.path,
-        '-Thumb',
-        thumb,
-      ], mode: ProcessStartMode.detachedWithStdio);
+      await Directory(base).create(recursive: true);
+      final thumb = '$base${Platform.pathSeparator}musique-pochette.bin';
+      _errors.clear();
+      // Sans fichier .ps1 : marche même si Windows bloque les scripts.
+      final p = await PowerShell.start(script, {'Thumb': thumb});
       _proc = p;
       p.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen((l) => _line(l, thumb), onDone: () => _died(p), onError: (_) => _died(p));
-      unawaited(p.stderr.drain<void>().catchError((_) {}));
-    } catch (_) {
+      p.stderr.transform(utf8.decoder).listen((e) {
+        if (_errors.length < 3000) _errors.write(e);
+      }, onError: (_) {});
+    } catch (e) {
       _proc = null;
+      error = '$e';
+      _startFallback();
     }
+  }
+
+  /// Repli : « Artiste - Titre » dans le titre de la fenêtre de Spotify, et
+  /// les touches multimédia du clavier pour les commandes.
+  void _startFallback() {
+    if (fallback) return;
+    fallback = true;
+    _fallbackTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      try {
+        final titles = Win.titlesOf('Spotify.exe');
+        final np = parseSpotifyTitle(titles);
+        onChange(np);
+      } catch (_) {}
+    });
+  }
+
+  /// Titre de la fenêtre Spotify → morceau (null si en pause / fermé).
+  static NowPlaying? parseSpotifyTitle(List<String> titles) {
+    for (final t in titles) {
+      final i = t.indexOf(' - ');
+      if (i <= 0 || t.startsWith('Spotify')) continue;
+      return NowPlaying(
+        title: t.substring(i + 3).trim(),
+        artist: t.substring(0, i).trim(),
+        playing: true,
+        app: 'Spotify.exe',
+        at: DateTime.now(),
+      );
+    }
+    return null;
   }
 
   void _died(Process p) {
     if (_proc != p) return;
     _proc = null;
+    _deaths++;
+    final e = PowerShell.firstError('$_errors');
+    if (e.isNotEmpty) error = e;
     // Relance (PowerShell fermé, veille…), sauf si on a arrêté exprès.
     if (!_stopped) Timer(const Duration(seconds: 5), start);
   }
@@ -68,6 +107,11 @@ class WindowsMediaSession {
       m = j;
     } catch (_) {
       return;
+    }
+    if (m['t'] == 'error') {
+      error = '${m['msg'] ?? 'erreur'}';
+      _deaths = 2; // inutile d'insister : on passe au repli
+      return _startFallback();
     }
     if (m['t'] == 'none') return onChange(null);
     if (m['t'] != 'np') return;
@@ -111,12 +155,14 @@ class WindowsMediaSession {
     } catch (_) {}
   }
 
-  void toggle() => _send('toggle');
-  void next() => _send('next');
-  void previous() => _send('prev');
+  void toggle() => _proc != null ? _send('toggle') : Win.mediaKey('toggle');
+  void next() => _proc != null ? _send('next') : Win.mediaKey('next');
+  void previous() => _proc != null ? _send('prev') : Win.mediaKey('prev');
 
   Future<void> stop() async {
     _stopped = true;
+    _fallbackTimer?.cancel();
+    fallback = false;
     final p = _proc;
     _proc = null;
     try {

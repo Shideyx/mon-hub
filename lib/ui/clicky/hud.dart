@@ -224,3 +224,132 @@ String clickyGreeting(String name, DateTime now) {
   final who = name.trim().isEmpty ? '' : ' ${name.trim()}';
   return '$part$who. Clicky est prêt. Maintiens Contrôle et Alt, ou dis « Clicky », pour me parler.';
 }
+
+/// Le petit mouvement « vivant » de Clicky : il flotte et dérive doucement
+/// autour du curseur, et de temps en temps fait une boucle, comme quelqu'un
+/// qui ne tient pas en place.
+Offset aliveOffset(double t) {
+  final wander = Offset(
+    math.sin(t * 0.9) * 7 + math.sin(t * 2.3 + 1) * 3,
+    math.cos(t * 0.7) * 6 + math.sin(t * 1.9 + 2) * 2.5,
+  );
+  // Une petite boucle toutes les ~11 s (1,4 s).
+  final cycle = t % 11;
+  if (cycle < 1.4) {
+    final a = Curves.easeInOut.transform(cycle / 1.4) * 2 * math.pi;
+    return wander + Offset(math.sin(a) * 9, (1 - math.cos(a)) * -7);
+  }
+  return wander;
+}
+
+/// Fait vivre Clicky : dérive, boucles, et l'animation de démarrage
+/// (anneaux qui s'ouvrent + « CLICKY EN LIGNE »).
+class ClickyAlive extends StatefulWidget {
+  const ClickyAlive({
+    super.key,
+    required this.child,
+    this.moving = true,
+    this.bootAt,
+    this.base = const Offset(12, 11),
+  });
+  final Widget child;
+
+  /// Dérive active (pas pendant qu'il montre quelque chose).
+  final bool moving;
+
+  /// Moment du démarrage (animation pendant 2,6 s).
+  final DateTime? bootAt;
+
+  /// Décalage de repos (la dérive reste positive : rien n'est coupé).
+  final Offset base;
+
+  @override
+  State<ClickyAlive> createState() => _ClickyAliveState();
+}
+
+class _ClickyAliveState extends State<ClickyAlive> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 60),
+  )..repeat();
+  final _start = DateTime.now();
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _a,
+    builder: (context, child) {
+      final now = DateTime.now();
+      final t = now.difference(_start).inMilliseconds / 1000;
+      final off = widget.moving ? widget.base + aliveOffset(t) : widget.base;
+      final boot = widget.bootAt == null
+          ? 1.0
+          : (now.difference(widget.bootAt!).inMilliseconds / 2600);
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (boot < 1)
+            Positioned(
+              left: off.dx - 30,
+              top: off.dy - 30,
+              child: IgnorePointer(
+                child: CustomPaint(size: const Size(90, 90), painter: _BootPainter(boot)),
+              ),
+            ),
+          Transform.translate(offset: off, child: child),
+          if (boot < 1 && boot > 0.25)
+            Positioned(
+              left: off.dx + 34,
+              top: off.dy + 4,
+              child: Opacity(
+                opacity: (boot < 0.85 ? (boot - 0.25) / 0.2 : (1 - boot) / 0.15).clamp(0.0, 1.0),
+                child: const Text(
+                  'CLICKY EN LIGNE',
+                  style: TextStyle(
+                    color: hudCyan,
+                    fontSize: 10,
+                    letterSpacing: 2,
+                    fontWeight: FontWeight.w800,
+                    shadows: [Shadow(color: hudCyan, blurRadius: 8)],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+    child: widget.child,
+  );
+}
+
+class _BootPainter extends CustomPainter {
+  _BootPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    for (var i = 0; i < 3; i++) {
+      final p = ((t * 1.6) - i * 0.2).clamp(0.0, 1.0);
+      if (p <= 0) continue;
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: 8 + p * 36),
+        -math.pi / 2 + i,
+        2 * math.pi * p,
+        false,
+        Paint()
+          ..color = hudCyan.withValues(alpha: (1 - p) * 0.9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BootPainter o) => o.t != t;
+}

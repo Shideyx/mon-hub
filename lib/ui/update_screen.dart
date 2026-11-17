@@ -68,7 +68,11 @@ class UpdateScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     const Text(
                       'Mise à jour de Mon Hub',
-                      style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(

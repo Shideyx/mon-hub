@@ -169,6 +169,9 @@ class SpotifyApi {
           : 'Spotify refuse : $msg (ton compte est-il ajouté dans « User Management » de ton appli ?)';
     }
     if (r.statusCode == 429) throw 'Spotify demande de patienter un peu';
+    if (r.statusCode == 404 && path.contains('/me/player')) {
+      throw 'Spotify : no active device (404)';
+    }
     if (r.statusCode >= 400) throw 'Spotify : ${_msg(r)}';
     return r;
   }
@@ -331,7 +334,7 @@ class SpotifyApi {
   }
 
   /// Lance un titre (dans une playlist / un album si [context]).
-  Future<void> play({String? uri, String? context}) => _req(
+  Future<void> play({String? uri, String? context}) => _player(
     'PUT',
     '/me/player/play',
     body: {
@@ -341,10 +344,107 @@ class SpotifyApi {
     },
   );
 
-  Future<void> pause() => _req('PUT', '/me/player/pause');
-  Future<void> resume() => _req('PUT', '/me/player/play');
-  Future<void> next() => _req('POST', '/me/player/next');
-  Future<void> previous() => _req('POST', '/me/player/previous');
+  /// Appareils Spotify (PC, téléphone, enceinte…).
+  Future<List<Map<String, dynamic>>> devices() async {
+    final j = await _get('/me/player/devices');
+    return [
+      for (final d in (j['devices'] as List?) ?? const [])
+        if (d is Map<String, dynamic>) d,
+    ];
+  }
+
+  /// Aucun appareil actif : on réveille le premier disponible (l'appli
+  /// Spotify du PC de préférence), comme le plugin JARVIS.
+  Future<void> _wakeDevice() async {
+    final list = await devices();
+    if (list.isEmpty) {
+      throw 'Aucun appareil Spotify ouvert : lance l\'appli Spotify (PC ou téléphone) puis réessaie';
+    }
+    final pc =
+        list.where((d) => '${d['type']}'.toLowerCase() == 'computer').firstOrNull ?? list.first;
+    await _req(
+      'PUT',
+      '/me/player',
+      body: {
+        'device_ids': [pc['id']],
+        'play': false,
+      },
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+
+  /// Une commande de lecture, en réveillant un appareil si besoin.
+  Future<void> _player(String method, String path, {Object? body}) async {
+    try {
+      await _req(method, path, body: body);
+    } catch (e) {
+      if (!'$e'.toLowerCase().contains('device') && !'$e'.contains('404')) rethrow;
+      await _wakeDevice();
+      await _req(method, path, body: body);
+    }
+  }
+
+  /// Premier résultat d'une recherche (titre, album, artiste, playlist).
+  Future<(String uri, String name)?> searchFirst(String query, {String type = 'track'}) async {
+    final j = await _get('/search?q=${Uri.encodeQueryComponent(query)}&type=$type&limit=1');
+    final items = ((j['${type}s'] as Map?)?['items'] as List?) ?? const [];
+    final it = items.whereType<Map>().firstOrNull;
+    if (it == null) return null;
+    final who = [for (final a in (it['artists'] as List?) ?? const []) '${(a as Map)['name']}']
+        .join(', ');
+    return ('${it['uri']}', who.isEmpty ? '${it['name']}' : '${it['name']} — $who');
+  }
+
+  /// Cherche et joue un morceau.
+  Future<String> searchPlay(String query) async {
+    final hit = await searchFirst(query);
+    if (hit == null) return 'Rien trouvé sur Spotify pour « $query ».';
+    await _player(
+      'PUT',
+      '/me/player/play',
+      body: {
+        'uris': [hit.$1],
+      },
+    );
+    return 'J\'écoute : ${hit.$2}';
+  }
+
+  /// Joue une de tes playlists (sinon une playlist publique).
+  Future<String> playPlaylist(String query) async {
+    final q = query.toLowerCase().trim();
+    final mine = await playlists();
+    var hit =
+        mine.where((p) => p.name.toLowerCase() == q).firstOrNull ??
+        mine.where((p) => p.name.toLowerCase().contains(q)).firstOrNull;
+    String uri, name;
+    if (hit != null) {
+      uri = hit.uri;
+      name = hit.name;
+    } else {
+      final pub = await searchFirst(query, type: 'playlist');
+      if (pub == null) return 'Pas de playlist « $query ».';
+      (uri, name) = pub;
+    }
+    await _player('PUT', '/me/player/play', body: {'context_uri': uri});
+    return 'Je lance la playlist $name.';
+  }
+
+  Future<String> queue(String query) async {
+    final hit = await searchFirst(query);
+    if (hit == null) return 'Rien trouvé sur Spotify pour « $query ».';
+    await _player('POST', '/me/player/queue?uri=${Uri.encodeQueryComponent(hit.$1)}');
+    return 'Ajouté à la file : ${hit.$2}';
+  }
+
+  Future<void> volume(int percent) =>
+      _player('PUT', '/me/player/volume?volume_percent=${percent.clamp(0, 100)}');
+
+  Future<void> shuffle(bool on) => _player('PUT', '/me/player/shuffle?state=$on');
+
+  Future<void> pause() => _player('PUT', '/me/player/pause');
+  Future<void> resume() => _player('PUT', '/me/player/play');
+  Future<void> next() => _player('POST', '/me/player/next');
+  Future<void> previous() => _player('POST', '/me/player/previous');
 
   Future<bool> isLiked(String trackId) async {
     final r = await _req('GET', '/me/tracks/contains?ids=$trackId');

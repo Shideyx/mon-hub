@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
 import '../../core/claude_bridge.dart';
+import '../../core/powershell.dart';
 
 /// Lecture du texte à l'écran (OCR) avec la reconnaissance de texte
 /// intégrée à Windows (Windows.Media.Ocr), hors ligne et sans rien
@@ -20,22 +20,9 @@ class ClickyOcr {
     await dir.create(recursive: true);
     final sep = Platform.pathSeparator;
     final img = File('${dir.path}${sep}clicky-ocr.png');
-    final script = File('${dir.path}${sep}clicky-ocr.ps1');
     try {
       await img.writeAsBytes(png, flush: true);
-      if (!await script.exists() || await script.readAsString() != _script) {
-        await script.writeAsString(_script);
-      }
-      final r = await Process.run('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        script.path,
-        '-Path',
-        img.path,
-      ], stdoutEncoding: utf8).timeout(const Duration(seconds: 25));
+      final r = await PowerShell.run(_script, {'Path': img.path});
       return '${r.stdout}'.trim();
     } catch (_) {
       return '';

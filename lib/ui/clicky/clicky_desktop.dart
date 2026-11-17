@@ -287,7 +287,7 @@ class _Desktop extends StatefulWidget {
 }
 
 /// Taille de la fenêtre (en points) : compacte, ou avec le panneau ouvert.
-const _cursorOnly = Size(110, 50);
+const _cursorOnly = Size(170, 80);
 const _pointing = Size(300, 60);
 const _compact = Size(390, 330);
 const _withPanel = Size(420, 400);
@@ -307,6 +307,11 @@ class _DesktopState extends State<_Desktop> {
 
   // Position actuelle de la fenêtre et vol vers une cible (pixels physiques).
   Offset? _pos;
+
+  /// Posée par toi (glisser la barre du haut) : ne suit plus la souris.
+  bool _pinned = false;
+  Offset? _dragFrom;
+  Offset? _dragPos;
   Offset? _flightFrom;
   Offset? _flightTo;
   DateTime? _flightStart;
@@ -325,6 +330,23 @@ class _DesktopState extends State<_Desktop> {
       if (mounted) setState(() {});
     };
     c.addListener(_onChange);
+    // La boîte s'attrape par sa barre du haut : la fenêtre suit la souris
+    // (en pixels de l'écran) et reste où on la pose.
+    c.onDragBox = (d, start) {
+      final cur = Win.cursor();
+      if (cur == null) return;
+      final p = Offset(cur.$1.toDouble(), cur.$2.toDouble());
+      if (start || _dragFrom == null) {
+        _dragFrom = p;
+        _dragPos = _pos;
+        return;
+      }
+      final from = _dragPos;
+      if (from == null) return;
+      _pos = from + (p - _dragFrom!);
+      _pinned = true;
+      _place(force: true);
+    };
     _tick = Timer.periodic(const Duration(milliseconds: 16), (_) => _loop());
     _slow = Timer.periodic(const Duration(seconds: 3), (_) => _housekeeping());
   }
@@ -399,6 +421,10 @@ class _DesktopState extends State<_Desktop> {
     final h = hwnd;
     if (h == null || !mounted) return;
     final visible = c.active && (c.buddyVisible || c.boxOpen || c.board != null);
+    if (_pinned && !c.boxOpen && c.board == null && c.holo == null) {
+      _pinned = false;
+      _dragFrom = null;
+    }
     if (!visible) {
       if (!_hidden) {
         Win.hide(h);
@@ -414,7 +440,7 @@ class _DesktopState extends State<_Desktop> {
     final to = _flightTo;
     if (to != null) {
       want = to + const Offset(1, 1);
-    } else if (_interactive) {
+    } else if (_interactive || _pinned) {
       want = _pos ?? cur + const Offset(16, 14);
     } else {
       want = cur + const Offset(16, 14);
@@ -438,7 +464,7 @@ class _DesktopState extends State<_Desktop> {
     }
     // Fenêtre juste assez grande : minuscule autour du curseur, plus grande
     // quand la boîte de texte est ouverte (elle ne bloque ainsi aucun clic).
-    final size = c.board != null
+    final size = c.board != null || c.holo != null
         ? _withBoard
         : _interactive
         ? _withPanel

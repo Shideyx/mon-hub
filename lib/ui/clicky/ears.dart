@@ -88,8 +88,9 @@ class WindowsEars extends ClickyEars {
 
   bool _warmed = false;
 
-  /// Lancement sans fichier de script (-EncodedCommand), après un échec.
-  bool _encoded = false;
+  /// Lancement sans fichier de script (-EncodedCommand) : par défaut, car
+  /// certains PC bloquent les fichiers .ps1 ; le fichier sert de repli.
+  bool _encoded = true;
   final _errors = StringBuffer();
 
   /// Le script en paramètre de PowerShell (UTF-16 en base64), sans fichier :
@@ -335,10 +336,9 @@ class WindowsEars extends ClickyEars {
     _hyp = '';
     _speech = false;
     var boot = await _ensure();
-    if (boot != null && boot.code == 'died' && !_encoded) {
-      // PowerShell n'a pas pu lancer le fichier de script (règles de
-      // sécurité de Windows, antivirus…) : on réessaie sans fichier.
-      _encoded = true;
+    if (boot != null && boot.code == 'died' && _encoded) {
+      // Le lancement sans fichier a échoué : on réessaie avec le fichier.
+      _encoded = false;
       _kill();
       boot = await _ensure();
     }

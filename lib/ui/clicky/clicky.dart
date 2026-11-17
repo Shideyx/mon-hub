@@ -12,6 +12,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/claude_api.dart';
+import '../../modules/carnet/carnet_module.dart';
+import '../../modules/carnet/carnet_store.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_controller.dart';
 import '../../core/hub_files.dart';
@@ -27,6 +29,7 @@ import 'documents.dart';
 import 'drive.dart';
 import 'ears.dart';
 import 'extensions.dart';
+import 'holo.dart';
 import 'hud.dart';
 import 'journal.dart';
 import 'marks.dart';
@@ -128,6 +131,21 @@ class ClickyController extends ChangeNotifier {
   ClickyBoard? board;
   bool drawing = false;
 
+  /// Hologramme 3D affiché (molécule, planète, solide…).
+  HoloScene? holo;
+
+  void closeHolo() {
+    holo = null;
+    if (!panelOpen && board == null) onInteractive?.call(false);
+    notifyListeners();
+  }
+
+  /// Démarrage (animation « CLICKY EN LIGNE »).
+  DateTime? bootAt;
+
+  /// Déplacement de la boîte à la souris : (décalage, début du geste).
+  void Function(Offset delta, bool start)? onDragBox;
+
   void closeBoard() {
     board = null;
     if (!panelOpen) onInteractive?.call(false);
@@ -152,8 +170,9 @@ class ClickyController extends ChangeNotifier {
       'Explique-moi ce qu\'il y a à l\'écran comme un prof : de quoi ça parle, les notions '
       'importantes, avec un tableau visuel.';
   static const briefingPrompt =
-      'Fais-moi le briefing : mes cours d\'aujourd\'hui (et ceux annulés), les devoirs pour demain, '
-      'mes dernières notes, mes messages non lus et mes évènements. Court et clair.';
+      'Fais-moi le briefing : la météo et quoi mettre, mes cours d\'aujourd\'hui (et ceux annulés), '
+      'les devoirs pour demain, mes dernières notes, mes tâches du carnet, mes messages non lus et mes '
+      'évènements. Court et clair, comme JARVIS.';
 
   bool get hasHistory => _memory().isNotEmpty;
 
@@ -209,6 +228,7 @@ class ClickyController extends ChangeNotifier {
     'drive',
     'journal',
     'perApp',
+    'alive',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -219,10 +239,14 @@ class ClickyController extends ChangeNotifier {
     return d == null ? null : File('$d${Platform.pathSeparator}clicky.json');
   }
 
+  /// Ce que Clicky sait de toi (Carnet → Mémoire).
+  List<String> get _facts => Carnet.instance.facts.take(60).toList();
+
   /// Recharge l'historique et le journal (démarrage, compte changé).
   Future<void> loadMemory() async {
     await history.load();
     await Journal.instance.load();
+    await Carnet.instance.load();
     notifyListeners();
   }
 
@@ -354,6 +378,9 @@ class ClickyController extends ChangeNotifier {
   /// Une mémoire séparée par appli (Clicky partout).
   bool get perApp => _opt('perApp', true);
 
+  /// Clicky bouge tout seul autour du curseur (vivant).
+  bool get alive => _opt('alive', true);
+
   static bool get everywhereSupported => !kIsWeb && Platform.isWindows;
 
   /// Clicky de l'appli désactivé car « Clicky partout » s'en charge.
@@ -402,6 +429,10 @@ class ClickyController extends ChangeNotifier {
       ready = r;
       notifyListeners();
     }
+    if (r && enabled && here && bootAt == null) {
+      bootAt = DateTime.now();
+      notifyListeners();
+    }
     if (r && enabled && here && !_greeted) {
       _greeted = true;
       unawaited(_greetOnce());
@@ -439,6 +470,7 @@ class ClickyController extends ChangeNotifier {
       _recent ||
       panelOpen ||
       board != null ||
+      holo != null ||
       marks.isNotEmpty ||
       state != ClickyState.idle ||
       agentsRunning > 0;
@@ -1008,6 +1040,9 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
+  /// Actions des modules de Mon Hub (dans l'appli).
+  List<HubTool> get hubTools => _tools;
+
   List<HubTool> get _tools => [
     ...toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
     if (toolsOverride == null) ...McpTools.cached,
@@ -1036,7 +1071,9 @@ Tu es Clicky, un compagnon IA qui vit à côté du curseur de la personne, dans 
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
-${clickyPersona(callName)}''';
+${clickyPersona(callName)}
+${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
+Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.''';
     if (agent) {
       return '''$base
 
@@ -1058,6 +1095,8 @@ ${code ? 'MODE CODE : un éditeur de code est ouvert. Tu peux mettre de courts e
 ${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Clicky montre une étape à la fois.' : ''}
 
 $_boardGuide
+
+${HoloScene.guide}
 ${annotate ? '''
 Dessiner sur l'écran (comme au tableau) : tu peux ajouter des annotations, en pixels de la capture$shotsNote : [ARROW:x1,y1->x2,y2:légende] (flèche), [CIRCLE:x,y,rayon:légende] (entoure un élément), [UNDERLINE:x,y,largeur] (souligne un texte, y = bas du texte), [LABEL:x,y:texte] (étiquette). Au plus 4, seulement si ça aide à comprendre.''' : ''}
 ${driveOn && desktopMode ? DriveRunner.guide : ''}
@@ -1140,6 +1179,14 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         newConversation();
       case ClickyCommand.history:
         toggleHistory();
+      case ClickyCommand.protocol:
+        final tool = _tools.where((t) => t.name == 'carnet_protocole').firstOrNull;
+        if (tool == null) return false;
+        _set(ClickyState.thinking, status: 'Protocole $rest…', reply: '');
+        unawaited(ClickyChime.play());
+        final r = '${await tool.run({'action': 'lancer', 'nom': rest})}';
+        _set(ClickyState.idle, status: '', reply: r);
+        _fadeSoon();
       case ClickyCommand.briefing:
         await _askAi(briefingPrompt, shown: q, withScreen: false);
       case ClickyCommand.today || ClickyCommand.week:
@@ -1315,14 +1362,20 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       final live = narrate && voice && _voicePlatform;
       void streamed(String t) {
         if (id != _askId) return;
-        final noBoard = ClickyBoard.strip(t);
+        final noBoard = HoloScene.strip(ClickyBoard.strip(t));
         // Leçon en étapes : on n'affiche et ne lit que la première.
         final clean = stripClickyTags(stepsMode ? splitSteps(noBoard).first : noBoard);
-        final d = ClickyBoard.writing(t);
+        final d = ClickyBoard.writing(t) || HoloScene.writing(t);
         if (live) voiceOut.feed(clean);
         if (clean != reply || d != drawing) {
           drawing = d;
-          _set(state, status: d ? 'Je dessine au tableau…' : '', reply: clean);
+          _set(
+            state,
+            status: d
+                ? (HoloScene.writing(t) ? 'Je projette l\'hologramme…' : 'Je dessine au tableau…')
+                : '',
+            reply: clean,
+          );
         }
       }
 
@@ -1386,7 +1439,12 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       }
       if (id != _askId) return;
       drawing = false;
-      final (spokenAll, newBoard) = ClickyBoard.extract(raw);
+      final (spokenBoard, newBoard) = ClickyBoard.extract(raw);
+      final (spokenAll, newHolo) = HoloScene.extract(spokenBoard);
+      if (newHolo != null) {
+        holo = newHolo;
+        onInteractive?.call(true);
+      }
       final (noPlan, plan) = DrivePlan.extract(spokenAll);
       final parts = stepsMode ? splitSteps(noPlan) : [noPlan.replaceAll(stepRe, ' ')];
       if (newBoard != null) _showBoard(newBoard);
@@ -1744,6 +1802,18 @@ class _ClickyLayerState extends State<ClickyLayer> {
         };
       r.start();
       unawaited(c.loadMemory());
+      // Le Carnet (protocoles) parle et utilise les outils de Mon Hub.
+      CarnetModule.say = c.speak;
+      CarnetModule.callTool = (name, args) async {
+        final t = c.hubTools.where((x) => x.name == name).firstOrNull;
+        if (t == null) throw 'Outil introuvable : $name';
+        return t.run(args);
+      };
+      // Historique du presse-papier (si activé dans le Carnet).
+      ClipboardVault.start(
+        () async => (await Clipboard.getData(Clipboard.kTextPlain))?.text,
+        sensitive: () => Win.supportedHere && isSensitiveTitle(Win.foregroundTitle()),
+      );
       // Outils des serveurs MCP ajoutés dans les réglages.
       unawaited(McpTools.refresh(force: true));
     }
@@ -1764,7 +1834,10 @@ class _ClickyLayerState extends State<ClickyLayer> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(c.onKey);
     ClaudeApi.store.removeListener(_settingsChanged);
-    if (widget.hub != null) Routines.instance.stop();
+    if (widget.hub != null) {
+      Routines.instance.stop();
+      ClipboardVault.stop();
+    }
     super.dispose();
   }
 
@@ -1818,6 +1891,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
   /// souris) pour qu'on puisse cliquer dedans et écrire.
   Offset? _anchor;
   bool _wasOpen = false;
+  Offset _holoAt = Offset.zero;
 
   @override
   Widget build(BuildContext context) {
@@ -1826,11 +1900,16 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
     final cursor = c.follow ? c.cursor : null;
     final home = cursor == null
         ? Offset(size.width - 44, size.height - (mobile ? 150 : 60))
-        : cursor + const Offset(18, 16);
+        : cursor + (c.alive ? const Offset(10, 10) : const Offset(18, 16));
     final at = c.target ?? home;
 
     final open = c.boxOpen;
     if (open && !_wasOpen) _anchor = cursor;
+    // On attrape la barre du haut de la boîte pour la déplacer.
+    c.onDragBox = (d, start) {
+      if (mobile) return;
+      setState(() => _anchor = (_anchor ?? cursor ?? Offset(size.width / 2, size.height / 2)) + d);
+    };
     _wasOpen = open;
     final nearMouse = !mobile && _anchor != null;
     const boxW = 320.0;
@@ -1882,6 +1961,18 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
             child: ClickyBox(c: c),
           ),
         ),
+        // L'hologramme 3D, en haut à gauche (déplaçable).
+        if (c.holo != null)
+          Positioned(
+            left: 16 + _holoAt.dx,
+            right: mobile ? 16 : null,
+            top: 16 + _holoAt.dy,
+            width: mobile ? null : math.min(440, size.width - 32),
+            child: GestureDetector(
+              onPanUpdate: (d) => setState(() => _holoAt += d.delta),
+              child: HoloView(key: ValueKey(c.holo), scene: c.holo!, onClose: c.closeHolo),
+            ),
+          ),
         // Le tableau visuel, sur le côté (en haut sur téléphone).
         if (c.board != null)
           Positioned(
@@ -1920,7 +2011,12 @@ class _PointerWithLabel extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _Pointer(c: c),
+      ClickyAlive(
+        moving: c.alive && c.state != ClickyState.pointing,
+        bootAt: c.bootAt,
+        base: c.state == ClickyState.pointing || !c.alive ? Offset.zero : const Offset(8, 6),
+        child: _Pointer(c: c),
+      ),
       if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
         Container(
           margin: EdgeInsets.only(left: 4, top: c.hud ? 22 : 14),
@@ -2040,13 +2136,23 @@ class ClickyFollower extends StatelessWidget {
           top: pointerAt.dy + 22,
           right: marks.isEmpty ? 4 : null,
           width: marks.isEmpty ? null : 380,
-          bottom: c.board != null ? 4 : null,
+          bottom: c.board != null || c.holo != null ? 4 : null,
           child: IgnorePointer(
             ignoring: !interactive,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (c.holo != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: HoloView(
+                      key: ValueKey(c.holo),
+                      scene: c.holo!,
+                      onClose: c.closeHolo,
+                      compact: c.board != null,
+                    ),
+                  ),
                 if (c.board != null)
                   Flexible(
                     child: Padding(
@@ -2354,83 +2460,99 @@ class ClickyBox extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Barre du haut : état, historique, outils, voix, fermer.
-        Container(
-          color: accent.withValues(alpha: hud ? 0.10 : 0.12),
-          padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
-          child: Row(
-            children: [
-              if (busy)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+        // Barre du haut : état, historique, outils, voix, fermer. On
+        // l'attrape pour déplacer la boîte.
+        GestureDetector(
+          onPanStart: (_) => c.onDragBox?.call(Offset.zero, true),
+          onPanUpdate: (d) => c.onDragBox?.call(d.delta, false),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.move,
+            child: Container(
+              color: accent.withValues(alpha: hud ? 0.10 : 0.12),
+              padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
+              child: Row(
+                children: [
+                  if (busy)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(
+                        listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
+                        color: listening ? Colors.redAccent : accent,
+                        size: 16,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      c.agentsRunning > 0
+                          ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
+                          : title,
+                      style: text.labelLarge?.copyWith(
+                        letterSpacing: hud ? 1.6 : null,
+                        color: hud ? hudCyan : null,
+                        fontWeight: hud ? FontWeight.w700 : null,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Icon(
-                    listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                    color: listening ? Colors.redAccent : accent,
-                    size: 16,
+                  if (LessonRecorder.instance.on)
+                    const Tooltip(
+                      message: 'Leçon en cours d\'enregistrement',
+                      child: Icon(
+                        Icons.fiber_manual_record_rounded,
+                        color: Colors.redAccent,
+                        size: 14,
+                      ),
+                    ),
+                  if (WorkflowCapture.instance.on)
+                    const Tooltip(
+                      message: 'Gestes en cours de capture',
+                      child: Icon(Icons.gesture_rounded, color: Colors.orange, size: 16),
+                    ),
+                  if (busy || c.voiceOut.speaking)
+                    IconButton(
+                      tooltip: 'Arrêter (Échap)',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                      onPressed: c.cancel,
+                    ),
+                  IconButton(
+                    tooltip: 'Historique des conversations',
+                    visualDensity: VisualDensity.compact,
+                    isSelected: c.showHistory,
+                    icon: const Icon(Icons.history_rounded, size: 18),
+                    onPressed: c.toggleHistory,
                   ),
-                ),
-              Expanded(
-                child: Text(
-                  c.agentsRunning > 0
-                      ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
-                      : title,
-                  style: text.labelLarge?.copyWith(
-                    letterSpacing: hud ? 1.6 : null,
-                    color: hud ? hudCyan : null,
-                    fontWeight: hud ? FontWeight.w700 : null,
+                  _ToolsMenu(c: c),
+                  IconButton(
+                    tooltip: c.voice ? 'Couper la voix' : 'Remettre la voix',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      size: 18,
+                    ),
+                    onPressed: c.toggleVoice,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  IconButton(
+                    tooltip: 'Fermer (Échap)',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    onPressed: c.closeBox,
+                  ),
+                ],
               ),
-              if (LessonRecorder.instance.on)
-                const Tooltip(
-                  message: 'Leçon en cours d\'enregistrement',
-                  child: Icon(Icons.fiber_manual_record_rounded, color: Colors.redAccent, size: 14),
-                ),
-              if (WorkflowCapture.instance.on)
-                const Tooltip(
-                  message: 'Gestes en cours de capture',
-                  child: Icon(Icons.gesture_rounded, color: Colors.orange, size: 16),
-                ),
-              if (busy || c.voiceOut.speaking)
-                IconButton(
-                  tooltip: 'Arrêter (Échap)',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                  onPressed: c.cancel,
-                ),
-              IconButton(
-                tooltip: 'Historique des conversations',
-                visualDensity: VisualDensity.compact,
-                isSelected: c.showHistory,
-                icon: const Icon(Icons.history_rounded, size: 18),
-                onPressed: c.toggleHistory,
-              ),
-              _ToolsMenu(c: c),
-              IconButton(
-                tooltip: c.voice ? 'Couper la voix' : 'Remettre la voix',
-                visualDensity: VisualDensity.compact,
-                icon: Icon(c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded, size: 18),
-                onPressed: c.toggleVoice,
-              ),
-              IconButton(
-                tooltip: 'Fermer (Échap)',
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: c.closeBox,
-              ),
-            ],
+            ),
           ),
         ),
+        if (hud && !c.showHistory) _HudStrip(c: c),
         if (c.showHistory)
           Flexible(child: _HistoryPeek(c: c))
         else
@@ -2916,6 +3038,57 @@ class _MicHelp extends StatelessWidget {
         ),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+/// Bandeau « tête haute » sous la barre : heure, météo, état.
+class _HudStrip extends StatelessWidget {
+  const _HudStrip({required this.c});
+  final ClickyController c;
+
+  @override
+  Widget build(BuildContext context) {
+    final city = Carnet.instance.setting<String>('city', '');
+    final now = DateTime.now();
+    const style = TextStyle(
+      color: hudCyan,
+      fontSize: 10.5,
+      letterSpacing: 1.4,
+      fontWeight: FontWeight.w600,
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: hudCyan.withValues(alpha: 0.25))),
+      ),
+      child: Row(
+        children: [
+          Text('${hhmm(now)}  ·  ${dayLabel(now).toUpperCase()}', style: style),
+          const Spacer(),
+          if (city.isNotEmpty)
+            FutureBuilder(
+              future: Weather.forCity(city),
+              builder: (context, snap) => snap.hasData
+                  ? Text(
+                      '${snap.data!['icone']} ${snap.data!['temperature']?.round()} °C',
+                      style: style,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          if (c.agentsRunning > 0) ...[
+            const SizedBox(width: 10),
+            Text(
+              '${c.agentsRunning} AGENT${c.agentsRunning > 1 ? 'S' : ''}',
+              style: style.copyWith(color: hudAmber),
+            ),
+          ],
+          if (c.docs.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Text('${c.docs.length} DOC', style: style),
+          ],
+        ],
+      ),
     );
   }
 }

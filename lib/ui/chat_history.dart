@@ -181,6 +181,19 @@ class ChatHistory extends ChangeNotifier {
     return out;
   }
 
+  /// Ajoute ou remplace des conversations entières (import claude.ai).
+  Future<int> upsertAll(List<ChatThread> threads) async {
+    await _file.update((list) {
+      for (final t in threads) {
+        list.removeWhere((x) => x.id == t.id);
+        list.add(t);
+      }
+      return list;
+    });
+    notifyListeners();
+    return threads.length;
+  }
+
   Future<void> rename(String id, String title) => _change(id, (t) => t.title = title);
   Future<void> togglePin(String id) => _change(id, (t) => t.pinned = !t.pinned);
 
