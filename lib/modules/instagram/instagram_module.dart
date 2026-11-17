@@ -4,6 +4,7 @@ import 'dart:io' show File;
 
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
@@ -12,6 +13,7 @@ import '../../core/nav.dart';
 import '../../ui/web_login.dart';
 import '../../core/photo.dart';
 import '../../ui/call_page.dart';
+import '../../ui/media_view.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 
@@ -53,6 +55,40 @@ String? findIgImage(Object? node, [int depth = 0]) {
   return null;
 }
 
+/// La première vidéo (MP4) trouvée dans une réponse d'Instagram.
+String? findIgVideo(Object? node, [int depth = 0]) {
+  if (depth > 8 || node == null) return null;
+  if (node is Map) {
+    final vv = node['video_versions'];
+    if (vv is List && vv.isNotEmpty && vv.first is Map && (vv.first as Map)['url'] is String) {
+      return (vv.first as Map)['url'] as String;
+    }
+    for (final v in node.values) {
+      final r = findIgVideo(v, depth + 1);
+      if (r != null) return r;
+    }
+  } else if (node is List) {
+    for (final v in node) {
+      final r = findIgVideo(v, depth + 1);
+      if (r != null) return r;
+    }
+  }
+  return null;
+}
+
+/// Les photos et vidéos d'une publication (carrousel compris).
+List<MediaItem> igMedia(Map m) {
+  final carousel = m['carousel_media'];
+  final parts = carousel is List && carousel.isNotEmpty ? carousel : [m];
+  return [
+    for (final c in parts)
+      if (c is Map)
+        if (MediaItem(image: findIgImage({'x': c['image_versions2'] == null ? c : {'image_versions2': c['image_versions2']}}), video: findIgVideo(c['video_versions'] == null ? null : {'video_versions': c['video_versions']})) case final it
+            when it.image != null || it.isVideo)
+          it,
+  ];
+}
+
 class IgMessage {
   IgMessage(
     this.id,
@@ -65,12 +101,16 @@ class IgMessage {
     this.waveform = const [],
     this.reactions = const [],
     this.isLike = false,
+    this.media = const [],
   ]);
   final String id;
   final String userId;
   final String text;
   final DateTime at;
   final String? image;
+
+  /// Photo ou vidéo du message (envoyée, ou publication / reel partagé).
+  final List<MediaItem> media;
 
   /// Message vocal : adresse du son, durée et onde.
   final String? audioUrl;
@@ -88,7 +128,8 @@ class IgMessage {
     final text = switch (type) {
       'text' => j['text'] as String? ?? '',
       'like' => '❤️',
-      'media_share' || 'clip' || 'xma_media_share' => '🎬 a partagé une publication',
+      'clip' || 'xma_clip' => '🎬 a partagé un reel',
+      'media_share' || 'xma_media_share' => '📌 a partagé une publication',
       'media' || 'raven_media' => '📷 Photo / vidéo',
       'voice_media' => '🎤 Message vocal',
       'animated_media' => 'GIF',
@@ -98,6 +139,7 @@ class IgMessage {
     };
     final ts = int.tryParse('${j['timestamp']}') ?? 0;
     final image = type == 'text' || type == 'like' || type == 'voice_media' ? null : findIgImage(j);
+    final video = type == 'text' || type == 'like' || type == 'voice_media' ? null : findIgVideo(j);
     final audio = ((j['voice_media'] as Map?)?['media'] as Map?)?['audio'] as Map?;
     final ms = (audio?['duration'] as num?)?.toInt();
     final r = j['reactions'] as Map?;
@@ -120,6 +162,7 @@ class IgMessage {
           if (e is Map) ('${e['emoji'] ?? '❤️'}', '${e['sender_id']}'),
       ],
       type == 'like',
+      [if (image != null || video != null) MediaItem(image: image, video: video)],
     );
   }
 
@@ -168,12 +211,16 @@ class IgPost {
     this.comments,
     this.liked,
     this.isVideo,
-    this.at,
-  );
+    this.at, {
+    this.media = const [],
+  });
   final String id;
   final String code;
   final IgUser user;
   final List<String> images;
+
+  /// Photos et vidéos, dans l'ordre du carrousel.
+  final List<MediaItem> media;
   final String caption;
   int likes;
   final int comments;
@@ -201,6 +248,7 @@ class IgPost {
       m['has_liked'] == true,
       m['media_type'] == 2,
       DateTime.fromMillisecondsSinceEpoch(((m['taken_at'] ?? 0) as int) * 1000),
+      media: igMedia(m),
     );
   }
 }
@@ -213,10 +261,11 @@ class IgStoryUser {
 }
 
 class IgStoryItem {
-  IgStoryItem(this.image, this.isVideo, this.at);
+  IgStoryItem(this.image, this.isVideo, this.at, {this.video});
   final String image;
   final bool isVideo;
   final DateTime at;
+  final String? video;
 }
 
 class IgThread {
@@ -466,6 +515,35 @@ class InstagramApi {
     return out;
   }
 
+  /// Les reels (vidéos courtes) proposés par Instagram ; sinon les vidéos
+  /// du fil.
+  Future<List<IgPost>> reels() async {
+    Object? last;
+    final attempts = <Future<Map<String, dynamic>> Function()>[
+      () => _post('/clips/discover/', {'container_module': 'clips_viewer_clips_tab', 'max_id': ''}),
+      () => _post('/clips/home/', {'page_size': '12'}),
+      () => _get('/clips/connected/?page_size=12'),
+    ];
+    for (final attempt in attempts) {
+      try {
+        final j = await attempt();
+        final out = <IgPost>[];
+        for (final it in (j['items'] as List?) ?? const []) {
+          final m = it is Map ? (it['media'] ?? it) : null;
+          if (m is! Map<String, dynamic> || m['user'] == null) continue;
+          final p = IgPost.fromJson(m);
+          if (p.media.any((x) => x.isVideo)) out.add(p);
+        }
+        if (out.isNotEmpty) return out;
+      } catch (e) {
+        last = e;
+      }
+    }
+    final videos = (await timeline()).where((p) => p.media.any((x) => x.isVideo)).toList();
+    if (videos.isNotEmpty) return videos;
+    throw last ?? 'Pas de reels pour le moment';
+  }
+
   /// Personnes qui ont aimé une publication.
   Future<List<IgUser>> likers(String mediaId) async {
     final j = await _get('/media/$mediaId/likers/');
@@ -543,6 +621,7 @@ class InstagramApi {
           findIgImage(it) ?? '',
           (it['video_versions'] as List?)?.isNotEmpty == true,
           DateTime.fromMillisecondsSinceEpoch(((it['taken_at'] ?? 0) as int) * 1000),
+          video: findIgVideo(it['video_versions'] == null ? null : {'video_versions': it['video_versions']}),
         ),
     ].where((e) => e.image.isNotEmpty).toList();
   }
@@ -872,7 +951,7 @@ class InstagramModule extends HubModule {
 
   @override
   Widget buildPage(BuildContext context) => DefaultTabController(
-    length: 3,
+    length: 4,
     child: Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -890,6 +969,7 @@ class InstagramModule extends HubModule {
         bottom: const TabBar(
           tabs: [
             Tab(text: 'Fil d\'actu'),
+            Tab(text: 'Reels'),
             Tab(text: 'Messages'),
             Tab(text: 'Activité'),
           ],
@@ -909,6 +989,7 @@ class InstagramModule extends HubModule {
           return TabBarView(
             children: [
               _FeedTab(module: this),
+              _ReelsTab(module: this),
               FutureBuilder(
                 future: load(),
                 initialData: _threads,
@@ -1056,6 +1137,213 @@ class _FeedTabState extends State<_FeedTab> with AutomaticKeepAliveClientMixin {
   }
 }
 
+/// Les reels, comme dans l'appli : une vidéo à la fois, en plein cadre ;
+/// ↑ ↓ (ou la molette) pour passer.
+class _ReelsTab extends StatefulWidget {
+  const _ReelsTab({required this.module});
+  final InstagramModule module;
+
+  @override
+  State<_ReelsTab> createState() => _ReelsTabState();
+}
+
+class _ReelsTabState extends State<_ReelsTab> with AutomaticKeepAliveClientMixin {
+  late Future<List<IgPost>> future = _load();
+  final pages = PageController();
+  int current = 0;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<List<IgPost>> _load() async {
+    final api = await widget.module._client();
+    if (api == null) return const [];
+    return api.reels();
+  }
+
+  @override
+  void dispose() {
+    pages.dispose();
+    super.dispose();
+  }
+
+  void _go(int to, int count) {
+    if (to < 0 || to >= count) return;
+    pages.animateToPage(to, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return FutureBuilder(
+      future: future,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return EmptyHint('${snap.error}', action: ('Réessayer', () => setState(() => future = _load())));
+        }
+        if (!snap.hasData) return const LoadingHint();
+        final reels = snap.data!;
+        if (reels.isEmpty) return const EmptyHint('Pas de reels pour le moment');
+        return CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowDown): () => _go(current + 1, reels.length),
+            const SingleActivator(LogicalKeyboardKey.arrowUp): () => _go(current - 1, reels.length),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Container(
+              color: Colors.black,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: AspectRatio(
+                      aspectRatio: 9 / 16,
+                      child: PageView.builder(
+                        controller: pages,
+                        scrollDirection: Axis.vertical,
+                        itemCount: reels.length,
+                        onPageChanged: (i) => setState(() => current = i),
+                        itemBuilder: (context, i) => _Reel(
+                          module: widget.module,
+                          post: reels[i],
+                          playing: i == current,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton.filledTonal(
+                        tooltip: 'Reel précédent (↑)',
+                        icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                        onPressed: current == 0 ? null : () => _go(current - 1, reels.length),
+                      ),
+                      const SizedBox(height: 10),
+                      IconButton.filledTonal(
+                        tooltip: 'Reel suivant (↓)',
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        onPressed: current >= reels.length - 1 ? null : () => _go(current + 1, reels.length),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Reel extends StatefulWidget {
+  const _Reel({required this.module, required this.post, required this.playing});
+  final InstagramModule module;
+  final IgPost post;
+  final bool playing;
+
+  @override
+  State<_Reel> createState() => _ReelState();
+}
+
+class _ReelState extends State<_Reel> {
+  Future<void> _like() async {
+    final p = widget.post;
+    setState(() {
+      p.liked = !p.liked;
+      p.likes += p.liked ? 1 : -1;
+    });
+    try {
+      final api = await widget.module._client();
+      p.liked ? await api!.like(p.id) : await api!.unlike(p.id);
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.post;
+    final video = p.media.firstWhere((m) => m.isVideo, orElse: () => p.media.first);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Seul le reel affiché joue (les autres montrent leur image).
+        if (widget.playing && video.isVideo)
+          WebVideo(url: video.video!, poster: video.image, loop: true, fit: 'cover')
+        else if (video.image != null)
+          Image.network(video.image!, fit: BoxFit.cover),
+        IgnorePointer(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.transparent, Colors.transparent, Color(0xB3000000)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 14,
+          right: 70,
+          bottom: 60,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  HubAvatar(url: p.user.pic, label: p.user.username, color: widget.module.color, size: 32),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      p.user.username,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              if (p.caption.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(p.caption, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white)),
+              ],
+            ],
+          ),
+        ),
+        Positioned(
+          right: 8,
+          bottom: 70,
+          child: Column(
+            children: [
+              IconButton(
+                iconSize: 32,
+                color: p.liked ? Colors.red : Colors.white,
+                icon: Icon(p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded),
+                onPressed: _like,
+              ),
+              Text('${p.likes}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              IconButton(
+                iconSize: 28,
+                color: Colors.white,
+                icon: const Icon(Icons.mode_comment_outlined),
+                onPressed: () => openLink(context, 'https://www.instagram.com/reel/${p.code}/'),
+              ),
+              Text('${p.comments}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PostCard extends StatefulWidget {
   const _PostCard({required this.module, required this.post});
   final InstagramModule module;
@@ -1096,23 +1384,37 @@ class _PostCardState extends State<_PostCard> {
                   PageView(
                     onPageChanged: (i) => setState(() => page = i),
                     children: [
-                      for (final url in p.images)
+                      for (final (i, url) in p.images.indexed)
                         GestureDetector(
-                          onTap: () => showPhoto(context, url),
+                          onTap: () => MediaViewer.open(
+                            context,
+                            p.media.isEmpty ? [for (final u in p.images) MediaItem(image: u)] : p.media,
+                            i,
+                            p.caption,
+                          ),
                           onDoubleTap: _toggleLike,
-                          child: Image.network(
-                            url,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const Center(child: Icon(Icons.broken_image_rounded)),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_rounded)),
+                              ),
+                              if (i < p.media.length && p.media[i].isVideo)
+                                Center(
+                                  child: Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                                    child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                     ],
                   ),
-                  if (p.isVideo)
-                    const Center(
-                      child: Icon(Icons.play_circle_fill_rounded, size: 64, color: Colors.white70),
-                    ),
                   if (p.images.length > 1)
                     Positioned(
                       top: 10,
@@ -1127,6 +1429,26 @@ class _PostCardState extends State<_PostCard> {
                           '${page + 1}/${p.images.length}',
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                         ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (p.images.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < p.images.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      width: i == page ? 8 : 6,
+                      height: i == page ? 8 : 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i == page ? const Color(0xFF0095F6) : theme.colorScheme.outlineVariant,
                       ),
                     ),
                 ],
@@ -1153,7 +1475,7 @@ class _PostCardState extends State<_PostCard> {
               ),
               const SizedBox(width: 12),
               IconButton(
-                tooltip: 'Commentaires / vidéo (ouvre Instagram)',
+                tooltip: 'Commentaires (ouvre Instagram)',
                 icon: const Icon(Icons.mode_comment_outlined),
                 onPressed: () => openLink(context, 'https://www.instagram.com/p/${p.code}/'),
               ),
@@ -1266,18 +1588,10 @@ class _StoryViewerState extends State<_StoryViewer> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(it.image, fit: BoxFit.contain),
-                if (it.isVideo)
-                  Center(
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Vidéo : ouvrir dans Instagram'),
-                      onPressed: () => openLink(
-                        context,
-                        'https://www.instagram.com/stories/${widget.story.user.username}/',
-                      ),
-                    ),
-                  ),
+                if (it.video != null)
+                  WebVideo(key: ValueKey(it.video), url: it.video!, poster: it.image)
+                else
+                  Image.network(it.image, fit: BoxFit.contain),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(8),
@@ -1446,8 +1760,9 @@ class _ThreadPageState extends State<_ThreadPage> {
                       }
                       return ChatBubble(
                         text: m.isVoice ? '' : (m.isLike ? '' : m.text),
-                        images: [?m.image],
-                        extra: m.isVoice
+                        extra: m.media.isNotEmpty
+                            ? MediaThumb(items: m.media, width: 240, height: m.media.first.isVideo ? 320 : 240)
+                            : m.isVoice
                             ? VoiceNotePlayer(
                                 url: m.audioUrl!,
                                 duration: m.audioLength,
