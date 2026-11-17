@@ -85,9 +85,11 @@
   3 min) ; YouTube y est le vrai m.youtube.com (`YouTubeMini`).
 - Médias : `ui/media_view.dart` (`WebVideo` = vidéo MP4 lue par WebView2, sans paquet ; `MediaViewer` plein écran ;
   `MediaThumb`). Vocaux : `VoiceNotePlayer` télécharge d'abord le son (`DeviceFileSource`), sinon `WebAudio`.
-- Instagram : onglet Reels (`InstagramApi.reels`, `_ReelsTab`, une seule vidéo jouée à la fois), vidéos des posts,
-  stories et messages (`igMedia`, `findIgVideo`). Discord : conversation façon Discord (`_DiscordLine`, messages
-  regroupés, `_DaySeparator`, `DiscordEmbed`, vidéos).
+- Instagram = **le vrai instagram.com** dans Mon Hub (`InstagramPage`/`InstagramMini`, `HubWebView`), v1.42.
+  ⚠️ **Jamais d'API privée Instagram ni de requête automatique** (lecture des messages, envoi, notifications) :
+  l'ancienne version (se faisant passer pour l'appli Android + relève toutes les 2 min) a fait bloquer le compte
+  de la personne (« logiciel malveillant »). Non lus = titre de la page (« (3) Instagram »). Discord : conversation façon
+  Discord (`_DiscordLine`, messages regroupés, `_DaySeparator`, `DiscordEmbed`, vidéos).
 - Assistant personnel (proactif, avec accord) : `ui/clicky/assistant.dart` (`Assistant` : consentement + 8 automatismes
   `AssistantFeature.all`, tour toutes les 5 min `tick`, propositions `Proposal` affichées par `AssistantLayer` en bas à
   gauche, `ui/clicky/assistant_view.dart` ; Réglages → Assistant personnel = `AssistantPage`). Initiatives hors modules :

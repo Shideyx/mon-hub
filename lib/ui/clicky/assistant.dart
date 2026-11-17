@@ -194,17 +194,8 @@ class Assistant extends ChangeNotifier {
     _tools = null;
     _busy = false;
     proposals.clear();
-    _lastRun.clear();
   }
 
-  // Ce qui ne se fait pas à chaque tour (Instagram, IA…).
-  final _lastRun = <String, DateTime>{};
-  bool _every(String key, Duration d, DateTime now) {
-    final last = _lastRun[key];
-    if (last != null && now.difference(last) < d) return false;
-    _lastRun[key] = now;
-    return true;
-  }
 
   void propose(Proposal p) {
     if (proposals.any((x) => x.id == p.id)) return;
@@ -719,10 +710,9 @@ class Assistant extends ChangeNotifier {
       final found = DateSpotter.find('${m['objet'] ?? ''}', n).firstOrNull;
       if (found != null) offerSpotted(key, found, n, source: 'un mail', subject: '${m['objet'] ?? ''}');
     }
+    // (Instagram n'est jamais lu en arrière-plan : il l'interdit.)
     final dms = [
       ..._list(await _get('discord_conversations')).map((d) => ('Discord', d)),
-      if (_every('instagram', const Duration(minutes: 30), n))
-        ..._list(await _get('instagram_conversations')).map((d) => ('Instagram', d)),
     ];
     for (final (app, d) in dms) {
       if (d['non_lu'] != true || '${d['dernier'] ?? ''}'.isEmpty) continue;
@@ -1111,7 +1101,6 @@ class Assistant extends ChangeNotifier {
     final ed = _list(await _get('ecole_messages'));
     final mails = _list(await _get('mails_lister', {'nombre': 20}));
     final discord = _list(await _get('discord_conversations'));
-    final insta = _list(await _get('instagram_conversations'));
     final rev = await _get('revision_paquets');
     final free = _list(await _get('agenda_creneaux_libres', {'debut': day, 'jours': 1, 'de': n.weekday >= 6 ? 10 : 16, 'a': 21, 'minimum': 45}));
     bool isToday(Map e) {
@@ -1139,7 +1128,6 @@ class Assistant extends ChangeNotifier {
       'messages_ecole': [for (final m in ed) if (m['lu'] == false) m],
       'mails': [for (final m in mails) if (m['lu'] == false && !_promo.hasMatch('${m['de']} ${m['objet']}')) m],
       'discord_non_lus': discord.where((d) => d['non_lu'] == true).length,
-      'instagram_non_lus': insta.where((d) => d['non_lu'] == true).length,
       'en_retard': [for (final t in tasks) if (t.reason.startsWith('en retard') || t.reason.startsWith('attend')) t],
       'taches': tasks,
       'objectifs': [for (final g in c.list('goals')) if (!g.done) g.text],
@@ -1225,8 +1213,7 @@ class Assistant extends ChangeNotifier {
     final edm = (d['messages_ecole'] as List).cast<Map>();
     final mails = (d['mails'] as List).cast<Map>();
     final dc = d['discord_non_lus'] as int;
-    final ig = d['instagram_non_lus'] as int;
-    if (edm.isNotEmpty || mails.isNotEmpty || dc > 0 || ig > 0) {
+    if (edm.isNotEmpty || mails.isNotEmpty || dc > 0) {
       b.writeln();
       for (final m in edm.take(3)) {
         b.writeln('✉️ École Directe — ${m['de']} : « ${m['objet']} »');
@@ -1234,8 +1221,8 @@ class Assistant extends ChangeNotifier {
       for (final m in mails.take(3)) {
         b.writeln('📧 ${'${m['de']}'.split('<').first.trim()} : « ${m['objet']} »');
       }
-      if (dc > 0 || ig > 0) {
-        b.writeln('💬 Non lus : ${[if (dc > 0) '$dc sur Discord', if (ig > 0) '$ig sur Instagram'].join(', ')}.');
+      if (dc > 0) {
+        b.writeln('💬 Non lus : $dc sur Discord.');
       }
     }
     final late = (d['en_retard'] as List).cast<RankedTask>();

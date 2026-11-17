@@ -137,7 +137,6 @@ void main() {
       ],
       'mails': <Map>[],
       'discord_non_lus': 2,
-      'instagram_non_lus': 0,
       'en_retard': [RankedTask('Rendre le livre', 93, 'en retard de 3 jours')],
       'taches': [RankedTask('Rendre le livre', 93, 'en retard de 3 jours'), RankedTask('Réviser Physique', 71, 'contrôle dans 2 jours')],
       'objectifs': ['Avoir 15 en maths'],

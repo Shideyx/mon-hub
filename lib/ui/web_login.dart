@@ -227,9 +227,18 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
 /// Site web intégré dans l'appli (session gardée d'une fois sur l'autre).
 class HubWebView extends StatefulWidget {
-  const HubWebView({super.key, required this.url, this.desktopUserAgent = false, this.onController});
+  const HubWebView({
+    super.key,
+    required this.url,
+    this.desktopUserAgent = false,
+    this.onController,
+    this.onTitleChanged,
+  });
   final String url;
   final bool desktopUserAgent;
+
+  /// Le titre de la page a changé (ex. « (2) Instagram » : 2 non lus).
+  final void Function(String? title)? onTitleChanged;
 
   /// Donne le contrôleur de la page (pour y lancer du JavaScript).
   final void Function(InAppWebViewController c)? onController;
@@ -313,6 +322,7 @@ class _HubWebViewState extends State<HubWebView> {
             },
             onProgressChanged: (_, p) => setState(() => _progress = p / 100),
             onLoadStop: (_, _) => _scheduleBlankCheck(),
+            onTitleChanged: widget.onTitleChanged == null ? null : (_, t) => widget.onTitleChanged!(t),
             onUpdateVisitedHistory: (_, _, _) => _scheduleBlankCheck(),
             // Fenêtres « pop-up » (connexion Google, Apple…) : on les ouvre
             // dans une vraie fenêtre liée à la page, pour que le site reçoive
