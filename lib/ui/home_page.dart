@@ -261,6 +261,23 @@ class ModuleCard extends StatefulWidget {
 class _ModuleCardState extends State<ModuleCard> {
   bool hover = false;
 
+  /// Le contenu de la carte, gardé tel quel quand on la survole : avant, un
+  /// simple passage de souris reconstruisait tout le résumé (et relançait
+  /// ses chargements), ce qui faisait ramer l'accueil.
+  Widget? _summary;
+
+  @override
+  void didUpdateWidget(ModuleCard old) {
+    super.didUpdateWidget(old);
+    _summary = null;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _summary = null; // thème, taille…
+  }
+
   void _open(BuildContext context) {
     final m = widget.module;
     widget.onOpen != null
@@ -397,7 +414,7 @@ class _ModuleCardState extends State<ModuleCard> {
                       },
                       child: MouseRegion(cursor: SystemMouseCursors.grab, child: _header(context)),
                     ),
-                    Expanded(child: m.buildSummary(context)),
+                    Expanded(child: RepaintBoundary(child: _summary ??= m.buildSummary(context))),
                   ],
                 ),
               ),

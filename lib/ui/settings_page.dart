@@ -19,6 +19,7 @@ import '../core/updater.dart';
 import '../core/vault.dart';
 import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
+import 'clicky/assistant_view.dart';
 import 'clicky/clicky.dart';
 import 'clicky/mic_test.dart';
 import 'widgets.dart';
@@ -163,6 +164,13 @@ class _SettingsPageState extends State<SettingsPage> {
                         : 'Compte : ${GoogleAuth.driveAccount}',
               ),
               onTap: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
+            ),
+            section('Assistant personnel'),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
+              title: const Text('Clicky prend les devants'),
+              subtitle: const Text('Rappels de devoirs, conflits, nouvelles réunions, plan de ta journée, objectifs, briefing du matin'),
+              onTap: () => AssistantPage.open(context),
             ),
             section('Rangement'),
             ListTile(

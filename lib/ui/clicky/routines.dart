@@ -258,8 +258,7 @@ class Routines extends ChangeNotifier {
   bool running(String id) => _busy.contains(id);
 
   Future<List<Routine>> load() async {
-    await _file.load();
-    notifyListeners();
+    if (await _file.reload()) notifyListeners();
     return list;
   }
 

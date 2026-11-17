@@ -43,11 +43,12 @@ class ClaudeModule extends HubModule {
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-    listenable: ClaudeApi.store,
-    builder: (context, _) => FutureBuilder(
-      future: ClickyController.instance.refreshReady(),
-      builder: (context, snap) {
-        final ready = snap.data == true;
+    // On lit simplement l'état de Clicky (avant : chaque affichage relançait
+    // toute sa préparation — micro, voix… — et l'accueil ramait).
+    listenable: Listenable.merge([ClaudeApi.store, ClickyController.instance]),
+    builder: (context, _) => Builder(
+      builder: (context) {
+        final ready = ClickyController.instance.ready;
         return Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(8),

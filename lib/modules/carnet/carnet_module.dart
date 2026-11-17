@@ -153,6 +153,7 @@ class CarnetModule extends HubModule {
       params: {
         'action': ('string', 'ajouter_tache, ajouter_note, liste, cocher ou effacer'),
         'texte': ('string', 'texte de la tâche ou de la note'),
+        'pour_le': ('string', 'date limite de la tâche AAAA-MM-JJ (facultatif)'),
       },
       required: ['action'],
       run: (a) async {
@@ -160,7 +161,8 @@ class CarnetModule extends HubModule {
         final t = '${a['texte'] ?? ''}'.trim();
         switch ('${a['action']}') {
           case 'ajouter_tache':
-            await c.add('todos', {'text': t});
+            final due = DateTime.tryParse('${a['pour_le'] ?? ''}');
+            await c.add('todos', {'text': t, 'due': ?due?.millisecondsSinceEpoch});
             return 'Tâche ajoutée : $t';
           case 'ajouter_note':
             await c.add('notes', {'text': t});

@@ -91,8 +91,7 @@ class Journal extends ChangeNotifier {
   List<JournalEntry> get entries => [..._file.value]..sort((a, b) => b.at.compareTo(a.at));
 
   Future<List<JournalEntry>> load() async {
-    await _file.load();
-    notifyListeners();
+    if (await _file.reload()) notifyListeners();
     return entries;
   }
 

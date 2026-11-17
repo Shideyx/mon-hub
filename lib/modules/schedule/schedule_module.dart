@@ -397,10 +397,13 @@ class ScheduleModule extends HubModule {
     return out;
   }
 
-  Future<List<AgendaItem>> upcoming() {
+  Future<List<AgendaItem>> upcoming() async {
     final now = DateTime.now();
-    return itemsBetween(now, now.add(const Duration(days: 14)));
+    return _upcoming = await itemsBetween(now, now.add(const Duration(days: 14)));
   }
+
+  /// Le dernier résultat (affiché tout de suite pendant qu'on relit).
+  List<AgendaItem>? _upcoming;
 
   /// Rappel 15 minutes avant chaque évènement (hors cours, déjà signalés par
   /// École Directe s'ils sont annulés).
@@ -562,6 +565,7 @@ class ScheduleModule extends HubModule {
     listenable: Listenable.merge([store, if (ecole != null) ecole!.store]),
     builder: (context, _) => FutureBuilder(
       future: upcoming(),
+      initialData: _upcoming,
       builder: (context, snap) {
         final items = (snap.data ?? []).where((e) => !e.cancelled).take(7).toList();
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {

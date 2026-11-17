@@ -60,8 +60,7 @@ class Carnet extends ChangeNotifier {
   }
 
   Future<void> load() async {
-    await _file.load();
-    notifyListeners();
+    if (await _file.reload()) notifyListeners();
   }
 
   Future<CarnetItem> add(String name, Map<String, dynamic> item, {int max = 2000}) async {
@@ -352,6 +351,7 @@ class Weather {
       'max': at('temperature_2m_max', 0).round(),
       'pluie_pourcent': at('precipitation_probability_max', 0).round(),
       'vent_kmh': (cur['wind_speed_10m'] as num?)?.round(),
+      'pluie_demain_pourcent': at('precipitation_probability_max', 1).round(),
       'demain':
           '${at('temperature_2m_min', 1).round()} à ${at('temperature_2m_max', 1).round()} °C, '
           '${describe(at('weather_code', 1).toInt()).$1}',

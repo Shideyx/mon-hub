@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -78,7 +79,19 @@ class JsonFile<T> extends ChangeNotifier {
   DateTime? _stamp;
   String? _profile;
 
+  /// Change à chaque fois que le contenu est relu depuis le disque : permet
+  /// de ne prévenir l'interface que si quelque chose a vraiment changé
+  /// (sinon : écran qui se reconstruit en boucle et appli qui rame).
+  int version = 0;
+
   T get value => _value ??= empty();
+
+  /// Relit le fichier et dit si son contenu a changé.
+  Future<bool> reload() async {
+    final v = version;
+    await load();
+    return version != v;
+  }
 
   /// Relit le fichier s'il a été modifié (par l'autre programme).
   Future<T> load() async {
@@ -86,6 +99,7 @@ class JsonFile<T> extends ChangeNotifier {
       _profile = HubFiles.profileFolder;
       _value = null;
       _stamp = null;
+      version++;
     }
     final f = await HubFiles.file(name);
     if (f == null) return value;
@@ -105,8 +119,15 @@ class JsonFile<T> extends ChangeNotifier {
         _stamp = stamp;
         return value;
       }
-      _value = raw.trim().isEmpty ? empty() : decode(jsonDecode(raw));
+      // Gros fichier : lu à côté pour ne pas figer l'interface.
+      final json = raw.trim().isEmpty
+          ? null
+          : raw.length > 200000
+          ? await Isolate.run(() => jsonDecode(raw))
+          : jsonDecode(raw);
+      _value = json == null ? empty() : decode(json);
       _stamp = stamp;
+      version++;
     } catch (_) {
       // Fichier abîmé : on repart de ce qu'on a en mémoire.
     }

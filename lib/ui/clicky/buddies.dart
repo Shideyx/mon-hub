@@ -149,8 +149,7 @@ class Buddies extends ChangeNotifier {
   String? error;
 
   Future<void> load() async {
-    await _file.load();
-    notifyListeners();
+    if (await _file.reload()) notifyListeners();
   }
 
   Future<void> saveProfile(List<String> answers) async {

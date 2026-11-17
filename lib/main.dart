@@ -18,6 +18,7 @@ import 'core/session.dart';
 import 'core/shortcuts.dart';
 import 'core/updater.dart';
 import 'ui/app_shell.dart';
+import 'ui/clicky/assistant_view.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
 import 'ui/clicky/tutorial.dart';
@@ -201,7 +202,10 @@ class _HubAppState extends State<HubApp> {
         child: ClickyLayer(
           hub: hub,
           // Discord gardé ouvert en fond pour recevoir les appels.
-          child: DiscordPhoneLayer(child: child ?? const SizedBox.shrink()),
+          child: DiscordPhoneLayer(
+            // Les propositions de l'assistant personnel (en bas à gauche).
+            child: AssistantLayer(enabled: hub != null, child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
       debugShowCheckedModeBanner: false,

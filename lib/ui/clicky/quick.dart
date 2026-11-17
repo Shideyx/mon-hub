@@ -156,6 +156,53 @@ class QuickAnswers {
     final calc = Calc.fromSentence(raw);
     if (calc != null) return QuickReply(calc);
 
+    // Assistant personnel : priorités, plan de la journée, objectifs.
+    if (has('assistant_priorites') &&
+        RegExp(
+          r'^(?:quelles sont |c est quoi |donne moi )?mes priorites(?: du jour| aujourd hui)?$|'
+          r'^par quoi (?:je )?(?:commence|dois commencer|devrais commencer|je commence)(?: aujourd hui| ce soir)?$|'
+          r'^qu est ce que je (?:dois|devrais) faire (?:en premier|d abord)$|'
+          r'^j ai trop de (?:trucs|choses|devoirs|taches)(?: a faire)?$',
+        ).hasMatch(n)) {
+      final r = await call('assistant_priorites', const {});
+      if (r is Map) {
+        final l = [for (final x in (r['priorites'] as List?) ?? const []) if (x is Map) x];
+        if (l.isEmpty) return const QuickReply('Rien d\'urgent : tu es à jour, bravo !');
+        return QuickReply([
+          r['trop_de_choses'] == true ? 'Ça fait beaucoup, alors concentre-toi sur les 3 premières :' : 'Par quoi commencer :',
+          for (final (i, t) in l.take(5).indexed) '${i + 1}. ${t['tache']} (${t['pourquoi']})',
+        ].join('\n'));
+      }
+    }
+    if (has('assistant_planifier_journee') &&
+        RegExp(
+          r'^(?:aide moi a )?(?:re)?organise(?:r)? ma (?:journee|soiree)$|^planifie(?:r)? ma (?:journee|soiree)$|'
+          r'^fais moi un (?:planning|plan|programme) (?:pour )?(?:ce soir|aujourd hui|ma journee|ma soiree)$',
+        ).hasMatch(n)) {
+      final r = await call('assistant_planifier_journee', const {});
+      if (r is String) return QuickReply(r);
+      if (r is Map) {
+        final plan = [for (final x in (r['plan_propose'] as List?) ?? const []) if (x is Map) x];
+        return QuickReply([
+          'Voici ce que je te propose :',
+          for (final p in plan) '• ${'${p['debut']}'.substring(11, 16)} ${p['titre']}',
+          'Clique sur « Mettre dans l\'agenda » pour l\'enregistrer.',
+        ].join('\n'));
+      }
+    }
+    if (has('assistant_objectifs') && RegExp(r'^(?:quels sont |c est quoi )?mes objectifs$').hasMatch(n)) {
+      final r = await call('assistant_objectifs', const {'action': 'lister'});
+      if (r is List) {
+        final open = [
+          for (final g in r)
+            if (g is Map && g['atteint'] != true) '${g['objectif']}',
+        ];
+        return QuickReply(open.isEmpty
+            ? 'Tu n\'as pas encore d\'objectif. Dis-moi « mon objectif est de… » et je le retiens.'
+            : 'Tes objectifs : ${open.join(' · ')}.');
+      }
+    }
+
     // Minuteur.
     final timer = RegExp(
       r'^(?:mets |met |lance |demarre |fais )?(?:moi )?(?:un |le )?(?:minuteur|chrono|timer|compte a rebours)(?: de| pour)? '

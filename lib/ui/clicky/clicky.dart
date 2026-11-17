@@ -37,6 +37,7 @@ import 'ears.dart';
 import 'extensions.dart';
 import 'holo.dart';
 import 'hud.dart';
+import 'assistant.dart';
 import 'journal.dart';
 import 'live.dart';
 import 'pcm_player.dart';
@@ -1038,7 +1039,7 @@ class ClickyController extends ChangeNotifier {
           .then((_) => history.add(id, ChatMsg(mine: false, text: text)))
           .then((_) => history.rename(id, '$title · ${dayLabel(DateTime.now())}')),
     );
-    if (speakIt) await speak(text);
+    if (speakIt) await speak(withoutEmoji(text));
     if (state == ClickyState.speaking) _set(ClickyState.idle);
   }
 
@@ -1232,6 +1233,8 @@ class ClickyController extends ChangeNotifier {
   List<HubTool> get localTools => [
     if (_voicePlatform) ...repairTools,
     if (pcControl != 'off') ...PcControl.tools(),
+    // L'assistant personnel vit dans Mon Hub (qui a les modules).
+    if (hub != null && toolsOverride == null) ...Assistant.instance.tools,
   ];
 
   /// Les outils de dépannage de Clicky : l'IA peut voir ce qui ne va pas
@@ -1413,6 +1416,12 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       unawaited(_runAgent(q.substring(agent.end).trim()));
       return;
     }
+    // Mémoire de l'assistant : un projet, une décision, un objectif.
+    unawaited(
+      Assistant.instance.remember(q).then((m) {
+        if (m != null) notify?.call('Clicky s\'en souviendra', m);
+      }).catchError((Object _) {}),
+    );
     try {
       if (await _handleCommand(q)) return;
       if (await _handleSkill(q)) return;
@@ -1460,7 +1469,20 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         _set(ClickyState.idle, status: '', reply: r);
         _fadeSoon();
       case ClickyCommand.briefing:
-        await _askAi(briefingPrompt, shown: q, withScreen: false);
+        final a = Assistant.instance;
+        if (!a.briefingOn) {
+          await _askAi(briefingPrompt, shown: q, withScreen: false);
+          return true;
+        }
+        // Préparé par Mon Hub (rapide, sans Claude).
+        final tools = _tools;
+        a.useTools(
+          call: (name, args) async => tools.where((t) => t.name == name).firstOrNull?.run(args),
+          tools: () => {for (final t in tools) t.name},
+        );
+        _set(ClickyState.thinking, status: 'Je prépare ton briefing…', reply: '');
+        unawaited(ClickyChime.play());
+        await presentTopo('Briefing', await a.morningBriefing(name: callName), speakIt: voice);
       case ClickyCommand.today || ClickyCommand.week:
         final j = Journal.instance;
         await j.load();
@@ -2913,8 +2935,20 @@ class _ClickyLayerState extends State<ClickyLayer> {
       };
     if (widget.hub != null) {
       // Routines (briefing du matin…) : faites par Mon Hub, qui a les modules.
+      // L'assistant personnel : il prend les devants (avec ton accord).
+      Assistant.instance
+        ..notify = ((title, body) => c.notify?.call(title, body))
+        ..present = ((title, text) => c.presentTopo(title, text, speakIt: c.voice))
+        ..start(
+          call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
+          tools: () => {for (final t in c.hubTools) t.name},
+        );
       final r = Routines.instance
-        ..runner = c.runTask
+        // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
+        // autres routines par le cerveau de Clicky.
+        ..runner = ((task) => task == Routine.topoMorningPrompt && Assistant.instance.briefingOn
+            ? Assistant.instance.morningBriefing(name: c.callName)
+            : c.runTask(task))
         ..onDone = (routine, run) async {
           c.notify?.call(routine.name, run.text);
           if (routine.isTopo && run.ok) {
@@ -2972,6 +3006,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
     ClaudeApi.store.removeListener(_settingsChanged);
     if (widget.hub != null) {
       Routines.instance.stop();
+      Assistant.instance.stop();
       ClipboardVault.stop();
     }
     super.dispose();
