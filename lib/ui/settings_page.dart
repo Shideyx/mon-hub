@@ -11,6 +11,7 @@ import '../core/notifications.dart';
 import '../core/session.dart';
 import '../core/shortcuts.dart';
 import '../core/updater.dart';
+import '../core/vault.dart';
 import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
 import 'clicky/clicky.dart';
@@ -321,13 +322,35 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
             ],
+            section('Confidentialité et sécurité'),
+            const ListTile(
+              leading: Icon(Icons.lock_rounded),
+              title: Text('Tout reste sur cet appareil'),
+              subtitle: Text(
+                'Mon Hub n\'a aucun serveur : personne d\'autre que toi (ni le créateur de l\'appli) '
+                'ne voit tes comptes, messages, notes ou conversations. Mots de passe et jetons sont '
+                'dans le coffre du système (Gestionnaire d\'identification Windows, Trousseau, '
+                'Keystore Android) ; historiques, journal, carnet et routines sont chiffrés '
+                '(AES-256) avec une clé qui ne quitte pas l\'appareil.',
+              ),
+            ),
+            const ListTile(
+              leading: Icon(Icons.public_rounded),
+              title: Text('Ce qui part sur internet'),
+              subtitle: Text(
+                'Seulement vers le service concerné, directement depuis ton appareil : École Directe, '
+                'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Clicky va à '
+                'Claude (ton compte Anthropic) ; la voix neurale à Microsoft. Les mises à jour viennent '
+                'de GitHub, qui ne reçoit rien de toi.',
+              ),
+            ),
             section('Mes appareils'),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
                 'Configure tes comptes une fois (sur ton PC par exemple), exporte, puis '
-                'importe le fichier sur ton téléphone. ⚠️ Le fichier contient tes mots de passe '
-                'et jetons : garde-le pour toi et supprime-le après import.',
+                'importe le fichier sur ton téléphone. Le fichier est chiffré avec un mot de passe '
+                'que tu choisis : sans lui, il est illisible.',
               ),
             ),
             ListTile(
@@ -368,8 +391,72 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  /// Mot de passe de l'export (deux fois à la création).
+  static Future<String?> _password(BuildContext context, {required bool create}) async {
+    final a = TextEditingController();
+    final b = TextEditingController();
+    String? error;
+    return showDialog<String>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          icon: const Icon(Icons.lock_rounded),
+          title: Text(create ? 'Protéger l\'export' : 'Mot de passe de l\'export'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (create)
+                const Text(
+                  'Choisis un mot de passe : il sera demandé pour importer le fichier. '
+                  'Mon Hub ne peut pas le retrouver si tu l\'oublies.',
+                ),
+              TextField(
+                controller: a,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Mot de passe'),
+              ),
+              if (create)
+                TextField(
+                  controller: b,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Encore une fois'),
+                ),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(error!, style: const TextStyle(color: Colors.redAccent)),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: () {
+                if (create && a.text.length < 8) {
+                  return set(() => error = 'Au moins 8 caractères.');
+                }
+                if (create && a.text != b.text) {
+                  return set(() => error = 'Les deux mots de passe sont différents.');
+                }
+                Navigator.pop(c, a.text);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _export(BuildContext context) async {
-    final json = await _dump();
+    final pass = await _password(context, create: true);
+    if (pass == null || !context.mounted) return;
+    final json = const JsonEncoder.withIndent(' ').convert({
+      'app': 'mon-hub',
+      'version': 2,
+      'protege': await Vault.protect(await _dump(), pass),
+    });
     try {
       if (Platform.isAndroid || Platform.isIOS) {
         await Clipboard.setData(ClipboardData(text: json));
@@ -400,8 +487,15 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       );
       if (file == null) return;
-      final j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      var j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       if (j['app'] != 'mon-hub') throw 'Ce fichier n\'est pas une configuration Mon Hub';
+      if (j['protege'] is Map) {
+        if (!context.mounted) return;
+        final pass = await _password(context, create: false);
+        if (pass == null) return;
+        j = jsonDecode(await Vault.unprotect((j['protege'] as Map).cast<String, dynamic>(), pass))
+            as Map<String, dynamic>;
+      }
       final prefs = ModuleStore.prefs;
       for (final e in (j['prefs'] as Map<String, dynamic>).entries) {
         final v = e.value;

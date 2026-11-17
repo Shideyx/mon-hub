@@ -333,16 +333,134 @@ class SpotifyApi {
     ];
   }
 
-  /// Lance un titre (dans une playlist / un album si [context]).
-  Future<void> play({String? uri, String? context}) => _player(
+  /// Lance un titre (dans une playlist / un album si [context], ou dans
+  /// une liste de titres [uris]).
+  Future<void> play({String? uri, String? context, List<String>? uris}) => _player(
     'PUT',
-    '/me/player/play',
+    '/me/player/play${_device == null ? '' : '?device_id=$_device'}',
     body: {
       if (context != null && context.isNotEmpty) 'context_uri': context,
       if (context != null && uri != null && uri.isNotEmpty) 'offset': {'uri': uri},
-      if (context == null && uri != null) 'uris': [uri],
+      if (context == null && uris != null && uris.isNotEmpty) ...{
+        'uris': uris.take(100).toList(),
+        if (uri != null && uris.contains(uri)) 'offset': {'uri': uri},
+      } else if (context == null && uri != null)
+        'uris': [uri],
     },
   );
+
+  /// Appareil choisi dans Mon Hub (null : celui qui joue déjà).
+  String? _device;
+
+  /// Fait jouer la musique sur cet appareil (PC, téléphone, enceinte…).
+  Future<void> transfer(String deviceId, {bool play = true}) async {
+    await _req(
+      'PUT',
+      '/me/player',
+      body: {
+        'device_ids': [deviceId],
+        'play': play,
+      },
+    );
+    _device = deviceId;
+  }
+
+  /// Recherche dans tout Spotify : titres, artistes, albums, playlists.
+  Future<SpotifySearch> search(String query, {int limit = 10}) async {
+    final j = await _get(
+      '/search?q=${Uri.encodeQueryComponent(query)}&type=track,artist,album,playlist&limit=$limit',
+    );
+    List<Map> items(String k) =>
+        (((j[k] as Map?)?['items'] as List?) ?? const []).whereType<Map>().toList();
+    String names(Object? artists) =>
+        [for (final a in (artists as List?) ?? const []) if (a is Map) '${a['name']}'].join(', ');
+    return SpotifySearch(
+      tracks: [for (final t in items('tracks')) track(t)],
+      artists: [
+        for (final a in items('artists'))
+          SpotifyItem(
+            kind: 'artist',
+            id: '${a['id']}',
+            name: '${a['name'] ?? ''}',
+            sub: (a['genres'] as List?)?.take(2).join(', ') ?? '',
+            image: _img(a['images']),
+            uri: '${a['uri'] ?? ''}',
+          ),
+      ],
+      albums: [
+        for (final a in items('albums'))
+          SpotifyItem(
+            kind: 'album',
+            id: '${a['id']}',
+            name: '${a['name'] ?? ''}',
+            sub: [names(a['artists']), '${a['release_date'] ?? ''}'.split('-').first]
+                .where((x) => x.isNotEmpty)
+                .join(' · '),
+            image: _img(a['images']),
+            uri: '${a['uri'] ?? ''}',
+          ),
+      ],
+      playlists: [
+        for (final p in items('playlists'))
+          MusicPlaylist(
+            id: '${p['id']}',
+            name: '${p['name'] ?? ''}',
+            cover: _img(p['images']),
+            count: (((p['tracks'] ?? p['items']) as Map?)?['total'] as num?)?.toInt() ?? 0,
+            owner: '${(p['owner'] as Map?)?['display_name'] ?? ''}',
+            uri: '${p['uri'] ?? ''}',
+            link: (p['external_urls'] as Map?)?['spotify'] as String?,
+          ),
+      ],
+    );
+  }
+
+  /// Les titres les plus écoutés d'un artiste.
+  Future<List<MusicTrack>> artistTopTracks(String id) async {
+    final j = await _get('/artists/$id/top-tracks?market=from_token');
+    return [
+      for (final t in (j['tracks'] as List?) ?? const [])
+        if (t is Map) track(t),
+    ];
+  }
+
+  /// La file d'attente (ce qui va jouer ensuite).
+  Future<List<MusicTrack>> userQueue() async {
+    final j = await _get('/me/player/queue');
+    return [
+      for (final t in (j['queue'] as List?) ?? const [])
+        if (t is Map && t['type'] != 'episode') track(t),
+    ];
+  }
+
+  /// Ajoute un titre précis à la file.
+  Future<void> addToQueue(String uri) =>
+      _player('POST', '/me/player/queue?uri=${Uri.encodeQueryComponent(uri)}');
+
+  /// Joue l'album ou l'artiste trouvé par une recherche.
+  Future<String> searchPlayContext(String query, String type) async {
+    final hit = await searchFirst(query, type: type);
+    if (hit == null) return 'Rien trouvé sur Spotify pour « $query ».';
+    await _player('PUT', '/me/player/play', body: {'context_uri': hit.$1});
+    return type == 'artist' ? 'Je lance ${hit.$2}.' : 'Je lance l\'album ${hit.$2}.';
+  }
+
+  /// Fait jouer sur l'appareil dont le nom ressemble à [name].
+  Future<String> transferByName(String name) async {
+    final list = await devices();
+    final q = name.toLowerCase().trim();
+    final d =
+        list.where((d) => '${d['name']}'.toLowerCase() == q).firstOrNull ??
+        list.where((d) => '${d['name']}'.toLowerCase().contains(q)).firstOrNull ??
+        list.where((d) => '${d['type']}'.toLowerCase().contains(q)).firstOrNull;
+    if (d == null) {
+      return list.isEmpty
+          ? 'Aucun appareil Spotify ouvert.'
+          : 'Pas d\'appareil « $name ». Appareils : ${list.map((x) => x['name']).join(', ')}.';
+    }
+    await transfer('${d['id']}');
+    return 'La musique passe sur ${d['name']}.';
+  }
 
   /// Appareils Spotify (PC, téléphone, enceinte…).
   Future<List<Map<String, dynamic>>> devices() async {
@@ -454,6 +572,42 @@ class SpotifyApi {
 
   Future<void> setLiked(String trackId, bool like) =>
       _req(like ? 'PUT' : 'DELETE', '/me/tracks?ids=$trackId');
+}
+
+/// Résultats d'une recherche Spotify.
+class SpotifySearch {
+  const SpotifySearch({
+    this.tracks = const [],
+    this.artists = const [],
+    this.albums = const [],
+    this.playlists = const [],
+  });
+  final List<MusicTrack> tracks;
+  final List<SpotifyItem> artists;
+  final List<SpotifyItem> albums;
+  final List<MusicPlaylist> playlists;
+
+  bool get isEmpty => tracks.isEmpty && artists.isEmpty && albums.isEmpty && playlists.isEmpty;
+}
+
+/// Un artiste ou un album Spotify.
+class SpotifyItem {
+  const SpotifyItem({
+    required this.kind,
+    required this.id,
+    required this.name,
+    this.sub = '',
+    this.image,
+    this.uri = '',
+  });
+
+  /// 'artist' ou 'album'.
+  final String kind;
+  final String id;
+  final String name;
+  final String sub;
+  final String? image;
+  final String uri;
 }
 
 // ---------------------------------------------------------------------------
