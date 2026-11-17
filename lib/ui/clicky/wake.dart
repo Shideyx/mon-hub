@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/claude_bridge.dart';
 
-/// Mot d'activation (Windows) : dis « Jarvis » (ou « Clicky ») et il
+/// Mot d'activation (Windows) : dis « Clicky » et il
 /// t'écoute, sans toucher au clavier.
 ///
 /// La reconnaissance vocale de Windows ne cherche que ces quelques mots
@@ -24,14 +24,19 @@ class WakeWord {
 
   bool get running => _proc != null;
 
-  static List<String> phrasesFor(String word) {
-    final w = word.toLowerCase().trim().isEmpty ? 'jarvis' : word.toLowerCase().trim();
-    return [w, 'hey $w', 'ok $w', 'dis $w', 'hé $w', 'salut $w'];
-  }
+  /// Ce qui le réveille.
+  static const phrases = [
+    'clicky',
+    'hey clicky',
+    'ok clicky',
+    'dis clicky',
+    'hé clicky',
+    'salut clicky',
+  ];
 
-  Future<void> start(String word) async {
+  Future<void> start() async {
     if (!supported) return;
-    final words = phrasesFor(word);
+    const words = phrases;
     if (_proc != null && listEquals(words, _words)) {
       resume();
       return;
@@ -108,7 +113,7 @@ class WakeWord {
 
   @visibleForTesting
   static const script = r'''
-param([string]$Words = 'jarvis')
+param([string]$Words = 'clicky')
 $ErrorActionPreference = 'Stop'
 $out = New-Object System.IO.StreamWriter([Console]::OpenStandardOutput())
 $out.AutoFlush = $true

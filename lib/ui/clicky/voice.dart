@@ -12,7 +12,7 @@ class SystemVoice {
   final String name;
   final String locale;
 
-  /// Voix d'homme (pour Jarvis), d'après le nom.
+  /// Voix d'homme, d'après le nom.
   bool get male => RegExp(
     r'paul|claude|henri|remy|rémy|guy|david|mark|george|ryan|thomas|daniel|james|male',
     caseSensitive: false,
@@ -180,7 +180,7 @@ class ClickyVoice {
   void resetLive() => _fed = 0;
 }
 
-/// Petit son « bip-bip » de Jarvis (généré, aucun fichier).
+/// Petit son « bip-bip » de Clicky (généré, aucun fichier).
 class ClickyChime {
   ClickyChime._();
   static AudioPlayer? _p;
@@ -228,7 +228,7 @@ class ClickyChime {
     if (kIsWeb) return;
     try {
       final path = _path ??= () {
-        final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}monhub-jarvis.wav');
+        final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}monhub-clicky.wav');
         f.writeAsBytesSync(wav());
         return f.path;
       }();

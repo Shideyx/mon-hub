@@ -152,7 +152,7 @@ class ClaudeModule extends HubModule {
           ChatHistoryList(
             history: ChatHistory.clicky,
             color: color,
-            otherName: ClickyController.instance.jarvis ? 'Jarvis' : 'Clicky',
+            otherName: 'Clicky',
             onOpen: (t) => Navigator.push(
               context,
               MaterialPageRoute<void>(builder: (_) => _ClickyThreadPage(thread: t, color: color)),
@@ -267,7 +267,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(c.jarvis ? 'Jarvis, Claude et Clicky' : 'Claude et Clicky'),
+          title: const Text('Claude et Clicky'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -916,7 +916,7 @@ class _ClickyThreadPage extends StatelessWidget {
             ),
         ],
       ),
-      body: ChatThreadView(thread: thread, color: color, otherName: c.jarvis ? 'Jarvis' : 'Clicky'),
+      body: ChatThreadView(thread: thread, color: color, otherName: 'Clicky'),
     );
   }
 }

@@ -27,7 +27,7 @@ import 'documents.dart';
 import 'drive.dart';
 import 'ears.dart';
 import 'extensions.dart';
-import 'jarvis.dart';
+import 'hud.dart';
 import 'journal.dart';
 import 'marks.dart';
 import 'ocr.dart';
@@ -188,10 +188,9 @@ class ClickyController extends ChangeNotifier {
     'provider',
     'everywhere',
     'look',
-    'jarvisName',
+    'callName',
     'greet',
     'wake',
-    'wakeWord',
     'ttsVoice',
     'ttsRate',
     'ttsPitch',
@@ -308,20 +307,20 @@ class ClickyController extends ChangeNotifier {
   /// Windows : Clicky au-dessus de tout l'écran et de toutes les applis.
   bool get everywhere => _opt('everywhere', true);
 
-  /// Apparence : 'jarvis' (affichage tête haute, majordome) ou 'classic'.
-  String get look => _opt('look', 'jarvis');
-  bool get jarvis => look == 'jarvis';
+  /// Apparence : 'hud' (réacteur animé, fenêtres tête haute) ou 'classic'
+  /// (le petit curseur bleu d'origine).
+  String get look => _opt('look', 'hud');
+  bool get hud => look != 'classic';
 
-  /// Comment Jarvis t'appelle (vide : ton prénom de compte Mon Hub).
-  String get jarvisName {
-    final n = _opt('jarvisName', '').trim();
+  /// Comment Clicky t'appelle (vide : ton prénom de compte Mon Hub).
+  String get callName {
+    final n = _opt('callName', '').trim();
     if (n.isNotEmpty) return n;
     return (AppSession.instance.current?.name ?? '').split(' ').first;
   }
 
   bool get greet => _opt('greet', true);
   bool get wakeOn => _opt('wake', false);
-  String get wakeWord => _opt('wakeWord', 'jarvis');
   String get ttsVoice => _opt('ttsVoice', '');
   double get ttsRate => _opt('ttsRate', 1.0);
   double get ttsPitch => _opt('ttsPitch', 1.0);
@@ -393,9 +392,9 @@ class ClickyController extends ChangeNotifier {
     final here = desktopMode || !handledElsewhere;
     // Windows : prépare le micro à l'avance pour ne pas rater le début.
     if (r && enabled && mic && here) ears.warmUp();
-    // Mot d'activation (« Jarvis »).
+    // Mot d'activation (« Clicky »).
     if (r && enabled && mic && here && wakeOn && WakeWord.supported) {
-      unawaited(_wake.start(wakeWord));
+      unawaited(_wake.start());
     } else if (_wake.running) {
       unawaited(_wake.stop());
     }
@@ -410,9 +409,9 @@ class ClickyController extends ChangeNotifier {
     return r;
   }
 
-  /// Jarvis te salue au premier démarrage de la journée.
+  /// Clicky te salue au premier démarrage de la journée.
   Future<void> _greetOnce() async {
-    if (!jarvis || !greet || !voice || !_voicePlatform) return;
+    if (!greet || !voice || !_voicePlatform) return;
     try {
       final saved = await _stateFile.load();
       final today = DateTime.now().toIso8601String().substring(0, 10);
@@ -422,7 +421,7 @@ class ClickyController extends ChangeNotifier {
     await Future<void>.delayed(const Duration(seconds: 2));
     if (state != ClickyState.idle) return;
     unawaited(ClickyChime.play());
-    await speak(jarvisGreeting(jarvisName, DateTime.now()));
+    await speak(clickyGreeting(callName, DateTime.now()));
   }
 
   final _stateFile = JsonFile<Map<String, dynamic>>(
@@ -462,8 +461,7 @@ class ClickyController extends ChangeNotifier {
     voiceOut
       ..voiceName = ttsVoice
       ..rate = ttsRate
-      ..pitch = ttsPitch * (jarvis && ttsPitch == 1 ? 0.92 : 1)
-      ..preferMale = jarvis
+      ..pitch = ttsPitch
       ..language = lang ?? voiceOut.language;
   }
 
@@ -473,7 +471,7 @@ class ClickyController extends ChangeNotifier {
 
   Timer? _autoSend;
 
-  /// « Jarvis ! » entendu : il écoute ta question.
+  /// « Clicky ! » entendu : il écoute ta question.
   void _onWake() {
     if (!active || state != ClickyState.idle) {
       _wake.resume();
@@ -1032,14 +1030,13 @@ class ClickyController extends ChangeNotifier {
       for (var i = 0; i < shots.length; i++)
         'Image ${i + 1} = écran ${i + 1} (${shots[i].label}, ${shots[i].width} × ${shots[i].height} pixels)',
     ].join(' ; ');
-    final name = jarvis ? 'Jarvis' : 'Clicky';
     final base =
         '''
-Tu es $name, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
+Tu es Clicky, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
-${jarvis ? jarvisPersona(jarvisName) : ''}''';
+${clickyPersona(callName)}''';
     if (agent) {
       return '''$base
 
@@ -1050,7 +1047,7 @@ Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au b
     return '''$base
 
 Ta réponse est lue à voix haute :
-- ${multilang ? 'réponds dans la langue de la question (français par défaut)' : 'réponds en français'}, comme à l'oral, ${jarvis ? 'posé et précis' : 'chaleureux et clair'}, en 1 à 4 phrases courtes ;
+- ${multilang ? 'réponds dans la langue de la question (français par défaut)' : 'réponds en français'}, comme à l'oral, clair et précis, en 1 à 4 phrases courtes ;
 - pas de markdown, pas de listes à puces, pas d'émojis ;
 - si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève : tu es un prof patient qui aide à comprendre (comparaisons de la vie de tous les jours, exemples concrets), et tu vérifies que c'est compris ;
 - « où est… ? » : montre-le et explique en une phrase à quoi il sert.
@@ -1087,7 +1084,7 @@ Blocs possibles (2 à 5 par tableau, textes très courts, adaptés à un·e él�
 Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une phrase (« regarde le schéma »). Pas de tableau pour une simple question pratique.''';
 
   static final _agentRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|jarvis)[\s,]+)?agent\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?agent\b[\s,:]*',
     caseSensitive: false,
   );
 
@@ -1280,7 +1277,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final id = ++_askId;
     _lastQuestion = shown ?? q;
     steps = const [];
-    _set(ClickyState.thinking, status: jarvis ? 'Analyse en cours…' : 'Je regarde…', reply: '');
+    _set(ClickyState.thinking, status: 'Je regarde…', reply: '');
     final useOllama = provider == 'ollama';
     final usePro = provider == 'claudecode';
     if (usePro ? await ClaudeCode.find() == null : (!useOllama && !await ClaudeApi.hasKey())) {
@@ -1643,14 +1640,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       return;
     }
     agentsRunning++;
-    _set(
-      ClickyState.idle,
-      status: '',
-      reply: jarvis
-          ? 'Bien. Je m\'en occupe en arrière-plan.'
-          : 'C\'est parti, je m\'en occupe en arrière-plan.',
-    );
-    unawaited(speak(jarvis ? 'Je m\'en occupe.' : 'C\'est parti, je m\'en occupe.'));
+    _set(ClickyState.idle, status: '', reply: 'C\'est parti, je m\'en occupe en arrière-plan.');
+    unawaited(speak('C\'est parti, je m\'en occupe.'));
     _fadeSoon();
     try {
       final text = await runTask(task);
@@ -1658,7 +1649,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       _set(state, reply: 'Agent : $text');
       unawaited(history.add(threadId, ChatMsg(mine: true, text: 'Agent, $task'), app: _appKey));
       unawaited(history.add(threadId, ChatMsg(mine: false, text: text), app: _appKey));
-      notify?.call('${jarvis ? 'Jarvis' : 'Clicky'} : tâche terminée', text);
+      notify?.call('Clicky : tâche terminée', text);
       if (state == ClickyState.idle) await speak('Ton agent a fini. $text');
     } catch (e) {
       agentsRunning--;
@@ -1678,7 +1669,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.auto_awesome_rounded),
-          title: Text('${jarvis ? 'Jarvis' : 'Clicky'} veut agir'),
+          title: const Text('Clicky veut agir'),
           content: SingleChildScrollView(
             child: Text(
               '${tool.description}\n\n'
@@ -1858,7 +1849,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
             child: ClickyMarksView(
               key: ValueKey(c.marksId),
               marks: c.marks,
-              color: c.jarvis ? jarvisCyan : clickyBlue,
+              color: c.hud ? hudCyan : clickyBlue,
               hold: Duration(seconds: c.slow ? 7 : 4),
               onDone: c.clearMarks,
             ),
@@ -1932,25 +1923,25 @@ class _PointerWithLabel extends StatelessWidget {
       _Pointer(c: c),
       if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
         Container(
-          margin: EdgeInsets.only(left: 4, top: c.jarvis ? 22 : 14),
+          margin: EdgeInsets.only(left: 4, top: c.hud ? 22 : 14),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: c.jarvis ? jarvisGlass : clickyBlue,
-            borderRadius: BorderRadius.circular(c.jarvis ? 4 : 12),
-            border: c.jarvis ? Border.all(color: jarvisCyan) : null,
+            color: c.hud ? hudGlass : clickyBlue,
+            borderRadius: BorderRadius.circular(c.hud ? 4 : 12),
+            border: c.hud ? Border.all(color: hudCyan) : null,
             boxShadow: [
               BoxShadow(
                 blurRadius: 8,
-                color: c.jarvis ? jarvisCyan.withValues(alpha: 0.4) : const Color(0x33000000),
+                color: c.hud ? hudCyan.withValues(alpha: 0.4) : const Color(0x33000000),
               ),
             ],
           ),
           child: Text(
-            c.jarvis ? c.targetLabel.toUpperCase() : c.targetLabel,
+            c.hud ? c.targetLabel.toUpperCase() : c.targetLabel,
             style: TextStyle(
-              color: c.jarvis ? jarvisCyan : Colors.white,
+              color: c.hud ? hudCyan : Colors.white,
               fontWeight: FontWeight.w600,
-              letterSpacing: c.jarvis ? 1.2 : null,
+              letterSpacing: c.hud ? 1.2 : null,
             ),
           ),
         ),
@@ -2033,7 +2024,7 @@ class ClickyFollower extends StatelessWidget {
               child: ClickyMarksView(
                 key: ValueKey(c.marksId),
                 marks: marks,
-                color: c.jarvis ? jarvisCyan : clickyBlue,
+                color: c.hud ? hudCyan : clickyBlue,
                 hold: Duration(seconds: c.slow ? 7 : 4),
                 onDone: c.clearMarks,
               ),
@@ -2150,13 +2141,13 @@ class _Pointer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final thinking = c.state == ClickyState.thinking;
-    if (c.jarvis) {
+    if (c.hud) {
       final mode = switch (c.state) {
-        ClickyState.listening => JarvisMode.listening,
-        ClickyState.thinking => JarvisMode.thinking,
-        ClickyState.speaking => JarvisMode.speaking,
-        ClickyState.pointing => JarvisMode.pointing,
-        _ => JarvisMode.idle,
+        ClickyState.listening => HudMode.listening,
+        ClickyState.thinking => HudMode.thinking,
+        ClickyState.speaking => HudMode.speaking,
+        ClickyState.pointing => HudMode.pointing,
+        _ => HudMode.idle,
       };
       return Stack(
         clipBehavior: Clip.none,
@@ -2164,10 +2155,10 @@ class _Pointer extends StatelessWidget {
           // Le bout du réacteur reste au même endroit que la pointe du curseur.
           Transform.translate(
             offset: Offset(
-              mode == JarvisMode.pointing ? -27 : -4,
-              mode == JarvisMode.pointing ? -27 : -4,
+              mode == HudMode.pointing ? -27 : -4,
+              mode == HudMode.pointing ? -27 : -4,
             ),
-            child: JarvisReactor(mode: mode, levels: c.levels, size: 34),
+            child: HudReactor(mode: mode, levels: c.levels, size: 34),
           ),
           if (c.agentsRunning > 0)
             Positioned(
@@ -2175,10 +2166,7 @@ class _Pointer extends StatelessWidget {
               top: 22,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: jarvisAmber,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: hudAmber, borderRadius: BorderRadius.circular(8)),
                 child: Text(
                   '${c.agentsRunning}',
                   style: const TextStyle(color: Colors.black, fontSize: 10),
@@ -2303,10 +2291,8 @@ class _Fab extends StatelessWidget {
         onLongPressStart: (_) => c.startListening(),
         onLongPressEnd: (_) => c.stopListening(),
         child: Material(
-          color: listening ? Colors.redAccent : (c.jarvis ? jarvisGlass : clickyBlue),
-          shape: CircleBorder(
-            side: c.jarvis ? const BorderSide(color: jarvisCyan) : BorderSide.none,
-          ),
+          color: listening ? Colors.redAccent : (c.hud ? hudGlass : clickyBlue),
+          shape: CircleBorder(side: c.hud ? const BorderSide(color: hudCyan) : BorderSide.none),
           elevation: 4,
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -2316,7 +2302,7 @@ class _Fab extends StatelessWidget {
               height: 44,
               child: Icon(
                 listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                color: c.jarvis && !listening ? jarvisCyan : Colors.white,
+                color: c.hud && !listening ? hudCyan : Colors.white,
                 size: 22,
               ),
             ),
@@ -2341,30 +2327,27 @@ class ClickyBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = Theme.of(context);
-    if (!c.jarvis) return _content(context, base);
+    if (!c.hud) return _content(context, base);
     return Theme(
-      data: jarvisTheme(base),
-      child: Builder(
-        builder: (context) => JarvisFrame(child: _content(context, Theme.of(context))),
-      ),
+      data: hudTheme(base),
+      child: Builder(builder: (context) => HudFrame(child: _content(context, Theme.of(context)))),
     );
   }
 
   Widget _content(BuildContext context, ThemeData theme) {
     final scheme = theme.colorScheme;
     final text = theme.textTheme;
-    final jarvis = c.jarvis;
-    final accent = jarvis ? jarvisCyan : clickyBlue;
+    final hud = c.hud;
+    final accent = hud ? hudCyan : clickyBlue;
     final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
     final problem = c.micProblem;
-    final name = jarvis ? 'JARVIS' : 'Clicky';
+    final name = hud ? 'CLICKY' : 'Clicky';
     final title = switch (c.state) {
       _ when problem != null => 'Souci de micro',
       _ when c.showHistory => 'Historique',
-      ClickyState.listening => jarvis ? 'À votre écoute…' : 'Je t\'écoute…',
-      ClickyState.thinking =>
-        c.reply.isEmpty ? (jarvis ? 'Analyse en cours…' : 'Je réfléchis…') : name,
+      ClickyState.listening => 'Je t\'écoute…',
+      ClickyState.thinking => c.reply.isEmpty ? 'Je réfléchis…' : name,
       _ => name,
     };
     final body = Column(
@@ -2373,7 +2356,7 @@ class ClickyBox extends StatelessWidget {
       children: [
         // Barre du haut : état, historique, outils, voix, fermer.
         Container(
-          color: accent.withValues(alpha: jarvis ? 0.10 : 0.12),
+          color: accent.withValues(alpha: hud ? 0.10 : 0.12),
           padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
           child: Row(
             children: [
@@ -2401,9 +2384,9 @@ class ClickyBox extends StatelessWidget {
                       ? '$title · ${c.agentsRunning} agent${c.agentsRunning > 1 ? 's' : ''} au travail'
                       : title,
                   style: text.labelLarge?.copyWith(
-                    letterSpacing: jarvis ? 1.6 : null,
-                    color: jarvis ? jarvisCyan : null,
-                    fontWeight: jarvis ? FontWeight.w700 : null,
+                    letterSpacing: hud ? 1.6 : null,
+                    color: hud ? hudCyan : null,
+                    fontWeight: hud ? FontWeight.w700 : null,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -2460,7 +2443,7 @@ class ClickyBox extends StatelessWidget {
                 children: [
                   // Ce que tu dis, écrit en direct.
                   if (listening) ...[
-                    if (!jarvis) _Wave(levels: c.levels) else _JarvisWave(levels: c.levels),
+                    if (!hud) _Wave(levels: c.levels) else _HudWave(levels: c.levels),
                     const SizedBox(height: 8),
                     AnimatedSize(
                       duration: const Duration(milliseconds: 120),
@@ -2500,7 +2483,7 @@ class ClickyBox extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         c.status,
-                        style: text.bodySmall?.copyWith(color: jarvis ? jarvisCyan : null),
+                        style: text.bodySmall?.copyWith(color: hud ? hudCyan : null),
                       ),
                     ),
                   // La réponse, écrite au fur et à mesure.
@@ -2587,7 +2570,7 @@ class ClickyBox extends StatelessWidget {
                     color: accent,
                     onTap: () => c.ask(ClickyController.visualPrompt),
                   ),
-                if (jarvis)
+                if (hud)
                   _QuickChip(
                     icon: Icons.dashboard_rounded,
                     label: 'Briefing',
@@ -2637,7 +2620,7 @@ class ClickyBox extends StatelessWidget {
                     textInputAction: TextInputAction.send,
                     onSubmitted: c.ask,
                     decoration: InputDecoration(
-                      hintText: jarvis ? 'À votre service…' : 'Demande-moi quelque chose…',
+                      hintText: 'Demande-moi quelque chose…',
                       isDense: true,
                       border: const OutlineInputBorder(),
                     ),
@@ -2681,7 +2664,7 @@ class ClickyBox extends StatelessWidget {
       ),
       child: body,
     );
-    if (jarvis) return Material(type: MaterialType.transparency, child: box);
+    if (hud) return Material(type: MaterialType.transparency, child: box);
     return Material(
       elevation: 4,
       shadowColor: Colors.black26,
@@ -2832,9 +2815,9 @@ class _HistoryPeek extends StatelessWidget {
   }
 }
 
-/// Onde de Jarvis (barres fines, cyan).
-class _JarvisWave extends StatelessWidget {
-  const _JarvisWave({required this.levels});
+/// Onde du look tête haute (barres fines, cyan).
+class _HudWave extends StatelessWidget {
+  const _HudWave({required this.levels});
   final List<double> levels;
 
   @override
@@ -2850,9 +2833,9 @@ class _JarvisWave extends StatelessWidget {
             width: 2.5,
             height: 3.0 + 22 * l,
             decoration: BoxDecoration(
-              color: jarvisCyan,
+              color: hudCyan,
               borderRadius: BorderRadius.circular(2),
-              boxShadow: [BoxShadow(color: jarvisCyan.withValues(alpha: 0.6), blurRadius: 4)],
+              boxShadow: [BoxShadow(color: hudCyan.withValues(alpha: 0.6), blurRadius: 4)],
             ),
           ),
       ],
