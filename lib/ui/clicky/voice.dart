@@ -49,6 +49,21 @@ class ClickyVoice {
 
   FlutterTts get _engine => _tts ??= FlutterTts();
 
+  /// La voix de Windows est en train de parler.
+  ///
+  /// IMPORTANT : sous Windows, `FlutterTts.stop()` fait **planter tout le
+  /// programme** s'il n'est pas en train de parler (le module répond à une
+  /// demande qui n'existe pas). On ne l'appelle donc que dans ce cas.
+  bool _ttsSpeaking = false;
+
+  Future<void> _stopTts() async {
+    if (!_ttsSpeaking) return;
+    _ttsSpeaking = false;
+    try {
+      await _tts?.stop();
+    } catch (_) {}
+  }
+
   static List<SystemVoice>? _voices;
 
   /// Voix installées sur l'appareil.
@@ -212,9 +227,7 @@ class ClickyVoice {
     await f.writeAsBytes(bytes, flush: true);
     if (gen != _generation) return;
     // Jamais par-dessus la voix de Windows.
-    try {
-      await _tts?.stop();
-    } catch (_) {}
+    await _stopTts();
     var finished = false;
     final sub = p.onPlayerComplete.listen((_) => finished = true);
     final started = DateTime.now();
@@ -290,9 +303,13 @@ class ClickyVoice {
           await _player?.stop();
         } catch (_) {}
         if (gen != _generation) break;
+        _ttsSpeaking = true;
         try {
           await _engine.speak(s);
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+          _ttsSpeaking = false;
+        }
       }
     } catch (_) {
     } finally {
@@ -329,8 +346,8 @@ class ClickyVoice {
     final d = _drained;
     _drained = null;
     d?.complete();
+    unawaited(_stopTts());
     try {
-      unawaited(_tts?.stop());
       unawaited(_player?.stop());
     } catch (_) {}
   }
