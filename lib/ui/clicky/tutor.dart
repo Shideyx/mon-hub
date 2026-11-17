@@ -39,6 +39,9 @@ enum ClickyCommand {
 
   /// « montre-moi l'historique ».
   history,
+
+  /// « protocole travail ».
+  protocol,
 }
 
 /// Minuscules, sans accents ni ponctuation, espaces simples.
@@ -140,6 +143,8 @@ String normalize(String s) {
     r'^(?:change(?:r)? (?:de |la )?voix|prends la voix|utilise la voix)(?: (?:pour|de|a))? ?(.*)$',
   ).firstMatch(n);
   if (v != null) return (ClickyCommand.changeVoice, v.group(1)!.trim());
+  final proto = RegExp(r'^(?:lance |active |demarre )?(?:le )?protocole (.+)$').firstMatch(n);
+  if (proto != null) return (ClickyCommand.protocol, proto.group(1)!.trim());
   if (RegExp(r'^(montre|ouvre|affiche) (moi )?(l )?historique').hasMatch(n)) {
     return (ClickyCommand.history, '');
   }

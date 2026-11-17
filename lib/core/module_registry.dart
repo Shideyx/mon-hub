@@ -1,4 +1,5 @@
 import '../modules/books/books_module.dart';
+import '../modules/carnet/carnet_module.dart';
 import '../modules/claude/claude_module.dart';
 import '../modules/discord/discord_module.dart';
 import '../modules/ecoledirecte/ecoledirecte_module.dart';
@@ -20,6 +21,7 @@ List<HubModule> buildModules() {
   return [
     ScheduleModule(ecole: ecole),
     ClaudeModule(),
+    CarnetModule(),
     ecole,
     MailModule(),
     DiscordModule(),

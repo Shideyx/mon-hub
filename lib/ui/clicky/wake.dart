@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/claude_bridge.dart';
+import '../../core/powershell.dart';
 
 /// Mot d'activation (Windows) : dis « Clicky » et il
 /// t'écoute, sans toucher au clavier.
@@ -44,20 +44,8 @@ class WakeWord {
     await stop();
     _words = words;
     try {
-      final base = ClaudeBridge.folder ?? Directory.systemTemp.path;
-      final f = File('$base${Platform.pathSeparator}clicky-reveil.ps1');
-      await f.parent.create(recursive: true);
-      if (!await f.exists() || await f.readAsString() != script) await f.writeAsString(script);
-      final p = await Process.start('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        f.path,
-        '-Words',
-        words.join('|'),
-      ], mode: ProcessStartMode.detachedWithStdio);
+      // Sans fichier .ps1 : marche même si Windows bloque les scripts.
+      final p = await PowerShell.start(script, {'Words': words.join('|')});
       _proc = p;
       _paused = false;
       p.stdout

@@ -8,6 +8,7 @@ import 'capture.dart';
 import 'clicky.dart';
 import 'extensions.dart';
 import 'journal.dart';
+import 'tutorial.dart';
 import 'voice.dart';
 import 'wake.dart';
 import 'win.dart';
@@ -76,6 +77,20 @@ class ClickyMoreSettings extends StatelessWidget {
             onSave: (v) => c.setOption('callName', v),
           ),
           sw('greet', c.greet, 'Me saluer au premier démarrage de la journée'),
+          sw(
+            'alive',
+            c.alive,
+            'Clicky vivant',
+            'Il flotte et bouge tout seul autour de ta souris, fait des petites boucles.',
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.slideshow_rounded),
+              label: const Text('Revoir la visite guidée'),
+              onPressed: () => ClickyTutorial.show(context),
+            ),
+          ),
 
           head('Voix', Icons.record_voice_over_rounded),
           const _VoicePicker(),

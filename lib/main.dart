@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import 'core/claude_bridge.dart';
+import 'modules/claude/claude_module.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
 import 'core/module_store.dart';
@@ -14,6 +15,7 @@ import 'core/updater.dart';
 import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
+import 'ui/clicky/tutorial.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
 import 'ui/update_screen.dart';
@@ -102,6 +104,8 @@ class _HubAppState extends State<HubApp> {
         _openFor = login;
         // Laisse l'appli Claude (PC) lire et agir dans Mon Hub.
         unawaited(b.start().then((_) => _startClicky()));
+        // Première ouverture du compte : la visite guidée de Clicky.
+        unawaited(_tutorial());
         unawaited(n.start());
         // Quand Claude Code (Clicky) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
@@ -116,6 +120,16 @@ class _HubAppState extends State<HubApp> {
       }
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _tutorial() async {
+    if (ClickyTutorial.seen || widget.controller != null) return;
+    final ctx = await hubDialogContext(timeout: const Duration(seconds: 20));
+    if (ctx == null || !ctx.mounted || ClickyTutorial.seen) return;
+    await ClickyTutorial.show(ctx, onBrain: () {
+      final c = hubNavigatorKey.currentContext;
+      if (c != null) ClaudeModule.showSettings(c);
+    });
   }
 
   /// Windows : Clicky au-dessus de tout l'écran (petit programme à part).

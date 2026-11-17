@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'holo.dart';
+
 /// Annotations que Clicky dessine sur l'écran pendant qu'il explique, comme
 /// un prof au tableau :
 ///
@@ -145,7 +147,7 @@ List<String> splitSteps(String raw) {
 
 /// Retire toutes les balises de Clicky (même à moitié écrites) du texte
 /// affiché ou lu à voix haute pendant qu'il s'écrit.
-String stripClickyTags(String t) => t
+String stripClickyTags(String t) => HoloScene.strip(t)
     .replaceAll(RegExp(r'\[POINT:\s*[^\]]*\]', caseSensitive: false), '')
     .replaceAll(ClickyMark.tagRe, '')
     .replaceAll(RegExp(r'\[ACTIONS\][\s\S]*?(\[/ACTIONS\]|$)', caseSensitive: false), '')

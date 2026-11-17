@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -72,7 +73,9 @@ class MusicModule extends HubModule {
     ),
     HubTool(
       name: 'musique_commande',
-      description: 'Contrôle la musique : lecture, pause, suivant ou precedent.',
+      description:
+          'Contrôle la musique (Spotify, Deezer ou n\'importe quel lecteur du PC) : '
+          'action = lecture, pause, suivant ou precedent.',
       params: {'action': ('string', 'lecture, pause, suivant ou precedent')},
       required: ['action'],
       run: (a) async {
@@ -85,6 +88,52 @@ class MusicModule extends HubModule {
             await player.toggle();
         }
         return {'ok': true};
+      },
+    ),
+    HubTool(
+      name: 'spotify',
+      description:
+          'Spotify (compte connecté) : action=chercher_jouer + requete (un morceau, un artiste), '
+          'action=playlist + requete (une de MES playlists, quand je dis « playlist »), '
+          'action=file + requete (ajouter à la file sans couper), action=volume + volume (0-100), '
+          'action=aleatoire + actif (true/false), action=appareils (où Spotify peut jouer).',
+      params: {
+        'action': ('string', 'chercher_jouer, playlist, file, volume, aleatoire ou appareils'),
+        'requete': ('string', 'morceau, artiste ou nom de playlist'),
+        'volume': ('integer', 'volume de 0 à 100'),
+        'actif': ('boolean', 'lecture aléatoire activée'),
+      },
+      required: ['action'],
+      run: (a) async {
+        if (!spotify.connected) {
+          return 'Spotify n\'est pas connecté : module Musique → réglages.';
+        }
+        final q = '${a['requete'] ?? ''}'.trim();
+        final String r = switch ('${a['action']}'.toLowerCase()) {
+          'chercher_jouer' || 'jouer' => q.isEmpty ? 'Quel morceau ?' : await spotify.searchPlay(q),
+          'playlist' => q.isEmpty ? 'Quelle playlist ?' : await spotify.playPlaylist(q),
+          'file' => q.isEmpty ? 'Quel morceau ?' : await spotify.queue(q),
+          'volume' => await () async {
+            final v = (a['volume'] as num?)?.toInt() ?? 50;
+            await spotify.volume(v);
+            return 'Volume à $v %.';
+          }(),
+          'aleatoire' => await () async {
+            final on = a['actif'] != false;
+            await spotify.shuffle(on);
+            return on ? 'Lecture aléatoire activée.' : 'Lecture aléatoire désactivée.';
+          }(),
+          'appareils' => await () async {
+            final d = await spotify.devices();
+            if (d.isEmpty) return 'Aucun appareil Spotify ouvert.';
+            return d
+                .map((x) => '${x['name']}${x['is_active'] == true ? ' (actif)' : ''}')
+                .join(', ');
+          }(),
+          _ => 'Action inconnue',
+        };
+        unawaited(Future<void>.delayed(const Duration(seconds: 1), player.refresh));
+        return r;
       },
     ),
   ];
@@ -268,7 +317,21 @@ class MusicPlayer extends ChangeNotifier {
     }
   }
 
-  bool get _useWindows => _session != null && _win != null;
+  bool get _useWindows => _session != null && (_win != null || _session!.fallback);
+
+  /// État de la lecture « en écoute » sur Windows (pour les réglages).
+  String get diagnostic {
+    final se = _session;
+    if (se == null) return 'Lecture du PC indisponible ici (seulement sur Windows).';
+    if (se.fallback) {
+      return 'Mode de secours : Mon Hub lit le titre de la fenêtre Spotify et utilise les touches '
+          'multimédia${se.error == null ? '' : ' (Windows a répondu : ${se.error})'}.';
+    }
+    if (se.error != null) return 'Windows a répondu : ${se.error}';
+    return _win == null
+        ? 'Prêt : lance un morceau dans Spotify, Deezer ou ton navigateur.'
+        : 'OK : ${_win!.appName} joue « ${_win!.title} ».';
+  }
 
   Future<void> toggle() async {
     if (_useWindows) return _session!.toggle();
@@ -1264,27 +1327,57 @@ class _MusicSettingsState extends State<_MusicSettings> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (WindowsMediaSession.supported)
-                const Card(
+                Card(
                   child: ListTile(
-                    leading: Icon(Icons.check_circle_rounded, color: Colors.green),
-                    title: Text('« En écoute » marche déjà'),
-                    subtitle: Text(
-                      'Mon Hub lit ce que joue l\'appli Spotify, Deezer ou ton navigateur sur ce PC, '
-                      'sans connexion. Connecte-toi seulement pour tes titres likés et tes playlists.',
-                    ),
+                    leading: const Icon(Icons.graphic_eq_rounded),
+                    title: const Text('« En écoute » sur ce PC (sans connexion)'),
+                    subtitle: Text(m.player.diagnostic),
                   ),
                 ),
               const SizedBox(height: 8),
               Text('Spotify', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              Text(
-                m.spotify.connected
-                    ? 'Connecté ✔ (titres likés, playlists, écoutes récentes, j\'aime, commandes).'
-                    : '1. Va sur developer.spotify.com/dashboard et crée une appli (gratuit) : '
-                          'nom « Mon Hub », Redirect URI ${SpotifyApi.redirect}, coche « Web API ».\n'
-                          '2. Dans « User Management », ajoute l\'e-mail de ton compte Spotify.\n'
-                          '3. Copie le « Client ID » ici, puis « Se connecter ».',
-              ),
+              if (m.spotify.connected)
+                const Text(
+                  'Connecté ✔ (titres likés, playlists, écoutes récentes, j\'aime, commandes vocales).',
+                )
+              else ...[
+                const Text(
+                  'Spotify oblige chaque appli à avoir son « Client ID » (gratuit, 2 minutes) :',
+                ),
+                const SizedBox(height: 6),
+                _Step(
+                  n: 1,
+                  text: 'Ouvre le tableau de bord Spotify et clique « Create app ».',
+                  action: (
+                    'Ouvrir',
+                    () => openLink(context, 'https://developer.spotify.com/dashboard'),
+                  ),
+                ),
+                _Step(
+                  n: 2,
+                  text:
+                      'Nom : Mon Hub. Redirect URI : ${SpotifyApi.redirect} (copie-la), coche « Web API », Save.',
+                  action: (
+                    'Copier',
+                    () async {
+                      await Clipboard.setData(const ClipboardData(text: SpotifyApi.redirect));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(content: Text('Adresse copiée')));
+                      }
+                    },
+                  ),
+                ),
+                const _Step(
+                  n: 3,
+                  text: 'Onglet « User Management » : ajoute ton nom et l\'e-mail de ton compte Spotify.',
+                ),
+                const _Step(
+                  n: 4,
+                  text: 'Onglet « Basic Information » : copie le « Client ID », colle-le ci-dessous, puis « Se connecter ».',
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: clientId,
@@ -1352,4 +1445,26 @@ class _MusicSettingsState extends State<_MusicSettings> {
       ],
     );
   }
+}
+
+/// Une étape numérotée de l'assistant Spotify.
+class _Step extends StatelessWidget {
+  const _Step({required this.n, required this.text, this.action});
+  final int n;
+  final String text;
+  final (String, VoidCallback)? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(radius: 11, child: Text('$n', style: const TextStyle(fontSize: 12))),
+        const SizedBox(width: 10),
+        Expanded(child: SelectableText(text)),
+        if (action != null) TextButton(onPressed: action!.$2, child: Text(action!.$1)),
+      ],
+    ),
+  );
 }

@@ -331,4 +331,55 @@ class Win {
       ..mouseData = (notches * 120) & 0xFFFFFFFF;
     SendInput(1, input, sizeOf<INPUT>());
   });
+
+  // ---------- Applis ouvertes (repli musique) ----------
+
+  static String _exeOf(HWND h) => using((a) {
+    final pidPtr = a<Uint32>();
+    GetWindowThreadProcessId(h, pidPtr);
+    final proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pidPtr.value).value;
+    if (proc.address == 0) return '';
+    try {
+      final buf = wsalloc(1024, a);
+      final size = a<Uint32>()..value = 1024;
+      if (!QueryFullProcessImageName(proc, PROCESS_NAME_WIN32, buf, size).value) return '';
+      return buf.toDartString().split(RegExp(r'[\\/]')).last;
+    } finally {
+      CloseHandle(proc);
+    }
+  });
+
+  /// Titres des fenêtres visibles d'un programme (ex. « Spotify.exe »).
+  static List<String> titlesOf(String exeName) {
+    final out = <String>[];
+    final want = exeName.toLowerCase();
+    int callback(Pointer h, int _) {
+      final hwnd = HWND(h);
+      if (IsWindowVisible(hwnd)) {
+        final t = _title(hwnd);
+        if (t.trim().isNotEmpty && _exeOf(hwnd).toLowerCase() == want) out.add(t);
+      }
+      return 1;
+    }
+
+    final cb = NativeCallable<WNDENUMPROC>.isolateLocal(callback, exceptionalReturn: 0);
+    try {
+      EnumWindows(cb.nativeFunction, const LPARAM(0));
+    } catch (_) {
+    } finally {
+      cb.close();
+    }
+    return out;
+  }
+
+  /// Touches multimédia du clavier : marchent avec n'importe quel lecteur.
+  static void mediaKey(String key) {
+    final vk = switch (key) {
+      'next' => VK_MEDIA_NEXT_TRACK,
+      'prev' => VK_MEDIA_PREV_TRACK,
+      'stop' => VK_MEDIA_STOP,
+      _ => VK_MEDIA_PLAY_PAUSE,
+    };
+    _keys([(vk, false), (vk, true)]);
+  }
 }
