@@ -26,6 +26,27 @@ class _MicTestDialogState extends State<MicTestDialog> {
   double level = 0;
   EarsProblem? problem;
   bool done = false;
+  bool repairing = false;
+  List<String> repairSteps = const [];
+
+  /// « Clicky répare » : relance le micro de toutes les façons possibles.
+  Future<void> _repair() async {
+    setState(() {
+      repairing = true;
+      repairSteps = const [];
+    });
+    final r = await ears.repair();
+    ClickyController.instance.lastRepair = r;
+    if (!mounted) return;
+    setState(() {
+      repairing = false;
+      repairSteps = r.steps;
+      problem = r.problem;
+      done = false;
+      heard = '';
+    });
+    if (r.ok) await _start();
+  }
 
   @override
   void dispose() {
@@ -142,16 +163,37 @@ class _MicTestDialogState extends State<MicTestDialog> {
               const SizedBox(height: 10),
               Text(p.message, style: text.bodyMedium?.copyWith(color: Colors.redAccent)),
               if (p.code.isNotEmpty) Text('Code : ${p.code}', style: text.bodySmall),
-              if (p.fixUri != null)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.settings_rounded, size: 16),
-                    label: Text(p.fixLabel ?? 'Ouvrir les réglages'),
-                    onPressed: () => launchUrl(Uri.parse(p.fixUri!)),
+              Wrap(
+                spacing: 6,
+                children: [
+                  TextButton.icon(
+                    icon: repairing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_fix_high_rounded, size: 16),
+                    label: Text(repairing ? 'Clicky répare…' : 'Clicky répare'),
+                    onPressed: repairing || starting ? null : _repair,
                   ),
-                ),
+                  if (p.fixUri != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.settings_rounded, size: 16),
+                      label: Text(p.fixLabel ?? 'Ouvrir les réglages'),
+                      onPressed: () => launchUrl(Uri.parse(p.fixUri!)),
+                    ),
+                ],
+              ),
             ],
+            if (repairSteps.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  repairSteps.map((s) => '• $s').join('\n'),
+                  style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
             if (ears.language != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -178,7 +220,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
                   )
                 : const Icon(Icons.mic_rounded),
             label: Text(done || p != null ? 'Recommencer' : 'Commencer'),
-            onPressed: starting ? null : _start,
+            onPressed: starting || repairing ? null : _start,
           ),
       ],
     );

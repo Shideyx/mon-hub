@@ -42,6 +42,9 @@ enum ClickyCommand {
 
   /// « protocole travail ».
   protocol,
+
+  /// « répare le micro », « le micro ne marche pas » : Clicky se répare.
+  repair,
 }
 
 /// Minuscules, sans accents ni ponctuation, espaces simples.
@@ -145,6 +148,13 @@ String normalize(String s) {
   if (v != null) return (ClickyCommand.changeVoice, v.group(1)!.trim());
   final proto = RegExp(r'^(?:lance |active |demarre )?(?:le )?protocole (.+)$').firstMatch(n);
   if (proto != null) return (ClickyCommand.protocol, proto.group(1)!.trim());
+  if (RegExp(
+    r'^(?:(?:repare|reparer|repars|depanne|relance)(?: le| mon| ton| ce)? (?:micro|toi|clicky|l ecoute)'
+    r'|(?:le |mon |ton )?micro (?:ne )?(?:marche|fonctionne|m entend) (?:pas|plus)'
+    r'|tu (?:ne )?m entends (?:pas|plus)|diagnostic(?: du micro)?$)',
+  ).hasMatch(n)) {
+    return (ClickyCommand.repair, '');
+  }
   if (RegExp(r'^(montre|ouvre|affiche) (moi )?(l )?historique').hasMatch(n)) {
     return (ClickyCommand.history, '');
   }

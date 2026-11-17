@@ -17,8 +17,9 @@ import '../../core/claude_bridge.dart';
 /// comptent dans les limites de ton abonnement.
 ///
 /// Claude Code reçoit la capture d'écran et peut utiliser les actions de
-/// Mon Hub (agenda, notes, messages…) via le pont local (`/mcp`), mais aucun
-/// de ses outils de programmation (pas de commandes, pas de fichiers).
+/// Mon Hub (agenda, notes, messages…) et celles de Clicky (contrôle du PC,
+/// avec ta permission) via le pont local (`/mcp`), mais aucun de ses propres
+/// outils de programmation.
 class ClaudeCode {
   ClaudeCode._();
 
@@ -309,6 +310,11 @@ class ClaudeCode {
                 onStatus?.call(switch (name) {
                   'WebSearch' => 'Je cherche sur internet…',
                   'WebFetch' => 'Je lis une page web…',
+                  'mcp__monhub__pc_commande' => 'J\'agis sur ton PC…',
+                  'mcp__monhub__pc_ouvrir' => 'J\'ouvre ça…',
+                  'mcp__monhub__pc_lire' => 'Je regarde sur ton PC…',
+                  'mcp__monhub__pc_ecrire_fichier' => 'J\'écris le fichier…',
+                  'mcp__monhub__clicky_reparer_micro' => 'Je répare le micro…',
                   _ => 'J\'utilise ${name.replaceFirst('mcp__monhub__', '').replaceAll('_', ' ')}…',
                 });
               }

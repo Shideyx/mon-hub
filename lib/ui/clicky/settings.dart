@@ -8,6 +8,7 @@ import 'capture.dart';
 import 'clicky.dart';
 import 'extensions.dart';
 import 'journal.dart';
+import 'pc.dart';
 import 'routines.dart';
 import 'neural_voice.dart';
 import 'tutorial.dart';
@@ -233,6 +234,35 @@ class ClickyMoreSettings extends StatelessWidget {
               'Sur demande (« fais-le pour moi »), il propose un plan de clics et de frappe ; tu le relis '
                   'avant. Échap arrête tout, bouger la souris aussi.',
             ),
+          if (PcControl.supported) ...[
+            const SizedBox(height: 8),
+            Text('Contrôle du PC', style: text.titleSmall),
+            const SizedBox(height: 4),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'ask', icon: Icon(Icons.verified_user_rounded), label: Text('Demander')),
+                ButtonSegment(value: 'auto', icon: Icon(Icons.bolt_rounded), label: Text('Sans demander')),
+                ButtonSegment(value: 'off', icon: Icon(Icons.block_rounded), label: Text('Désactivé')),
+              ],
+              selected: {c.pcControl},
+              onSelectionChanged: (v) => c.setOption('pc', v.first),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              switch (c.pcControl) {
+                'auto' =>
+                  'Clicky fait tout ce que tu lui demandes sur le PC (commandes, fichiers, logiciels, '
+                      'réglages) sans demander. Il demande quand même pour les commandes dangereuses '
+                      '(formatage, suppressions en masse, extinction…) et en administrateur.',
+                'off' => 'Clicky ne touche pas à ton PC (il peut seulement t\'expliquer comment faire).',
+                _ =>
+                  'Dis « Clicky, installe VLC », « range mes téléchargements », « mets le son à 30 % »… : '
+                      'il le fait lui-même. Chaque commande s\'affiche avant et attend ton « Autoriser ».',
+              },
+              style: text.bodySmall,
+            ),
+            const SizedBox(height: 8),
+          ],
           if (WorkflowCapture.supported)
             Text(
               'Capture des gestes et enregistrement de leçon : menu ⋮ dans la boîte de Clicky.',

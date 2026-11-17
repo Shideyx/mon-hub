@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hub/ui/clicky/board.dart';
 import 'package:hub/ui/clicky/clicky.dart';
 import 'package:hub/ui/clicky/ears.dart';
+import 'package:hub/ui/clicky/tutor.dart';
 import 'package:material_ui/material_ui.dart';
 
 const sample = '''Regarde le schéma, c'est un cycle. [TABLEAU]
@@ -76,6 +77,41 @@ void main() {
     expect(windowsProblem('MicrophoneUnavailable', '').fixUri, 'ms-settings:sound');
     expect(windowsProblem('TopicLanguageNotSupported', '').fixUri, 'ms-settings:regionlanguage');
     expect(windowsProblem('0x1234', 'bizarre').message, contains('Win + H'));
+  });
+
+  test('micro Windows : Clicky se relance autrement sans « Process is detached »', () {
+    // Chaque façon de lancer donne des paramètres valides.
+    for (final how in EarsLaunch.values) {
+      final a = WindowsEars.launchArgs(how, r'C:\x\clicky-ecoute.ps1');
+      expect(a, contains('-NoProfile'));
+      expect(a.contains('-File') || a.contains('-EncodedCommand'), isTrue);
+    }
+    expect(WindowsEars.launchArgs(EarsLaunch.file, 's.ps1'), contains('s.ps1'));
+    // Le dernier recours n'est pas « détaché » (le code de sortie se lit).
+    expect(EarsLaunch.values.last.detached, isFalse);
+    expect(isLaunchProblem(const EarsProblem('x', code: 'launch')), isTrue);
+    expect(isLaunchProblem(const EarsProblem('x', code: 'died')), isTrue);
+    expect(isLaunchProblem(windowsProblem('0x80070005', '')), isFalse);
+    final prompt = micRepairPrompt(
+      const EarsProblem('Bad state: Process is detached', code: 'launch'),
+      const EarsRepair(problem: null, steps: ['J\'ai arrêté l\'ancienne écoute.']),
+      system: 'windows',
+    );
+    expect(prompt, contains('Process is detached'));
+    expect(prompt, contains('ancienne écoute'));
+  });
+
+  test('commande « répare le micro »', () {
+    for (final q in [
+      'Clicky, répare le micro',
+      'répare-toi',
+      'le micro ne marche pas',
+      'tu ne m\'entends pas',
+      'diagnostic',
+    ]) {
+      expect(parseCommand(q)?.$1, ClickyCommand.repair, reason: q);
+    }
+    expect(parseCommand('répare mon vélo')?.$1, isNot(ClickyCommand.repair));
   });
 
   test('script de reconnaissance vocale Windows', () {
