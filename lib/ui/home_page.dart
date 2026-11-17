@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 import '../core/desktop_widgets.dart';
@@ -47,7 +45,7 @@ class HomePage extends StatelessWidget {
                 if (away.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -74,13 +72,13 @@ class HomePage extends StatelessWidget {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     sliver: SliverGrid.builder(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 440,
                         mainAxisExtent: 268,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
                       ),
                       itemCount: modules.length,
                       itemBuilder: (context, i) => ModuleCard(
@@ -123,97 +121,101 @@ class _Header extends StatelessWidget {
     final theme = Theme.of(context);
     final now = DateTime.now();
     final userName = ModuleStore.prefs.getString('hub.name') ?? '';
-    final windows = !kIsWeb && Platform.isWindows;
-    // En-tête façon Windows 11 : grand titre, date, boutons discrets.
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 16, 12),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(24, 20, 16, 22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6D4AFF), Color(0xFFE0457B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C5CFF).withValues(alpha: 0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$_greeting${userName.isEmpty ? '' : ' $userName'}',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontFamily: windows ? 'Segoe UI Variable Display' : null,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]} · ${hhmm(now)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                    ],
+                  child: Text(
+                    '${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}'
+                        .toUpperCase(),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85), letterSpacing: 1.2),
                   ),
                 ),
                 ListenableBuilder(
                   listenable: notifications,
                   builder: (context, _) => IconButton(
                     tooltip: 'Notifications',
+                    color: Colors.white,
                     icon: Badge(
                       isLabelVisible: notifications.unread > 0,
                       label: Text('${notifications.unread}'),
-                      child: const Icon(Icons.notifications_none_rounded),
+                      child: const Icon(Icons.notifications_rounded),
                     ),
                     onPressed: () {
                       notifications.markRead();
                       Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => NotificationsPage(notifications: notifications, controller: controller),
-                        ),
-                      );
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => NotificationsPage(
+                                  notifications: notifications, controller: controller)));
                     },
                   ),
                 ),
                 IconButton(
                   tooltip: theme.brightness == Brightness.dark ? 'Mode clair' : 'Mode sombre',
-                  icon: Icon(theme.brightness == Brightness.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                  color: Colors.white,
+                  icon: Icon(theme.brightness == Brightness.dark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded),
                   onPressed: () => AppSession.instance.setThemeMode(
-                    theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark,
-                  ),
+                      theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark),
                 ),
                 IconButton(
                   tooltip: 'Réglages',
-                  icon: const Icon(Icons.settings_outlined),
+                  color: Colors.white,
+                  icon: const Icon(Icons.tune_rounded),
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => SettingsPage(controller: controller, notifications: notifications)),
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            SettingsPage(controller: controller, notifications: notifications)),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              '$_greeting${userName.isEmpty ? '' : ' $userName'} 👋',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                  color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+            ),
+            const SizedBox(height: 14),
             ListenableBuilder(
               listenable: Listenable.merge([for (final m in modules) m.badge]),
-              builder: (context, _) {
-                final busy = [for (final m in modules) if (m.badge.value > 0) m];
-                if (busy.isEmpty) return const SizedBox(height: 4);
-                return Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [for (final m in busy) _HeaderChip(icon: m.icon, color: m.color, text: '${m.badge.value} · ${m.name}')],
-                  ),
-                );
-              },
-            ),
-            if (DesktopWidgets.supported)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'Astuce : attrape un widget par son titre et lâche-le en dehors de Mon Hub pour le poser sur le bureau.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
+              builder: (context, _) => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _HeaderChip(icon: Icons.schedule_rounded, text: hhmm(now)),
+                  for (final m in modules)
+                    if (m.badge.value > 0)
+                      _HeaderChip(icon: m.icon, text: '${m.badge.value} · ${m.name}'),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -222,31 +224,25 @@ class _Header extends StatelessWidget {
 }
 
 class _HeaderChip extends StatelessWidget {
-  const _HeaderChip({required this.icon, required this.color, required this.text});
+  const _HeaderChip({required this.icon, required this.text});
   final IconData icon;
-  final Color color;
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: color),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 15, color: Colors.white),
           const SizedBox(width: 6),
-          Text(text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        ],
-      ),
-    );
-  }
+          Text(text,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+        ]),
+      );
 }
 
 class ModuleCard extends StatefulWidget {
@@ -277,50 +273,52 @@ class _ModuleCardState extends State<ModuleCard> {
     final m = widget.module;
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 6),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 6),
       child: Row(
         children: [
           Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(color: m.color, borderRadius: BorderRadius.circular(6)),
-            child: Icon(m.icon, color: Colors.white, size: 17),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              m.name,
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
-              overflow: TextOverflow.ellipsis,
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              gradient: LinearGradient(
+                colors: [m.color, Color.lerp(m.color, Colors.black, 0.3)!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
+            child: Icon(m.icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(m.name,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis),
           ),
           ValueListenableBuilder(
             valueListenable: m.badge,
             builder: (context, n, _) => n == 0
                 ? const SizedBox.shrink()
                 : Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(10)),
-                    child: Text(
-                      '$n',
-                      style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.w700, fontSize: 11),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: m.color,
+                      borderRadius: BorderRadius.circular(20),
                     ),
+                    child: Text('$n',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
                   ),
           ),
           if (!dragging && DesktopWidgets.supported)
             IconButton(
-              tooltip: 'Détacher sur le bureau',
+              tooltip: 'Détacher sur le bureau (ou glisse la carte hors de Mon Hub)',
               visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.open_in_new_rounded, size: 17),
+              color: theme.colorScheme.onSurfaceVariant,
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
               onPressed: () => DesktopWidgets.instance.detach(m.id),
             ),
-          if (!dragging)
-            IconButton(
-              tooltip: 'Ouvrir',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.chevron_right_rounded, size: 20),
-              onPressed: () => _open(context),
-            ),
+          if (!dragging) Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
     );
@@ -333,58 +331,78 @@ class _ModuleCardState extends State<ModuleCard> {
     final card = MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: BoxDecoration(
-          color: hover
-              ? Color.lerp(theme.cardTheme.color, theme.colorScheme.onSurface, 0.025)
-              : theme.cardTheme.color,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: hover ? 1 : 0.7)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Le titre s'attrape : lâché hors de Mon Hub, le widget part
-            // sur le bureau ; lâché sur une autre carte, elles s'échangent.
-            Draggable<HubModule>(
-              data: m,
-              dragAnchorStrategy: pointerDragAnchorStrategy,
-              feedback: Material(
-                color: Colors.transparent,
-                child: Opacity(
-                  opacity: 0.9,
-                  child: Container(
-                    width: 320,
-                    decoration: BoxDecoration(
-                      color: theme.cardTheme.color,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: theme.colorScheme.primary),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6))],
-                    ),
-                    child: _header(context, dragging: true),
+      child: AnimatedScale(
+        scale: hover ? 1.015 : 1,
+        duration: const Duration(milliseconds: 160),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // Halo coloré discret dans le coin.
+              Positioned(
+                top: -60,
+                right: -60,
+                child: Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      m.color.withValues(alpha: 0.22),
+                      m.color.withValues(alpha: 0),
+                    ]),
                   ),
                 ),
               ),
-              onDragEnd: (d) {
-                final size = MediaQuery.sizeOf(context);
-                final p = d.offset;
-                // Hors de la fenêtre (ou tout contre son bord : Windows ne
-                // suit pas toujours la souris au-delà).
-                const edge = 12.0;
-                final outside = p.dx < edge || p.dy < edge || p.dx > size.width - edge || p.dy > size.height - edge;
-                if (outside && DesktopWidgets.supported) {
-                  final at = Win.cursor();
-                  unawaited(DesktopWidgets.instance.detach(m.id, at: at));
-                }
-              },
-              child: MouseRegion(cursor: SystemMouseCursors.grab, child: _header(context)),
-            ),
-            Expanded(
-              child: InkWell(onTap: () => _open(context), child: m.buildSummary(context)),
-            ),
-          ],
+              InkWell(
+                onTap: () => _open(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Le titre s'attrape : lâché hors de Mon Hub, le widget
+                    // part sur le bureau ; lâché sur une autre carte, elles
+                    // échangent leur place.
+                    Draggable<HubModule>(
+                      data: m,
+                      dragAnchorStrategy: pointerDragAnchorStrategy,
+                      feedback: Material(
+                        color: Colors.transparent,
+                        child: Opacity(
+                          opacity: 0.9,
+                          child: Container(
+                            width: 320,
+                            decoration: BoxDecoration(
+                              color: theme.cardTheme.color ?? theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: m.color),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6)),
+                              ],
+                            ),
+                            child: _header(context, dragging: true),
+                          ),
+                        ),
+                      ),
+                      onDragEnd: (d) {
+                        final size = MediaQuery.sizeOf(context);
+                        final p = d.offset;
+                        // Hors de la fenêtre (ou tout contre son bord : Windows
+                        // ne suit pas toujours la souris au-delà).
+                        const edge = 12.0;
+                        final outside =
+                            p.dx < edge || p.dy < edge || p.dx > size.width - edge || p.dy > size.height - edge;
+                        if (outside && DesktopWidgets.supported) {
+                          unawaited(DesktopWidgets.instance.detach(m.id, at: Win.cursor()));
+                        }
+                      },
+                      child: MouseRegion(cursor: SystemMouseCursors.grab, child: _header(context)),
+                    ),
+                    Expanded(child: m.buildSummary(context)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -396,8 +414,8 @@ class _ModuleCardState extends State<ModuleCard> {
           : DecoratedBox(
               position: DecorationPosition.foreground,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.colorScheme.primary, width: 2),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: m.color, width: 2),
               ),
               child: card,
             ),

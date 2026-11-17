@@ -15,7 +15,6 @@ import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/shortcuts.dart';
 import 'core/updater.dart';
-import 'core/windows_look.dart';
 import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
@@ -169,8 +168,6 @@ class _HubAppState extends State<HubApp> {
     }
   }
 
-  Brightness? _titleBar;
-
   @override
   Widget build(BuildContext context) {
     final hub = widget.controller ?? _hub;
@@ -179,17 +176,9 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
-      builder: (context, child) {
-        // Barre de titre de Windows assortie (claire / sombre).
-        final b = Theme.of(context).brightness;
-        if (b != _titleBar) {
-          _titleBar = b;
-          WidgetsBinding.instance.addPostFrameCallback((_) => WindowsLook.applyTitleBar(b));
-        }
-        return UpdateGate(
-          child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
-        );
-      },
+      builder: (context, child) => UpdateGate(
+        child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+      ),
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),

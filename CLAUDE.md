@@ -38,7 +38,9 @@
   réponse écrite.
 - Certificats https : `TrustedCertificates.install()` (magasins Windows ROOT + CA, et
   `assets/cacert.pem` de Mozilla) au démarrage des deux programmes.
-- Look Windows 11 : `ui/theme.dart` + `core/windows_look.dart` (accent du registre, barre de titre DWM).
+- Look : la personne **préfère l'ancienne interface** (violet, en-tête dégradé, cartes arrondies) ; le look
+  Windows 11 de la v1.34 a été retiré en v1.35, ne pas le remettre. `core/windows_look.dart` ne sert plus
+  qu'aux fenêtres des widgets détachés (barre de titre).
   Liens web : `core/browser.dart` (Chrome par défaut). Widgets détachés : `core/desktop_widgets.dart`,
   `ui/widget_window.dart`, lanceur `windows/runner/main.cpp` (`--widget=`, AppUserModelID par widget ;
   le runner compile en /W4 /WX : aucun avertissement C++ toléré). Appels : `ui/call_page.dart`.
