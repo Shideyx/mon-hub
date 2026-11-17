@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'module_store.dart';
 import 'version.dart';
 
 /// Une nouvelle version publiée sur GitHub.
@@ -102,6 +103,9 @@ class Updater extends ChangeNotifier {
 
   void start() {
     if (!supported || _timer != null) return;
+    // La version installée a bien été mise à jour : on oublie l'essai.
+    final tried = _tried;
+    if (tried != null && (versionNumber(tried) ?? 0) <= (current ?? 0)) _tried = null;
     unawaited(check());
     _timer = Timer.periodic(const Duration(minutes: 30), (_) => check());
   }
@@ -126,12 +130,47 @@ class Updater extends ChangeNotifier {
       if (manual) postponed = false;
       notifyListeners();
       // Directement : l'appli se met en pause et télécharge.
+      // Déjà essayée et toujours pas installée : pas de boucle, on explique.
+      final tried = _tried;
+      if (tried == info.tag) {
+        _set(
+          status: '',
+          progress: null,
+          error:
+              'La mise à jour vers ${info.tag} n\'a pas pu s\'installer toute seule. Télécharge-la à la main '
+              '(bouton ci-dessous), décompresse-la par-dessus ton dossier Mon Hub : les suivantes se feront '
+              'toutes seules.',
+        );
+        return info;
+      }
       if (!postponed) unawaited(install());
       return info;
     } catch (_) {
       return null;
     }
   }
+
+  /// Dernière version dont l'installation a été lancée (anti-boucle).
+  static String? get _tried {
+    try {
+      return ModuleStore.global.getString('app.updateTried');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static set _tried(String? v) {
+    try {
+      if (v == null) {
+        unawaited(ModuleStore.global.remove('app.updateTried'));
+      } else {
+        unawaited(ModuleStore.global.setString('app.updateTried', v));
+      }
+    } catch (_) {}
+  }
+
+  /// Page des versions (téléchargement à la main).
+  static String get releasesUrl => 'https://github.com/$repo/releases/latest';
 
   void later() {
     postponed = true;
@@ -208,31 +247,26 @@ class Updater extends ChangeNotifier {
         src = sub.path;
       }
 
-      // 4. Installation : un petit script remplace les fichiers une fois
-      // Mon Hub fermé, puis le relance.
-      _set(status: 'Installation : Mon Hub va redémarrer…', progress: null);
+      // 4. Installation, sans aucun script (certains PC bloquent PowerShell :
+      // l'ancienne méthode ne faisait alors rien, et la mise à jour revenait
+      // en boucle). Windows interdit d'écraser un programme lancé, mais
+      // permet de le renommer : on met les anciens fichiers de côté, on
+      // copie les nouveaux, puis on relance.
+      _set(status: 'Installation…', progress: null);
       final dst = File(Platform.resolvedExecutable).parent.path;
-      final script = File('${work.path}${sep}installer.ps1');
-      await script.writeAsString(installScript);
       await beforeInstall?.call();
-      await Process.start('powershell.exe', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script.path,
-        '-Src',
-        src,
-        '-Dst',
-        dst,
-        '-Exe',
-        exeName,
-        '-ParentPid',
-        '$pid',
-      ], mode: ProcessStartMode.detached);
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+      // Laisse Clicky partout se fermer (il utilise les mêmes fichiers).
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      await replaceInPlace(src, dst);
+      _set(status: 'C\'est installé : Mon Hub redémarre…', progress: null);
+      _tried = info.tag;
+      await Process.start(
+        '$dst${Platform.pathSeparator}$exeName',
+        const ['--updated'],
+        workingDirectory: dst,
+        mode: ProcessStartMode.detached,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       exit(0);
     } catch (e) {
       busy = false;
@@ -241,27 +275,71 @@ class Updater extends ChangeNotifier {
     }
   }
 
-  /// Remplace les fichiers de Mon Hub (une fois fermé) et le relance. Si le
-  /// dossier est protégé (Program Files…), Windows demande l'autorisation.
-  @visibleForTesting
-  static const installScript = r'''
-param([string]$Src, [string]$Dst, [string]$Exe = 'hub.exe', [int]$ParentPid = 0)
-$ErrorActionPreference = 'Continue'
-if ($ParentPid -gt 0) { try { Wait-Process -Id $ParentPid -Timeout 30 -ErrorAction SilentlyContinue } catch {} }
-$name = [System.IO.Path]::GetFileNameWithoutExtension($Exe)
-Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($Dst, [System.StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 800
-$ok = $false
-for ($i = 0; $i -lt 5 -and -not $ok; $i++) {
-  robocopy "$Src" "$Dst" /E /R:3 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-  if ($LASTEXITCODE -lt 8) { $ok = $true } else { Start-Sleep -Seconds 2 }
-}
-$target = Join-Path $Dst $Exe
-if ($ok) {
-  Start-Process -FilePath $target -ArgumentList '--updated'
-} else {
-  $cmd = "robocopy '$Src' '$Dst' /E /R:3 /W:1; Start-Process '$target' -ArgumentList '--updated'"
-  Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command $cmd"
-}
-''';
+  /// Suffixe des anciens fichiers mis de côté (supprimés au démarrage
+  /// suivant).
+  static const oldSuffix = '.ancien-monhub';
+
+  /// Copie la nouvelle version ([src]) par-dessus l'installée ([dst]). Un
+  /// fichier en cours d'utilisation est renommé au lieu d'être écrasé. En cas
+  /// d'échec, tout est remis comme avant.
+  static Future<void> replaceInPlace(String src, String dst) async {
+    final sep = Platform.pathSeparator;
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    // (fichier installé, nom de l'ancien mis de côté ou null s'il est nouveau)
+    final done = <(File, String?)>[];
+    try {
+      final files = [
+        for (final e in await Directory(src).list(recursive: true).toList())
+          if (e is File) e,
+      ];
+      if (files.isEmpty) throw 'La nouvelle version est vide';
+      for (final f in files) {
+        final rel = f.path.substring(src.length).replaceFirst(RegExp(r'^[\\/]+'), '');
+        final target = File('$dst$sep$rel');
+        await target.parent.create(recursive: true);
+        String? aside;
+        if (await target.exists()) {
+          // Jamais supprimé : renommé (marche même s'il est en cours
+          // d'utilisation), pour pouvoir tout remettre en cas d'échec.
+          aside = '${target.path}$oldSuffix$stamp';
+          await target.rename(aside);
+        }
+        done.add((target, aside));
+        await f.copy(target.path);
+      }
+    } catch (e) {
+      // Retour en arrière : tout redevient comme avant.
+      for (final (target, aside) in done.reversed) {
+        try {
+          if (await target.exists()) await target.delete();
+        } catch (_) {}
+        if (aside != null) {
+          try {
+            await File(aside).rename(target.path);
+          } catch (_) {}
+        }
+      }
+      final low = '$e'.toLowerCase();
+      final denied = low.contains('denied') || low.contains('refusé') || low.contains('errno = 5');
+      throw denied
+          ? 'Windows refuse de modifier le dossier de Mon Hub ($dst). Installe la nouvelle version à la main '
+                'dans un dossier à toi (Documents par exemple) : les suivantes se feront toutes seules.'
+          : 'Installation impossible : $e';
+    }
+  }
+
+  /// Au démarrage : supprime les anciens fichiers mis de côté.
+  static Future<void> cleanup() async {
+    if (kIsWeb || !Platform.isWindows) return;
+    try {
+      final dir = File(Platform.resolvedExecutable).parent;
+      await for (final e in dir.list(recursive: true)) {
+        if (e is File && e.path.contains(oldSuffix)) {
+          try {
+            await e.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
 }

@@ -91,6 +91,7 @@ class WindowsEars extends ClickyEars {
   /// Lancement sans fichier de script (-EncodedCommand) : par défaut, car
   /// certains PC bloquent les fichiers .ps1 ; le fichier sert de repli.
   bool _encoded = true;
+  int? _exit;
   final _errors = StringBuffer();
 
   /// Le script en paramètre de PowerShell (UTF-16 en base64), sans fichier :
@@ -174,6 +175,8 @@ class WindowsEars extends ClickyEars {
           mode: ProcessStartMode.detachedWithStdio,
         );
         _proc = p;
+        _exit = null;
+        unawaited(p.exitCode.then((c) => _exit = c));
         p.stdout
             .transform(utf8.decoder)
             .transform(const LineSplitter())
@@ -225,14 +228,21 @@ class WindowsEars extends ClickyEars {
     final boot = _boot;
     _boot = null;
     if (boot != null && !boot.isCompleted) {
-      final detail = errorDetail('$_errors');
-      boot.complete(
-        EarsProblem(
-          'La reconnaissance vocale de Windows s\'est arrêtée tout de suite'
-          '${detail.isEmpty ? '.' : ' : $detail'}',
-          code: 'died',
-        ),
-      );
+      // Le code de sortie arrive juste après : il dit pourquoi PowerShell
+      // s'est arrêté (bloqué par Windows, antivirus…).
+      Future<void>.delayed(const Duration(milliseconds: 400), () {
+        if (boot.isCompleted) return;
+        final detail = errorDetail('$_errors');
+        final code = _exit == null ? '' : ' (code ${_exit! < 0 ? '0x${(_exit! & 0xFFFFFFFF).toRadixString(16).toUpperCase()}' : _exit})';
+        boot.complete(
+          EarsProblem(
+            'La reconnaissance vocale de Windows s\'est arrêtée tout de suite$code'
+            '${detail.isEmpty ? '. PowerShell semble bloqué sur ce PC (antivirus ou règles de sécurité) : '
+                      'utilise la dictée Windows (Win + H) en attendant.' : ' : $detail'}',
+            code: 'died',
+          ),
+        );
+      });
     }
     if (_listening && !_stopping) {
       _listening = false;

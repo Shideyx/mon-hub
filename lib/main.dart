@@ -43,6 +43,8 @@ Future<void> main(List<String> args) async {
     }
   });
   updater.start();
+  // Fichiers de l'ancienne version mis de côté pendant la mise à jour.
+  unawaited(Updater.cleanup());
   runApp(const HubApp());
 }
 

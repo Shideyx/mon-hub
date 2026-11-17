@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hub/core/hub_files.dart';
+import 'package:hub/core/updater.dart';
 import 'package:hub/core/news.dart';
 import 'package:hub/ui/clicky/neural_voice.dart';
 import 'package:hub/ui/clicky/routines.dart';
@@ -79,5 +80,35 @@ void main() {
     expect(Routine.topoMorningPrompt, contains('actualites'));
     expect(Routine.topoMorningPrompt, contains('mails_lister'));
     expect(Routine.topoMorningPrompt, contains('ecole_devoirs'));
+  });
+
+  test('mise à jour : remplacement en place, sans script, avec retour en arrière', () async {
+    final root = await Directory.systemTemp.createTemp('maj');
+    try {
+      final src = Directory('${root.path}/new')..createSync();
+      final dst = Directory('${root.path}/app')..createSync();
+      File('${dst.path}/hub.exe').writeAsStringSync('v1.24');
+      File('${dst.path}/garde.txt').writeAsStringSync('mes données');
+      Directory('${src.path}/data').createSync();
+      File('${src.path}/hub.exe').writeAsStringSync('v1.25');
+      File('${src.path}/data/app.so').writeAsStringSync('nouveau');
+      await Updater.replaceInPlace(src.path, dst.path);
+      expect(File('${dst.path}/hub.exe').readAsStringSync(), 'v1.25');
+      expect(File('${dst.path}/data/app.so').readAsStringSync(), 'nouveau');
+      expect(File('${dst.path}/garde.txt').readAsStringSync(), 'mes données');
+      final aside = dst
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.contains(Updater.oldSuffix))
+          .toList();
+      expect(aside.length, 1, reason: 'ancien hub.exe mis de côté');
+      expect(aside.single.readAsStringSync(), 'v1.24');
+      // Source vide : erreur, rien n'est touché.
+      final empty = Directory('${root.path}/vide')..createSync();
+      await expectLater(Updater.replaceInPlace(empty.path, dst.path), throwsA(isA<String>()));
+      expect(File('${dst.path}/hub.exe').readAsStringSync(), 'v1.25');
+    } finally {
+      await root.delete(recursive: true);
+    }
   });
 }
