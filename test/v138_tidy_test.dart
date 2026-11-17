@@ -77,6 +77,11 @@ void main() {
     expect(PcTidy.subject('Exposé_Histoire-géo_guerre froide.pptx'), 'Histoire-Géo');
     expect(PcTidy.subject('TP_physique_chimie.pdf'), 'Physique-Chimie');
     expect(PcTidy.subject('photo_all.jpg'), isNull);
+    // Copies à la même date : l'original est celui sans « (1) ».
+    final t = DateTime(2026);
+    final names = ['vacances (1).jpg', 'vacances - Copie.jpg', 'vacances.jpg']
+      ..sort((a, b) => PcTidy.originalFirst(a, t, b, t));
+    expect(names.first, 'vacances.jpg');
   });
 
   test('connexion Google : l\'identifiant client se colle dans Mon Hub', () async {
