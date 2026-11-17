@@ -96,11 +96,13 @@ class DiscordPhone extends ChangeNotifier {
     if (!active) start();
     if (!active) return;
     shown = true;
+    unawaited(_js(quietScript(false)));
     notifyListeners();
   }
 
   void hide() {
     shown = false;
+    unawaited(_js(quietScript(true)));
     notifyListeners();
   }
 
@@ -109,7 +111,7 @@ class DiscordPhone extends ChangeNotifier {
   void attach(InAppWebViewController c) {
     _c = c;
     _watch?.cancel();
-    _watch = Timer.periodic(const Duration(milliseconds: 1500), (_) => unawaited(check()));
+    _watch = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(check()));
   }
 
   Future<Object?> _js(String source) async {
@@ -128,7 +130,9 @@ class DiscordPhone extends ChangeNotifier {
     if (_checking) return;
     _checking = true;
     try {
-      final r = await _js(statusScript);
+      // Caché derrière Mon Hub, Discord ne dessine plus rien (avant : il se
+      // redessinait sans arrêt en arrière-plan et faisait ramer l'appli).
+      final r = await _js('${quietScript(!shown)}\n$statusScript');
       if (r is! String) return;
       final j = (jsonDecode(r) as Map).cast<String, dynamic>();
       onStatus(j);
@@ -288,13 +292,29 @@ class DiscordPhone extends ChangeNotifier {
         box = box.parentElement;
         if (!box) break;
         var acc = buttons(box).filter(function (x) { return ACC.test(lab(x)); });
-        if (acc.length && (CALL.test(box.innerText || '') || acc.some(function (x) { return CALL.test(lab(x)); }))) {
+        if (acc.length && (CALL.test(box.textContent || '') || acc.some(function (x) { return CALL.test(lab(x)); }))) {
           return box;
         }
       }
     }
     return null;
   }
+''';
+
+  /// Rend Discord invisible et immobile (rien à dessiner) quand il est caché.
+  /// Les boutons restent là : on peut toujours répondre ou raccrocher.
+  static String quietScript(bool quiet) =>
+      '''
+(function (q) {
+  var s = document.getElementById('mh-quiet');
+  if (q && !s) {
+    s = document.createElement('style');
+    s.id = 'mh-quiet';
+    s.textContent = '*,*::before,*::after{visibility:hidden!important;animation-play-state:paused!important;transition:none!important}';
+    (document.head || document.documentElement).appendChild(s);
+  }
+  if (!q && s) s.remove();
+})($quiet);
 ''';
 
   /// Lit l'état de Discord (en JSON).

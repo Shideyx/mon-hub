@@ -144,8 +144,7 @@ class ChatHistory extends ChangeNotifier {
   }
 
   Future<List<ChatThread>> load() async {
-    await _file.load();
-    notifyListeners();
+    if (await _file.reload()) notifyListeners();
     return threads;
   }
 

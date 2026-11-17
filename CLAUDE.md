@@ -88,3 +88,14 @@
 - Instagram : onglet Reels (`InstagramApi.reels`, `_ReelsTab`, une seule vidéo jouée à la fois), vidéos des posts,
   stories et messages (`igMedia`, `findIgVideo`). Discord : conversation façon Discord (`_DiscordLine`, messages
   regroupés, `_DaySeparator`, `DiscordEmbed`, vidéos).
+- Assistant personnel (proactif, avec accord) : `ui/clicky/assistant.dart` (`Assistant` : consentement + 8 automatismes
+  `AssistantFeature.all`, tour toutes les 5 min `tick`, propositions `Proposal` affichées par `AssistantLayer` en bas à
+  gauche, `ui/clicky/assistant_view.dart` ; Réglages → Assistant personnel = `AssistantPage`). Initiatives hors modules :
+  `ui/clicky/initiatives.dart` (`DateSpotter` : rendez-vous / dates limites dans les messages, `grade20`), notes,
+  série de révisions, messages sans réponse, pluie, objectifs (`Carnet` liste `goals`), idées Gemini 1×/jour
+  (`AiText.ask(geminiOnly: true)`, jamais Claude). Briefing du matin = `Assistant.morningBriefing` (sans IA, Gemini pour
+  rédiger) : routine topo-matin et commande « briefing ». Outils `assistant_*` dans `ClickyController.localTools`.
+- Appli qui fige (v1.41) : **jamais** de `FutureBuilder(future: x.load())` dont `load()` prévient les écouteurs sans
+  changement (`JsonFile.reload()` dit si le fichier a changé) ; le résumé d'une carte d'accueil est gardé au survol
+  (`_ModuleCardState._summary`) ; le Discord caché est rendu invisible (`DiscordPhone.quietScript`) ; chiffrement et
+  gros JSON hors du fil de l'interface (`Vault`, `JsonFile.load` avec `Isolate.run`).

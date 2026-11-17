@@ -313,6 +313,7 @@ class RevisionsModule extends HubModule {
         return {
           'serie_jours': revisions.streak(now),
           'a_revoir_aujourdhui': revisions.dueCount(now),
+          'cartes_faites_aujourdhui': revisions.today(now).cards,
           'paquets': [
             for (final d in revisions.decks)
               {

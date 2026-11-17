@@ -165,9 +165,8 @@ class RevisionsStore extends ChangeNotifier {
   List<Deck> get decks => data.decks;
 
   Future<RevisionsData> load() async {
-    final d = await _file.load();
-    notifyListeners();
-    return d;
+    if (await _file.reload()) notifyListeners();
+    return _file.value;
   }
 
   Future<void> _save() async {

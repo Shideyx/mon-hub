@@ -83,8 +83,7 @@ class DocStore extends ChangeNotifier {
   List<HubDoc> get docs => [..._index.value]..sort((a, b) => b.updated.compareTo(a.updated));
 
   Future<List<HubDoc>> load() async {
-    await _index.load();
-    notifyListeners();
+    if (await _index.reload()) notifyListeners();
     return docs;
   }
 

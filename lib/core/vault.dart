@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math' show Random;
 
 import 'package:cryptography/cryptography.dart';
@@ -58,8 +59,32 @@ class Vault {
   static Future<String> seal(String plain) async {
     final key = await _key();
     if (key == null) return plain;
-    final box = await _aes.encrypt(utf8.encode(plain), secretKey: key);
+    // Gros fichier : chiffré à côté, pour que l'appli ne se fige pas.
+    if (plain.length > _big) {
+      final bytes = await key.extractBytes();
+      try {
+        return await Isolate.run(() => _sealWith(bytes, plain));
+      } catch (_) {}
+    }
+    return _sealWith(await key.extractBytes(), plain);
+  }
+
+  /// Au-delà, le travail se fait hors du fil de l'interface.
+  static const _big = 48 * 1024;
+
+  static Future<String> _sealWith(List<int> key, String plain) async {
+    final box = await AesGcm.with256bits().encrypt(utf8.encode(plain), secretKey: SecretKey(key));
     return '$prefix${base64.encode(box.concatenation())}';
+  }
+
+  static Future<String> _openWith(List<int> key, String text) async {
+    final aes = AesGcm.with256bits();
+    final box = SecretBox.fromConcatenation(
+      base64.decode(text.substring(prefix.length)),
+      nonceLength: aes.nonceLength,
+      macLength: aes.macAlgorithm.macLength,
+    );
+    return utf8.decode(await aes.decrypt(box, secretKey: SecretKey(key)));
   }
 
   /// Déchiffre ce que [seal] a produit (un ancien fichier en clair est
@@ -68,12 +93,17 @@ class Vault {
     if (!isSealed(text)) return text;
     final key = await _key();
     if (key == null) throw StateError('Clé du coffre introuvable');
-    final box = SecretBox.fromConcatenation(
-      base64.decode(text.substring(prefix.length)),
-      nonceLength: _aes.nonceLength,
-      macLength: _aes.macAlgorithm.macLength,
-    );
-    return utf8.decode(await _aes.decrypt(box, secretKey: key));
+    final bytes = await key.extractBytes();
+    if (text.length > _big) {
+      String? out;
+      try {
+        out = await Isolate.run(() => _openWith(bytes, text));
+      } on SecretBoxAuthenticationError {
+        rethrow;
+      } catch (_) {}
+      if (out != null) return out;
+    }
+    return _openWith(bytes, text);
   }
 
   // ---- Export protégé par un mot de passe ----

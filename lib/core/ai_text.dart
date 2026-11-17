@@ -21,6 +21,9 @@ class AiText {
 
   static Future<String> _geminiKey() async => (await ClaudeApi.store.readSecret('gemini.key') ?? '').trim();
 
+  /// La clé Gemini (gratuite) est là.
+  static Future<bool> hasGemini() async => override != null || (await _geminiKey()).isNotEmpty;
+
   /// Une IA est-elle disponible ?
   static Future<bool> available() async {
     if (override != null) return true;
@@ -38,10 +41,16 @@ class AiText {
     String system = 'Tu es Clicky, un assistant qui aide un lycéen. Réponds en français.',
     List<String> images = const [],
     String? pdf,
+    bool geminiOnly = false,
   }) async {
     final o = override;
     if (o != null) return o(prompt, system);
     final key = await _geminiKey();
+    // Pour les petites tâches (rédiger le briefing…), on n'utilise pas Claude.
+    if (geminiOnly) {
+      if (key.isEmpty) throw 'Pas de clé Gemini';
+      return _gemini(key, prompt, system, images, pdf);
+    }
     if (key.isNotEmpty) {
       try {
         return await _gemini(key, prompt, system, images, pdf);
