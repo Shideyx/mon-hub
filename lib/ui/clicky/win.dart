@@ -196,6 +196,20 @@ class Win {
   /// La fenêtre au premier plan (celle où tu travailles).
   static HWND foreground() => GetForegroundWindow();
 
+  /// Depuis combien de secondes personne n'a touché ni la souris ni le
+  /// clavier (sur tout le PC).
+  static int idleSeconds() {
+    final p = calloc<LASTINPUTINFO>();
+    try {
+      p.ref.cbSize = sizeOf<LASTINPUTINFO>();
+      if (!GetLastInputInfo(p)) return 0;
+      final ms = (GetTickCount() - p.ref.dwTime) & 0xFFFFFFFF;
+      return ms ~/ 1000;
+    } finally {
+      calloc.free(p);
+    }
+  }
+
   /// Rectangle de la fenêtre au premier plan (x, y, largeur, hauteur).
   static (int, int, int, int)? foregroundRect() {
     final r = calloc<RECT>();

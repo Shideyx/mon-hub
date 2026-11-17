@@ -194,7 +194,9 @@ class ClickyMind extends ChangeNotifier {
     _d
       ..remove('ep')
       ..remove('mood')
-      ..remove('bond');
+      ..remove('bond')
+      ..remove('decisions')
+      ..remove('ideaKeys');
     await _save();
   }
 
@@ -362,6 +364,102 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     _d['noticeUsed'] = used + 1;
     await _save();
     return true;
+  }
+
+  // ------------------------------------------------------------ Autonomie
+
+  /// Il décide tout seul de choses à faire (avec ton accord).
+  bool get autonomy => _d['autonomy'] != false;
+
+  /// 'souvent', 'normal' ou 'rarement'.
+  String get pace => const ['souvent', 'normal', 'rarement'].contains(_d['pace']) ? _d['pace'] as String : 'normal';
+
+  Future<void> setPace(String v) async {
+    _d['pace'] = v;
+    await _save();
+  }
+
+  /// Écart minimal entre deux idées, et nombre par jour.
+  Duration get ideaGap => switch (pace) {
+    'souvent' => const Duration(minutes: 25),
+    'rarement' => const Duration(minutes: 90),
+    _ => const Duration(minutes: 45),
+  };
+  int get ideasPerDay => switch (pace) {
+    'souvent' => 8,
+    'rarement' => 3,
+    _ => 5,
+  };
+
+  /// Peut-il proposer une idée maintenant ?
+  bool ideaAllowed(DateTime now) {
+    if (!on || !autonomy || now.hour < 7 || now.hour >= 23) return false;
+    final day = now.toIso8601String().substring(0, 10);
+    final used = _d['ideaDay'] == day ? (_d['ideaUsed'] as num?)?.toInt() ?? 0 : 0;
+    if (used >= ideasPerDay) return false;
+    final last = _d['ideaAt'] is num ? _ms(_d['ideaAt'], now) : null;
+    return last == null || now.difference(last) >= ideaGap;
+  }
+
+  Future<void> ideaProposed(String key, DateTime now) async {
+    final day = now.toIso8601String().substring(0, 10);
+    final used = _d['ideaDay'] == day ? (_d['ideaUsed'] as num?)?.toInt() ?? 0 : 0;
+    _d['ideaDay'] = day;
+    _d['ideaUsed'] = used + 1;
+    _d['ideaAt'] = now.millisecondsSinceEpoch;
+    final recent = (_d['ideaKeys'] as Map?)?.cast<String, dynamic>() ?? {};
+    recent.removeWhere((k, v) => v is! num || now.millisecondsSinceEpoch - v > const Duration(hours: 24).inMilliseconds);
+    recent[key] = now.millisecondsSinceEpoch;
+    _d['ideaKeys'] = recent;
+    await _save();
+  }
+
+  /// La même idée a déjà été proposée aujourd'hui.
+  bool ideaSeen(String key) => ((_d['ideaKeys'] as Map?) ?? const {}).containsKey(key);
+
+  /// Ta réponse : il apprend ce que tu aimes qu'il fasse.
+  Future<void> recordDecision(String tool, bool yes, {DateTime? now}) async {
+    final n = now ?? DateTime.now();
+    final stats = (_d['decisions'] as Map?)?.cast<String, dynamic>() ?? {};
+    final s = (stats[tool] as Map?)?.cast<String, dynamic>() ?? {};
+    s[yes ? 'oui' : 'non'] = ((s[yes ? 'oui' : 'non'] as num?)?.toInt() ?? 0) + 1;
+    if (!yes) s['nonAt'] = n.millisecondsSinceEpoch;
+    stats[tool] = s;
+    _d['decisions'] = stats;
+    _nudge(yes ? 0.12 : -0.03, n);
+    await _save();
+  }
+
+  Map<String, (int, int)> get _decisions => {
+    for (final e in ((_d['decisions'] as Map?) ?? const {}).entries)
+      if (e.value is Map) '${e.key}': (((e.value as Map)['oui'] as num?)?.toInt() ?? 0, ((e.value as Map)['non'] as num?)?.toInt() ?? 0),
+  };
+
+  /// Ce que tu acceptes souvent / refuses souvent (pour décider).
+  String get likes => [for (final e in _decisions.entries) if (e.value.$1 >= 2 && e.value.$1 > e.value.$2) e.key].join(', ');
+  String get dislikes => [for (final e in _decisions.entries) if (e.value.$2 >= 2 && e.value.$2 > e.value.$1) e.key].join(', ');
+
+  /// Ce qu'il ne propose plus pendant une semaine (refusé 2 fois de suite).
+  Set<String> skipTools(DateTime now) {
+    final out = <String>{};
+    for (final e in ((_d['decisions'] as Map?) ?? const {}).entries) {
+      final v = e.value;
+      if (v is! Map) continue;
+      final no = (v['non'] as num?)?.toInt() ?? 0;
+      final yes = (v['oui'] as num?)?.toInt() ?? 0;
+      final at = v['nonAt'] is num ? _ms(v['nonAt'], now) : null;
+      if (no >= 2 && no > yes && at != null && now.difference(at).inDays < 7) out.add('${e.key}');
+    }
+    return out;
+  }
+
+  /// Quand tu reviens après une absence.
+  String welcomeBack({required DateTime now, String name = '', Duration away = const Duration(minutes: 30)}) {
+    final who = name.trim().isEmpty ? '' : ' ${name.trim()}';
+    final loop = dueLoops(now).firstOrNull;
+    if (loop != null) return 'Te revoilà$who ! Au fait : « ${loop.text} », ça s\'est passé comment ?';
+    final h = away.inMinutes >= 90 ? 'Ça fait un moment' : 'Re';
+    return '$h$who ! Je suis là si tu as besoin.';
   }
 
   /// La consigne pour une remarque spontanée sur l'écran (Gemini).

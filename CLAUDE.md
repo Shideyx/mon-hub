@@ -124,3 +124,10 @@
   (`ClickyFlight` : arc, 0,26–0,75 s selon la distance, orientation `angleAt`, taille 1,3 au milieu ; `springTowards` pour
   suivre la souris), `flightPose` ; il parcourt la fenêtre pendant qu'il réfléchit (`_scanStep`) et part vers la cible
   avant de viser précisément. Bulle qui rebondit et s'écrit (`TypedText`).
+- Clicky **autonome** (v1.45) : `ui/clicky/autonomy.dart` (`ClickyIdea`, `Autonomy.allowed` / `never` = jamais envoyer un
+  message, supprimer, lancer une commande ; `prompt` Gemini JSON, `parse`, `rules` sans IA, `answer` « oui/non » à la voix).
+  `ClickyController.startAutonomy` (Mon Hub, toutes les minutes) → `autonomyTick` (présent = `Win.idleSeconds` < 2 min,
+  pas en plein écran, rythme `ClickyMind.ideaAllowed` : rarement/normal/souvent) → `decideIdea` → `proposeIdea` (boîte de
+  Clicky avec Oui / Non / Plus tard `_IdeaButtons`, à l'oral ; envoyée à Clicky partout par `idea64`) → `answerIdea` →
+  `_runIdea` (outil direct, ou `agent` = `_runAgent`). Il apprend (`recordDecision`, `likes/dislikes`, `skipTools` après 2
+  refus). Retour après 20 min d'absence : `welcomeBack`. Outil `assistant_ajouter_plan_journee` (ajoute le plan, avec accord).

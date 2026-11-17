@@ -113,6 +113,70 @@ class _MindPageState extends State<MindPage> {
                 ),
               ),
               const Divider(height: 32),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.bolt_rounded, color: Color(0xFFFFA000)),
+                title: const Text('Clicky décide tout seul', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: const Text(
+                  'Il regarde ta journée, décide d\'une chose utile à faire (préparer un contrôle, organiser ta soirée, '
+                  'lancer des révisions, chercher pour toi…) et te la propose. Il ne fait rien sans ton « oui », et ne '
+                  'propose jamais d\'envoyer un message ni de supprimer. Il retient ce que tu acceptes ou refuses.',
+                ),
+                value: m.autonomy,
+                onChanged: m.on ? (v) => m.set('autonomy', v) : null,
+              ),
+              if (m.autonomy && m.on) ...[
+                const SizedBox(height: 6),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'rarement', label: Text('Rarement')),
+                    ButtonSegment(value: 'normal', label: Text('Normal')),
+                    ButtonSegment(value: 'souvent', label: Text('Souvent')),
+                  ],
+                  selected: {m.pace},
+                  onSelectionChanged: (v) => m.setPace(v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  switch (m.pace) {
+                    'souvent' => 'Jusqu\'à 8 idées par jour, au moins 25 minutes entre deux.',
+                    'rarement' => 'Jusqu\'à 3 idées par jour, au moins 1 h 30 entre deux.',
+                    _ => 'Jusqu\'à 5 idées par jour, au moins 45 minutes entre deux.',
+                  },
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    icon: const Icon(Icons.lightbulb_rounded),
+                    label: const Text('Propose-moi une idée maintenant'),
+                    onPressed: () async {
+                      final c = ClickyController.instance;
+                      final i = await c.decideIdea(DateTime.now());
+                      if (i != null) {
+                        await c.proposeIdea(i);
+                      } else if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Rien d\'utile à proposer pour l\'instant, d\'après Clicky.')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                if (m.likes.isNotEmpty || m.dislikes.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      [
+                        if (m.likes.isNotEmpty) 'Tu acceptes souvent : ${m.likes}.',
+                        if (m.dislikes.isNotEmpty) 'Tu refuses souvent : ${m.dislikes}.',
+                      ].join(' '),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+              ],
+              const Divider(height: 32),
               Text('Ses souvenirs', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
               if (eps.isEmpty)

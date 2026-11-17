@@ -17,6 +17,7 @@ import '../../core/module_store.dart';
 import '../../core/nav.dart';
 import '../../core/session.dart';
 import '../theme.dart';
+import 'autonomy.dart';
 import 'clicky.dart';
 import 'flight.dart';
 import 'win.dart';
@@ -173,6 +174,13 @@ Future<void> runClickyDesktop() async {
       if (cmd.startsWith('act64 ')) {
         try {
           unawaited(c.act(utf8.decode(base64Decode(cmd.substring(6)))));
+        } catch (_) {}
+      }
+      // Une idée décidée par Mon Hub : c'est Clicky partout qui la propose.
+      if (cmd.startsWith('idea64 ')) {
+        try {
+          final i = ClickyIdea.fromJson(jsonDecode(utf8.decode(base64Decode(cmd.substring(7)))));
+          if (i != null) unawaited(c.proposeIdea(i));
         } catch (_) {}
       }
       // « Regarde mon écran maintenant » (réglages de Mon Hub).
