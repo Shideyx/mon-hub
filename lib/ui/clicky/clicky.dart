@@ -41,6 +41,7 @@ import 'journal.dart';
 import 'live.dart';
 import 'pcm_player.dart';
 import 'marks.dart';
+import 'neural_voice.dart';
 import 'ocr.dart';
 import 'pc.dart';
 import 'ollama.dart';
@@ -534,9 +535,10 @@ class ClickyController extends ChangeNotifier {
 
   bool get _voicePlatform => ClickyEars.supported;
 
-  /// Moteur de voix : 'edge' (voix neurale Microsoft gratuite, par
-  /// défaut), 'gemini' (clé gratuite AI Studio) ou 'system' (Windows).
-  String get ttsEngine => _opt('ttsEngine', 'edge');
+  /// Moteur de voix : 'edge' (voix neurale Microsoft gratuite, sans limite,
+  /// par défaut) ou 'gemini' (clé gratuite AI Studio). La voix de Windows a
+  /// été retirée (l'ancien réglage « Windows » devient Microsoft).
+  String get ttsEngine => _opt('ttsEngine', 'edge') == 'gemini' ? 'gemini' : 'edge';
   /// Voix Microsoft : Rémy multilingue par défaut (la plus naturelle, la plus
   /// proche de Gemini, gratuite et sans limite).
   String get neuralVoice => _opt('neuralVoice', 'fr-FR-RemyMultilingualNeural');
@@ -557,7 +559,6 @@ class ClickyController extends ChangeNotifier {
       ..neuralVoice = neuralVoice
       ..geminiVoice = geminiVoice;
     voiceOut
-      ..voiceName = ttsVoice
       ..rate = ttsRate
       ..pitch = ttsPitch
       ..language = lang ?? voiceOut.language;
@@ -1512,23 +1513,28 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           withScreen: false,
         );
       case ClickyCommand.changeVoice:
-        final all = await voiceOut.voices();
+        // « Change de voix pour Rémy » : voix Microsoft ou Gemini.
         final wanted = normalize(rest);
-        final v = all
-            .where((x) => normalize(x.name).contains(wanted) && wanted.isNotEmpty)
+        final edge = EdgeVoice.voices.entries
+            .where((e) => wanted.isNotEmpty && (normalize(e.value).contains(wanted) || normalize(e.key).contains(wanted)))
             .firstOrNull;
-        if (v == null) {
-          final fr = all
-              .where((x) => x.locale.toLowerCase().startsWith('fr'))
-              .map((x) => x.name)
-              .take(6);
+        final gem = GeminiVoice.voices.where((v) => wanted.isNotEmpty && normalize(v) == wanted).firstOrNull;
+        if (edge != null) {
+          await setOption('neuralVoice', edge.key);
+          await setOption('ttsEngine', 'edge');
+          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix ${edge.value.split(' (').first}.');
+        } else if (gem != null && voiceOut.geminiKey.trim().isNotEmpty) {
+          await setOption('geminiVoice', gem);
+          await setOption('ttsEngine', 'gemini');
+          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix Gemini $gem.');
+        } else {
           _set(
             ClickyState.idle,
-            reply: 'Je ne trouve pas cette voix. Voix françaises : ${fr.join(', ')}.',
+            reply:
+                'Je ne trouve pas cette voix. Voix possibles : '
+                '${EdgeVoice.voices.values.map((v) => v.split(' (').first).take(6).join(', ')}'
+                '${voiceOut.geminiKey.trim().isEmpty ? '' : ', ou les voix Gemini ${GeminiVoice.voices.take(4).join(', ')}'}.',
           );
-        } else {
-          await setOption('ttsVoice', v.name);
-          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix ${v.name}.');
         }
         await speak(reply);
         _fadeSoon();

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:win32/win32.dart' show HWND;
 
+import '../../core/certificates.dart';
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/error_log.dart';
@@ -131,6 +132,7 @@ class ClickyDesktop {
 Future<void> runClickyDesktop() async {
   WidgetsFlutterBinding.ensureInitialized();
   ErrorLog.install('Clicky partout');
+  await TrustedCertificates.install();
   final ServerSocket lock;
   try {
     lock = await ServerSocket.bind(InternetAddress.loopbackIPv4, ClickyDesktop.port);

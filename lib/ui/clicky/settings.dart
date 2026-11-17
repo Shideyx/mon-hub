@@ -12,7 +12,6 @@ import 'pc.dart';
 import 'routines.dart';
 import 'neural_voice.dart';
 import 'tutorial.dart';
-import 'voice.dart';
 import 'wake.dart';
 import 'win.dart';
 import 'whisper.dart';
@@ -114,7 +113,6 @@ class ClickyMoreSettings extends StatelessWidget {
                         '${c.liveError == null ? '' : '\nDernier souci : ${c.liveError}'}',
             ),
           const _NeuralVoicePicker(),
-          if (c.ttsEngine == 'system') const _VoicePicker(),
           sw(
             'narrate',
             c.narrate,
@@ -343,95 +341,6 @@ class _TextOptionState extends State<_TextOption> {
   );
 }
 
-/// Choix de la voix (voix installées sur le PC), vitesse et hauteur.
-class _VoicePicker extends StatefulWidget {
-  const _VoicePicker();
-
-  @override
-  State<_VoicePicker> createState() => _VoicePickerState();
-}
-
-class _VoicePickerState extends State<_VoicePicker> {
-  final c = ClickyController.instance;
-  late final Future<List<SystemVoice>> voices = c.voiceOut.voices();
-  double? rate, pitch;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: voices,
-      builder: (context, snap) {
-        final all = snap.data ?? const <SystemVoice>[];
-        final names = {for (final v in all) v.name};
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: names.contains(c.ttsVoice) ? c.ttsVoice : '',
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Voix', border: OutlineInputBorder()),
-              items: [
-                DropdownMenuItem(value: '', child: Text('Automatique (voix française)')),
-                for (final v in all)
-                  DropdownMenuItem(value: v.name, child: Text('${v.name} (${v.locale})')),
-              ],
-              onChanged: (v) => c.setOption('ttsVoice', v ?? ''),
-            ),
-            if (snap.connectionState == ConnectionState.done && all.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text(
-                  'Pour plus de voix : Paramètres Windows → Heure et langue → Voix → Ajouter des voix.',
-                ),
-              ),
-            Row(
-              children: [
-                const SizedBox(width: 80, child: Text('Vitesse')),
-                Expanded(
-                  child: Slider(
-                    min: 0.6,
-                    max: 1.6,
-                    divisions: 10,
-                    value: (rate ?? c.ttsRate).clamp(0.6, 1.6),
-                    label: '×${(rate ?? c.ttsRate).toStringAsFixed(1)}',
-                    onChanged: (v) => setState(() => rate = v),
-                    onChangeEnd: (v) => c.setOption('ttsRate', v),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                const SizedBox(width: 80, child: Text('Hauteur')),
-                Expanded(
-                  child: Slider(
-                    min: 0.7,
-                    max: 1.4,
-                    divisions: 7,
-                    value: (pitch ?? c.ttsPitch).clamp(0.7, 1.4),
-                    label: (pitch ?? c.ttsPitch).toStringAsFixed(1),
-                    onChanged: (v) => setState(() => pitch = v),
-                    onChangeEnd: (v) => c.setOption('ttsPitch', v),
-                  ),
-                ),
-              ],
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Écouter la voix'),
-                onPressed: () => c.speak(
-                  'Salut${c.callName.isEmpty ? '' : ' ${c.callName}'} ! C\'est Clicky. Je suis là pour t\'aider.',
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
 /// Raccourcis vocaux.
 class _SkillsEditor extends StatefulWidget {
@@ -684,7 +593,7 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
         testing = false;
         info = err == null
             ? null
-            : 'La voix choisie ne répond pas ($err) : Clicky utilise la voix de Windows à la place.';
+            : 'La voix choisie ne répond pas ($err). Vérifie ta connexion internet ; sinon Clicky répond par écrit.';
       });
     }
   }
@@ -701,31 +610,25 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
             label: Text('Neurale (gratuite)'),
           ),
           ButtonSegment(value: 'gemini', icon: Icon(Icons.diamond_rounded), label: Text('Gemini')),
-          ButtonSegment(
-            value: 'system',
-            icon: Icon(Icons.computer_rounded),
-            label: Text('Windows'),
-          ),
         ],
         selected: {c.ttsEngine},
         onSelectionChanged: (v) => c.setOption('ttsEngine', v.first),
       ),
       const SizedBox(height: 6),
       Text(switch (c.ttsEngine) {
-        'edge' =>
-          'Voix neurales de Microsoft (celles de la lecture à voix haute d\'Edge) : très naturelles, '
-              'gratuites, sans clé. Il faut internet ; sinon Clicky reprend la voix de Windows.',
         'gemini' =>
           'Voix de Google Gemini avec une clé gratuite (aistudio.google.com → Get API key). Le quota '
               'gratuit est limité chaque jour : quand il est épuisé, la voix Microsoft prend le relais.',
-        _ => 'Voix installées sur Windows : hors ligne, plus robotiques.',
+        _ =>
+          'Voix neurales de Microsoft (celles de la lecture à voix haute d\'Edge) : très naturelles, '
+              'gratuites, sans clé ni limite. Il faut internet ; sans internet, Clicky répond par écrit.',
       }, style: Theme.of(context).textTheme.bodySmall),
       const SizedBox(height: 8),
       if (c.ttsEngine == 'edge')
         DropdownButtonFormField<String>(
           initialValue: EdgeVoice.voices.containsKey(c.neuralVoice)
               ? c.neuralVoice
-              : 'fr-FR-HenriNeural',
+              : 'fr-FR-RemyMultilingualNeural',
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Voix', border: OutlineInputBorder()),
           items: [
@@ -768,8 +671,7 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
           onChanged: (v) => c.setOption('geminiVoice', v ?? 'Charon'),
         ),
       ],
-      if (c.ttsEngine != 'system')
-        Align(
+      Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             icon: testing

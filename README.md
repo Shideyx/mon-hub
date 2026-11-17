@@ -52,6 +52,10 @@ Les alertes (messages, notes, devoirs, compagnons, Clicky) arrivent dans la cloc
 
 Réglages → *Journal des erreurs* : ce qui a planté (gardé sur le PC seulement), à copier pour corriger un souci. Clicky partout est relancé tout seul s'il se ferme.
 
+## Connexions sécurisées
+
+Au démarrage, Mon Hub fait confiance aux certificats de Windows (dont ceux d'un antivirus ou du réseau) et à la liste officielle de Mozilla (`assets/cacert.pem`, `lib/core/certificates.dart`) : plus d'erreur « CERTIFICATE_VERIFY_FAILED » (Spotify, École Directe…).
+
 ## Confidentialité et sécurité
 
 * **Aucun serveur** : Mon Hub ne parle qu'aux services que tu utilises (École Directe, Spotify, Google…), directement depuis ton appareil. Le créateur de l'appli n'a accès à aucune donnée de personne.
@@ -87,7 +91,7 @@ Réglages → *Journal des erreurs* : ce qui a planté (gardé sur le PC seuleme
   * **Capture des gestes** (« qu'est-ce que je viens de faire ? », sans jamais garder les lettres tapées) et **enregistrement de leçon** (compte rendu + captures dans Documents\Mon Hub\Leçons) : menu ⋮ de la boîte (`capture.dart`).
   * **Raccourcis vocaux** à toi (une phrase → ouvrir un site, lancer un programme, dire une phrase, poser une question) et **outils MCP** en plus (serveurs HTTPS ajoutés par toi, chaque action avec permission, `extensions.dart`).
   * **Vie privée** : pas de capture quand un gestionnaire de mots de passe ou une banque est ouvert à l'écran ; Échap arrête la réponse et la voix à tout moment.
-  * **Micro sur Windows** : **Whisper** (whisper.cpp, sur le PC, sans internet, installé en un clic : Réglages → Écoute) ou la reconnaissance vocale moderne de Windows en français ; en mode Automatique, Whisper prend le relais dès que Windows ne marche pas (comme Win + H, `ears.dart`), Réglages → **Tester le micro**. **Clicky se répare tout seul** : si la reconnaissance vocale ne démarre pas, il la relance d'une autre façon (sans fichier, avec fichier, lancement classique) ; sinon bouton **« Clicky répare »**, ou dis / écris « répare le micro » : il essaie tout, et s'il reste bloqué il t'explique le réglage à changer (outils `clicky_diagnostic` et `clicky_reparer_micro`, utilisables aussi par l'IA). **Voix** : toutes les voix installées sur le PC, vitesse et hauteur réglables. Sur Windows, **Clicky partout** : une fenêtre transparente suit la souris au-dessus de toutes les applis (`hub.exe --clicky`, `clicky_desktop.dart`).
+  * **Micro sur Windows** : **Whisper** (whisper.cpp, sur le PC, sans internet, installé en un clic : Réglages → Écoute) ou la reconnaissance vocale moderne de Windows en français ; en mode Automatique, Whisper prend le relais dès que Windows ne marche pas (comme Win + H, `ears.dart`), Réglages → **Tester le micro**. **Clicky se répare tout seul** : si la reconnaissance vocale ne démarre pas, il la relance d'une autre façon (sans fichier, avec fichier, lancement classique) ; sinon bouton **« Clicky répare »**, ou dis / écris « répare le micro » : il essaie tout, et s'il reste bloqué il t'explique le réglage à changer (outils `clicky_diagnostic` et `clicky_reparer_micro`, utilisables aussi par l'IA). **Voix** : voix neurales Microsoft (Rémy multilingue par défaut) ou Gemini, vitesse et hauteur réglables (la voix de Windows a été retirée). Sur Windows, **Clicky partout** : une fenêtre transparente suit la souris au-dessus de toutes les applis (`hub.exe --clicky`, `clicky_desktop.dart`).
 * **Logo et raccourcis** : icône Mon Hub sur toutes les plateformes ; raccourcis Bureau + menu Démarrer créés et réparés automatiquement sur Windows (entrée du menu des applications sur Linux).
 * **Claude** : discussion directe (ton abonnement Claude Pro, ou une clé API) **avec l'historique de toutes tes conversations**, + claude.ai intégré (ton compte habituel). Sur PC, l'extension `claude-extension/` (fichier `MonHub-Claude.mcpb`) permet à l'appli Claude de lire et d'agir dans Mon Hub via un pont local (`lib/core/claude_bridge.dart`, 127.0.0.1 + clé secrète). Chaque module déclare ses actions dans `tools`.
 
@@ -97,9 +101,8 @@ Chaque matin (à 7 h, ou dès que tu allumes le PC jusqu'à midi), Clicky fait t
 
 ## Voix de Clicky (gratuite)
 
-* **Voix neurale Microsoft** (par défaut) : les voix de la lecture à voix haute d'Edge (Henri, Denise, Rémy…), très naturelles, **gratuites et sans clé** (accès non officiel, comme l'outil libre edge-tts). Sans internet ou si le service refuse, Clicky reprend la voix de Windows.
+* **Voix neurale Microsoft** (par défaut) : les voix de la lecture à voix haute d'Edge (Henri, Denise, Rémy…), très naturelles, **gratuites et sans clé** (accès non officiel, comme l'outil libre edge-tts). Sans internet, Clicky répond par écrit.
 * **Gemini** : la voix de Google, avec une **clé gratuite** d'AI Studio (quota gratuit limité par jour ; quand il est épuisé, la voix Microsoft prend le relais).
-* **Windows** : hors ligne.
 
 ## Mises à jour automatiques (Windows)
 

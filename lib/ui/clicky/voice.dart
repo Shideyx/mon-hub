@@ -4,29 +4,19 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 
 import '../../core/claude_bridge.dart';
 import 'neural_voice.dart';
 
-/// Une voix du système (Windows : Paul, Hortense, Julie…).
-class SystemVoice {
-  const SystemVoice(this.name, this.locale);
-  final String name;
-  final String locale;
-
-  /// Voix d'homme, d'après le nom.
-  bool get male => RegExp(
-    r'paul|claude|henri|remy|rémy|guy|david|mark|george|ryan|thomas|daniel|james|male',
-    caseSensitive: false,
-  ).hasMatch(name);
-}
-
-/// La voix de Clicky : voix de Windows (hors ligne), choix de la voix, de la
-/// vitesse et de la hauteur, et lecture **phrase par phrase pendant que la
-/// réponse s'écrit** (il commence à parler sans attendre la fin).
+/// La voix de Clicky : voix neurales (Microsoft, gratuite et sans limite ;
+/// ou Gemini avec ta clé), vitesse et hauteur réglables, et lecture **phrase
+/// par phrase pendant que la réponse s'écrit** (il commence à parler sans
+/// attendre la fin).
+///
+/// La voix de Windows a été retirée : elle sonnait robotique, et son module
+/// (flutter_tts) faisait planter le programme sous Windows. Sans internet,
+/// Clicky répond par écrit.
 class ClickyVoice {
-  FlutterTts? _tts;
   int _generation = 0;
   final _queue = <String>[];
   bool _running = false;
@@ -37,7 +27,6 @@ class ClickyVoice {
   String _lastSpoken = '';
 
   /// Réglages appliqués avant chaque phrase.
-  String voiceName = '';
   String language = 'fr-FR';
   double rate = 1;
   double pitch = 1;
@@ -46,75 +35,6 @@ class ClickyVoice {
   String get lastSpoken => _lastSpoken;
 
   bool get speaking => _running;
-
-  FlutterTts get _engine => _tts ??= FlutterTts();
-
-  /// La voix de Windows est en train de parler.
-  ///
-  /// IMPORTANT : sous Windows, `FlutterTts.stop()` fait **planter tout le
-  /// programme** s'il n'est pas en train de parler (le module répond à une
-  /// demande qui n'existe pas). On ne l'appelle donc que dans ce cas.
-  bool _ttsSpeaking = false;
-
-  Future<void> _stopTts() async {
-    if (!_ttsSpeaking) return;
-    _ttsSpeaking = false;
-    try {
-      await _tts?.stop();
-    } catch (_) {}
-  }
-
-  static List<SystemVoice>? _voices;
-
-  /// Voix installées sur l'appareil.
-  Future<List<SystemVoice>> voices() async {
-    final cached = _voices;
-    if (cached != null) return cached;
-    try {
-      final raw = await _engine.getVoices;
-      final out = <SystemVoice>[
-        for (final v in (raw as List? ?? const []))
-          if (v is Map) SystemVoice('${v['name'] ?? ''}', '${v['locale'] ?? ''}'),
-      ]..removeWhere((v) => v.name.isEmpty);
-      out.sort((a, b) => '${a.locale}${a.name}'.compareTo('${b.locale}${b.name}'));
-      return _voices = out;
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  /// La voix à utiliser pour [lang] : celle choisie si elle parle cette
-  /// langue, sinon une voix de cette langue (d'homme si [preferMale]).
-  Future<SystemVoice?> pick(String lang, {bool preferMale = false}) async {
-    final all = await voices();
-    final prefix = lang.split('-').first.toLowerCase();
-    bool speaks(SystemVoice v) => v.locale.toLowerCase().replaceAll('_', '-').startsWith(prefix);
-    final chosen = all.where((v) => v.name == voiceName).firstOrNull;
-    if (chosen != null && speaks(chosen)) return chosen;
-    final same = all.where(speaks).toList();
-    if (same.isEmpty) return null;
-    if (preferMale) return same.where((v) => v.male).firstOrNull ?? same.first;
-    return same.first;
-  }
-
-  bool preferMale = false;
-
-  Future<void> _apply() async {
-    final t = _engine;
-    await t.setLanguage(language);
-    final v = await pick(language, preferMale: preferMale);
-    if (v != null) {
-      try {
-        await t.setVoice({'name': v.name, 'locale': v.locale});
-      } catch (_) {}
-    }
-    final mobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
-    await t.setSpeechRate(((mobile ? 0.5 : 0.55) * rate).clamp(0.1, 1.0));
-    try {
-      await t.setPitch(pitch.clamp(0.5, 2.0));
-    } catch (_) {}
-    await t.awaitSpeakCompletion(true);
-  }
 
   /// Lit tout un texte (et attend la fin).
   Future<void> say(String text) async {
@@ -158,36 +78,27 @@ class ClickyVoice {
     if (!_running) unawaited(_run(_generation));
   }
 
-  /// Moteur : 'edge' (voix neurale Microsoft, gratuite), 'gemini' (clé
-  /// gratuite), 'system' (voix de Windows, hors ligne).
+  /// Moteur : 'edge' (voix neurale Microsoft, gratuite, sans limite) ou
+  /// 'gemini' (clé gratuite).
   String engine = 'edge';
-  String neuralVoice = 'fr-FR-HenriNeural';
+  String neuralVoice = 'fr-FR-RemyMultilingualNeural';
   String geminiKey = '';
   String geminiVoice = 'Charon';
 
-  /// Dernier souci de la voix neurale (affiché dans les réglages). Après un
-  /// échec, Clicky repasse sur la voix de Windows jusqu'au prochain essai.
+  /// Dernier souci de la voix (affiché dans les réglages).
   String? neuralError;
-  DateTime? _neuralDownUntil;
 
   AudioPlayer? _player;
-
-  bool get _neural =>
-      (engine == 'edge' || engine == 'gemini') &&
-      (_neuralDownUntil == null || DateTime.now().isAfter(_neuralDownUntil!));
 
   /// Gemini a échoué (quota gratuit épuisé…) : voix Microsoft un moment.
   DateTime? _geminiDownUntil;
 
+  bool get _geminiOk =>
+      geminiKey.trim().isNotEmpty && (_geminiDownUntil == null || DateTime.now().isAfter(_geminiDownUntil!));
+
   /// La voix d'une réponse, choisie une fois pour toute la réponse : jamais
   /// deux voix différentes en même temps.
-  String _pickEngine() {
-    if (!_neural) return 'system';
-    if (engine == 'gemini' && (_geminiDownUntil == null || DateTime.now().isAfter(_geminiDownUntil!))) {
-      return 'gemini';
-    }
-    return 'edge';
-  }
+  String _pickEngine() => engine == 'gemini' && _geminiOk ? 'gemini' : 'edge';
 
   Future<Uint8List> _synthWith(String eng, String text) => eng == 'gemini'
       ? GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice)
@@ -226,8 +137,6 @@ class ClickyVoice {
     );
     await f.writeAsBytes(bytes, flush: true);
     if (gen != _generation) return;
-    // Jamais par-dessus la voix de Windows.
-    await _stopTts();
     var finished = false;
     final sub = p.onPlayerComplete.listen((_) => finished = true);
     final started = DateTime.now();
@@ -252,69 +161,56 @@ class ClickyVoice {
     _running = true;
     await VoiceLock.acquire();
     try {
-      await _apply();
       var eng = _pickEngine();
       Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
-        if (eng != 'system') {
-          try {
-            final audio = await (next ?? _synthWith(eng, s));
-            next = null;
-            if (gen != _generation) break;
-            // On prépare la phrase suivante (même voix) pendant la lecture.
-            if (_queue.isNotEmpty) {
-              final n = _synthWith(eng, _queue.first);
-              n.then((_) {}, onError: (Object _) {});
-              next = n;
-            }
-            await _play(audio, gen);
-            neuralError = null;
-            continue;
-          } catch (e) {
-            neuralError = '$e';
-            next = null;
-            try {
-              await _player?.stop();
-            } catch (_) {}
-            if (gen != _generation) break;
-            if (eng == 'gemini') {
-              // Gemini indisponible : la voix Microsoft lit la suite de la
-              // réponse (on ne revient pas en arrière au milieu).
-              // Quota gratuit épuisé : voix Microsoft (illimitée) une heure.
-              _geminiDownUntil = DateTime.now().add(
-                RegExp(r'429|quota|RESOURCE_EXHAUSTED', caseSensitive: false).hasMatch('$e')
-                    ? const Duration(hours: 1)
-                    : const Duration(minutes: 10),
-              );
-              eng = 'edge';
-              try {
-                await _play(await _synthWith(eng, s), gen);
-                continue;
-              } catch (_) {}
-            }
-            // Plus de voix en ligne : voix de Windows pendant 10 minutes.
-            _neuralDownUntil = DateTime.now().add(const Duration(minutes: 10));
-            eng = 'system';
+        try {
+          final audio = await (next ?? _synthWith(eng, s));
+          next = null;
+          if (gen != _generation) break;
+          // On prépare la phrase suivante (même voix) pendant la lecture.
+          if (_queue.isNotEmpty) {
+            final n = _synthWith(eng, _queue.first);
+            n.then((_) {}, onError: (Object _) {});
+            next = n;
           }
-        }
-        // Voix de Windows : rien d'autre ne joue en même temps.
-        try {
-          await _player?.stop();
-        } catch (_) {}
-        if (gen != _generation) break;
-        _ttsSpeaking = true;
-        try {
-          await _engine.speak(s);
-        } catch (_) {
-        } finally {
-          _ttsSpeaking = false;
+          await _play(audio, gen);
+          neuralError = null;
+        } catch (e) {
+          neuralError = '$e';
+          next = null;
+          try {
+            await _player?.stop();
+          } catch (_) {}
+          if (gen != _generation) break;
+          // L'autre voix lit la suite de la réponse (on ne revient pas en
+          // arrière au milieu) ; sans aucune voix, Clicky répond par écrit.
+          if (eng == 'gemini') {
+            // Quota gratuit épuisé : voix Microsoft (sans limite) une heure.
+            _geminiDownUntil = DateTime.now().add(
+              RegExp(r'429|quota|RESOURCE_EXHAUSTED', caseSensitive: false).hasMatch('$e')
+                  ? const Duration(hours: 1)
+                  : const Duration(minutes: 10),
+            );
+            eng = 'edge';
+          } else if (_geminiOk) {
+            eng = 'gemini';
+          } else {
+            break;
+          }
+          try {
+            await _play(await _synthWith(eng, s), gen);
+          } catch (_) {
+            break;
+          }
         }
       }
     } catch (_) {
     } finally {
       VoiceLock.release();
       if (gen == _generation) {
+        _queue.clear();
         _running = false;
         _drained?.complete();
         _drained = null;
@@ -324,7 +220,6 @@ class ClickyVoice {
 
   /// Essaie la voix choisie (bouton « Écouter » des réglages).
   Future<String?> test(String text) async {
-    _neuralDownUntil = null;
     _geminiDownUntil = null;
     neuralError = null;
     await say(text);
@@ -346,7 +241,6 @@ class ClickyVoice {
     final d = _drained;
     _drained = null;
     d?.complete();
-    unawaited(_stopTts());
     try {
       unawaited(_player?.stop());
     } catch (_) {}

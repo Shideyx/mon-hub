@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
 import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
@@ -28,6 +29,9 @@ Future<void> main(List<String> args) async {
   // Journal des erreurs (sur le PC) et garde-fous : une erreur ne casse
   // plus tout l'écran.
   ErrorLog.install('Mon Hub');
+  // Certificats de Windows (antivirus, réseau…) et de Mozilla : plus
+  // d'erreur « CERTIFICATE_VERIFY_FAILED ».
+  await TrustedCertificates.install();
   await ModuleStore.init();
   AppSession.instance.restore();
   // Raccourcis Bureau / menu Démarrer, créés ou réparés tout seuls.
