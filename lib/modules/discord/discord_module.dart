@@ -1,20 +1,21 @@
 import 'dart:io' show File;
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:file_selector/file_selector.dart';
-import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
 import '../../ui/web_login.dart';
 import '../../ui/call_page.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import 'discord_api.dart';
+import 'discord_phone.dart';
 
-/// Discord : tes messages privés (avec ton jeton, lecture seule) + l'état de
-/// tes serveurs via le widget public officiel.
+/// Discord : tes messages privés, tous tes serveurs et leurs salons, et les
+/// appels reçus et passés dans Mon Hub (le Discord officiel gardé ouvert en
+/// fond, voir discord_phone.dart).
 class DiscordModule extends HubModule {
   @override
   String get id => 'discord';
@@ -38,6 +39,83 @@ class DiscordModule extends HubModule {
   String? lastError;
 
   bool get connected => store.getJson<bool>('connected') == true;
+
+  /// Recevoir et passer les appels dans Mon Hub (activé par défaut).
+  bool get phoneEnabled => store.getJson<bool>('phone') ?? true;
+
+  Future<void> setPhone(bool v) async {
+    await store.setJson('phone', v);
+    syncPhone();
+  }
+
+  /// Ouvre ou ferme le Discord caché qui reçoit les appels.
+  void syncPhone() {
+    final phone = DiscordPhone.instance;
+    if (connected && phoneEnabled) {
+      phone.start();
+    } else {
+      phone.stop();
+    }
+  }
+
+  /// Le téléphone Discord de Mon Hub est prêt à appeler.
+  bool get phoneReady => DiscordPhone.supported && DiscordPhone.allowed && connected && phoneEnabled;
+
+  /// Appelle une conversation privée : dans Mon Hub (Discord caché), sinon
+  /// dans une page d'appel.
+  Future<void> callDm(BuildContext? context, String channelId, {required String title, bool video = false}) async {
+    if (phoneReady) {
+      unawaited(DiscordPhone.instance.call(channelId, video: video, title: title));
+      return;
+    }
+    final ctx = context ?? await hubDialogContext();
+    if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
+    unawaited(CallPage.open(
+      ctx,
+      url: 'https://discord.com/channels/@me/$channelId',
+      title: title,
+      video: video,
+      color: color,
+    ));
+  }
+
+  /// Rejoint un salon vocal d'un serveur.
+  Future<void> joinVoice(BuildContext? context, String guildId, DiscordChannel ch) async {
+    if (phoneReady) {
+      unawaited(DiscordPhone.instance.joinVoice(guildId, ch.id, title: '🔊 ${ch.name}'));
+      return;
+    }
+    final ctx = context ?? await hubDialogContext();
+    if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
+    unawaited(Navigator.push(
+      ctx,
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text('🔊 ${ch.name}')),
+          body: HubWebView(url: 'https://discord.com/channels/$guildId/${ch.id}', desktopUserAgent: true),
+        ),
+      ),
+    ));
+  }
+
+  List<DiscordGuild>? _guilds;
+  final _channels = <String, List<DiscordChannel>>{};
+
+  /// Tes serveurs (gardés en mémoire pendant que Mon Hub est ouvert).
+  Future<List<DiscordGuild>> guilds({bool force = false}) async {
+    if (_guilds != null && !force) return _guilds!;
+    final api = await _client();
+    if (api == null) throw 'Discord n\'est pas connecté';
+    return _guilds = await api.guilds();
+  }
+
+  Future<List<DiscordChannel>> channels(String guildId, {bool force = false}) async {
+    final known = _channels[guildId];
+    if (known != null && !force) return known;
+    final api = await _client();
+    if (api == null) throw 'Discord n\'est pas connecté';
+    return _channels[guildId] = await api.channels(guildId);
+  }
 
   Future<DiscordApi?> _client() async {
     if (_api != null) return _api;
@@ -164,16 +242,70 @@ class DiscordModule extends HubModule {
           },
           required: ['id'],
           run: (a) async {
-            final ctx = await hubDialogContext();
-            if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
-            unawaited(CallPage.open(
-              ctx,
-              url: 'https://discord.com/channels/@me/${a['id']}',
-              title: 'Discord',
-              video: a['video'] == true,
-              color: color,
-            ));
-            return {'ok': true, 'appel': a['video'] == true ? 'vidéo' : 'vocal'};
+            final id = a['id'] as String;
+            final dm = _dms.where((d) => d.id == id).firstOrNull;
+            await callDm(null, id, title: dm?.name ?? 'Discord', video: a['video'] == true);
+            return {'ok': true, 'appel': a['video'] == true ? 'vidéo' : 'vocal', 'dans_mon_hub': phoneReady};
+          },
+        ),
+        HubTool(
+          name: 'discord_appel',
+          description: 'Gère l\'appel Discord en cours : répondre (vocal ou vidéo), refuser, raccrocher, '
+              'ou voir l\'état (qui appelle).',
+          params: {'action': ('string', 'repondre, repondre_video, refuser, raccrocher ou etat')},
+          required: ['action'],
+          run: (a) async {
+            final p = DiscordPhone.instance;
+            if (!p.active) throw 'Les appels Discord dans Mon Hub sont désactivés';
+            final ok = switch ('${a['action']}') {
+              'repondre' => await p.answer(),
+              'repondre_video' => await p.answer(video: true),
+              'refuser' => await p.decline(),
+              'raccrocher' => await p.hangUp(),
+              _ => true,
+            };
+            return {'ok': ok, 'etat': p.state.name, if (p.who.isNotEmpty) 'qui': p.who};
+          },
+        ),
+        HubTool(
+          name: 'discord_serveurs',
+          description: 'Liste tes serveurs Discord.',
+          run: (_) async => [
+            for (final g in await guilds())
+              {'id': g.id, 'nom': g.name, if (g.online != null) 'en_ligne': g.online},
+          ],
+        ),
+        HubTool(
+          name: 'discord_salons',
+          description: 'Salons d\'un serveur Discord (textuels et vocaux). Les messages d\'un salon textuel se '
+              'lisent avec discord_messages et s\'envoient avec discord_envoyer (id du salon).',
+          params: {'serveur': ('string', 'id du serveur (discord_serveurs)')},
+          required: ['serveur'],
+          run: (a) async => [
+            for (final (cat, list) in DiscordChannel.grouped(await channels(a['serveur'] as String)))
+              for (final c in list)
+                {
+                  'id': c.id,
+                  'nom': c.name,
+                  'type': c.isVoice ? 'vocal' : 'texte',
+                  if (cat != null) 'categorie': cat.name,
+                },
+          ],
+        ),
+        HubTool(
+          name: 'discord_rejoindre_vocal',
+          description: 'Rejoint un salon vocal d\'un serveur Discord, dans Mon Hub.',
+          params: {
+            'serveur': ('string', 'id du serveur'),
+            'salon': ('string', 'id du salon vocal (discord_salons)'),
+          },
+          required: ['serveur', 'salon'],
+          run: (a) async {
+            final list = await channels(a['serveur'] as String);
+            final ch = list.where((c) => c.id == a['salon']).firstOrNull;
+            if (ch == null || !ch.isVoice) throw 'Ce salon vocal n\'existe pas';
+            await joinVoice(null, a['serveur'] as String, ch);
+            return {'ok': true};
           },
         ),
         HubTool(
@@ -277,6 +409,7 @@ class DiscordModule extends HubModule {
       await store.setJson('connected', true);
       await load(force: true);
       store.changed();
+      syncPhone();
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Connecté en tant que ${u.name}')));
@@ -289,6 +422,9 @@ class DiscordModule extends HubModule {
   Future<void> disconnect() async {
     await store.writeSecret('token', null);
     await store.setJson('connected', null);
+    DiscordPhone.instance.stop();
+    _guilds = null;
+    _channels.clear();
     _api = null;
     me = null;
     _dms = [];
@@ -296,21 +432,6 @@ class DiscordModule extends HubModule {
     _loading = null;
     store.changed();
   }
-
-  // ---------- Serveurs (widget public officiel) ----------
-
-  List<String> get guildIds =>
-      (store.getJson<List<dynamic>>('guilds') ?? const []).cast<String>();
-
-  Future<List<Map<String, dynamic>>> fetchGuilds() => Future.wait(guildIds.map((id) async {
-        try {
-          final r = await http.get(Uri.parse('https://discord.com/api/guilds/$id/widget.json'));
-          if (r.statusCode != 200) return {'id': id, 'error': 'Widget désactivé'};
-          return {'id': id, ...jsonDecode(r.body) as Map<String, dynamic>};
-        } catch (e) {
-          return {'id': id, 'error': '$e'};
-        }
-      }));
 
   // ---------- Interface ----------
 
@@ -326,7 +447,7 @@ class DiscordModule extends HubModule {
             future: load(),
             initialData: _dms,
             builder: (context, snap) {
-              final list = (snap.data ?? []).take(4).toList();
+              final list = (snap.data ?? []).take(10).toList();
               if (list.isEmpty) {
                 return snap.connectionState == ConnectionState.waiting
                     ? const LoadingHint()
@@ -335,10 +456,24 @@ class DiscordModule extends HubModule {
                             ? null
                             : ('Réessayer', () => load(force: true).then((_) => store.changed())));
               }
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                physics: const NeverScrollableScrollPhysics(),
-                children: [for (final d in list) _dmTile(context, d, dense: true)],
+              return ChatsSummary(
+                color: color,
+                items: [
+                  for (final d in list)
+                    ChatItem(
+                      name: d.name,
+                      preview: d.last?.preview ?? '',
+                      avatarUrl: d.avatarUrl,
+                      unread: isUnread(d),
+                      at: d.last?.at,
+                      mine: d.last != null && d.last!.author.id == me?.id,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => _ConversationPage(module: this, channelId: d.id, title: d.name)),
+                      ),
+                    ),
+                ],
               );
             },
           );
@@ -412,9 +547,17 @@ class DiscordModule extends HubModule {
               _dmsTab(context),
               _guildsTab(context),
               // Le vrai Discord (serveurs, salons, appels…) dans l'appli, avec
-              // la session gardée d'une fois sur l'autre.
+              // la session gardée d'une fois sur l'autre. Si le Discord caché
+              // tourne déjà (appels), on l'affiche lui plutôt qu'un deuxième.
               if (webLoginSupported)
-                const HubWebView(url: 'https://discord.com/channels/@me', desktopUserAgent: true),
+                phoneReady
+                    ? EmptyHint(
+                        'Le vrai Discord, en grand dans Mon Hub (serveurs, salons, appels, '
+                        'paramètres…). Reviens ici avec « Réduire ».',
+                        icon: Icons.open_in_full_rounded,
+                        action: ('Ouvrir Discord', DiscordPhone.instance.show),
+                      )
+                    : const HubWebView(url: 'https://discord.com/channels/@me', desktopUserAgent: true),
             ],
           ),
         ),
@@ -438,6 +581,18 @@ class DiscordModule extends HubModule {
               leading: HubAvatar(url: me!.avatarUrl, label: me!.name, color: color),
               title: Text('Connecté : ${me!.name}'),
               trailing: TextButton(onPressed: disconnect, child: const Text('Déconnecter')),
+            ),
+          if (DiscordPhone.supported)
+            SwitchListTile(
+              secondary: const Icon(Icons.ring_volume_rounded),
+              title: const Text('Recevoir et passer les appels dans Mon Hub'),
+              subtitle: const Text('Discord reste ouvert en fond, sans navigateur : Mon Hub sonne quand on '
+                  't\'appelle.'),
+              value: phoneEnabled,
+              onChanged: (v) async {
+                await setPhone(v);
+                store.changed();
+              },
             ),
           if (lastError != null) ...[
             ErrorBanner(lastError!),
@@ -510,55 +665,270 @@ class DiscordModule extends HubModule {
     }
   }
 
-  Widget _guildsTab(BuildContext context) => FutureBuilder(
-        future: fetchGuilds(),
-        builder: (context, snap) => ListView(
-          padding: const EdgeInsets.only(bottom: 24),
-          children: [
-            for (final g in snap.data ?? <Map<String, dynamic>>[])
-              ListTile(
-                leading: HubAvatar(label: g['name'] as String? ?? '#', color: color),
-                title: Text(g['name'] as String? ?? g['id'] as String),
-                subtitle: Text(g['error'] as String? ?? '● ${g['presence_count']} en ligne'),
-                onTap: () => openLink(context, 'https://discord.com/channels/${g['id']}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  onPressed: () => store.setJson(
-                      'guilds', guildIds.where((x) => x != g['id']).toList()),
+  Widget _guildsTab(BuildContext context) {
+    if (!connected) {
+      return EmptyHint('Connecte ton compte Discord pour voir tous tes serveurs',
+          icon: Icons.dns_rounded, action: ('Connecter mon compte', () => connect(context)));
+    }
+    return _GuildsGrid(module: this);
+  }
+}
+
+/// Tous tes serveurs, en grandes icônes.
+class _GuildsGrid extends StatefulWidget {
+  const _GuildsGrid({required this.module});
+  final DiscordModule module;
+
+  @override
+  State<_GuildsGrid> createState() => _GuildsGridState();
+}
+
+class _GuildsGridState extends State<_GuildsGrid> {
+  late Future<List<DiscordGuild>> future = widget.module.guilds();
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.module;
+    final theme = Theme.of(context);
+    return FutureBuilder(
+      future: future,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return EmptyHint('${snap.error}', action: ('Réessayer', () {
+            setState(() => future = m.guilds(force: true));
+          }));
+        }
+        if (!snap.hasData) return const LoadingHint();
+        final all = snap.data!;
+        final q = query.toLowerCase();
+        final list = q.isEmpty ? all : all.where((g) => g.name.toLowerCase().contains(q)).toList();
+        return RefreshIndicator(
+          onRefresh: () async {
+            final f = m.guilds(force: true);
+            setState(() => future = f);
+            await f;
+          },
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintText: 'Chercher parmi tes ${all.length} serveurs',
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setState(() => query = v),
+                  ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Ajouter un serveur'),
-                onPressed: () async {
-                  final r = await askFields(context,
-                      title: 'ID du serveur',
-                      labels: ['Clic droit sur le serveur > Copier l\'identifiant']);
-                  final v = r?.first.trim() ?? '';
-                  if (v.isNotEmpty) await store.setJson('guilds', {...guildIds, v}.toList());
-                },
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                sliver: SliverGrid.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 150,
+                    mainAxisExtent: 150,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: list.length,
+                  itemBuilder: (context, i) {
+                    final g = list[i];
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => _GuildPage(module: m, guild: g)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          children: [
+                            _GuildIcon(guild: g, size: 64, color: m.color),
+                            const SizedBox(height: 8),
+                            Text(
+                              g.name,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if (g.online != null)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Dot(color: Color(0xFF23A55A), size: 7),
+                                  const SizedBox(width: 4),
+                                  Text('${g.online} en ligne', style: theme.textTheme.labelSmall),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Le nombre de membres en ligne s\'affiche si le widget est activé '
-                '(Paramètres du serveur > Widget).',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// L'icône d'un serveur (ou ses initiales).
+class _GuildIcon extends StatelessWidget {
+  const _GuildIcon({required this.guild, required this.size, required this.color});
+  final DiscordGuild guild;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = guild.name
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .take(3)
+        .map((w) => w.characters.first)
+        .join();
+    final fallback = Container(
+      color: color,
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? '#' : initials,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * 0.3),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.3),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: guild.iconUrl == null
+            ? fallback
+            : Image.network(guild.iconUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback),
+      ),
+    );
+  }
+}
+
+/// Les salons d'un serveur, rangés par catégorie comme dans Discord.
+class _GuildPage extends StatefulWidget {
+  const _GuildPage({required this.module, required this.guild});
+  final DiscordModule module;
+  final DiscordGuild guild;
+
+  @override
+  State<_GuildPage> createState() => _GuildPageState();
+}
+
+class _GuildPageState extends State<_GuildPage> {
+  late Future<List<DiscordChannel>> future = widget.module.channels(widget.guild.id);
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.module;
+    final g = widget.guild;
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            _GuildIcon(guild: g, size: 32, color: m.color),
+            const SizedBox(width: 12),
+            Expanded(child: Text(g.name, overflow: TextOverflow.ellipsis)),
           ],
         ),
-      );
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => setState(() => future = m.channels(g.id, force: true)),
+          ),
+        ],
+      ),
+      body: FutureBuilder(
+        future: future,
+        builder: (context, snap) {
+          if (snap.hasError) return EmptyHint('${snap.error}');
+          if (!snap.hasData) return const LoadingHint();
+          final groups = DiscordChannel.grouped(snap.data!);
+          if (groups.isEmpty) return const EmptyHint('Aucun salon visible');
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+            children: [
+              for (final (cat, list) in groups) ...[
+                if (cat != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 4),
+                    child: Text(
+                      cat.name.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        letterSpacing: 1.1,
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                for (final c in list)
+                  Card(
+                    margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      leading: Icon(
+                        c.isVoice
+                            ? Icons.volume_up_rounded
+                            : c.type == 5
+                                ? Icons.campaign_rounded
+                                : Icons.tag_rounded,
+                        color: c.isVoice ? const Color(0xFF23A55A) : m.color,
+                      ),
+                      title: Text(c.name, overflow: TextOverflow.ellipsis),
+                      subtitle: c.topic.isEmpty
+                          ? null
+                          : Text(c.topic, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      trailing: c.isVoice
+                          ? FilledButton.tonalIcon(
+                              icon: const Icon(Icons.headset_mic_rounded, size: 18),
+                              label: const Text('Rejoindre'),
+                              onPressed: () => m.joinVoice(context, g.id, c),
+                            )
+                          : const Icon(Icons.chevron_right_rounded),
+                      onTap: () => c.isVoice
+                          ? m.joinVoice(context, g.id, c)
+                          : Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => _ConversationPage(
+                                  module: m,
+                                  channelId: c.id,
+                                  title: '#${c.name}',
+                                  canCall: false,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _ConversationPage extends StatefulWidget {
-  const _ConversationPage({required this.module, required this.channelId, required this.title});
+  const _ConversationPage({required this.module, required this.channelId, required this.title, this.canCall = true});
   final DiscordModule module;
   final String channelId;
   final String title;
+
+  /// Conversation privée (on peut appeler) ; non pour un salon de serveur.
+  final bool canCall;
 
   @override
   State<_ConversationPage> createState() => _ConversationPageState();
@@ -605,28 +975,18 @@ class _ConversationPageState extends State<_ConversationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title), actions: [
-        IconButton(
-          tooltip: 'Appel vocal',
-          icon: const Icon(Icons.call_rounded),
-          onPressed: () => CallPage.open(
-            context,
-            url: 'https://discord.com/channels/@me/${widget.channelId}',
-            title: widget.title,
-            video: false,
-            color: widget.module.color,
+        if (widget.canCall) ...[
+          IconButton(
+            tooltip: 'Appel vocal',
+            icon: const Icon(Icons.call_rounded),
+            onPressed: () => module.callDm(context, widget.channelId, title: widget.title),
           ),
-        ),
-        IconButton(
-          tooltip: 'Appel vidéo',
-          icon: const Icon(Icons.videocam_rounded),
-          onPressed: () => CallPage.open(
-            context,
-            url: 'https://discord.com/channels/@me/${widget.channelId}',
-            title: widget.title,
-            video: true,
-            color: widget.module.color,
+          IconButton(
+            tooltip: 'Appel vidéo',
+            icon: const Icon(Icons.videocam_rounded),
+            onPressed: () => module.callDm(context, widget.channelId, title: widget.title, video: true),
           ),
-        ),
+        ],
       ]),
       body: Column(
         children: [

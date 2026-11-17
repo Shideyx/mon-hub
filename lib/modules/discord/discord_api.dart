@@ -152,6 +152,79 @@ class DiscordDm {
   String? get avatarUrl => recipients.length == 1 ? recipients.first.avatarUrl : null;
 }
 
+/// Un serveur Discord dont tu fais partie.
+class DiscordGuild {
+  DiscordGuild(this.id, this.name, this.icon, {this.members, this.online});
+  final String id;
+  final String name;
+  final String? icon;
+  final int? members;
+  final int? online;
+
+  String? get iconUrl => icon == null
+      ? null
+      : 'https://cdn.discordapp.com/icons/$id/$icon.${icon!.startsWith('a_') ? 'gif' : 'png'}?size=128';
+
+  factory DiscordGuild.fromJson(Map<String, dynamic> j) => DiscordGuild(
+        '${j['id']}',
+        j['name'] as String? ?? 'Serveur',
+        j['icon'] as String?,
+        members: (j['approximate_member_count'] as num?)?.toInt(),
+        online: (j['approximate_presence_count'] as num?)?.toInt(),
+      );
+}
+
+/// Un salon d'un serveur (textuel, vocal, catégorie…).
+class DiscordChannel {
+  DiscordChannel(this.id, this.name, this.type, {this.parentId, this.position = 0, this.topic = ''});
+  final String id;
+  final String name;
+
+  /// 0 texte, 2 vocal, 4 catégorie, 5 annonces, 13 conférence, 15 forum.
+  final int type;
+  final String? parentId;
+  final int position;
+  final String topic;
+
+  bool get isCategory => type == 4;
+  bool get isText => type == 0 || type == 5;
+  bool get isVoice => type == 2 || type == 13;
+
+  factory DiscordChannel.fromJson(Map<String, dynamic> j) => DiscordChannel(
+        '${j['id']}',
+        j['name'] as String? ?? '',
+        (j['type'] as num?)?.toInt() ?? 0,
+        parentId: j['parent_id'] as String?,
+        position: (j['position'] as num?)?.toInt() ?? 0,
+        topic: j['topic'] as String? ?? '',
+      );
+
+  /// Rangés comme dans Discord : d'abord les salons sans catégorie, puis
+  /// chaque catégorie ; dans une catégorie, les salons écrits avant les
+  /// vocaux.
+  static List<(DiscordChannel?, List<DiscordChannel>)> grouped(List<DiscordChannel> all) {
+    int order(DiscordChannel a, DiscordChannel b) {
+      final v = (a.isVoice ? 1 : 0).compareTo(b.isVoice ? 1 : 0);
+      if (v != 0) return v;
+      final p = a.position.compareTo(b.position);
+      return p != 0 ? p : a.id.compareTo(b.id);
+    }
+
+    final usable = all.where((c) => c.isText || c.isVoice).toList();
+    final cats = all.where((c) => c.isCategory).toList()
+      ..sort((a, b) => a.position != b.position ? a.position.compareTo(b.position) : a.id.compareTo(b.id));
+    final catIds = {for (final c in cats) c.id};
+    final out = <(DiscordChannel?, List<DiscordChannel>)>[];
+    final loose = usable.where((c) => c.parentId == null || !catIds.contains(c.parentId)).toList()..sort(order);
+    if (loose.isNotEmpty) out.add((null, loose));
+    for (final cat in cats) {
+      final inside = usable.where((c) => c.parentId == cat.id).toList()..sort(order);
+      if (inside.isNotEmpty) out.add((cat, inside));
+    }
+    return out;
+  }
+}
+
 /// Accès à ton compte Discord avec ton jeton utilisateur (lecture seule).
 ///
 /// ⚠️ Les conditions d'utilisation de Discord interdisent d'automatiser un
@@ -310,6 +383,18 @@ class DiscordApi {
           headers: _headers,
         ));
     _check(r);
+  }
+
+  /// Tous tes serveurs.
+  Future<List<DiscordGuild>> guilds() async {
+    final list = await _get('/users/@me/guilds?with_counts=true') as List;
+    return [for (final g in list) DiscordGuild.fromJson((g as Map).cast<String, dynamic>())];
+  }
+
+  /// Les salons d'un serveur.
+  Future<List<DiscordChannel>> channels(String guildId) async {
+    final list = await _get('/guilds/$guildId/channels') as List;
+    return [for (final c in list) DiscordChannel.fromJson((c as Map).cast<String, dynamic>())];
   }
 
   Future<List<DiscordMessage>> messages(String channelId, {int limit = 30}) async {

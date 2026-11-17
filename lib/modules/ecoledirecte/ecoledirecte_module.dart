@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import 'ed_client.dart';
 
@@ -586,23 +587,21 @@ class EcoleDirecteModule extends HubModule {
             final now = DateTime.now();
             final next = (snap.data ?? [])
                 .where((l) => l.end.isAfter(now) && !l.cancelled)
-                .take(5)
+                .take(7)
                 .toList();
             if (snap.connectionState == ConnectionState.waiting && next.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
             if (next.isEmpty) return const EmptyHint('Pas de cours à venir');
-            return ListView(
-              padding: EdgeInsets.zero,
-              children: [
+            return NextUpSummary(
+              items: [
                 for (final l in next)
-                  ListTile(
-                    dense: true,
-                    title: Text(l.subject),
-                    subtitle: Text(
-                      '${dayLabel(l.start)} · ${hhmm(l.start)}'
-                      '${l.room.isEmpty ? '' : ' · ${l.room}'}',
-                    ),
+                  NextItem(
+                    title: l.subject,
+                    start: l.start,
+                    end: l.end,
+                    color: lessonColor(l.color) ?? color,
+                    place: [l.room, l.teacher].where((x) => x.isNotEmpty).join(' · '),
                   ),
               ],
             );

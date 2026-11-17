@@ -44,3 +44,13 @@
   Liens web : `core/browser.dart` (Chrome par défaut). Widgets détachés : `core/desktop_widgets.dart`,
   `ui/widget_window.dart`, lanceur `windows/runner/main.cpp` (`--widget=`, AppUserModelID par widget ;
   le runner compile en /W4 /WX : aucun avertissement C++ toléré). Appels : `ui/call_page.dart`.
+- Accueil : les résumés des cartes ne sont **pas des listes** (la personne n'aime pas) : `ui/summary.dart`
+  (`NextUpSummary` prochain cours en grand + pastilles, `ChatsSummary` visages + bulle, `SummaryFace`,
+  `StatTile`).
+- Discord : serveurs/salons (`DiscordApi.guilds/channels`, `DiscordChannel.grouped`) ; appels sans
+  navigateur = `discord_phone.dart` : le Discord officiel (discord.com) caché derrière Mon Hub
+  (`DiscordPhoneLayer` dans le builder de `HubApp`, enfants du Stack **avec clés** pour ne jamais
+  reconstruire l'appli), sonnerie détectée dans la page (`statusScript`), boutons pressés par
+  `buttonScript`. Seule la fenêtre principale l'ouvre (`DiscordPhone.allowed`).
+- YouTube : `modules/youtube/` = le vrai youtube.com dans `HubWebView`, recherche sans clé
+  (`ytInitialData`, cookie `SOCS=CAI`), historique « Reprendre » local.

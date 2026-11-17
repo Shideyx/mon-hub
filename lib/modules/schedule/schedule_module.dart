@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import '../ecoledirecte/ecoledirecte_module.dart';
 import 'ics_parser.dart';
@@ -562,7 +563,7 @@ class ScheduleModule extends HubModule {
     builder: (context, _) => FutureBuilder(
       future: upcoming(),
       builder: (context, snap) {
-        final items = (snap.data ?? []).where((e) => !e.cancelled).take(5).toList();
+        final items = (snap.data ?? []).where((e) => !e.cancelled).take(7).toList();
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -572,23 +573,16 @@ class ScheduleModule extends HubModule {
             icon: Icons.add_rounded,
           );
         }
-        return ListView(
-          padding: EdgeInsets.zero,
-          children: [
+        return NextUpSummary(
+          items: [
             for (final e in items)
-              ListTile(
-                dense: true,
-                leading: Container(
-                  width: 4,
-                  height: 32,
-                  decoration: BoxDecoration(color: e.color, borderRadius: BorderRadius.circular(2)),
-                ),
-                title: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                  '${dayLabel(e.start)}'
-                  '${e.allDay ? '' : ' · ${hhmm(e.start)}'}'
-                  '${e.place.isEmpty ? '' : ' · ${e.place}'}',
-                ),
+              NextItem(
+                title: e.title,
+                start: e.start,
+                end: e.end,
+                color: e.color,
+                place: e.place,
+                allDay: e.allDay,
               ),
           ],
         );

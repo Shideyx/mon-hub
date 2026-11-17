@@ -12,6 +12,7 @@ import '../../core/nav.dart';
 import '../../ui/web_login.dart';
 import '../../core/photo.dart';
 import '../../ui/call_page.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 
 class IgUser {
@@ -840,16 +841,29 @@ class InstagramModule extends HubModule {
         future: load(),
         initialData: _threads,
         builder: (context, snap) {
-          final list = (snap.data ?? []).take(4).toList();
+          final list = (snap.data ?? []).take(10).toList();
           if (list.isEmpty) {
             return snap.connectionState == ConnectionState.waiting
                 ? const LoadingHint()
                 : EmptyHint(lastError ?? 'Aucun message');
           }
-          return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            physics: const NeverScrollableScrollPhysics(),
-            children: [for (final t in list) _threadTile(context, t, dense: true)],
+          return ChatsSummary(
+            color: color,
+            items: [
+              for (final t in list)
+                ChatItem(
+                  name: t.title,
+                  preview: t.last?.text ?? '',
+                  avatarUrl: t.users.length == 1 ? t.users.first.pic : null,
+                  unread: t.unread,
+                  at: t.last?.at,
+                  mine: t.last != null && t.last!.userId == me?.id,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => _ThreadPage(module: this, thread: t)),
+                  ),
+                ),
+            ],
           );
         },
       );
