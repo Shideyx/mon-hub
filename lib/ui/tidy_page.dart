@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/google_auth.dart';
+import 'google_setup.dart';
 import '../core/tidy.dart';
 import '../modules/drive/drive_tidy.dart';
 import 'widgets.dart';
@@ -216,7 +217,18 @@ class _TidyPageState extends State<TidyPage> {
           Text('Mon Google Drive', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           if (google == null)
-            const Text('Connecte ton compte Google (module Drive) pour que Clicky range ton Drive.')
+            Wrap(
+              spacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('Connecte ton compte Google pour que Clicky range ton Drive.'),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.login_rounded),
+                  label: Text(GoogleAuth.available ? 'Connecter Google' : 'Activer la connexion Google'),
+                  onPressed: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
+                ),
+              ],
+            )
           else ...[
             Text('Compte : $google', style: theme.textTheme.bodySmall),
             if (!GoogleAuth.canWriteDrive(google))

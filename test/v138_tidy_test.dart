@@ -1,7 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hub/core/google_auth.dart';
 import 'package:hub/core/hub_files.dart';
+import 'package:hub/core/module_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hub/core/tidy.dart';
 import 'package:hub/modules/drive/drive_tidy.dart';
 
@@ -73,6 +76,19 @@ void main() {
     expect(PcTidy.subject('Exposé_Histoire-géo_guerre froide.pptx'), 'Histoire-Géo');
     expect(PcTidy.subject('TP_physique_chimie.pdf'), 'Physique-Chimie');
     expect(PcTidy.subject('photo_all.jpg'), isNull);
+  });
+
+  test('connexion Google : l\'identifiant client se colle dans Mon Hub', () async {
+    SharedPreferences.setMockInitialValues({});
+    await ModuleStore.init();
+    expect(GoogleAuth.available, isFalse);
+    expect(() => GoogleAuth.setClient('n\'importe quoi', 'x'), throwsA(isA<String>()));
+    await GoogleAuth.setClient(' 123-abc.apps.googleusercontent.com ', ' GOCSPX-secret ');
+    expect(GoogleAuth.available, isTrue);
+    expect(GoogleAuth.clientId, '123-abc.apps.googleusercontent.com');
+    expect(GoogleAuth.clientSecret, 'GOCSPX-secret');
+    await GoogleAuth.setClient('', '');
+    expect(GoogleAuth.available, isFalse);
   });
 
   test('Drive : chaque type de fichier a son dossier', () {

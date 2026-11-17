@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/google_auth.dart';
 import '../core/module_store.dart';
 import 'clicky/hud.dart';
+import 'google_setup.dart';
 
 /// Clicky demande ton compte Google (une fois par compte Mon Hub) : pour
 /// ranger ton Drive, ouvrir et écrire tes Google Docs dans le Word de Mon
@@ -12,9 +13,10 @@ class GoogleWelcome {
 
   static const _seenKey = 'google.welcome.v137';
 
-  /// Il manque un compte Google, ou il n'a que la lecture du Drive.
+  /// Il manque un compte Google, ou il n'a que la lecture du Drive (ou la
+  /// connexion Google n'est pas encore activée).
   static bool get needed {
-    if (!GoogleAuth.available) return false;
+    if (!GoogleAuth.available) return true;
     final a = GoogleAuth.driveAccount;
     return a == null || !GoogleAuth.canWriteDrive(a);
   }
@@ -44,6 +46,13 @@ class _GoogleWelcomeDialogState extends State<_GoogleWelcomeDialog> {
   String? error;
 
   Future<void> _connect() async {
+    if (!GoogleAuth.available) {
+      // Il faut d'abord activer Google (une fois) : l'écran qui explique.
+      final nav = Navigator.of(context);
+      nav.pop();
+      await nav.push(MaterialPageRoute<void>(builder: (_) => const GoogleSetupPage()));
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -123,7 +132,9 @@ class _GoogleWelcomeDialogState extends State<_GoogleWelcomeDialog> {
                   ? '$done est connecté. Dis-moi « range mon Drive » ou ouvre un Google Doc dans Documents.'
                   : upgrade
                       ? 'Ton compte $existing est connecté en lecture seule. Autorise-moi aussi à modifier ton Drive :'
-                      : 'C\'est Clicky. Avec ton compte Google, je peux faire beaucoup plus pour toi :',
+                      : !GoogleAuth.available
+                          ? 'C\'est Clicky. Active Google une fois (5 minutes, je t\'explique tout) et je pourrai :'
+                          : 'C\'est Clicky. Avec ton compte Google, je peux faire beaucoup plus pour toi :',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFFB7D9E6), fontSize: 15, height: 1.45),
             ),
@@ -166,7 +177,13 @@ class _GoogleWelcomeDialogState extends State<_GoogleWelcomeDialog> {
                       icon: busy
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w900, fontSize: 18)),
-                      label: Text(busy ? 'Termine dans ton navigateur…' : (upgrade ? 'Autoriser' : 'Se connecter avec Google')),
+                      label: Text(
+                        busy
+                            ? 'Termine dans ton navigateur…'
+                            : !GoogleAuth.available
+                                ? 'Activer Google'
+                                : (upgrade ? 'Autoriser' : 'Se connecter avec Google'),
+                      ),
                       onPressed: busy ? null : _connect,
                     ),
                   ),

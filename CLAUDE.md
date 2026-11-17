@@ -68,3 +68,6 @@
   écran `ui/tidy_page.dart` (Réglages → Rangement). Outils `pc_ranger_apercu/pc_ranger/pc_ranger_annuler`,
   `drive_ranger_*` (« ranger » = action à autoriser dans `ClaudeBridge.isWriteAction` et `PcControl.isWrite`).
 - Compte Google demandé par Clicky après la visite guidée (et une fois aux anciens comptes) : `ui/google_welcome.dart`.
+- ⚠️ Les secrets GitHub GOOGLE_CLIENT_ID/SECRET sont **vides** (vu dans le journal de construction v1.37) : la
+  connexion Google s'active donc dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart`,
+  `GoogleAuth.setClient`, gardé dans les préférences ; un ID fourni à la construction reste prioritaire).

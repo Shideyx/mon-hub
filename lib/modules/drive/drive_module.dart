@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
 import 'drive_tidy.dart';
+import '../../ui/google_setup.dart';
 import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 
@@ -205,7 +206,11 @@ class DriveModule extends HubModule {
     listenable: store,
     builder: (context, _) {
       if (!GoogleAuth.available) {
-        return const EmptyHint('Ouvre la tuile pour voir ton Drive', icon: Icons.add_to_drive_rounded);
+        return EmptyHint(
+          'Active la connexion Google une fois pour voir et ranger ton Drive',
+          icon: Icons.add_to_drive_rounded,
+          action: ('Activer Google', () => GoogleSetupPage.open(context)),
+        );
       }
       if (account == null) {
         return EmptyHint(

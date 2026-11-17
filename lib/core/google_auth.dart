@@ -22,9 +22,42 @@ import 'browser.dart';
 class GoogleAuth {
   GoogleAuth._();
 
-  static const clientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
-  static const clientSecret = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
+  /// Identifiants « application de bureau » de Google : fournis à la
+  /// construction (secrets GitHub GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET),
+  /// sinon collés dans Réglages → Compte Google (ils ne sont pas secrets
+  /// pour une appli installée, Google le dit lui-même).
+  static const builtInId = String.fromEnvironment('GOOGLE_CLIENT_ID');
+  static const _builtInSecret = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
+
+  static String get clientId => builtInId.isNotEmpty ? builtInId : _custom().$1;
+  static String get clientSecret => builtInId.isNotEmpty ? _builtInSecret : _custom().$2;
   static bool get available => clientId.isNotEmpty;
+
+  static const _customKey = 'google.client';
+
+  static (String, String) _custom() {
+    try {
+      final raw = ModuleStore.prefs.getString(_customKey);
+      if (raw == null) return ('', '');
+      final j = jsonDecode(raw) as Map;
+      return ('${j['id'] ?? ''}'.trim(), '${j['secret'] ?? ''}'.trim());
+    } catch (_) {
+      return ('', '');
+    }
+  }
+
+  /// Enregistre les identifiants collés par la personne.
+  static Future<void> setClient(String id, String secret) async {
+    final i = id.trim();
+    if (i.isEmpty) {
+      await ModuleStore.prefs.remove(_customKey);
+      return;
+    }
+    if (!i.endsWith('.apps.googleusercontent.com')) {
+      throw 'Ce n\'est pas un identifiant client Google (il finit par « .apps.googleusercontent.com »)';
+    }
+    await ModuleStore.prefs.setString(_customKey, jsonEncode({'id': i, 'secret': secret.trim()}));
+  }
 
   static const scopes = [
     'openid',
@@ -68,7 +101,7 @@ class GoogleAuth {
 
   /// Ouvre la page Google et renvoie l'adresse du compte connecté.
   static Future<String> signIn() async {
-    if (!available) throw 'La connexion Google n\'est pas encore activée dans cette version';
+    if (!available) throw 'La connexion Google n\'est pas encore activée : Réglages → Connexion Google';
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final redirect = 'http://127.0.0.1:${server.port}';
     final verifier = _rand(64);
