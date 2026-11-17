@@ -10,6 +10,7 @@ import '../core/module_store.dart';
 import '../core/notifications.dart';
 import '../core/session.dart';
 import '../core/shortcuts.dart';
+import '../core/updater.dart';
 import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
 import 'clicky/clicky.dart';
@@ -55,8 +56,30 @@ class _SettingsPageState extends State<SettingsPage> {
             ListTile(
               leading: const Icon(Icons.info_outline_rounded),
               title: const Text('Version de Mon Hub'),
+              subtitle: Updater.supported
+                  ? const Text('Mises à jour automatiques : Mon Hub se met à jour tout seul.')
+                  : null,
               trailing: Text(appVersion, style: Theme.of(context).textTheme.titleMedium),
             ),
+            if (Updater.supported)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.system_update_alt_rounded),
+                    label: const Text('Vérifier les mises à jour'),
+                    onPressed: () async {
+                      final found = await Updater.instance.check(manual: true);
+                      if (found == null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Tu as déjà la dernière version 👍')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
             section('Profil'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -10,11 +10,13 @@ import 'core/nav.dart';
 import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/shortcuts.dart';
+import 'core/updater.dart';
 import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
+import 'ui/update_screen.dart';
 
 Future<void> main(List<String> args) async {
   // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
@@ -24,6 +26,21 @@ Future<void> main(List<String> args) async {
   AppSession.instance.restore();
   // Raccourcis Bureau / menu Démarrer, créés ou réparés tout seuls.
   unawaited(AppShortcuts.ensure().catchError((Object _) {}));
+  // Mises à jour automatiques : pause + écran de téléchargement, puis
+  // redémarrage sur la nouvelle version.
+  final updater = Updater.instance..beforeInstall = ClickyDesktop.stop;
+  var paused = false;
+  updater.addListener(() {
+    // Clicky partout se met en pause pendant la mise à jour.
+    if (updater.showing && !paused) {
+      paused = true;
+      unawaited(ClickyDesktop.stop());
+    } else if (!updater.showing && paused) {
+      paused = false;
+      unawaited(ClickyDesktop.launch());
+    }
+  });
+  updater.start();
   runApp(const HubApp());
 }
 
@@ -122,7 +139,9 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
-      builder: (context, child) => ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => UpdateGate(
+        child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+      ),
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),
