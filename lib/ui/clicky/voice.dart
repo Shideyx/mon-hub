@@ -193,6 +193,9 @@ class ClickyVoice {
     return Duration(microseconds: ((b.length - 44) * 1000000 / byteRate).round());
   }
 
+  /// Durée d'un MP3 de la voix Microsoft (48 kbit/s), d'après sa taille.
+  static Duration mp3Duration(Uint8List b) => Duration(milliseconds: (b.length * 8 / 48).round());
+
   /// Joue un son (MP3 ou WAV) et attend **vraiment** la fin (l'évènement
   /// « terminé » de Windows arrive parfois trop tôt ou jamais : on se fie
   /// aussi à la durée du son).
@@ -213,15 +216,10 @@ class ClickyVoice {
     final started = DateTime.now();
     try {
       await p.play(DeviceFileSource(f.path));
-      var dur = wavDuration(bytes);
-      if (dur == null) {
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-        try {
-          dur = await p.getDuration().timeout(const Duration(seconds: 1));
-        } catch (_) {}
-      }
-      final max = (dur ?? const Duration(seconds: 90)) + const Duration(milliseconds: 1500);
-      final min = dur ?? Duration.zero;
+      // WAV : durée exacte ; MP3 de la voix Microsoft : 48 kbit/s.
+      final dur = wavDuration(bytes) ?? mp3Duration(bytes);
+      final max = dur + const Duration(milliseconds: 1500);
+      final min = dur;
       while (gen == _generation) {
         final elapsed = DateTime.now().difference(started);
         if (elapsed >= max) break;

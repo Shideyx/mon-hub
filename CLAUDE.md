@@ -29,3 +29,7 @@
   main ». Compagnons : `buddies.dart`. Voix : une seule à la fois (`VoiceLock`).
 - Spotify : depuis février 2026, appli en mode développement = Premium du créateur obligatoire,
   `/me/library` pour les j'aime, plus de « top tracks » ; sans API → recherche Deezer + `spotify:search:`.
+- Réponse instantanée : Gemini Live (`live.dart`, WebSocket BidiGenerateContent, activité manuelle
+  activityStart/End, audio PCM 16 kHz → 24 kHz joué par `PcmPlayer` waveOut). Branché dans
+  `ClickyController.startListening/stopListening/ask` (`liveReady`). Erreurs : `ErrorLog`
+  (`journal-erreurs.log`), Clicky partout surveillé par `ClickyDesktop.watch()`.

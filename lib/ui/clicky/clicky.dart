@@ -9,12 +9,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/claude_api.dart';
 import '../../modules/carnet/carnet_module.dart';
 import '../../modules/carnet/carnet_store.dart';
 import '../../core/claude_bridge.dart';
+import '../../core/error_log.dart';
 import '../../core/hub_controller.dart';
 import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
@@ -36,6 +38,8 @@ import 'extensions.dart';
 import 'holo.dart';
 import 'hud.dart';
 import 'journal.dart';
+import 'live.dart';
+import 'pcm_player.dart';
 import 'marks.dart';
 import 'ocr.dart';
 import 'pc.dart';
@@ -240,6 +244,7 @@ class ClickyController extends ChangeNotifier {
     'geminiVoice',
     'pc',
     'micEngine',
+    'instant',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -406,6 +411,12 @@ class ClickyController extends ChangeNotifier {
   bool get handledElsewhere => !desktopMode && everywhereSupported && everywhere;
 
   Future<void> setOption(String k, Object v) async {
+    if (const ['instant', 'geminiVoice', 'callName'].contains(k)) {
+      // La voix et les consignes sont fixées à la connexion : on reconnecte.
+      unawaited(_live?.close());
+      _live = null;
+      _liveDownUntil = null;
+    }
     // « Clicky partout » n'écrit jamais dans les préférences (ça écraserait
     // celles de Mon Hub) : seulement dans le fichier partagé.
     if (!desktopMode) await ClaudeApi.store.setJson('clicky.$k', v);
@@ -440,7 +451,10 @@ class ClickyController extends ChangeNotifier {
       voiceOut.geminiKey = await ClaudeApi.store.readSecret('gemini.key') ?? '';
     } catch (_) {}
     // Windows : prépare le micro à l'avance pour ne pas rater le début.
-    if (r && enabled && mic && here) ears.warmUp();
+    if (r && enabled && mic && here) {
+      ears.warmUp();
+      warmUpLive();
+    }
     // Mot d'activation (« Clicky »).
     if (r && enabled && mic && here && wakeOn && WakeWord.supported) {
       unawaited(_wake.start());
@@ -594,6 +608,13 @@ class ClickyController extends ChangeNotifier {
       status: _dictating ? 'Dictée : parle, je tape le texte.' : '',
       reply: '',
     );
+    // Réponse instantanée (Gemini Live, comme JARVIS) : le micro part en
+    // direct, la réponse revient en voix tout de suite.
+    if (!_dictating && liveReady) {
+      if (await _liveListen()) return;
+      // Tu as déjà lâché pendant l'essai de connexion : rien à écouter.
+      if (state != ClickyState.listening) return;
+    }
     final starting = ears.start(
       onText: (t) {
         if (state != ClickyState.listening) return;
@@ -695,6 +716,7 @@ class ClickyController extends ChangeNotifier {
   Future<void> stopListening({bool send = true}) async {
     if (state != ClickyState.listening) return;
     _autoSend?.cancel();
+    if (_liveMic != null) return _liveStop(send: send);
     if (!send) {
       await ears.cancel();
       _dictating = false;
@@ -804,6 +826,9 @@ class ClickyController extends ChangeNotifier {
     _askId++;
     ClaudeCode.cancelAll();
     await stopSpeaking();
+    // Gemini Live : on coupe la voix et on ignore la fin de la réponse.
+    _livePlayer.stop();
+    if (_liveTurn) _liveIgnore = true;
     if (state == ClickyState.listening) await stopListening(send: false);
     steps = const [];
     drawing = false;
@@ -1262,6 +1287,10 @@ class ClickyController extends ChangeNotifier {
       'voix': voice,
       'cerveau': provider,
       'etat': state.name,
+      'dernieres_erreurs': () {
+        final log = ErrorLog.read();
+        return log.length > 2500 ? log.substring(log.length - 2500) : log;
+      }(),
     };
   }
 
@@ -1275,6 +1304,8 @@ class ClickyController extends ChangeNotifier {
     final now = DateTime.now();
     final where = hiddenScreen
         ? 'Pas de capture d\'écran cette fois : une fenêtre sensible (mots de passe, banque…) est ouverte, par sécurité tu ne la vois pas.'
+        : shots.isEmpty && !agent
+        ? 'Pas de capture d\'écran pour cette question (question générale) : réponds directement, sans parler de l\'écran.'
         : desktopMode
         ? 'Tu vois une capture de chaque écran de l\'ordinateur (toutes les applis, pas seulement Mon Hub).'
         : 'Tu vois une capture de la fenêtre de l\'appli Mon Hub.';
@@ -1377,6 +1408,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     try {
       if (await _handleCommand(q)) return;
       if (await _handleSkill(q)) return;
+      if (liveReady && !needsClassic(q) && await _liveAsk(q)) return;
       await _askAi(q);
     } finally {
       // Le mot d'activation se remet à écouter après chaque échange.
@@ -1563,7 +1595,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     final lang = multilang ? detectLanguage(q) : 'fr-FR';
     _applyVoice(lang: lang);
-    final (shots0, fg, hidden) = withScreen ? await _look() : (const <ClickyShot>[], '', false);
+    // Pas de capture pour une question générale : beaucoup plus rapide.
+    final look = withScreen && needsScreen(q);
+    final (shots0, fg, hidden) = look ? await _look() : (const <ClickyShot>[], '', false);
     final shots = shots0;
     if (id != _askId) return;
 
@@ -1868,6 +1902,378 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     _set(ClickyState.idle, status: '', reply: r);
     await speak(r);
     _fadeSoon();
+  }
+
+  // ---------- Réponse instantanée : Gemini Live (comme JARVIS) ----------
+
+  /// Réglage « Réponse instantanée » (activé par défaut quand il y a une
+  /// clé Gemini).
+  bool get instant => _opt('instant', true);
+
+  /// Gemini Live peut servir maintenant.
+  bool get liveReady =>
+      instant &&
+      voice &&
+      PcmPlayer.supported &&
+      voiceOut.geminiKey.trim().isNotEmpty &&
+      (_liveDownUntil == null || DateTime.now().isAfter(_liveDownUntil!));
+
+  /// Questions qui ont besoin de Claude (montrer où cliquer, dessiner…).
+  static bool needsClassic(String q) => RegExp(
+    r"\b(montre|montrez|o[uù] (est|se trouve|cliquer)|clique|pointe|tableau|sch[ée]ma|dessine|hologramme|quiz|interroge|le[cç]on|[ée]tape par [ée]tape)\b",
+    caseSensitive: false,
+  ).hasMatch(q);
+
+  GeminiLive? _live;
+  final _livePlayer = PcmPlayer();
+  AudioRecorder? _liveRec;
+  StreamSubscription<Uint8List>? _liveMic;
+  DateTime? _liveDownUntil;
+  String _liveIn = '';
+  String _liveOut = '';
+  bool _liveTurn = false;
+  bool _liveIgnore = false;
+  bool _liveSpoke = false;
+  DateTime? _liveQuiet;
+  Timer? _liveWatch;
+
+  /// Dernier souci de Gemini Live (affiché dans les réglages).
+  String? liveError;
+
+  String _liveSystem() {
+    final modules = hub?.enabled ?? const <HubModule>[];
+    final now = DateTime.now();
+    return '''
+${clickyPersona(callName)}
+Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
+Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
+${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
+Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
+Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
+${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}''';
+  }
+
+  static const _liveExtras = [
+    {
+      'name': 'regarder_ecran',
+      'description': 'Regarde l\'écran de la personne (toutes les fenêtres) et décrit ce qu\'il y a, pour répondre à une question sur l\'écran.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'question': {'type': 'STRING', 'description': 'Ce qu\'il faut chercher ou comprendre à l\'écran.'},
+        },
+        'required': ['question'],
+      },
+    },
+    {
+      'name': 'agir_sur_ordinateur',
+      'description': 'Clicky prend la souris et le clavier pour faire une tâche à l\'écran (ouvrir un site et y chercher, cliquer, faire défiler, écrire dans une appli…).',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'but': {'type': 'STRING', 'description': 'Le but précis, avec tous les détails.'},
+        },
+        'required': ['but'],
+      },
+    },
+    {
+      'name': 'expliquer_au_tableau',
+      'description': 'Explication détaillée avec tableau visuel, schéma, hologramme 3D ou en montrant où cliquer à l\'écran.',
+      'parameters': {
+        'type': 'OBJECT',
+        'properties': {
+          'question': {'type': 'STRING', 'description': 'La question complète de la personne.'},
+        },
+        'required': ['question'],
+      },
+    },
+  ];
+
+  Future<GeminiLive> _liveSession() async {
+    final current = _live;
+    if (current != null) {
+      if (current.connected) return current;
+      // Déjà en train de se connecter (préparée au démarrage) : on attend.
+      if (current.connecting) {
+        await current.connect();
+        return current;
+      }
+      await current.close();
+    }
+    late final GeminiLive l;
+    l = GeminiLive(
+      key: voiceOut.geminiKey,
+      system: _liveSystem(),
+      voice: voiceOut.geminiVoice,
+      tools: [for (final t in _tools) if (!t.name.startsWith('mcp_')) t],
+      extraDeclarations: _liveExtras,
+    )
+      ..onAudio = _liveAudio
+      ..onOutputText = (t) {
+        if (_liveIgnore) return;
+        _liveOut = '$_liveOut$t';
+        reply = _liveOut.trim();
+        notifyListeners();
+      }
+      ..onInputText = (t) {
+        _liveIn = '$_liveIn$t';
+        transcript = _liveIn.trim();
+        notifyListeners();
+      }
+      ..onInterrupted = _livePlayer.stop
+      ..onTurnComplete = () {
+        unawaited(_liveDone());
+      }
+      ..onToolCall = _liveTool
+      ..onToolStatus = (name) {
+        if (!_liveIgnore) _set(ClickyState.thinking, status: 'J\'utilise ${name.replaceAll('_', ' ')}…');
+      }
+      ..onClosed = (_) {
+        if (identical(_live, l)) _live = null;
+      };
+    _live = l;
+    await l.connect();
+    liveError = null;
+    return l;
+  }
+
+  /// Prépare la connexion à l'avance (la première réponse est aussi
+  /// instantanée).
+  void warmUpLive() {
+    if (!liveReady) return;
+    unawaited(_liveConnect());
+  }
+
+  Future<GeminiLive?> _liveConnect() async {
+    try {
+      return await _liveSession();
+    } catch (e) {
+      liveError = '$e';
+      _liveDownUntil = DateTime.now().add(const Duration(minutes: 10));
+      ErrorLog.record(e, null, where: 'Gemini Live');
+      return null;
+    }
+  }
+
+  void _liveBegin(String shown) {
+    _livePlayer.stop();
+    voiceOut.stop();
+    _liveIgnore = false;
+    _liveIn = shown;
+    _liveOut = '';
+    _liveSpoke = false;
+    _liveQuiet = null;
+  }
+
+  /// Connexion en cours pendant que tu parles déjà (le son est gardé).
+  Future<GeminiLive?>? _liveConn;
+  final _liveBuffer = <Uint8List>[];
+  GeminiLive? _liveTarget;
+
+  /// Écoute en direct : chaque morceau du micro part vers Gemini. Le micro
+  /// démarre tout de suite ; si la connexion n'est pas encore prête, le son
+  /// est gardé puis envoyé (aucun mot perdu).
+  Future<bool> _liveListen() async {
+    _liveBegin('');
+    _liveBuffer.clear();
+    _liveTarget = null;
+    final ready = _live != null && _live!.connected ? _live : null;
+    try {
+      final rec = _liveRec ??= AudioRecorder();
+      final stream = await rec.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+          echoCancel: true,
+          noiseSuppress: true,
+        ),
+      );
+      if (ready != null) {
+        ready.activityStart();
+        _liveTarget = ready;
+      }
+      _liveMic = stream.listen((chunk) {
+        final t = _liveTarget;
+        t == null ? _liveBuffer.add(chunk) : t.sendAudio(chunk);
+        final lv = PcmPlayer.rms(chunk);
+        levels.setRange(0, levels.length - 1, levels.skip(1));
+        levels[levels.length - 1] = lv;
+        notifyListeners();
+        // Sans Ctrl + Alt maintenus : la question part après un silence.
+        if (lv > 0.12) {
+          _liveSpoke = true;
+          _liveQuiet = null;
+        } else if (_liveSpoke && !_holding) {
+          _liveQuiet ??= DateTime.now();
+          if (DateTime.now().difference(_liveQuiet!) > const Duration(milliseconds: 900)) {
+            _liveSpoke = false;
+            unawaited(stopListening());
+          }
+        }
+      }, onError: (Object e) => ErrorLog.record(e, null, where: 'micro Gemini Live'));
+    } catch (e) {
+      ErrorLog.record(e, null, where: 'micro Gemini Live');
+      return false;
+    }
+    _set(ClickyState.listening, status: '', reply: '');
+    if (ready == null) {
+      // Connexion pendant que tu parles.
+      final conn = _liveConn = _liveConnect();
+      final l = await conn;
+      if (identical(_liveConn, conn)) _liveConn = null;
+      if (l == null) {
+        // Gemini indisponible : on repasse sur l'écoute classique.
+        final sub = _liveMic;
+        _liveMic = null;
+        await sub?.cancel();
+        try {
+          await _liveRec?.stop();
+        } catch (_) {}
+        _liveBuffer.clear();
+        return false;
+      }
+      _liveFlush(l);
+    }
+    return true;
+  }
+
+  /// Envoie le son gardé pendant la connexion.
+  void _liveFlush(GeminiLive l) {
+    if (_liveTarget != null) return;
+    l.activityStart();
+    for (final b in _liveBuffer) {
+      l.sendAudio(b);
+    }
+    _liveBuffer.clear();
+    _liveTarget = l;
+  }
+
+  /// Fin de ta question : Gemini répond tout de suite.
+  Future<void> _liveStop({bool send = true}) async {
+    final sub = _liveMic;
+    _liveMic = null;
+    await sub?.cancel();
+    try {
+      await _liveRec?.stop();
+    } catch (_) {}
+    if (!send) {
+      _liveTarget?.activityEnd();
+      _liveIgnore = true;
+      _liveBuffer.clear();
+      _set(ClickyState.idle, status: '');
+      _wake.resume();
+      return;
+    }
+    _set(ClickyState.thinking, status: '', reply: '');
+    // Tu as lâché avant la fin de la connexion : on attend, puis on envoie.
+    var l = _liveTarget;
+    if (l == null) {
+      final conn = _liveConn;
+      final got = conn == null ? null : await conn;
+      if (got == null) {
+        _set(ClickyState.idle, status: 'Gemini Live ne répond pas : réessaie.');
+        _fadeSoon();
+        return;
+      }
+      _liveFlush(got);
+      l = got;
+    }
+    l.activityEnd();
+    _liveTurn = true;
+    _liveWatchdog();
+  }
+
+  /// Une question écrite, par Gemini Live.
+  Future<bool> _liveAsk(String q) async {
+    final l = await _liveConnect();
+    if (l == null) return false;
+    _liveBegin(q);
+    _lastQuestion = q;
+    transcript = q;
+    _liveTurn = true;
+    _set(ClickyState.thinking, status: '', reply: '');
+    l.sendText(q);
+    _liveWatchdog();
+    return true;
+  }
+
+  void _liveWatchdog() {
+    _liveWatch?.cancel();
+    _liveWatch = Timer(const Duration(seconds: 20), () {
+      if (_liveTurn && _liveOut.isEmpty && !_livePlayer.playing) {
+        _liveTurn = false;
+        unawaited(_live?.close());
+        _live = null;
+        _set(ClickyState.idle, status: 'Gemini ne répond pas, réessaie (ou je repasse sur Claude).');
+        _liveDownUntil = DateTime.now().add(const Duration(minutes: 2));
+        _fadeSoon();
+      }
+    });
+  }
+
+  void _liveAudio(Uint8List pcm) {
+    if (_liveIgnore) return;
+    _livePlayer.write(pcm);
+    if (state != ClickyState.speaking && state != ClickyState.listening) {
+      _set(ClickyState.speaking, status: '');
+    }
+  }
+
+  Future<void> _liveDone() async {
+    _liveWatch?.cancel();
+    _liveTurn = false;
+    if (_liveIgnore) {
+      _liveIgnore = false;
+      return;
+    }
+    // Attend la fin de la voix (le son arrive plus vite qu'il ne se joue).
+    for (var i = 0; i < 600 && _livePlayer.playing && !_liveIgnore; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    final q = _liveIn.trim(), a = _liveOut.trim();
+    if (q.isNotEmpty || a.isNotEmpty) {
+      final app = _appKey;
+      unawaited(history.add(threadId, ChatMsg(mine: true, text: q.isEmpty ? '(question à voix haute)' : q), app: app));
+      if (a.isNotEmpty) unawaited(history.add(threadId, ChatMsg(mine: false, text: a), app: app));
+    }
+    if (state == ClickyState.speaking || state == ClickyState.thinking) {
+      _set(ClickyState.idle, status: '', reply: a);
+      _fadeSoon();
+    }
+    _wake.resume();
+  }
+
+  /// Gemini Live utilise une action de Mon Hub.
+  Future<Object?> _liveTool(String name, Map<String, dynamic> args) async {
+    switch (name) {
+      case 'regarder_ecran':
+        final (shots, _, hidden) = await _look();
+        if (hidden) return 'Une fenêtre sensible est ouverte : je ne regarde pas l\'écran.';
+        if (shots.isEmpty) return 'Je ne vois pas l\'écran.';
+        return GeminiVision.look(voiceOut.geminiKey, [for (final s in shots) s.png64], '${args['question'] ?? ''}');
+      case 'agir_sur_ordinateur':
+        final goal = '${args['but'] ?? ''}'.trim();
+        if (goal.isEmpty) return 'Quel est le but ?';
+        // Après la phrase de Gemini (« je m'en occupe »).
+        unawaited(Future<void>.delayed(const Duration(seconds: 2), () => act(goal)));
+        return 'D\'accord : je prends la souris dans un instant. Dis-le en quelques mots.';
+      case 'expliquer_au_tableau':
+        final question = '${args['question'] ?? _liveIn}'.trim();
+        unawaited(() async {
+          for (var i = 0; i < 80 && (_liveTurn || _livePlayer.playing); i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+          await _askAi(question);
+        }());
+        return 'Clicky prépare l\'explication au tableau : dis juste « je te montre ».';
+    }
+    final tool = _tools.where((t) => t.name == name).firstOrNull;
+    if (tool == null) return 'Action inconnue : $name';
+    if (ClaudeBridge.isWriteAction(tool) && !await confirmAction(tool, args)) {
+      return 'La personne a refusé cette action.';
+    }
+    return tool.run(args);
   }
 
   // ---------- Clicky agit : il prend la souris et le clavier ----------

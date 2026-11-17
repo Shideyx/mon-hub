@@ -420,7 +420,10 @@ abstract class RecordingEars extends ClickyEars {
   /// Dernière erreur de transcription (affichée à la place du texte).
   String? lastError;
 
-  final _rec = AudioRecorder();
+  /// Créé seulement quand on s'en sert (pas au démarrage des deux
+  /// programmes).
+  AudioRecorder? _recorder;
+  AudioRecorder get _rec => _recorder ??= AudioRecorder();
   StreamSubscription<Amplitude>? _amp;
   String? _wav;
   bool _listening = false;
@@ -525,7 +528,7 @@ abstract class RecordingEars extends ClickyEars {
     await _amp?.cancel();
     _amp = null;
     try {
-      await _rec.cancel();
+      await _recorder?.cancel();
     } catch (_) {}
     _text = '';
   }

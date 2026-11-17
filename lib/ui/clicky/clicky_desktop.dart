@@ -10,6 +10,7 @@ import 'package:win32/win32.dart' show HWND;
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
+import '../../core/error_log.dart';
 import '../../core/hub_module.dart';
 import '../../core/module_store.dart';
 import '../../core/nav.dart';
@@ -50,6 +51,7 @@ class ClickyDesktop {
 
   /// Démarre Clicky partout (s'il n'est pas déjà lancé).
   static Future<void> launch() async {
+    _paused = false;
     final c = ClickyController.instance;
     // Pas de cerveau configuré : on ne lance rien du tout.
     if (!supported || !c.everywhere || !await c.refreshReady() || !c.enabled) return;
@@ -84,7 +86,33 @@ class ClickyDesktop {
     }
   }
 
-  static Future<void> stop() => send('quit');
+  /// Arrêt voulu (mise à jour…) : la surveillance ne le relance pas.
+  static Future<void> stop() {
+    _paused = true;
+    return send('quit');
+  }
+
+  static Timer? _watch;
+  static bool _paused = false;
+  static final _restarts = <DateTime>[];
+
+  /// Surveille Clicky partout : s'il a planté, il est relancé (au plus 5
+  /// fois en 10 minutes, pour ne pas tourner en boucle).
+  static void watch() {
+    if (!supported) return;
+    _watch?.cancel();
+    _watch = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final c = ClickyController.instance;
+      if (_paused || !c.everywhere || !c.enabled) return;
+      if (await running()) return;
+      final now = DateTime.now();
+      _restarts.removeWhere((t) => now.difference(t) > const Duration(minutes: 10));
+      if (_restarts.length >= 5) return;
+      _restarts.add(now);
+      ErrorLog.record('Clicky partout s\'est fermé : relancé', null, where: 'surveillance');
+      await launch();
+    });
+  }
 
   /// Relance Clicky partout (compte changé, cerveau ou modèle modifié…).
   static Future<void> restart() async {
@@ -102,6 +130,7 @@ class ClickyDesktop {
 /// Point d'entrée de `hub.exe --clicky`.
 Future<void> runClickyDesktop() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ErrorLog.install('Clicky partout');
   final ServerSocket lock;
   try {
     lock = await ServerSocket.bind(InternetAddress.loopbackIPv4, ClickyDesktop.port);
@@ -162,8 +191,9 @@ Future<List<ClickyShot>> _captureScreens() async {
     for (var i = 0; i < mons.length; i++) {
       final (x, y, w, h) = mons[i];
       final bytes = Win.capture(x, y, w, h);
-      // Taille conseillée pour l'IA : 1568 px sur le grand côté au maximum.
-      final s = math.min(1.0, 1568 / math.max(w, h));
+      // 1280 px sur le grand côté au maximum : assez net pour lire l'écran,
+      // et plus léger à envoyer (réponse plus rapide).
+      final s = math.min(1.0, 1280 / math.max(w, h));
       final tw = math.max(1, (w * s).round()), th = math.max(1, (h * s).round());
       final c = Completer<ui.Image>();
       ui.decodeImageFromPixels(
