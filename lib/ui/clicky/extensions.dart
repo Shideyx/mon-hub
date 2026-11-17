@@ -4,12 +4,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import 'tutor.dart';
+import '../../core/browser.dart';
 
 // ---------------------------------------------------------------------------
 // Outils MCP personnalisés
@@ -275,7 +275,7 @@ class VoiceSkill {
     switch (kind) {
       case 'url':
         final u = Uri.tryParse(value);
-        if (u != null) await launchUrl(u, mode: LaunchMode.externalApplication);
+        if (u != null) await Browser.open(u.toString());
         return ('C\'est ouvert.', null);
       case 'app':
         if (!kIsWeb && Platform.isWindows) {

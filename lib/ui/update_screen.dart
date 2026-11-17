@@ -1,8 +1,8 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../core/updater.dart';
 import '../core/version.dart';
+import '../core/browser.dart';
 
 /// Met l'appli en pause et affiche l'écran de mise à jour par-dessus tout
 /// (connexion comprise) dès qu'une nouvelle version est trouvée.
@@ -134,9 +134,8 @@ class UpdateScreen extends StatelessWidget {
                           FilledButton.icon(
                             icon: const Icon(Icons.download_rounded),
                             label: const Text('Télécharger à la main'),
-                            onPressed: () => launchUrl(
-                              Uri.parse(Updater.releasesUrl),
-                              mode: LaunchMode.externalApplication,
+                            onPressed: () => Browser.open(
+                              Updater.releasesUrl,
                             ),
                           ),
                           OutlinedButton.icon(

@@ -44,6 +44,14 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | **Bibliothèque** | ✅ Local | Étagère visuelle avec couvertures, statut *Lu / En cours / À lire*, étoiles, note « À retenir », statistiques, **retrouve tout seul le livre** à partir du titre (Open Library + Google Livres, meilleur résultat proposé, couverture au format livre 2:3, couvertures manquantes complétées toutes seules, choix parmi les couvertures trouvées). |
 | **Google Drive** | ✅ Officiel (Google) | Ton Drive en visuel : dossiers, fichiers avec miniatures, Récents / Partagés / Suivis, recherche, espace utilisé, ouverture dans l'appli. Via « Se connecter avec Google » (lecture seule). Sans connexion Google : drive.google.com intégré. |
 
+## Interface façon Windows 11
+
+Police Segoe UI Variable, fond gris clair / gris foncé comme Paramètres de Windows 11, cartes bordées d'un trait fin, menu de gauche avec la barre d'accent, **couleur d'accent de ton Windows**, barre de titre assortie (claire / sombre). Les liens s'ouvrent dans **Google Chrome** (Réglages → Apparence pour changer).
+
+**Widgets sur le bureau** : attrape un widget de l'accueil par son titre et lâche-le hors de Mon Hub (ou bouton « Détacher ») : il devient une petite fenêtre à part, avec **sa propre icône dans la barre des tâches**, qu'on peut garder devant les autres fenêtres. Mon Hub se souvient de sa place et le rouvre au démarrage ; « Remettre dans Mon Hub » le ramène dans l'accueil (`hub.exe --widget=<module>`, `widget_window.dart`). Glisser une carte sur une autre les échange.
+
+**Photos et appels** : dans une conversation Instagram ou Discord, 🖼 envoie une ou plusieurs photos (converties en JPEG pour Instagram) ; 📞 / 📹 lance un appel vocal ou vidéo **dans Mon Hub** (le vrai site, micro et caméra autorisés, bouton d'appel appuyé tout seul). Clicky aussi : outils `instagram_envoyer_photo`, `discord_envoyer_fichier`, `instagram_appeler`, `discord_appeler`.
+
 ## Notifications
 
 Les alertes (messages, notes, devoirs, compagnons, Clicky) arrivent dans la cloche de l'accueil **et** en bandeau dans la fenêtre de Mon Hub (en haut à droite), en plus de la notification de Windows.

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
+import 'core/desktop_widgets.dart';
 import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
 import 'core/hub_controller.dart';
@@ -14,6 +15,7 @@ import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/shortcuts.dart';
 import 'core/updater.dart';
+import 'core/windows_look.dart';
 import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
@@ -21,10 +23,14 @@ import 'ui/clicky/tutorial.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
 import 'ui/update_screen.dart';
+import 'ui/widget_window.dart';
 
 Future<void> main(List<String> args) async {
   // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
   if (args.contains('--clicky')) return runClickyDesktop();
+  // « hub.exe --widget=musique » : un widget détaché sur le bureau.
+  final widget = args.where((a) => a.startsWith('--widget=')).firstOrNull;
+  if (widget != null) return runWidgetWindow(widget.substring(9));
   WidgetsFlutterBinding.ensureInitialized();
   // Journal des erreurs (sur le PC) et garde-fous : une erreur ne casse
   // plus tout l'écran.
@@ -156,10 +162,14 @@ class _HubAppState extends State<HubApp> {
       await ClickyDesktop.restart();
       // S'il se ferme tout seul (plantage), il est relancé.
       ClickyDesktop.watch();
+      // Les widgets laissés sur le bureau se rouvrent.
+      unawaited(DesktopWidgets.instance.launchAll());
     } catch (e) {
       debugPrint('Clicky : $e');
     }
   }
+
+  Brightness? _titleBar;
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +179,17 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
-      builder: (context, child) => UpdateGate(
-        child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
-      ),
+      builder: (context, child) {
+        // Barre de titre de Windows assortie (claire / sombre).
+        final b = Theme.of(context).brightness;
+        if (b != _titleBar) {
+          _titleBar = b;
+          WidgetsBinding.instance.addPostFrameCallback((_) => WindowsLook.applyTitleBar(b));
+        }
+        return UpdateGate(
+          child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+        );
+      },
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),

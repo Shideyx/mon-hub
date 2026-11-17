@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/browser.dart';
 import '../core/error_log.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
@@ -119,6 +120,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 onSelectionChanged: (v) => AppSession.instance.setThemeMode(v.first),
               ),
             ),
+            if (Platform.isWindows) ...[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 6),
+                child: Text('Ouvrir les liens dans'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SegmentedButton<String>(
+                  segments: [
+                    ButtonSegment(
+                      value: 'chrome',
+                      icon: const Icon(Icons.public_rounded),
+                      label: Text(Browser.chromePath() == null ? 'Google Chrome (pas installé)' : 'Google Chrome'),
+                    ),
+                    const ButtonSegment(
+                      value: 'defaut',
+                      icon: Icon(Icons.open_in_browser_rounded),
+                      label: Text('Navigateur par défaut'),
+                    ),
+                  ],
+                  selected: {Browser.choice},
+                  onSelectionChanged: (v) async {
+                    await Browser.setChoice(v.first);
+                    setState(() {});
+                  },
+                ),
+              ),
+            ],
             section('Compte'),
             ListTile(
               leading: const Icon(Icons.account_circle_rounded),

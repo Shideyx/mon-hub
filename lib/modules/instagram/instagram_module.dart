@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 
-import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../core/nav.dart';
 import '../../ui/web_login.dart';
+import '../../core/photo.dart';
+import '../../ui/call_page.dart';
 import '../../ui/widgets.dart';
 
 class IgUser {
@@ -656,6 +659,44 @@ class InstagramModule extends HubModule {
               for (final m in (await api.thread(a['id'] as String)).reversed)
                 {'de': who(m.userId), 'texte': m.text, 'date': m.at},
             ];
+          },
+        ),
+        HubTool(
+          name: 'instagram_envoyer_photo',
+          description: 'Envoie une photo (fichier sur le PC : JPEG, PNG, WebP…) dans une conversation Instagram.',
+          params: {
+            'id': ('string', 'id de la conversation (instagram_conversations)'),
+            'chemin': ('string', 'Chemin de la photo sur le PC'),
+          },
+          required: ['id', 'chemin'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Instagram n\'est pas connecté';
+            final (jpeg, w, h) = await Photo.toJpeg(await File('${a['chemin']}').readAsBytes());
+            await api.sendPhoto(a['id'] as String, jpeg, w, h);
+            return {'ok': true};
+          },
+        ),
+        HubTool(
+          name: 'instagram_appeler',
+          description: 'Lance un appel vocal ou vidéo Instagram dans Mon Hub.',
+          params: {
+            'id': ('string', 'id de la conversation (instagram_conversations)'),
+            'video': ('boolean', 'true : appel vidéo'),
+          },
+          required: ['id'],
+          run: (a) async {
+            final ctx = await hubDialogContext();
+            if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
+            final t = _threads.where((x) => x.id == a['id']).firstOrNull;
+            unawaited(CallPage.open(
+              ctx,
+              url: 'https://www.instagram.com/direct/t/${a['id']}/',
+              title: t?.title ?? 'Instagram',
+              video: a['video'] == true,
+              color: color,
+            ));
+            return {'ok': true, 'appel': a['video'] == true ? 'vidéo' : 'vocal'};
           },
         ),
         HubTool(
@@ -1347,9 +1388,26 @@ class _ThreadPageState extends State<_ThreadPage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Appel vocal / vidéo (ouvre Instagram)',
+            tooltip: 'Appel vocal',
             icon: const Icon(Icons.call_rounded),
-            onPressed: () => openLink(context, 'https://www.instagram.com/direct/t/${thread.id}/'),
+            onPressed: () => CallPage.open(
+              context,
+              url: 'https://www.instagram.com/direct/t/${thread.id}/',
+              title: thread.title,
+              video: false,
+              color: module.color,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Appel vidéo',
+            icon: const Icon(Icons.videocam_rounded),
+            onPressed: () => CallPage.open(
+              context,
+              url: 'https://www.instagram.com/direct/t/${thread.id}/',
+              title: thread.title,
+              video: true,
+              color: module.color,
+            ),
           ),
         ],
       ),
@@ -1405,17 +1463,17 @@ class _ThreadPageState extends State<_ThreadPage> {
             color: module.color,
             hint: 'Écrire à ${thread.title}',
             onAttach: () async {
-              final file = await openFile(
-                acceptedTypeGroups: const [
-                  XTypeGroup(label: 'Photos', extensions: ['jpg', 'jpeg', 'png']),
-                ],
+              // Une ou plusieurs photos, converties en JPEG (seul format
+              // accepté par Instagram).
+              final files = await openFiles(
+                acceptedTypeGroups: const [XTypeGroup(label: 'Photos', extensions: Photo.extensions)],
               );
-              if (file == null) return;
-              final bytes = await file.readAsBytes();
-              final codec = await ui.instantiateImageCodec(bytes);
-              final frame = await codec.getNextFrame();
+              if (files.isEmpty) return;
               final api = await module._client();
-              await api!.sendPhoto(thread.id, bytes, frame.image.width, frame.image.height);
+              for (final file in files) {
+                final (jpeg, w, h) = await Photo.toJpeg(await file.readAsBytes());
+                await api!.sendPhoto(thread.id, jpeg, w, h);
+              }
               await _load();
             },
             onSend: (text) async {

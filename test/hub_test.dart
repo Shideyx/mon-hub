@@ -75,7 +75,7 @@ void main() {
     await ModuleStore.init();
     final hub = HubController(buildModules());
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
-    expect(find.textContaining('👋'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^(Bonjour|Bonsoir)')), findsOneWidget);
     expect(find.text('Agenda'), findsWidgets);
     expect(find.text('Accueil'), findsOneWidget);
   });

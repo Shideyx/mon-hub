@@ -5,7 +5,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../core/browser.dart';
 
 const _desktopUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -371,9 +371,8 @@ class _HubWebViewState extends State<HubWebView> {
                       const Text('La page reste blanche ?'),
                       FilledButton.tonal(onPressed: _reload, child: const Text('Recharger')),
                       TextButton(
-                        onPressed: () => launchUrl(
-                          Uri.parse(widget.url),
-                          mode: LaunchMode.externalApplication,
+                        onPressed: () => Browser.open(
+                          widget.url,
                         ),
                         child: const Text('Ouvrir dans le navigateur'),
                       ),

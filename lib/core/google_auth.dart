@@ -5,9 +5,9 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 import 'module_store.dart';
+import 'browser.dart';
 
 /// « Se connecter avec Google » (OAuth officiel) pour Gmail et Google Agenda.
 ///
@@ -71,7 +71,7 @@ class GoogleAuth {
       'prompt': 'consent select_account',
     });
     try {
-      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (!await Browser.open(url.toString())) {
         throw 'Impossible d\'ouvrir le navigateur';
       }
       final code =

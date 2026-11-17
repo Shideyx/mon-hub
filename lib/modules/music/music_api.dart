@@ -5,11 +5,11 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/certificates.dart';
 import '../../core/module_store.dart';
 import 'music_models.dart';
+import '../../core/browser.dart';
 
 // ---------------------------------------------------------------------------
 // Spotify (API officielle, connexion PKCE avec TON identifiant d'appli)
@@ -90,7 +90,7 @@ class SpotifyApi {
         'state': state,
         'scope': scopes.join(' '),
       });
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+      await Browser.open(url.toString());
       final c = await code.future.timeout(const Duration(minutes: 5));
       final r = await _http.post(
         Uri.parse('https://accounts.spotify.com/api/token'),

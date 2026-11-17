@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/browser.dart';
 import '../../core/hub_module.dart';
 import '../../core/powershell.dart';
 
@@ -227,6 +228,8 @@ $command
   static Future<String> open(String target) async {
     final t = expand(target);
     if (t.isEmpty) throw 'Rien à ouvrir.';
+    // Pages web : dans Google Chrome (réglage « Ouvrir les liens »).
+    if (RegExp(r'^https?://', caseSensitive: false).hasMatch(t) && await Browser.open(t)) return 'Ouvert : $t';
     if (Platform.isWindows) {
       await Process.start('cmd', ['/c', 'start', '', t], mode: ProcessStartMode.detached);
     } else if (Platform.isMacOS) {

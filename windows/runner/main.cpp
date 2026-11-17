@@ -1,6 +1,9 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+#include <shobjidl.h>
+
+#include <string>
 
 #include "flutter_window.h"
 #include "utils.h"
@@ -27,8 +30,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // « hub.exe --clicky » : la petite fenêtre transparente de Clicky qui
   // suit la souris au-dessus de toutes les applis (lancée par Mon Hub).
   bool clicky = false;
+  // « hub.exe --widget=musique » : un widget de l'accueil détaché sur le
+  // bureau, dans sa petite fenêtre.
+  std::wstring widget;
   for (const auto& arg : command_line_arguments) {
     if (arg == "--clicky") clicky = true;
+    if (arg.rfind("--widget=", 0) == 0) {
+      widget.clear();
+      for (const char c : arg.substr(9)) {
+        widget.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+      }
+    }
+  }
+  // Chaque widget a sa propre icône dans la barre des tâches (au lieu d'être
+  // regroupé avec Mon Hub).
+  if (!widget.empty()) {
+    const std::wstring app_id = L"fr.erik.hub.widget." + widget;
+    ::SetCurrentProcessExplicitAppUserModelID(app_id.c_str());
   }
 
   FlutterWindow window(project);
@@ -38,6 +56,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (clicky) {
     origin = Win32Window::Point(0, 0);
     size = Win32Window::Size(380, 230);
+  } else if (!widget.empty()) {
+    origin = Win32Window::Point(80, 80);
+    size = Win32Window::Size(460, 380);
   }
   if (!window.Create(clicky ? L"Clicky" : L"Mon Hub", origin, size)) {
     return EXIT_FAILURE;
