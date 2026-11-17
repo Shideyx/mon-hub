@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/news.dart';
 import '../../ui/widgets.dart';
 import '../claude/claude_module.dart';
 import 'carnet_store.dart';
+import '../../core/browser.dart';
 
 /// Carnet : les plugins de ton JARVIS, dans Mon Hub (tâches, notes, idées en
 /// vrac, mémoire de Clicky, budget, sport, jeux, poèmes, météo + tenue,
@@ -60,7 +60,7 @@ class CarnetModule extends HubModule {
           case 'appli':
             await openApp(v);
           case 'site':
-            await launchUrl(Uri.parse(v), mode: LaunchMode.externalApplication);
+            await Browser.open(v);
           case 'dire':
             await say?.call(v);
           case 'notifier':

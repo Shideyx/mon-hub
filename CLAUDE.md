@@ -38,3 +38,7 @@
   réponse écrite.
 - Certificats https : `TrustedCertificates.install()` (magasins Windows ROOT + CA, et
   `assets/cacert.pem` de Mozilla) au démarrage des deux programmes.
+- Look Windows 11 : `ui/theme.dart` + `core/windows_look.dart` (accent du registre, barre de titre DWM).
+  Liens web : `core/browser.dart` (Chrome par défaut). Widgets détachés : `core/desktop_widgets.dart`,
+  `ui/widget_window.dart`, lanceur `windows/runner/main.cpp` (`--widget=`, AppUserModelID par widget ;
+  le runner compile en /W4 /WX : aucun avertissement C++ toléré). Appels : `ui/call_page.dart`.

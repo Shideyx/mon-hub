@@ -1,15 +1,14 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../core/browser.dart';
 
 import 'voice_note.dart';
 
 export 'voice_note.dart' show Reaction, VoiceNotePlayer;
 
-/// Ouvre un lien dans l'appli correspondante si elle est installée
-/// (Instagram, Discord…), sinon dans le navigateur.
+/// Ouvre un lien : les pages web dans Google Chrome (s'il est installé),
+/// le reste dans l'appli correspondante.
 Future<void> openLink(BuildContext context, String url) async {
-  final uri = Uri.tryParse(url);
-  final ok = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
+  final ok = await Browser.open(url);
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('Impossible d\'ouvrir $url')));

@@ -1,3 +1,4 @@
+import 'dart:io' show File;
 import 'dart:async';
 import 'dart:convert';
 
@@ -6,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../core/nav.dart';
 import '../../ui/web_login.dart';
+import '../../ui/call_page.dart';
 import '../../ui/widgets.dart';
 import 'discord_api.dart';
 
@@ -128,6 +131,49 @@ class DiscordModule extends HubModule {
               for (final m in (await api.messages(a['id'] as String)).reversed)
                 {'de': m.author.name, 'texte': m.preview, 'date': m.at},
             ];
+          },
+        ),
+        HubTool(
+          name: 'discord_envoyer_fichier',
+          description: 'Envoie une photo ou un fichier (sur le PC) dans une conversation Discord.',
+          params: {
+            'id': ('string', 'id de la conversation (discord_conversations)'),
+            'chemin': ('string', 'Chemin du fichier sur le PC'),
+            'texte': ('string', 'Message avec le fichier (facultatif)'),
+          },
+          required: ['id', 'chemin'],
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Discord n\'est pas connecté';
+            final f = File('${a['chemin']}');
+            await api.sendFile(
+              a['id'] as String,
+              f.uri.pathSegments.last,
+              await f.readAsBytes(),
+              content: '${a['texte'] ?? ''}',
+            );
+            return {'ok': true};
+          },
+        ),
+        HubTool(
+          name: 'discord_appeler',
+          description: 'Lance un appel vocal ou vidéo Discord dans Mon Hub.',
+          params: {
+            'id': ('string', 'id de la conversation (discord_conversations)'),
+            'video': ('boolean', 'true : appel vidéo'),
+          },
+          required: ['id'],
+          run: (a) async {
+            final ctx = await hubDialogContext();
+            if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
+            unawaited(CallPage.open(
+              ctx,
+              url: 'https://discord.com/channels/@me/${a['id']}',
+              title: 'Discord',
+              video: a['video'] == true,
+              color: color,
+            ));
+            return {'ok': true, 'appel': a['video'] == true ? 'vidéo' : 'vocal'};
           },
         ),
         HubTool(
@@ -560,9 +606,26 @@ class _ConversationPageState extends State<_ConversationPage> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title), actions: [
         IconButton(
-          tooltip: 'Appel vocal / vidéo (ouvre Discord)',
+          tooltip: 'Appel vocal',
           icon: const Icon(Icons.call_rounded),
-          onPressed: () => openLink(context, 'https://discord.com/channels/@me/${widget.channelId}'),
+          onPressed: () => CallPage.open(
+            context,
+            url: 'https://discord.com/channels/@me/${widget.channelId}',
+            title: widget.title,
+            video: false,
+            color: widget.module.color,
+          ),
+        ),
+        IconButton(
+          tooltip: 'Appel vidéo',
+          icon: const Icon(Icons.videocam_rounded),
+          onPressed: () => CallPage.open(
+            context,
+            url: 'https://discord.com/channels/@me/${widget.channelId}',
+            title: widget.title,
+            video: true,
+            color: widget.module.color,
+          ),
         ),
       ]),
       body: Column(
@@ -629,13 +692,17 @@ class _ConversationPageState extends State<_ConversationPage> {
             color: module.color,
             hint: 'Écrire à ${widget.title}',
             onAttach: () async {
-              final file = await openFile(acceptedTypeGroups: const [
-                XTypeGroup(label: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp']),
+              // Une ou plusieurs photos (ou n'importe quel fichier).
+              final files = await openFiles(acceptedTypeGroups: const [
+                XTypeGroup(label: 'Photos', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']),
+                XTypeGroup(label: 'Tous les fichiers'),
               ]);
-              if (file == null) return;
+              if (files.isEmpty) return;
               final api = await module._client();
-              final sent = await api!.sendFile(widget.channelId, file.name, await file.readAsBytes());
-              setState(() => msgs = [sent, ...?msgs]);
+              for (final file in files) {
+                final sent = await api!.sendFile(widget.channelId, file.name, await file.readAsBytes());
+                setState(() => msgs = [sent, ...?msgs]);
+              }
             },
             onSend: (text) async {
               final api = await module._client();

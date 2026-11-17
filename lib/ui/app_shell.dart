@@ -135,12 +135,12 @@ class _AppShellState extends State<AppShell> {
                     ),
                   ),
                 ),
-                Expanded(
-                  child: AnimatedSwitcher(
+                // Le contenu sur un « calque » légèrement plus clair, aux coins
+                // arrondis, comme dans les applis de Windows 11.
+                Expanded(child: _ContentLayer(child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: KeyedSubtree(key: ValueKey(selected), child: body),
-                  ),
-                ),
+                  ))),
               ],
             )),
           );
@@ -206,6 +206,9 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
+/// Le menu de gauche, façon Windows 11 (comme l'appli Paramètres) : fond
+/// de la fenêtre, éléments arrondis, petite barre de couleur d'accent sur
+/// la section ouverte.
 class _SideMenu extends StatelessWidget {
   const _SideMenu({
     required this.modules,
@@ -225,86 +228,80 @@ class _SideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    Widget item(int i, Widget icon, String label, Color color) {
+    final accent = theme.colorScheme.primary;
+    final selectedBg = (dark ? Colors.white : Colors.black).withValues(alpha: 0.06);
+    Widget item(int i, Widget icon, String label, {VoidCallback? onTap}) {
       final sel = i == index;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
         child: Material(
-          color: sel ? color.withValues(alpha: 0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          color: sel ? selectedBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
           child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => onSelect(i),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              child: Row(children: [
-                icon,
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(label,
-                      style: TextStyle(
-                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          color: sel ? color : null)),
-                ),
-              ]),
+            borderRadius: BorderRadius.circular(4),
+            onTap: onTap ?? () => onSelect(i),
+            child: SizedBox(
+              height: 38,
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 3,
+                    height: sel ? 16 : 0,
+                    decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(width: 11),
+                  IconTheme.merge(data: const IconThemeData(size: 18), child: icon),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       );
     }
 
-    return Container(
-      width: 240,
-      decoration: BoxDecoration(
-        color: dark ? const Color(0xFF13141A) : Colors.white,
-        border: Border(right: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4))),
-      ),
+    return SizedBox(
+      width: 260,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-              child: Row(children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFF6D4AFF), Color(0xFFE0457B)]),
+              padding: const EdgeInsets.fromLTRB(18, 14, 16, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(6)),
+                    child: Icon(Icons.hub_rounded, color: theme.colorScheme.onPrimary, size: 15),
                   ),
-                  child: const Icon(Icons.hub_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Text('Mon Hub',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-              ]),
+                  const SizedBox(width: 12),
+                  Text('Mon Hub', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
             Expanded(
               child: ListView(
                 children: [
-                  item(
-                      0,
-                      Icon(index == 0 ? Icons.home_rounded : Icons.home_outlined,
-                          color: index == 0 ? theme.colorScheme.primary : null),
-                      'Accueil',
-                      theme.colorScheme.primary),
-                  const SizedBox(height: 8),
+                  item(0, Icon(index == 0 ? Icons.home_rounded : Icons.home_outlined), 'Accueil'),
+                  const SizedBox(height: 4),
                   for (var i = 0; i < modules.length; i++)
-                    item(i + 1, badgeIcon(modules[i], selected: index == i + 1), modules[i].name,
-                        modules[i].color),
+                    item(i + 1, badgeIcon(modules[i], selected: index == i + 1), modules[i].name),
                 ],
               ),
             ),
-            const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: ListTile(
-                leading: const Icon(Icons.tune_rounded),
-                title: const Text('Réglages'),
-                onTap: onSettings,
-              ),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: item(-1, const Icon(Icons.settings_outlined), 'Réglages', onTap: onSettings),
             ),
           ],
         ),
@@ -312,7 +309,6 @@ class _SideMenu extends StatelessWidget {
     );
   }
 }
-
 
 /// Un bandeau d'alerte dans la fenêtre (glisse depuis la droite).
 class _Banner extends StatelessWidget {
@@ -374,6 +370,40 @@ class _Banner extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+/// Le calque du contenu (coin arrondi en haut à gauche, trait fin), comme
+/// l'appli Paramètres de Windows 11.
+class _ContentLayer extends StatelessWidget {
+  const _ContentLayer({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final layer = dark ? const Color(0xFF272727) : const Color(0xFFF9F9F9);
+    return Container(
+      decoration: BoxDecoration(
+        color: layer,
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(8)),
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.outlineVariant),
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: theme.copyWith(
+          scaffoldBackgroundColor: layer,
+          canvasColor: layer,
+          appBarTheme: theme.appBarTheme.copyWith(backgroundColor: layer),
+        ),
+        child: child,
       ),
     );
   }
