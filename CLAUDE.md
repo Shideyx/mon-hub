@@ -131,3 +131,11 @@
   Clicky avec Oui / Non / Plus tard `_IdeaButtons`, à l'oral ; envoyée à Clicky partout par `idea64`) → `answerIdea` →
   `_runIdea` (outil direct, ou `agent` = `_runAgent`). Il apprend (`recordDecision`, `likes/dislikes`, `skipTools` après 2
   refus). Retour après 20 min d'absence : `welcomeBack`. Outil `assistant_ajouter_plan_journee` (ajoute le plan, avec accord).
+- Lecture dans la Bibliothèque (v1.46) : `modules/books/read_finder.dart` (`ReadFinder` : titre nettoyé `ReadQuery.parse`
+  — « Tome 3 », « chapitre 12 », sous-titre —, recherche en parallèle MangaDex (scans, fr puis en, `contentRating` safe/
+  suggestive seulement), Projet Gutenberg via gutendex (texte) et Internet Archive (accès **libre** seulement, pas
+  d'emprunt) ; `confident` = ressemblance du titre ≥ 0,95 sinon « C'est celui-ci ? » ; `pickChapters` un chapitre par
+  numéro ; chapitres officiels `externalUrl` ouverts dans le navigateur). `Book.read` = `ReadLink` (source, chapitre,
+  page). Lecteurs : `modules/books/reader_page.dart` (`openReading`, `ScanReaderPage` page par page / webtoon / sens
+  japonais, `TextReaderPage` liseuse avec texte gardé dans `lectures/`, `WebBookPage`). Outil Clicky `livre_ou_lire`.
+  Jamais de site pirate ni de scraping : seulement ces API publiques.
