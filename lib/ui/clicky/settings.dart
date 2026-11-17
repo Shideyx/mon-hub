@@ -601,7 +601,7 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
         testing = false;
         info = err == null
             ? null
-            : 'La voix choisie ne répond pas ($err). Vérifie ta connexion internet ; sinon Clicky répond par écrit.';
+            : 'La voix Gemini ne répond pas ($err). Vérifie ta clé et ta connexion internet ; sinon Clicky répond par écrit.';
       });
     }
   }
@@ -610,42 +610,14 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      SegmentedButton<String>(
-        segments: const [
-          ButtonSegment(
-            value: 'edge',
-            icon: Icon(Icons.auto_awesome_rounded),
-            label: Text('Neurale (gratuite)'),
-          ),
-          ButtonSegment(value: 'gemini', icon: Icon(Icons.diamond_rounded), label: Text('Gemini')),
-        ],
-        selected: {c.ttsEngine},
-        onSelectionChanged: (v) => c.setOption('ttsEngine', v.first),
+      Text(
+        'Une seule voix, naturelle : celle de Google Gemini, avec ta clé gratuite (aistudio.google.com → '
+        'Get API key). Clicky lit ses réponses par gros morceaux ; si le quota gratuit du jour est épuisé, '
+        'Gemini Live prend le relais avec la même voix. Sans clé ni internet, Clicky répond par écrit.',
+        style: Theme.of(context).textTheme.bodySmall,
       ),
-      const SizedBox(height: 6),
-      Text(switch (c.ttsEngine) {
-        'gemini' =>
-          'Voix de Google Gemini avec une clé gratuite (aistudio.google.com → Get API key). Le quota '
-              'gratuit est limité chaque jour : quand il est épuisé, la voix Microsoft prend le relais.',
-        _ =>
-          'Voix neurales de Microsoft (celles de la lecture à voix haute d\'Edge) : très naturelles, '
-              'gratuites, sans clé ni limite. Il faut internet ; sans internet, Clicky répond par écrit.',
-      }, style: Theme.of(context).textTheme.bodySmall),
       const SizedBox(height: 8),
-      if (c.ttsEngine == 'edge')
-        DropdownButtonFormField<String>(
-          initialValue: EdgeVoice.voices.containsKey(c.neuralVoice)
-              ? c.neuralVoice
-              : 'fr-FR-RemyMultilingualNeural',
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Voix', border: OutlineInputBorder()),
-          items: [
-            for (final e in EdgeVoice.voices.entries)
-              DropdownMenuItem(value: e.key, child: Text(e.value)),
-          ],
-          onChanged: (v) => c.setOption('neuralVoice', v ?? 'fr-FR-HenriNeural'),
-        ),
-      if (c.ttsEngine == 'gemini') ...[
+      ...[
         TextField(
           controller: key,
           obscureText: true,

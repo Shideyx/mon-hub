@@ -9,6 +9,7 @@ import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
 import 'modules/discord/discord_module.dart';
 import 'modules/discord/discord_phone.dart';
+import 'modules/youtube/youtube_module.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
 import 'core/module_store.dart';
@@ -18,6 +19,7 @@ import 'core/session.dart';
 import 'core/shortcuts.dart';
 import 'core/updater.dart';
 import 'ui/app_shell.dart';
+import 'core/hub_home.dart';
 import 'ui/clicky/assistant_view.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
@@ -130,6 +132,14 @@ class _HubAppState extends State<HubApp> {
         // Appels Discord reçus dans Mon Hub (Discord officiel caché).
         DiscordPhone.allowed = true;
         DiscordPhone.instance.notifications = n;
+        // « Menu » ferme aussi la fenêtre d'appel Discord (l'appel continue).
+        final phone = DiscordPhone.instance;
+        HubHome.instance
+          ..closers.add(() {
+            if (phone.shown) phone.hide();
+          })
+          ..awayChecks.add(() => phone.active && phone.shown);
+        phone.addListener(HubHome.instance.refresh);
         hub.available.whereType<DiscordModule>().firstOrNull?.syncPhone();
         // Quand Claude Code (Clicky) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
@@ -197,14 +207,22 @@ class _HubAppState extends State<HubApp> {
     return MaterialApp(
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
+      navigatorObservers: [HubHome.instance.observer],
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
       builder: (context, child) => UpdateGate(
         child: ClickyLayer(
           hub: hub,
           // Discord gardé ouvert en fond pour recevoir les appels.
-          child: DiscordPhoneLayer(
-            // Les propositions de l'assistant personnel (en bas à gauche).
-            child: AssistantLayer(enabled: hub != null, child: child ?? const SizedBox.shrink()),
+          // Le bouton « Menu » (toujours visible hors de l'accueil) et le
+          // petit écran YouTube, au-dessus de tout.
+          child: HubHomeLayer(
+            enabled: hub != null,
+            child: YouTubeMiniLayer(
+              child: DiscordPhoneLayer(
+                // Les propositions de l'assistant personnel (en bas à gauche).
+                child: AssistantLayer(enabled: hub != null, child: child ?? const SizedBox.shrink()),
+              ),
+            ),
           ),
         ),
       ),

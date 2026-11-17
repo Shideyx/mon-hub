@@ -12,6 +12,7 @@ import '../core/notifications.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'clicky/win.dart';
+import 'motion.dart';
 import 'widgets.dart';
 
 class HomePage extends StatelessWidget {
@@ -39,8 +40,10 @@ class HomePage extends StatelessWidget {
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
-                  child: _Header(
-                      controller: controller, notifications: notifications, modules: all),
+                  child: EnterAnimation(
+                    offset: 10,
+                    child: _Header(controller: controller, notifications: notifications, modules: all),
+                  ),
                 ),
                 if (away.isNotEmpty)
                   SliverToBoxAdapter(
@@ -81,16 +84,24 @@ class HomePage extends StatelessWidget {
                         mainAxisSpacing: 16,
                       ),
                       itemCount: modules.length,
-                      itemBuilder: (context, i) => ModuleCard(
-                        module: modules[i],
-                        onOpen: onOpen,
-                        // Glisser une carte sur une autre : elles échangent leur place.
-                        onDropped: (dragged) {
-                          final order = controller.ordered.map((m) => m.id).toList();
-                          final from = order.indexOf(dragged.id);
-                          final to = order.indexOf(modules[i].id);
-                          if (from >= 0 && to >= 0 && from != to) controller.reorder(from, to);
-                        },
+                      // Les cartes arrivent en cascade et s'enfoncent quand on appuie.
+                      itemBuilder: (context, i) => EnterAnimation(
+                        key: ValueKey('enter-${modules[i].id}'),
+                        index: i + 1,
+                        child: PressScale(
+                          scale: 0.975,
+                          child: ModuleCard(
+                            module: modules[i],
+                            onOpen: onOpen,
+                            // Glisser une carte sur une autre : elles échangent leur place.
+                            onDropped: (dragged) {
+                              final order = controller.ordered.map((m) => m.id).toList();
+                              final from = order.indexOf(dragged.id);
+                              final to = order.indexOf(modules[i].id);
+                              if (from >= 0 && to >= 0 && from != to) controller.reorder(from, to);
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   ),
