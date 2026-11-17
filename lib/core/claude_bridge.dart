@@ -39,7 +39,15 @@ class ClaudeBridge {
     await s?.close(force: true);
   }
 
-  List<HubTool> get tools => [for (final m in hub.enabled) ...m.tools, ...extras.value];
+  List<HubTool> get tools => [
+    for (final m in hub.enabled) ...m.tools,
+    ...extras.value,
+    ...?appTools?.call(),
+  ];
+
+  /// Outils de l'appli elle-même (Clicky : contrôle du PC, réparation du
+  /// micro), pour que Claude Code puisse aussi s'en servir.
+  static List<HubTool> Function()? appTools;
 
   /// Outils en plus des modules (serveurs MCP ajoutés dans les réglages de
   /// Clicky).
@@ -215,7 +223,7 @@ class ClaudeBridge {
 
   /// Actions qui changent quelque chose : on demande la permission avant.
   static bool isWriteAction(HubTool t) =>
-      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter|^mcp_').hasMatch(t.name);
+      RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter|^mcp_|^pc_commande$|^pc_ecrire').hasMatch(t.name);
 
   /// Convertit le résultat en JSON simple (dates en texte).
   static Object? plain(Object? v) => switch (v) {

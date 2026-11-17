@@ -36,6 +36,7 @@ import 'hud.dart';
 import 'journal.dart';
 import 'marks.dart';
 import 'ocr.dart';
+import 'pc.dart';
 import 'ollama.dart';
 import 'pointer.dart';
 import 'routines.dart';
@@ -233,6 +234,7 @@ class ClickyController extends ChangeNotifier {
     'ttsEngine',
     'neuralVoice',
     'geminiVoice',
+    'pc',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -375,6 +377,14 @@ class ClickyController extends ChangeNotifier {
 
   /// Clicky peut proposer de cliquer / taper à ta place (après relecture).
   bool get driveOn => _opt('drive', true);
+
+  /// Contrôle du PC : 'ask' (permission à chaque commande), 'auto' (sans
+  /// demander, sauf commandes dangereuses) ou 'off'.
+  String get pcControl {
+    if (!PcControl.supported) return 'off';
+    final v = _opt('pc', 'ask');
+    return const ['ask', 'auto', 'off'].contains(v) ? v : 'ask';
+  }
 
   /// Journal des connaissances.
   bool get journalOn => _opt('journal', true);
@@ -1152,10 +1162,24 @@ class ClickyController extends ChangeNotifier {
   /// Actions des modules de Mon Hub (dans l'appli).
   List<HubTool> get hubTools => _tools;
 
-  List<HubTool> get _tools => [
-    ...toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
-    if (toolsOverride == null) ...McpTools.cached,
-    if (toolsOverride == null && _voicePlatform) ...repairTools,
+  List<HubTool> get _tools {
+    final local = localTools;
+    final names = {for (final t in local) t.name};
+    return [
+      ...[
+        ...toolsOverride?.call() ??
+            [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
+        if (toolsOverride == null) ...McpTools.cached,
+      ].where((t) => !names.contains(t.name)),
+      ...local,
+    ];
+  }
+
+  /// Outils de Clicky lui-même (exécutés dans ce programme) : dépannage et
+  /// contrôle du PC. Aussi servis à Claude Code par le pont local.
+  List<HubTool> get localTools => [
+    if (_voicePlatform) ...repairTools,
+    if (pcControl != 'off') ...PcControl.tools(),
   ];
 
   /// Les outils de dépannage de Clicky : l'IA peut voir ce qui ne va pas
@@ -1240,7 +1264,7 @@ ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 ${clickyPersona(callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
-${_voicePlatform ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.''';
+${_voicePlatform ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.''';
     if (agent) {
       return '''$base
 
@@ -1890,6 +1914,13 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Demande la permission avant une action qui envoie ou modifie quelque
   /// chose (aussi utilisée par le pont quand Claude Code agit).
   Future<bool> confirmAction(HubTool tool, Map<String, dynamic> args) async {
+    final pc = PcControl.isWrite(tool.name);
+    if (pc) {
+      if (pcControl == 'off') return false;
+      final cmd = '${args['commande'] ?? ''}';
+      if (pcControl == 'auto' && !PcControl.dangerous(cmd) && args['admin'] != true) return true;
+      return _confirmPc(tool, args);
+    }
     onInteractive?.call(true);
     try {
       final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
@@ -1903,6 +1934,78 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
             child: Text(
               '${tool.description}\n\n'
               '${args.entries.map((e) => '• ${e.key} : ${e.value}').join('\n')}',
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Refuser')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Autoriser')),
+          ],
+        ),
+      );
+      return ok == true;
+    } finally {
+      if (!panelOpen && board == null) onInteractive?.call(false);
+    }
+  }
+
+  /// Permission pour une commande ou un fichier sur le PC : on montre
+  /// exactement ce qui va être lancé.
+  Future<bool> _confirmPc(HubTool tool, Map<String, dynamic> args) async {
+    onInteractive?.call(true);
+    try {
+      final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+      if (ctx == null || !ctx.mounted) return false;
+      final command = tool.name == 'pc_commande';
+      final why = '${args['pourquoi'] ?? ''}'.trim();
+      final body = command
+          ? '${args['commande'] ?? ''}'
+          : '${args['chemin'] ?? ''}\n\n${'${args['contenu'] ?? ''}'.characters.take(1500)}';
+      final danger = command && PcControl.dangerous('${args['commande'] ?? ''}');
+      final ok = await showDialog<bool>(
+        context: ctx,
+        builder: (c) => AlertDialog(
+          icon: Icon(
+            danger ? Icons.warning_amber_rounded : Icons.terminal_rounded,
+            color: danger ? Colors.orange : null,
+          ),
+          title: Text(
+            command
+                ? (args['admin'] == true
+                      ? 'Clicky veut lancer une commande (administrateur)'
+                      : 'Clicky veut lancer une commande')
+                : (args['ajouter'] == true ? 'Clicky veut compléter un fichier' : 'Clicky veut écrire un fichier'),
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (why.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(why)),
+                  if (danger)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Attention : cette commande peut effacer des données ou changer le système. '
+                        'Autorise seulement si c\'est bien ce que tu as demandé.',
+                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SelectableText(
+                      body,
+                      style: const TextStyle(fontFamily: 'Consolas', fontSize: 12.5, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

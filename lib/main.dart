@@ -111,6 +111,9 @@ class _HubAppState extends State<HubApp> {
         unawaited(n.start());
         // Quand Claude Code (Clicky) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
+        // Les outils de Clicky (contrôle du PC, réparation du micro) aussi
+        // pour Claude Code.
+        ClaudeBridge.appTools = () => ClickyController.instance.localTools;
         // Alertes de Clicky (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.show(
           HubNotification(

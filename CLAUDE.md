@@ -1,0 +1,19 @@
+# Mon Hub — notes pour Claude
+
+## Livraison (important)
+- La personne installe Mon Hub sur Windows et **reçoit les mises à jour automatiquement** :
+  chaque push sur `main` lance `.github/workflows/build.yml`, qui publie une release GitHub,
+  et l'appli se met à jour toute seule (`lib/core/updater.dart`).
+- Donc, quand un changement est fini, testé (`flutter analyze`, `flutter test`) et poussé sur la
+  branche de travail : **ouvrir la pull request vers `main` et la fusionner** sans attendre
+  qu'on le redemande. Sinon la correction n'arrive jamais sur son PC.
+- Réponses et messages de commit en français, simples (la personne n'est pas développeuse).
+
+## Repères
+- Flutter (Dart). Clicky = l'assistant IA : `lib/ui/clicky/`.
+- Micro Windows : `ears.dart` (PowerShell lancé en `detachedWithStdio` : ne jamais lire
+  `exitCode` d'un processus détaché, ça lève « Bad state: Process is detached »).
+- Outils de Clicky lui-même (`ClickyController.localTools`) : réparation du micro
+  (`clicky_diagnostic`, `clicky_reparer_micro`) et contrôle du PC (`pc.dart` : `pc_commande`,
+  `pc_ouvrir`, `pc_lire`, `pc_ecrire_fichier`). Servis aussi à Claude Code via le pont local
+  (`ClaudeBridge.appTools`). Permission : `ClaudeBridge.isWriteAction` + `confirmAction`.
