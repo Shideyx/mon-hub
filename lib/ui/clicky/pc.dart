@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/browser.dart';
 import '../../core/hub_module.dart';
 import '../../core/powershell.dart';
+import '../../core/tidy.dart';
 
 /// Clicky agit sur ton ordinateur quand tu le lui demandes : commandes
 /// (PowerShell sur Windows), fichiers, applis, réglages du système.
@@ -28,7 +29,10 @@ class PcControl {
 
   /// Les actions qui changent quelque chose (permission, sauf mode auto).
   static bool isWrite(String toolName) =>
-      toolName == 'pc_commande' || toolName == 'pc_ecrire_fichier';
+      toolName == 'pc_commande' ||
+      toolName == 'pc_ecrire_fichier' ||
+      toolName == 'pc_ranger' ||
+      toolName == 'pc_ranger_annuler';
 
   /// Ce que Clicky sait faire sur le PC (ajouté à ses consignes).
   static String get guide =>
@@ -37,7 +41,8 @@ Contrôle du PC : quand la personne te demande de FAIRE quelque chose sur son or
 - pc_commande : une commande ${Platform.isWindows ? 'PowerShell (Windows) ; winget pour installer un logiciel ; admin=true seulement si nécessaire (Windows demande alors la confirmation)' : 'shell'}. Non interactive (pas de question en attente, -Force / -y quand il faut), puis lis la sortie pour vérifier que ça a marché ;
 - pc_ouvrir : ouvrir une appli, un fichier, un dossier, un site ou une page de réglages (ms-settings:…) ;
 - pc_lire : lire un fichier texte ou lister un dossier ;
-- pc_ecrire_fichier : créer ou modifier un fichier texte.
+- pc_ecrire_fichier : créer ou modifier un fichier texte ;
+- pc_ranger_apercu puis pc_ranger : ranger un dossier (Téléchargements, Bureau, Documents, Images ou un chemin) par type et par matière, doublons mis de côté ; dis d'abord ce qui va être rangé ; pc_ranger_annuler remet tout en place. Pour ranger, utilise ces outils plutôt que des commandes.
 Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écrase rien que la personne n'a pas demandé, et dis en une phrase ce que tu as fait.''';
 
   static List<HubTool> tools() => supported
@@ -92,8 +97,54 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
             required: ['chemin', 'contenu'],
             run: (a) => write('${a['chemin'] ?? ''}', '${a['contenu'] ?? ''}', append: a['ajouter'] == true),
           ),
+          HubTool(
+            name: 'pc_ranger_apercu',
+            description: 'Prépare le rangement d\'un dossier du PC : où irait chaque fichier en vrac (sans rien toucher).',
+            params: {
+              'dossier': ('string', 'telechargements, bureau, documents, images, ou un chemin'),
+              'par_matiere': ('boolean', 'Ranger les cours par matière (Cours/Maths…), oui par défaut'),
+            },
+            required: ['dossier'],
+            run: (a) async {
+              final plan = await _plan(a);
+              return {
+                'dossier': plan.root,
+                'fichiers': plan.moves.length,
+                'laisses_en_place': plan.skipped,
+                'rangement': {
+                  for (final e in plan.groups.entries)
+                    e.key: {'nombre': e.value.length, 'exemples': [for (final m in e.value.take(4)) m.name]},
+                },
+              };
+            },
+          ),
+          HubTool(
+            name: 'pc_ranger',
+            description: 'Range pour de vrai un dossier du PC (après pc_ranger_apercu). Rien n\'est supprimé ; annulable.',
+            params: {
+              'dossier': ('string', 'telechargements, bureau, documents, images, ou un chemin'),
+              'par_matiere': ('boolean', 'Ranger les cours par matière, oui par défaut'),
+            },
+            required: ['dossier'],
+            run: (a) async {
+              final (n, errors) = await PcTidy.apply(await _plan(a));
+              return {'ranges': n, if (errors.isNotEmpty) 'erreurs': errors.take(5).toList()};
+            },
+          ),
+          HubTool(
+            name: 'pc_ranger_annuler',
+            description: 'Annule le dernier rangement du PC (remet les fichiers à leur place).',
+            run: (_) async => {'remis_en_place': await PcTidy.undoLast()},
+          ),
         ]
       : const [];
+
+  static Future<TidyPlan> _plan(Map<String, dynamic> a) async {
+    final what = '${a['dossier'] ?? ''}'.trim();
+    final dir = PcTidy.folder(what) ?? (what.isEmpty ? null : PcTidy.folder(expand(what)));
+    if (dir == null) throw 'Dossier introuvable : $what';
+    return PcTidy.analyze(dir, bySubject: a['par_matiere'] != false);
+  }
 
   static String? _str(Object? v) {
     final s = v?.toString().trim() ?? '';

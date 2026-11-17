@@ -31,7 +31,7 @@ class GoogleDocs {
 
   static String get account {
     final a = GoogleAuth.driveAccount;
-    if (a == null) throw 'Connecte ton compte Google (module Drive, ou Clicky te le propose au démarrage)';
+    if (a == null) throw 'Connecte ton compte Google : Réglages → Connexion Google';
     return a;
   }
 

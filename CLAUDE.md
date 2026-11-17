@@ -63,3 +63,11 @@
   cartes faites par l'IA, plan avant les contrôles ED dans l'agenda).
 - Google : portée `drive` complète (ranger le Drive, Google Docs) ; les comptes connectés avant la v1.37 n'ont
   que la lecture → `GoogleAuth.canWriteDrive` / reconnexion.
+- Rangement : `core/tidy.dart` (`PcTidy` : fichiers en vrac → type ou Cours/matière, doublons dans « Doublons »,
+  jamais de suppression, journal `rangement-*.json` pour annuler), `modules/drive/drive_tidy.dart` (Drive),
+  écran `ui/tidy_page.dart` (Réglages → Rangement). Outils `pc_ranger_apercu/pc_ranger/pc_ranger_annuler`,
+  `drive_ranger_*` (« ranger » = action à autoriser dans `ClaudeBridge.isWriteAction` et `PcControl.isWrite`).
+- Compte Google demandé par Clicky après la visite guidée (et une fois aux anciens comptes) : `ui/google_welcome.dart`.
+- ⚠️ Les secrets GitHub GOOGLE_CLIENT_ID/SECRET sont **vides** (vu dans le journal de construction v1.37) : la
+  connexion Google s'active donc dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart`,
+  `GoogleAuth.setClient`, gardé dans les préférences ; un ID fourni à la construction reste prioritaire).

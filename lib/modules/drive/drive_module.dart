@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
+import 'drive_tidy.dart';
+import '../../ui/google_setup.dart';
 import '../../ui/web_login.dart';
 import '../../ui/widgets.dart';
 
@@ -149,6 +151,40 @@ class DriveModule extends HubModule {
   @override
   List<HubTool> get tools => [
     HubTool(
+      name: 'drive_ranger_apercu',
+      description: 'Prépare le rangement du Google Drive : où irait chaque fichier en vrac à la racine '
+          '(Documents, PDF, Photos, Cours/Maths…), sans rien toucher.',
+      params: {'par_matiere': ('boolean', 'Ranger les cours par matière, oui par défaut')},
+      run: (a) async {
+        final moves = await DriveTidy.analyze(bySubject: a['par_matiere'] != false);
+        final groups = <String, List<String>>{};
+        for (final m in moves) {
+          groups.putIfAbsent(m.dest, () => []).add(m.name);
+        }
+        return {
+          'fichiers': moves.length,
+          'rangement': {
+            for (final e in groups.entries) e.key: {'nombre': e.value.length, 'exemples': e.value.take(4).toList()},
+          },
+        };
+      },
+    ),
+    HubTool(
+      name: 'drive_ranger',
+      description: 'Range pour de vrai le Google Drive (après drive_ranger_apercu). Rien n\'est supprimé ; annulable.',
+      params: {'par_matiere': ('boolean', 'Ranger les cours par matière, oui par défaut')},
+      run: (a) async {
+        final (n, errors) = await DriveTidy.apply(await DriveTidy.analyze(bySubject: a['par_matiere'] != false));
+        _recent = null;
+        return {'ranges': n, if (errors.isNotEmpty) 'erreurs': errors.take(5).toList()};
+      },
+    ),
+    HubTool(
+      name: 'drive_ranger_annuler',
+      description: 'Annule le dernier rangement du Google Drive.',
+      run: (_) async => {'remis_en_place': await DriveTidy.undoLast()},
+    ),
+    HubTool(
       name: 'drive_chercher',
       description: 'Cherche des fichiers dans Google Drive par leur nom (ou liste les récents).',
       params: {'nom': ('string', 'Texte à chercher dans le nom (vide = fichiers récents)')},
@@ -170,7 +206,11 @@ class DriveModule extends HubModule {
     listenable: store,
     builder: (context, _) {
       if (!GoogleAuth.available) {
-        return const EmptyHint('Ouvre la tuile pour voir ton Drive', icon: Icons.add_to_drive_rounded);
+        return EmptyHint(
+          'Active la connexion Google une fois pour voir et ranger ton Drive',
+          icon: Icons.add_to_drive_rounded,
+          action: ('Activer Google', () => GoogleSetupPage.open(context)),
+        );
       }
       if (account == null) {
         return EmptyHint(

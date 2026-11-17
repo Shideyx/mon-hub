@@ -7,6 +7,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import 'google_setup.dart';
+import 'tidy_page.dart';
+import '../core/google_auth.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
@@ -148,6 +151,26 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ],
+            section('Google'),
+            ListTile(
+              leading: const Icon(Icons.g_mobiledata_rounded, size: 32),
+              title: const Text('Connexion Google'),
+              subtitle: Text(
+                !GoogleAuth.available
+                    ? 'À activer une fois (5 min) : Drive, Google Docs, agenda, Gmail'
+                    : GoogleAuth.driveAccount == null
+                        ? 'Activée : connecte ton compte'
+                        : 'Compte : ${GoogleAuth.driveAccount}',
+              ),
+              onTap: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
+            ),
+            section('Rangement'),
+            ListTile(
+              leading: const Icon(Icons.auto_fix_high_rounded),
+              title: const Text('Ranger mon PC et mon Drive'),
+              subtitle: const Text('Téléchargements, Bureau, Documents, Google Drive : par type et par matière, annulable'),
+              onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TidyPage())),
+            ),
             section('Compte'),
             ListTile(
               leading: const Icon(Icons.account_circle_rounded),
