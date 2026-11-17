@@ -12,7 +12,7 @@ import 'voice.dart';
 import 'wake.dart';
 import 'win.dart';
 
-/// Réglages de Clicky / Jarvis (apparence, voix, écoute, prof, vie privée,
+/// Réglages de Clicky (apparence, voix, écoute, prof, vie privée,
 /// outils), affichés sous le choix du cerveau.
 class ClickyMoreSettings extends StatelessWidget {
   const ClickyMoreSettings({super.key});
@@ -47,37 +47,35 @@ class ClickyMoreSettings extends StatelessWidget {
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(
-                value: 'jarvis',
+                value: 'hud',
                 icon: Icon(Icons.blur_circular_rounded),
-                label: Text('Jarvis'),
+                label: Text('Réacteur animé'),
               ),
               ButtonSegment(
                 value: 'classic',
                 icon: Icon(Icons.near_me_rounded),
-                label: Text('Clicky classique'),
+                label: Text('Curseur classique'),
               ),
             ],
-            selected: {c.look},
+            selected: {c.hud ? 'hud' : 'classic'},
             onSelectionChanged: (v) => c.setOption('look', v.first),
           ),
           const SizedBox(height: 6),
           Text(
-            c.jarvis
-                ? 'Jarvis : un réacteur bleu animé à côté du curseur, des fenêtres « tête haute », '
-                      'une voix posée de majordome, le briefing et le mot d\'activation « Jarvis ».'
-                : 'Clicky : le petit curseur bleu d\'origine.',
+            c.hud
+                ? 'Un réacteur bleu animé à côté du curseur (il tourne quand Clicky réfléchit, '
+                      's\'anime quand il t\'écoute) et des fenêtres « tête haute ».'
+                : 'Le petit curseur bleu d\'origine.',
             style: text.bodySmall,
           ),
-          if (c.jarvis) ...[
-            const SizedBox(height: 10),
-            _TextOption(
-              label: 'Comment Jarvis t\'appelle',
-              hint: c.jarvisName.isEmpty ? 'Ton prénom, « Monsieur », « Madame »…' : c.jarvisName,
-              value: ClickyController.instance.jarvisName,
-              onSave: (v) => c.setOption('jarvisName', v),
-            ),
-            sw('greet', c.greet, 'Me saluer au premier démarrage de la journée'),
-          ],
+          const SizedBox(height: 10),
+          _TextOption(
+            label: 'Comment Clicky t\'appelle',
+            hint: c.callName.isEmpty ? 'Ton prénom, un surnom…' : c.callName,
+            value: c.callName,
+            onSave: (v) => c.setOption('callName', v),
+          ),
+          sw('greet', c.greet, 'Me saluer au premier démarrage de la journée'),
 
           head('Voix', Icons.record_voice_over_rounded),
           const _VoicePicker(),
@@ -94,21 +92,9 @@ class ClickyMoreSettings extends StatelessWidget {
               'wake',
               c.wakeOn,
               'Mot d\'activation (mains libres)',
-              'Dis « ${c.wakeWord == 'clicky' ? 'Clicky' : 'Jarvis'} » et pose ta question, sans toucher au clavier. '
+              'Dis « Clicky » et pose ta question, sans toucher au clavier. '
                   'L\'écoute du mot se fait sur ton PC.',
             ),
-            if (c.wakeOn)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'jarvis', label: Text('« Jarvis »')),
-                    ButtonSegment(value: 'clicky', label: Text('« Clicky »')),
-                  ],
-                  selected: {c.wakeWord},
-                  onSelectionChanged: (v) => c.setOption('wakeWord', v.first),
-                ),
-              ),
           ],
           if (Win.supportedHere)
             sw(
@@ -319,12 +305,7 @@ class _VoicePickerState extends State<_VoicePicker> {
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Voix', border: OutlineInputBorder()),
               items: [
-                DropdownMenuItem(
-                  value: '',
-                  child: Text(
-                    c.jarvis ? 'Automatique (voix d\'homme française si possible)' : 'Automatique',
-                  ),
-                ),
+                DropdownMenuItem(value: '', child: Text('Automatique (voix française)')),
                 for (final v in all)
                   DropdownMenuItem(value: v.name, child: Text('${v.name} (${v.locale})')),
               ],
@@ -375,9 +356,7 @@ class _VoicePickerState extends State<_VoicePicker> {
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: const Text('Écouter la voix'),
                 onPressed: () => c.speak(
-                  c.jarvis
-                      ? 'Bonjour${c.jarvisName.isEmpty ? '' : ' ${c.jarvisName}'}. Je suis Jarvis, à votre service.'
-                      : 'Salut ! C\'est Clicky. Je suis là pour t\'aider.',
+                  'Salut${c.callName.isEmpty ? '' : ' ${c.callName}'} ! C\'est Clicky. Je suis là pour t\'aider.',
                 ),
               ),
             ),

@@ -261,7 +261,7 @@ class VoiceSkill {
   /// phrase), s'il y en a un.
   static (VoiceSkill, String)? match(String said, [List<VoiceSkill>? list]) {
     var n = normalize(said);
-    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:jarvis|clicky) ?'), '').trim();
+    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?clicky ?'), '').trim();
     for (final s in list ?? all) {
       final p = normalize(s.phrase);
       if (p.isEmpty) continue;

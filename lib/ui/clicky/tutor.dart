@@ -60,8 +60,8 @@ String normalize(String s) {
 /// Reconnaît une commande. Renvoie (commande, reste de la phrase).
 (ClickyCommand, String)? parseCommand(String raw) {
   var n = normalize(raw);
-  // « Jarvis, … », « Clicky, … », « dis Jarvis … » au début.
-  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:jarvis|clicky) ?'), '').trim();
+  // « Clicky, … », « dis Clicky … » au début.
+  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?clicky ?'), '').trim();
   if (n.isEmpty) return null;
   bool any(List<String> l) => l.any((p) => n == p || n == '$p s il te plait' || n == '$p merci');
   if (any([

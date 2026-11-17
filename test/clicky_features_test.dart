@@ -14,7 +14,7 @@ import 'package:hub/ui/chat_history.dart';
 import 'package:hub/ui/clicky/documents.dart';
 import 'package:hub/ui/clicky/drive.dart';
 import 'package:hub/ui/clicky/extensions.dart';
-import 'package:hub/ui/clicky/jarvis.dart';
+import 'package:hub/ui/clicky/hud.dart';
 import 'package:hub/ui/clicky/journal.dart';
 import 'package:hub/ui/clicky/marks.dart';
 import 'package:hub/ui/clicky/pointer.dart';
@@ -67,7 +67,7 @@ void main() {
   group('Clicky : commandes vocales', () {
     test('commandes reconnues', () {
       expect(parseCommand('Suivant')?.$1, ClickyCommand.next);
-      expect(parseCommand('Jarvis, continue')?.$1, ClickyCommand.next);
+      expect(parseCommand('Clicky, continue')?.$1, ClickyCommand.next);
       expect(parseCommand('répète')?.$1, ClickyCommand.repeat);
       expect(parseCommand('Stop !')?.$1, ClickyCommand.stop);
       expect(parseCommand('Qu\'est-ce qu\'on a vu aujourd\'hui ?')?.$1, ClickyCommand.today);
@@ -100,7 +100,7 @@ void main() {
         VoiceSkill('ouvre youtube', 'url', 'https://youtube.com'),
         VoiceSkill('mode revision', 'ask', 'Quiz'),
       ];
-      expect(VoiceSkill.match('Jarvis, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
+      expect(VoiceSkill.match('Clicky, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
       expect(VoiceSkill.match('Mode révision maths', list)?.$2, 'maths');
       expect(VoiceSkill.match('ouvre la porte', list), isNull);
     });
@@ -251,12 +251,13 @@ void main() {
     expect(historySection(DateTime(2026, 9, 1), DateTime(2026, 11, 16)), 'Plus ancien');
   });
 
-  test('voix : bip de Jarvis et salutation', () {
+  test('voix : bip de Clicky et salutation', () {
     final wav = ClickyChime.wav();
     expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
-    expect(jarvisGreeting('Erik', DateTime(2026, 11, 16, 8)), startsWith('Bonjour Erik.'));
-    expect(jarvisGreeting('', DateTime(2026, 11, 16, 20)), startsWith('Bonsoir.'));
-    expect(jarvisPersona('Erik'), contains('« Erik »'));
+    expect(clickyGreeting('Erik', DateTime(2026, 11, 16, 8)), startsWith('Bonjour Erik.'));
+    expect(clickyGreeting('', DateTime(2026, 11, 16, 20)), startsWith('Bonsoir.'));
+    expect(clickyPersona('Erik'), contains('« Erik »'));
+    expect(clickyPersona('Erik'), contains('Clicky'));
     expect(const SystemVoice('Microsoft Paul', 'fr-FR').male, isTrue);
     expect(const SystemVoice('Microsoft Hortense', 'fr-FR').male, isFalse);
   });
