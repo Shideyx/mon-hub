@@ -18,6 +18,7 @@ import '../../core/nav.dart';
 import '../../core/session.dart';
 import '../theme.dart';
 import 'clicky.dart';
+import 'flight.dart';
 import 'win.dart';
 
 /// « Clicky partout » (Windows) : Clicky sort de la fenêtre de Mon Hub.
@@ -149,7 +150,10 @@ Future<void> runClickyDesktop() async {
   final c = ClickyController.instance
     ..desktopMode = true
     ..captureOverride = _captureScreens
-    ..toolsOverride = _BridgeTools.list;
+    ..toolsOverride = _BridgeTools.list
+    // Sa présence : là où il peut aller regarder, et plein écran = discret.
+    ..lookSpots = _lookSpots
+    ..fullscreenNow = Win.foregroundFullscreen;
 
   unawaited(c.loadMemory());
   lock.listen((sock) {
@@ -171,6 +175,14 @@ Future<void> runClickyDesktop() async {
           unawaited(c.act(utf8.decode(base64Decode(cmd.substring(6)))));
         } catch (_) {}
       }
+      // « Regarde mon écran maintenant » (réglages de Mon Hub).
+      if (cmd == 'notice') unawaited(c.noticeSomething(force: true));
+      // Une pensée de Clicky (rappel de l'assistant…) envoyée par Mon Hub.
+      if (cmd.startsWith('think64 ')) {
+        try {
+          unawaited(c.think(utf8.decode(base64Decode(cmd.substring(8)))));
+        } catch (_) {}
+      }
       // Question envoyée par Mon Hub (révisions du journal…).
       if (cmd.startsWith('ask ')) {
         c.openPanel();
@@ -180,6 +192,31 @@ Future<void> runClickyDesktop() async {
   });
 
   runApp(const _ClickyDesktopApp());
+}
+
+/// Là où Clicky peut aller regarder tout seul (pixels de l'écran) : la barre
+/// de titre et le milieu de ta fenêtre, l'horloge, l'autre écran.
+List<Offset> _lookSpots() {
+  final out = <Offset>[];
+  final f = Win.foregroundRect();
+  if (f != null && f.$3 > 200 && f.$4 > 150) {
+    final (x, y, w, h) = f;
+    out.addAll([
+      Offset(x + w * 0.5, y + 16.0),
+      Offset(x + w * 0.5, y + h * 0.45),
+      Offset(x + w * 0.25, y + h * 0.3),
+      Offset(x + w * 0.75, y + h * 0.6),
+    ]);
+  }
+  final mons = Win.monitors();
+  if (mons.isNotEmpty) {
+    final (mx, my, mw, mh) = mons.first;
+    out.add(Offset(mx + mw - 70.0, my + mh - 24.0)); // l'horloge
+  }
+  for (final (mx, my, mw, mh) in mons.skip(1)) {
+    out.add(Offset(mx + mw / 2, my + mh / 2));
+  }
+  return out;
 }
 
 /// Captures de chaque écran (Clicky est caché pendant la photo).
@@ -334,7 +371,7 @@ class _Desktop extends StatefulWidget {
 
 /// Taille de la fenêtre (en points) : compacte, ou avec le panneau ouvert.
 const _cursorOnly = Size(170, 80);
-const _pointing = Size(300, 60);
+const _pointing = Size(330, 96);
 const _compact = Size(390, 330);
 const _withPanel = Size(420, 400);
 const _withBoard = Size(560, 760);
@@ -358,9 +395,16 @@ class _DesktopState extends State<_Desktop> {
   bool _pinned = false;
   Offset? _dragFrom;
   Offset? _dragPos;
-  Offset? _flightFrom;
+  /// Le vol en cours (vers une cible, un regard, ou retour à la souris).
+  ClickyFlight? _flight;
   Offset? _flightTo;
-  DateTime? _flightStart;
+
+  /// Pendant qu'il réfléchit après une capture : il parcourt l'écran.
+  Offset? _scan;
+  DateTime _nextScan = DateTime.now();
+
+  /// Position qui suit la souris (avec un petit ressort).
+  Offset? _follow;
 
   double get _dpr => View.of(context).devicePixelRatio;
 
@@ -405,18 +449,58 @@ class _DesktopState extends State<_Desktop> {
     super.dispose();
   }
 
-  Offset? _lastTarget;
+  Offset? _lastGoal;
+
+  /// Là où il doit être : la cible montrée, un regard, un coin de l'écran
+  /// qu'il parcourt en réfléchissant (sinon : à côté de la souris).
+  Offset? get _goal => c.target ?? c.gaze ?? _scan;
+
+  void _fly(Offset? to) {
+    final from = _pos;
+    _flightTo = to;
+    final dest = to ?? (c.cursor ?? from);
+    if (from == null || dest == null) {
+      _flight = null;
+      return;
+    }
+    _flight = ClickyFlight(from, to == null ? dest + const Offset(16, 14) : dest + const Offset(1, 1), DateTime.now(), dpr: _dpr);
+  }
 
   void _onChange() {
     if (c.marks.isEmpty) _frame = Offset.zero;
-    if (c.target != _lastTarget) {
+    final goal = _goal;
+    if (goal != _lastGoal) {
       // Départ (ou retour) en vol, en arc.
-      _flightFrom = _pos;
-      _flightTo = c.target;
-      _flightStart = DateTime.now();
-      _lastTarget = c.target;
+      _fly(goal);
+      _lastGoal = goal;
     }
     if (mounted) setState(() {});
+  }
+
+  /// En réfléchissant après une capture, il « lit » ta fenêtre : petits
+  /// sauts rapides d'un endroit à l'autre.
+  void _scanStep() {
+    final thinking = c.state == ClickyState.thinking && c.target == null && c.gaze == null && !_interactive;
+    if (!thinking) {
+      if (_scan != null) {
+        _scan = null;
+        _onChange();
+      }
+      return;
+    }
+    final now = DateTime.now();
+    if (now.isBefore(_nextScan)) return;
+    _nextScan = now.add(Duration(milliseconds: 520 + math.Random().nextInt(420)));
+    final f = Win.foregroundRect();
+    final cur = c.cursor;
+    final r = math.Random();
+    if (f != null && f.$3 > 200 && f.$4 > 150) {
+      final (x, y, w, h) = f;
+      _scan = Offset(x + w * (0.15 + r.nextDouble() * 0.7), y + h * (0.12 + r.nextDouble() * 0.7));
+    } else if (cur != null) {
+      _scan = cur + Offset(r.nextDouble() * 300 - 150, r.nextDouble() * 200 - 100);
+    }
+    _onChange();
   }
 
   /// Réglages changés dans Mon Hub, Mon Hub fermé…
@@ -460,6 +544,7 @@ class _DesktopState extends State<_Desktop> {
 
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
+    _scanStep();
     _place();
   }
 
@@ -489,23 +574,25 @@ class _DesktopState extends State<_Desktop> {
     } else if (_interactive || _pinned) {
       want = _pos ?? cur + const Offset(16, 14);
     } else {
-      want = cur + const Offset(16, 14);
+      // Il suit la souris avec un petit ressort (vif, mais vivant).
+      final home = cur + const Offset(16, 14);
+      want = _follow = springTowards(_follow ?? home, home);
     }
-    // Vol en arc vers la cible (ou retour vers la souris).
-    final start = _flightStart;
-    if (start != null && _flightFrom != null) {
-      final t = (DateTime.now().difference(start).inMilliseconds / 650).clamp(0.0, 1.0);
+    // Vol en arc (vers la cible, un regard, ou retour vers la souris) :
+    // il s'oriente dans le sens du vol et grossit un peu au milieu.
+    final fl = _flight;
+    if (fl != null) {
+      final now = DateTime.now();
+      final t = fl.progress(now);
       if (t < 1) {
-        final e = Curves.easeInOutCubic.transform(t);
-        final a = _flightFrom!, b = want;
-        final mid = Offset(
-          (a.dx + b.dx) / 2,
-          math.min(a.dy, b.dy) - (b - a).distance * 0.3 - 30 * dpr,
-        );
-        final u = 1 - e;
-        want = a * (u * u) + mid * (2 * u * e) + b * (e * e);
+        // Retour vers la souris : la destination suit la souris qui bouge.
+        final live = to == null ? ClickyFlight(fl.from, want, fl.start, dpr: dpr) : fl;
+        want = live.positionAt(t);
+        c.setFlight(live.angleAt(t), live.scaleAt(t));
       } else {
-        _flightStart = null;
+        _flight = null;
+        _follow = want;
+        c.setFlight(0, 1);
       }
     }
     // Fenêtre juste assez grande : minuscule autour du curseur, plus grande
@@ -514,7 +601,7 @@ class _DesktopState extends State<_Desktop> {
         ? _withBoard
         : _interactive
         ? _withPanel
-        : c.state == ClickyState.pointing
+        : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty
         ? _pointing
         : c.boxOpen
         ? _compact

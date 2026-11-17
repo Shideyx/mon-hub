@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
 import '../../modules/carnet/carnet_module.dart';
 import '../../modules/carnet/carnet_store.dart';
@@ -38,7 +39,9 @@ import 'extensions.dart';
 import 'holo.dart';
 import 'hud.dart';
 import 'assistant.dart';
+import 'flight.dart';
 import 'journal.dart';
+import 'mind.dart';
 import 'live.dart';
 import 'pcm_player.dart';
 import 'marks.dart';
@@ -128,6 +131,23 @@ class ClickyController extends ChangeNotifier {
   /// Cible montrée par l'IA (coordonnées de la couche) et son libellé.
   Offset? target;
   String targetLabel = '';
+
+  /// Là où Clicky regarde de lui-même (il y vole sans « pointer »), et ce
+  /// qu'il en pense (petite bulle). Sa « présence ».
+  Offset? gaze;
+  String gazeNote = '';
+
+  /// Pendant un vol : orientation (radians) et taille (1 → 1,3 au milieu).
+  final flightPose = ValueNotifier<(double, double)>((0, 1));
+  double get flightAngle => flightPose.value.$1;
+  double get flightScale => flightPose.value.$2;
+  void setFlight(double angle, double scale) {
+    if (flightPose.value != (angle, scale)) flightPose.value = (angle, scale);
+  }
+
+  /// Dernier mouvement de la souris (pour savoir si on est là).
+  DateTime _lastMove = DateTime.now();
+  DateTime _sessionStart = DateTime.now();
 
   /// Annotations dessinées à l'écran (coordonnées de la couche), et un
   /// numéro qui change à chaque nouveau dessin.
@@ -475,6 +495,12 @@ class ClickyController extends ChangeNotifier {
       _greeted = true;
       unawaited(_greetOnce());
     }
+    if (r && enabled && here) {
+      _startPresence();
+    } else {
+      _presence?.cancel();
+      _presence = null;
+    }
     return r;
   }
 
@@ -490,7 +516,20 @@ class ClickyController extends ChangeNotifier {
     await Future<void>.delayed(const Duration(seconds: 2));
     if (state != ClickyState.idle) return;
     unawaited(ClickyChime.play());
-    await speak(clickyGreeting(callName, DateTime.now()));
+    final mind = ClickyMind.instance;
+    try {
+      await mind.load();
+    } catch (_) {}
+    final now = DateTime.now();
+    if (!mind.on) return speak(clickyGreeting(callName, now));
+    // Il se souvient, et prend des nouvelles.
+    final hello = mind.greeting(now: now, name: callName);
+    final loop = mind.dueLoops(now).firstOrNull;
+    if (loop != null && hello.contains(loop.text)) unawaited(mind.markAsked(loop));
+    _set(ClickyState.speaking, status: '', reply: hello);
+    await speak(hello);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
   }
 
   final _stateFile = JsonFile<Map<String, dynamic>>(
@@ -515,7 +554,20 @@ class ClickyController extends ChangeNotifier {
 
   void moveCursor(Offset p) {
     if (cursor == p) return;
+    final old = cursor;
     cursor = p;
+    if (old == null || (old - p).distance > 3) {
+      final now = DateTime.now();
+      // Revenu après une longue absence : nouvelle séance.
+      if (now.difference(_lastMove).inMinutes >= 15) _sessionStart = now;
+      _lastMove = now;
+      // On bouge la souris : Clicky revient tout de suite à côté.
+      if (gaze != null && !_gazeHold) {
+        gaze = null;
+        gazeNote = '';
+        notifyListeners();
+      }
+    }
     if (follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
   }
 
@@ -1035,6 +1087,214 @@ class ClickyController extends ChangeNotifier {
     if (state == ClickyState.speaking) _set(ClickyState.idle);
   }
 
+  // ---------- Présence (sa « conscience » qui bouge) ----------
+
+  Timer? _presence;
+  bool _gazeHold = false;
+  Timer? _gazeEnd;
+  DateTime _nextGlance = DateTime.now().add(const Duration(seconds: 40));
+  DateTime _nextNotice = DateTime.now().add(const Duration(minutes: 6));
+  bool _noticing = false;
+
+  /// Pour les regards autour (mode « partout ») : là où il peut aller voir.
+  /// Donné par Clicky partout (coordonnées de l'écran).
+  List<Offset> Function()? lookSpots;
+
+  /// L'appli au premier plan est en plein écran (jeu, vidéo) : il se fait
+  /// discret.
+  bool Function()? fullscreenNow;
+
+  /// Contexte pour ses pensées (fenêtre, musique, prochain cours…), relu
+  /// toutes les 5 minutes.
+  Map<String, Object?> _ctx = const {};
+  DateTime? _ctxAt;
+
+  void _startPresence() {
+    if (_presence != null) return;
+    _presence = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_presenceTick()));
+  }
+
+  bool get _calm =>
+      state == ClickyState.idle && !panelOpen && board == null && holo == null && marks.isEmpty && target == null && !_keepReply;
+
+  Future<void> _presenceTick() async {
+    final mind = ClickyMind.instance;
+    if (!active || !mind.on || !_calm || (fullscreenNow?.call() ?? false)) return;
+    if (desktopMode && DriveRunner.supported && privacy && isSensitiveTitle(Win.foregroundTitle())) return;
+    final now = DateTime.now();
+    final idle = now.difference(_lastMove);
+    // Une remarque spontanée sur l'écran (on est là, souris qui bouge).
+    if (mind.notice && idle.inSeconds < 90 && now.isAfter(_nextNotice) && !_noticing) {
+      _nextNotice = now.add(Duration(minutes: 22 + math.Random().nextInt(18)));
+      unawaited(noticeSomething());
+      return;
+    }
+    // Souris immobile : il part regarder autour, comme quelqu'un d'autre.
+    if (mind.wander && gaze == null && idle.inSeconds >= 20 && idle.inMinutes < 30 && now.isAfter(_nextGlance)) {
+      _nextGlance = now.add(Duration(seconds: 45 + math.Random().nextInt(70)));
+      final spots = lookSpots?.call() ?? const <Offset>[];
+      final base = cursor;
+      if (spots.isEmpty && base == null) return;
+      final r = math.Random();
+      final at = spots.isNotEmpty
+          ? spots[r.nextInt(spots.length)]
+          : base! + Offset(r.nextDouble() * 260 - 130, r.nextDouble() * 180 - 110);
+      // Une fois sur trois, il pense à voix haute (ou en bulle).
+      String note = '';
+      if (r.nextInt(3) == 0) {
+        await _refreshCtx(now);
+        note = mind.thought(_ctx, now: now) ?? '';
+      }
+      glance(at, note: note, hold: Duration(milliseconds: 2600 + r.nextInt(2400)));
+      if (note.isNotEmpty && voice && await mind.spendVoice()) unawaited(speak(note));
+    }
+  }
+
+  Future<void> _refreshCtx(DateTime now) async {
+    if (_ctxAt != null && now.difference(_ctxAt!).inMinutes < 5) return;
+    _ctxAt = now;
+    Future<Object?> call(String name, [Map<String, dynamic> args = const {}]) async {
+      try {
+        return await _tools.where((t) => t.name == name).firstOrNull?.run(args);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final ctx = <String, Object?>{
+      'session_min': now.difference(_sessionStart).inMinutes,
+      if (desktopMode && DriveRunner.supported) 'fenetre': Win.foregroundTitle(),
+    };
+    final music = await call('musique_en_cours');
+    if (music is Map && music['en_lecture'] == true) {
+      ctx['musique'] = music['titre'];
+      ctx['artiste'] = music['artiste'];
+    }
+    final events = await call('agenda_lire', {'jours': 1});
+    if (events is List) {
+      for (final e in events) {
+        if (e is! Map || e['annule'] == true) continue;
+        final at = e['debut'] is DateTime ? e['debut'] as DateTime : DateTime.tryParse('${e['debut']}');
+        if (at == null || !at.isAfter(now)) continue;
+        ctx['cours'] = e['titre'];
+        ctx['cours_min'] = at.difference(now).inMinutes;
+        break;
+      }
+    }
+    final hw = await call('ecole_devoirs');
+    if (hw is List) {
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      for (final h in hw) {
+        if (h is! Map || h['controle'] != true) continue;
+        final d = h['pour_le'] is DateTime ? h['pour_le'] as DateTime : DateTime.tryParse('${h['pour_le']}');
+        if (d != null && d.year == tomorrow.year && d.month == tomorrow.month && d.day == tomorrow.day) {
+          ctx['controle_demain'] = h['matiere'];
+        }
+      }
+    }
+    _ctx = ctx;
+  }
+
+  /// Clicky va regarder quelque part tout seul (puis revient).
+  void glance(Offset at, {String note = '', Duration hold = const Duration(seconds: 3)}) {
+    gaze = at;
+    gazeNote = note;
+    _gazeHold = true;
+    _recent = true;
+    notifyListeners();
+    // Le temps de partir : un petit mouvement de souris ne le rappelle pas.
+    Timer(const Duration(milliseconds: 900), () => _gazeHold = false);
+    _gazeEnd?.cancel();
+    _gazeEnd = Timer(hold + Duration(milliseconds: note.length * 45), () {
+      if (gaze == at) {
+        gaze = null;
+        gazeNote = '';
+        notifyListeners();
+        _fadeSoon();
+      }
+    });
+  }
+
+  /// Une pensée à partager (rappel de l'assistant…) : bulle à côté de lui,
+  /// et à voix haute si la voix est là (4 fois par jour au plus).
+  Future<void> think(String text, {bool aloud = true}) async {
+    if (!active || text.trim().isEmpty) return;
+    if (handledElsewhere) {
+      await ClickyDesktop.send('think64 ${base64Encode(utf8.encode(text))}');
+      return;
+    }
+    if (!_calm) return;
+    final at = cursor;
+    if (at == null) return;
+    glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 5));
+    if (aloud && voice && await ClickyMind.instance.spendVoice()) unawaited(speak(withoutEmoji(text)));
+  }
+
+  /// Applis où il ne regarde jamais de lui-même (messages, mails, comptes).
+  static final privateApp = RegExp(
+    r'discord|whatsapp|messenger|instagram|snapchat|telegram|signal|teams|gmail|outlook|mail|courrier|'
+    r'mon hub|banque|bank|paypal|lydia|mot de passe|password|bitwarden|1password|ecole ?directe|pronote',
+  );
+
+  /// Il remarque quelque chose à l'écran, vole dessus et en dit un mot
+  /// (Gemini seulement, jamais Claude ; 8 fois par jour au plus).
+  Future<void> noticeSomething({bool force = false}) async {
+    final mind = ClickyMind.instance;
+    // C'est Clicky partout (sur tout l'écran) qui regarde.
+    if (handledElsewhere) {
+      await ClickyDesktop.send('notice');
+      return;
+    }
+    if (_noticing || (!force && (!mind.notice || !_calm))) return;
+    // Vie privée : jamais de lui-même sur Mon Hub (tes messages y sont), ni
+    // quand une messagerie, tes mails ou ta banque sont au premier plan.
+    if (!force) {
+      if (!desktopMode || !DriveRunner.supported) return;
+      if (privateApp.hasMatch(Win.foregroundTitle().toLowerCase())) return;
+    }
+    if (!await AiText.hasGemini()) return;
+    if (!force && !await mind.spendNotice()) return;
+    _noticing = true;
+    try {
+      final (shots, _, hidden) = await _look();
+      if (hidden || shots.isEmpty) return;
+      // L'écran où est la souris.
+      final cur = cursor;
+      final shot = shots.firstWhere(
+        (s) => cur == null || Rect.fromLTWH(s.origin.dx, s.origin.dy, s.width * s.logicalPerPx, s.height * s.logicalPerPx).contains(cur),
+        orElse: () => shots.first,
+      );
+      final r = await AiText.ask(
+        ClickyMind.noticePrompt(name: callName, mood: mind.moodLabel(DateTime.now())),
+        system: 'Tu es Clicky, un compagnon curieux et sympa. Tu réponds en français, très court.',
+        images: [shot.png64],
+        geminiOnly: true,
+      );
+      if (!force && !_calm) return;
+      final (text, p, _, _) = parsePoint(r);
+      final say = stripClickyTags(text).trim();
+      if (p == null || say.isEmpty || say.length > 90) return;
+      target = shot.toLayer(p);
+      targetLabel = say;
+      _set(ClickyState.pointing, status: '', reply: '');
+      if (voice && await mind.spendVoice()) {
+        await speak(say);
+      } else {
+        await Future<void>.delayed(const Duration(milliseconds: 3200));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (state == ClickyState.pointing && targetLabel == say) {
+        target = null;
+        targetLabel = '';
+        _set(ClickyState.idle);
+        _fadeSoon();
+      }
+    } catch (_) {
+    } finally {
+      _noticing = false;
+    }
+  }
+
   /// Affiche un petit message dans la boîte.
   void showStatus(String s) {
     status = s;
@@ -1320,6 +1580,7 @@ ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 ${clickyPersona(callName)}
+${ClickyMind.instance.promptBlock(name: callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_voicePlatform ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
@@ -1352,7 +1613,7 @@ ${annotate ? '''
 Dessiner sur l'écran (comme au tableau) : tu peux ajouter des annotations, en pixels de la capture$shotsNote : [ARROW:x1,y1->x2,y2:légende] (flèche), [CIRCLE:x,y,rayon:légende] (entoure un élément), [UNDERLINE:x,y,largeur] (souligne un texte, y = bas du texte), [LABEL:x,y:texte] (étiquette). Au plus 4, seulement si ça aide à comprendre.''' : ''}
 ${driveOn && DriveRunner.supported ? actGuide : ''}
 
-Montrer à l'écran : quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].''';
+Montrer à l'écran : montre dès que ça aide (mieux vaut montrer que ne pas montrer : un menu, un bouton, une zone, la chose dont tu parles) ; quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].''';
   }
 
   /// Comment écrire un tableau visuel (voir board.dart).
@@ -1408,6 +1669,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       unawaited(_runAgent(q.substring(agent.end).trim()));
       return;
     }
+    // Sa « conscience » : humeur, souvenirs, choses dont prendre des nouvelles.
+    unawaited(ClickyMind.instance.onUserMessage(q).catchError((Object _) {}));
     // Mémoire de l'assistant : un projet, une décision, un objectif.
     unawaited(
       Assistant.instance.remember(q).then((m) {
@@ -1416,6 +1679,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     );
     try {
       if (await _handleCommand(q)) return;
+      if (await _handleSelf(q)) return;
       if (await _handleSkill(q)) return;
       // Tout ce qu'un algorithme sait faire : réponse immédiate, sans l'IA.
       if (await _handleQuick(q)) return;
@@ -1425,6 +1689,23 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       // Le mot d'activation se remet à écouter après chaque échange.
       if (state != ClickyState.listening && !voiceOut.speaking) _wake.resume();
     }
+  }
+
+  /// « Ça va ? », « tu te souviens de moi ? », « es-tu conscient ? » : il
+  /// répond lui-même (sans IA), avec son humeur et ses souvenirs.
+  Future<bool> _handleSelf(String q) async {
+    if (!quick) return false;
+    final mind = ClickyMind.instance;
+    await mind.load();
+    final r = mind.selfAnswer(q, now: DateTime.now(), name: callName);
+    if (r == null) return false;
+    unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
+    unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));
+    _set(ClickyState.speaking, status: '', reply: r);
+    await speak(r);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
+    return true;
   }
 
   /// Commandes comprises sans l'IA.
@@ -1864,7 +2145,10 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     marksId++;
     var p = point;
     if (p != null && shot != null && precise) {
-      _set(ClickyState.thinking, status: 'Je vise précisément…', reply: text);
+      // Il s'envole tout de suite vers l'endroit, puis ajuste son tir.
+      target = shot.toLayer(p);
+      targetLabel = label;
+      _set(ClickyState.pointing, status: 'Je vise…', reply: text);
       p = await _refine(shot, p, label) ?? p;
       if (id != _askId) return;
     }
@@ -2017,6 +2301,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final now = DateTime.now();
     return '''
 ${clickyPersona(callName)}
+${ClickyMind.instance.promptBlock(name: callName)}
 Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
@@ -2919,7 +3204,11 @@ class _ClickyLayerState extends State<ClickyLayer> {
       // Routines (briefing du matin…) : faites par Mon Hub, qui a les modules.
       // L'assistant personnel : il prend les devants (avec ton accord).
       Assistant.instance
-        ..notify = ((title, body) => c.notify?.call(title, body))
+        ..notify = ((title, body) {
+          c.notify?.call(title, body);
+          // Clicky le dit lui-même, à côté de la souris (il est « présent »).
+          unawaited(c.think(title));
+        })
         ..present = ((title, text) => c.presentTopo(title, text))
         ..start(
           call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
@@ -3055,7 +3344,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
     final home = cursor == null
         ? Offset(size.width - 44, size.height - (mobile ? 150 : 60))
         : cursor + (c.alive ? const Offset(10, 10) : const Offset(18, 16));
-    final at = c.target ?? home;
+    final at = c.target ?? c.gaze ?? home;
 
     final open = c.boxOpen;
     if (open && !_wasOpen) _anchor = cursor;
@@ -3095,8 +3384,9 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
             children: [
               _Flight(
                 to: at,
-                flying: c.target != null,
+                flying: c.target != null || c.gaze != null,
                 slow: c.slow,
+                c: c,
                 child: IgnorePointer(child: _PointerWithLabel(c: c)),
               ),
             ],
@@ -3162,17 +3452,39 @@ class _PointerWithLabel extends StatelessWidget {
   final ClickyController c;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => ValueListenableBuilder(
+    valueListenable: c.flightPose,
+    builder: (context, _, _) => _build(context),
+  );
+
+  Widget _build(BuildContext context) {
+    final label = c.state == ClickyState.pointing && c.targetLabel.isNotEmpty
+        ? c.targetLabel
+        : (c.gaze != null && c.gazeNote.isNotEmpty ? c.gazeNote : '');
+    final flying = c.flightScale != 1 || c.flightAngle != 0;
+    return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       ClickyAlive(
-        moving: c.alive && c.state != ClickyState.pointing,
+        moving: c.alive && c.state != ClickyState.pointing && !flying,
         bootAt: c.bootAt,
         base: c.state == ClickyState.pointing || !c.alive ? Offset.zero : const Offset(8, 6),
-        child: _Pointer(c: c),
+        // En vol : la pointe suit le sens du vol et il grossit un peu.
+        child: Transform.rotate(
+          angle: c.flightAngle,
+          alignment: Alignment.topLeft,
+          child: Transform.scale(scale: c.flightScale, alignment: Alignment.topLeft, child: _Pointer(c: c)),
+        ),
       ),
-      if (c.state == ClickyState.pointing && c.targetLabel.isNotEmpty)
-        Container(
+      if (label.isNotEmpty && !flying)
+        TweenAnimationBuilder<double>(
+          key: ValueKey(label),
+          tween: Tween(begin: 0.5, end: 1),
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.elasticOut,
+          builder: (context, s, child) => Transform.scale(scale: s, alignment: Alignment.centerLeft, child: child),
+          child: Container(
+          constraints: const BoxConstraints(maxWidth: 240),
           margin: EdgeInsets.only(left: 4, top: c.hud ? 22 : 14),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
@@ -3186,8 +3498,9 @@ class _PointerWithLabel extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(
-            c.hud ? c.targetLabel.toUpperCase() : c.targetLabel,
+          child: TypedText(
+            c.hud ? label.toUpperCase() : label,
+            key: ValueKey('typed-$label'),
             style: TextStyle(
               color: c.hud ? hudCyan : Colors.white,
               fontWeight: FontWeight.w600,
@@ -3195,8 +3508,10 @@ class _PointerWithLabel extends StatelessWidget {
             ),
           ),
         ),
+        ),
     ],
   );
+  }
 }
 
 /// Ouverture / fermeture animée : la boîte grandit depuis le curseur en
@@ -3336,10 +3651,11 @@ class ClickyFollower extends StatelessWidget {
 /// Vol du curseur : suit la souris de près, et fait un arc (courbe de
 /// Bézier) quand il part montrer quelque chose.
 class _Flight extends StatefulWidget {
-  const _Flight({required this.to, required this.flying, required this.child, this.slow = false});
+  const _Flight({required this.to, required this.flying, required this.child, required this.c, this.slow = false});
   final Offset to;
   final bool flying;
   final Widget child;
+  final ClickyController c;
 
   /// Mode lent : vol 1,7 × plus lent (plus facile à suivre).
   final bool slow;
@@ -3349,23 +3665,19 @@ class _Flight extends StatefulWidget {
 }
 
 class _FlightState extends State<_Flight> with SingleTickerProviderStateMixin {
-  late final AnimationController _a = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
-  late Offset _from = widget.to;
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+  ClickyFlight? _fl;
   late Offset _pos = widget.to;
 
   @override
   void initState() {
     super.initState();
     _a.addListener(() {
-      final t = Curves.easeInOutCubic.transform(_a.value);
-      final a = _from, b = widget.to;
-      // Point de contrôle au-dessus du milieu : joli arc.
-      final mid = Offset((a.dx + b.dx) / 2, math.min(a.dy, b.dy) - (b - a).distance * 0.3 - 30);
-      final u = 1 - t;
-      setState(() => _pos = a * (u * u) + mid * (2 * u * t) + b * (t * t));
+      final fl = _fl;
+      if (fl == null) return;
+      final t = _a.value;
+      setState(() => _pos = fl.positionAt(t));
+      widget.c.setFlight(t >= 1 ? 0 : fl.angleAt(t), t >= 1 ? 1 : fl.scaleAt(t));
     });
   }
 
@@ -3375,8 +3687,8 @@ class _FlightState extends State<_Flight> with SingleTickerProviderStateMixin {
     if (old.to == widget.to) return;
     final arc = widget.flying != old.flying || (widget.to - _pos).distance > 300;
     if (arc) {
-      _from = _pos;
-      _a.duration = Duration(milliseconds: widget.slow ? 1200 : 700);
+      final fl = _fl = ClickyFlight(_pos, widget.to, DateTime.now());
+      _a.duration = fl.duration * (widget.slow ? 1.7 : 1);
       _a.forward(from: 0);
     } else if (!_a.isAnimating) {
       _pos = widget.to;
@@ -3392,6 +3704,45 @@ class _FlightState extends State<_Flight> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) =>
       Positioned(left: _pos.dx - 2, top: _pos.dy - 2, child: widget.child);
+}
+
+/// Un texte qui s'écrit lettre par lettre (30 à 60 ms), comme s'il parlait.
+class TypedText extends StatefulWidget {
+  const TypedText(this.text, {super.key, this.style});
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<TypedText> createState() => _TypedTextState();
+}
+
+class _TypedTextState extends State<TypedText> {
+  int _n = 0;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _next();
+  }
+
+  void _next() {
+    if (_n >= widget.text.length) return;
+    _t = Timer(Duration(milliseconds: 30 + math.Random().nextInt(30)), () {
+      if (!mounted) return;
+      setState(() => _n++);
+      _next();
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(widget.text.substring(0, _n), style: widget.style);
 }
 
 class _Pointer extends StatelessWidget {

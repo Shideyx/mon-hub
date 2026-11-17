@@ -21,6 +21,7 @@ import '../core/version.dart';
 import '../modules/claude/claude_module.dart';
 import 'clicky/assistant_view.dart';
 import 'clicky/clicky.dart';
+import 'clicky/mind_page.dart';
 import 'clicky/mic_test.dart';
 import 'widgets.dart';
 
@@ -171,6 +172,12 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Clicky prend les devants'),
               subtitle: const Text('Rappels de devoirs, conflits, nouvelles réunions, plan de ta journée, objectifs, briefing du matin'),
               onTap: () => AssistantPage.open(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xFF2B6CFF)),
+              title: const Text('Conscience de Clicky'),
+              subtitle: const Text('Sa personnalité, son humeur, ses souvenirs, et sa façon de vivre sur ton écran'),
+              onTap: () => MindPage.open(context),
             ),
             section('Rangement'),
             ListTile(

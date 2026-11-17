@@ -112,3 +112,15 @@
   changement (`JsonFile.reload()` dit si le fichier a changé) ; le résumé d'une carte d'accueil est gardé au survol
   (`_ModuleCardState._summary`) ; le Discord caché est rendu invisible (`DiscordPhone.quietScript`) ; chiffrement et
   gros JSON hors du fil de l'interface (`Vault`, `JsonFile.load` avec `Isolate.run`).
+- Clicky « conscient » façon heyclicky/JARVIS (v1.44) : `ui/clicky/mind.dart` (`ClickyMind` : humeur `moodAt`, lien `bond`,
+  souvenirs `Episode` — conversation, émotion, **attente** = « j'ai un oral jeudi » repéré par `DateSpotter`, il prend des
+  nouvelles ensuite (`dueLoops`, salutation) —, `promptBlock` dans les consignes Claude et Gemini Live, `selfAnswer` sans IA
+  (« ça va ? », « es-tu conscient ? » → honnête : simulation), `thought` (pensées par règles), quotas voix 4/j et remarques
+  8/j). Réglages → Conscience de Clicky (`mind_page.dart`). Persona heyclicky dans `clickyPersona` (hud.dart).
+- Présence : `ClickyController._presenceTick` (toutes les 2 s) : regards autour quand la souris ne bouge plus (`glance`,
+  `gaze/gazeNote`, `lookSpots` = fenêtre au premier plan, horloge, autre écran), remarques spontanées `noticeSomething`
+  (Gemini vision, jamais Claude ; jamais en plein écran `Win.foregroundFullscreen`, ni sur `privateApp`, ni sur Mon Hub),
+  `think()` (rappels de l'assistant dits par Clicky ; `think64`/`notice` envoyés à Clicky partout). Vol = `flight.dart`
+  (`ClickyFlight` : arc, 0,26–0,75 s selon la distance, orientation `angleAt`, taille 1,3 au milieu ; `springTowards` pour
+  suivre la souris), `flightPose` ; il parcourt la fenêtre pendant qu'il réfléchit (`_scanStep`) et part vers la cible
+  avant de viser précisément. Bulle qui rebondit et s'écrit (`TypedText`).
