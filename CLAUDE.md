@@ -33,9 +33,11 @@
   activityStart/End, audio PCM 16 kHz → 24 kHz joué par `PcmPlayer` waveOut). Branché dans
   `ClickyController.startListening/stopListening/ask` (`liveReady`). Erreurs : `ErrorLog`
   (`journal-erreurs.log`), Clicky partout surveillé par `ClickyDesktop.watch()`.
-- Voix de Windows (flutter_tts) **retirée** à la demande de la personne (et elle faisait planter :
-  `FlutterTts.stop()` à vide). Ne pas la remettre. Voix : Microsoft (Edge) ou Gemini ; sans internet,
-  réponse écrite.
+- **Une seule voix : Gemini** (demande de la personne, v1.43). Voix de Windows (flutter_tts) et voix Microsoft (Edge)
+  **retirées, ne pas les remettre**. `ClickyVoice` (`voice.dart`) : synthèse `GeminiVoice` par **gros morceaux**
+  (`ClickyVoice.chunks/cutAt` : quota gratuit ~15 lectures/jour), relais `LiveReader` (Gemini Live, même voix) quand
+  le quota est épuisé ; sans clé ni internet : réponse écrite. Les briefings/topos sont **toujours lus**
+  (`presentTopo` → `speak(force: true)`).
 - Certificats https : `TrustedCertificates.install()` (magasins Windows ROOT + CA, et
   `assets/cacert.pem` de Mozilla) au démarrage des deux programmes.
 - Look : la personne **préfère l'ancienne interface** (violet, en-tête dégradé, cartes arrondies) ; le look
@@ -82,7 +84,16 @@
 - Contrôles : `RevisionsModule.autoPrepare` (dans `poll`) prépare tout seul fiche + cartes + quiz (un paquet
   `📝 Matière`, `Deck.sheet/quiz/testId`), une fois par contrôle (`testKey`), réglage `autoPrep`. Fiche : `fiche_view.dart`.
 - Widgets du bureau : `DesktopWidgets.inWidgetWindow` ; `HubModule.liveWidget` (pas de rechargement toutes les
-  3 min) ; YouTube y est le vrai m.youtube.com (`YouTubeMini`).
+  3 min) ; YouTube y est le vrai m.youtube.com (`YouTubeMini`) et une vidéo ouverte y passe en grand (`MiniVideoView`).
+- YouTube « petit écran » (`YouTubeMiniPlayer`) : la vidéo se joue **dans la carte YouTube de l'accueil** (`_CardVideo`,
+  `inCard`), sinon dans une petite fenêtre flottante (`YouTubeMiniLayer`) ; en quittant la page pendant une vidéo, elle
+  continue à la même seconde (`VideoState`). `MiniVideoView` = watch?v=…&t= + CSS qui ne garde que le lecteur.
+- Bouton « Menu » toujours visible hors de l'accueil + Alt + Début : `core/hub_home.dart` (`HubHome.go` ferme pages,
+  boîtes, fenêtre d'appel Discord ; `HubHomeLayer` ; observateur du Navigator). Les couches au-dessus du Navigator
+  (`HubHomeLayer`, `YouTubeMiniLayer`, `AssistantLayer`) n'ont **pas d'infobulles** (pas d'Overlay).
+- Animations façon Spotify : `ui/motion.dart` (`SpotifyPageTransitionsBuilder` dans le thème, `EnterAnimation` cartes
+  en cascade, `PressScale`/`NoPressZone`, `EqualizerBars`, `ShimmerLines` dans `LoadingHint`). Rien qui tourne en
+  boucle sans raison (fluidité).
 - Médias : `ui/media_view.dart` (`WebVideo` = vidéo MP4 lue par WebView2, sans paquet ; `MediaViewer` plein écran ;
   `MediaThumb`). Vocaux : `VoiceNotePlayer` télécharge d'abord le son (`DeviceFileSource`), sinon `WebAudio`.
 - Instagram = **le vrai instagram.com** dans Mon Hub (`InstagramPage`/`InstagramMini`, `HubWebView`), v1.42.

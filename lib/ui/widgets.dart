@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/browser.dart';
 
 import 'voice_note.dart';
+import 'motion.dart';
 
 export 'voice_note.dart' show Reaction, VoiceNotePlayer;
 
@@ -56,13 +57,31 @@ class EmptyHint extends StatelessWidget {
   }
 }
 
+/// Pendant un chargement : des lignes qui scintillent (façon Spotify) quand
+/// il y a la place, sinon un petit cercle.
 class LoadingHint extends StatelessWidget {
   const LoadingHint({super.key});
 
   @override
-  Widget build(BuildContext context) => const Center(
-        child: SizedBox.square(
-            dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, box) {
+          final roomy = box.maxWidth.isFinite && box.maxWidth >= 200 && box.maxHeight >= 90;
+          if (!roomy) {
+            return const Center(
+              child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            );
+          }
+          return Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: const ShimmerLines(lines: 4),
+              ),
+            ),
+          );
+        },
       );
 }
 

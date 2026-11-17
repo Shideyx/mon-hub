@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'motion.dart';
+
 const _seed = Color(0xFF7C5CFF);
 
 ThemeData buildTheme(Brightness brightness) {
@@ -51,12 +53,13 @@ ThemeData buildTheme(Brightness brightness) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: radius)),
     ),
+    // Pages qui glissent en douceur, façon Spotify.
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+      TargetPlatform.android: SpotifyPageTransitionsBuilder(),
+      TargetPlatform.windows: SpotifyPageTransitionsBuilder(),
+      TargetPlatform.linux: SpotifyPageTransitionsBuilder(),
+      TargetPlatform.macOS: SpotifyPageTransitionsBuilder(),
+      TargetPlatform.iOS: SpotifyPageTransitionsBuilder(),
     }),
   );
 }

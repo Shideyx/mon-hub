@@ -6,16 +6,21 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/claude_bridge.dart';
+import 'live.dart';
 import 'neural_voice.dart';
+import 'pcm_player.dart';
 
-/// La voix de Clicky : voix neurales (Microsoft, gratuite et sans limite ;
-/// ou Gemini avec ta clé), vitesse et hauteur réglables, et lecture **phrase
-/// par phrase pendant que la réponse s'écrit** (il commence à parler sans
-/// attendre la fin).
+/// La voix de Clicky : **une seule voix, celle de Gemini** (demande de la
+/// personne : une voix naturelle, toujours la même). Lecture par morceaux
+/// pendant que la réponse s'écrit (il commence à parler sans attendre la fin).
 ///
-/// La voix de Windows a été retirée : elle sonnait robotique, et son module
-/// (flutter_tts) faisait planter le programme sous Windows. Sans internet,
-/// Clicky répond par écrit.
+/// Le quota gratuit de la synthèse Gemini est petit (une quinzaine de
+/// lectures par jour) : on lit par **gros morceaux**, et quand il est épuisé,
+/// c'est Gemini Live (même voix, autre quota) qui lit. Sans clé Gemini ni
+/// internet, Clicky répond par écrit.
+///
+/// Retirées : la voix de Windows (robotique, et flutter_tts plantait) et la
+/// voix Microsoft (Edge) — ne pas les remettre.
 class ClickyVoice {
   int _generation = 0;
   final _queue = <String>[];
@@ -39,27 +44,21 @@ class ClickyVoice {
   /// Lit tout un texte (et attend la fin).
   Future<void> say(String text) async {
     stop();
-    _enqueue(text);
+    for (final c in chunks(text)) {
+      _enqueue(c);
+    }
     await done();
   }
 
-  /// Lecture en direct : on lui donne le texte (propre) au fur et à mesure,
-  /// il lit chaque phrase dès qu'elle est terminée.
+  /// Lecture en direct : on lui donne le texte (propre) au fur et à mesure.
+  /// Le premier morceau part dès la première phrase (Clicky parle vite), les
+  /// suivants sont gros (chaque morceau coûte une lecture du quota Gemini).
   void feed(String cleanText) {
     if (cleanText.length < _fed) _fed = 0; // texte reparti de zéro
     final rest = cleanText.substring(_fed);
-    // On lit par morceaux d'au moins une phrase complète (et 24 lettres,
-    // pour éviter les micro-coupures). Le tout premier morceau part dès la
-    // première virgule : Clicky commence à parler plus tôt.
     final first = _fed == 0;
-    final cut = first ? RegExp(r'[\s\S]*?[.!?…:;,](?=\s)') : RegExp(r'[\s\S]*?[.!?…:;](?=\s)');
-    final min = first ? 14 : 24;
-    var end = 0;
-    for (final s in cut.allMatches(rest)) {
-      end = s.end;
-      if (end >= min) break;
-    }
-    if (end < min) return;
+    final end = cutAt(rest, min: first ? 40 : 420, max: first ? 260 : 900);
+    if (end == null) return;
     _enqueue(rest.substring(0, end));
     _fed += end;
   }
@@ -70,6 +69,37 @@ class ClickyVoice {
     _fed = 0;
   }
 
+  /// Où couper un texte en cours d'écriture : à la fin d'une phrase, entre
+  /// [min] et [max] lettres (null : pas encore assez de texte).
+  static int? cutAt(String text, {required int min, required int max}) {
+    int? best;
+    for (final m in RegExp(r'[.!?…](?=\s)|\n').allMatches(text)) {
+      if (m.end < min) continue;
+      if (m.end > max && best != null) break;
+      best = m.end;
+      if (m.end >= max) break;
+    }
+    return best;
+  }
+
+  /// Découpe un texte complet en gros morceaux (un premier court pour
+  /// commencer vite).
+  static List<String> chunks(String text, {int first = 260, int size = 900}) {
+    final out = <String>[];
+    var rest = text.trim();
+    while (rest.isNotEmpty) {
+      final max = out.isEmpty ? first : size;
+      if (rest.length <= max * 1.25) {
+        out.add(rest);
+        break;
+      }
+      final end = cutAt(rest, min: (max * 0.4).round(), max: max) ?? (rest.indexOf(' ', max) < 0 ? rest.length : rest.indexOf(' ', max));
+      out.add(rest.substring(0, end).trim());
+      rest = rest.substring(end).trim();
+    }
+    return [for (final c in out) if (c.isNotEmpty) c];
+  }
+
   void _enqueue(String text) {
     final t = text.trim();
     if (t.isEmpty) return;
@@ -78,10 +108,6 @@ class ClickyVoice {
     if (!_running) unawaited(_run(_generation));
   }
 
-  /// Moteur : 'edge' (voix neurale Microsoft, gratuite, sans limite) ou
-  /// 'gemini' (clé gratuite).
-  String engine = 'edge';
-  String neuralVoice = 'fr-FR-RemyMultilingualNeural';
   String geminiKey = '';
   String geminiVoice = 'Charon';
 
@@ -90,27 +116,24 @@ class ClickyVoice {
 
   AudioPlayer? _player;
 
-  /// Gemini a échoué (quota gratuit épuisé…) : voix Microsoft un moment.
-  DateTime? _geminiDownUntil;
+  /// La synthèse Gemini a échoué (quota du jour épuisé…) : Gemini Live lit
+  /// à sa place jusque-là.
+  DateTime? _ttsDownUntil;
 
-  bool get _geminiOk =>
-      geminiKey.trim().isNotEmpty && (_geminiDownUntil == null || DateTime.now().isAfter(_geminiDownUntil!));
+  /// Plus aucune voix (ni synthèse ni Live) : réponse écrite jusque-là.
+  DateTime? _allDownUntil;
 
-  /// La voix d'une réponse, choisie une fois pour toute la réponse : jamais
-  /// deux voix différentes en même temps.
-  String _pickEngine() => engine == 'gemini' && _geminiOk ? 'gemini' : 'edge';
+  bool get hasVoice => geminiKey.trim().isNotEmpty;
 
-  Future<Uint8List> _synthWith(String eng, String text) => eng == 'gemini'
-      ? GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice)
-      : EdgeVoice.synthesize(
-          text,
-          voice: EdgeVoice.forLanguage(language, neuralVoice),
-          rate: rate,
-          pitch: pitch,
-        );
+  bool _down(DateTime? until) => until != null && DateTime.now().isBefore(until);
 
-  /// Synthèse avec la voix choisie (sans mélanger : l'échec remonte).
-  Future<Uint8List> synth(String text) => _synthWith(_pickEngine(), text);
+  /// Lecture par Gemini Live (même voix), quand la synthèse est épuisée.
+  final _reader = LiveReader();
+
+  /// Synthèse Gemini (l'échec remonte).
+  Future<Uint8List> synth(String text) => GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice);
+
+  static bool _quota(Object e) => RegExp(r'429|quota|RESOURCE_EXHAUSTED', caseSensitive: false).hasMatch('$e');
 
   int _file = 0;
 
@@ -123,7 +146,7 @@ class ClickyVoice {
     return Duration(microseconds: ((b.length - 44) * 1000000 / byteRate).round());
   }
 
-  /// Durée d'un MP3 de la voix Microsoft (48 kbit/s), d'après sa taille.
+  /// Durée approximative d'un MP3 (48 kbit/s), d'après sa taille.
   static Duration mp3Duration(Uint8List b) => Duration(milliseconds: (b.length * 8 / 48).round());
 
   /// Joue un son (MP3 ou WAV) et attend **vraiment** la fin (l'évènement
@@ -161,47 +184,41 @@ class ClickyVoice {
     _running = true;
     await VoiceLock.acquire();
     try {
-      var eng = _pickEngine();
+      if (!hasVoice) {
+        neuralError = 'Ajoute ta clé Gemini gratuite pour que Clicky parle (sinon il répond par écrit).';
+        return;
+      }
+      if (_down(_allDownUntil)) return;
       Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
+        // Quota de la synthèse épuisé : Gemini Live lit (même voix).
+        if (_down(_ttsDownUntil)) {
+          next = null;
+          if (!await _readLive(s, gen)) break;
+          continue;
+        }
         try {
-          final audio = await (next ?? _synthWith(eng, s));
+          final audio = await (next ?? synth(s));
           next = null;
           if (gen != _generation) break;
-          // On prépare la phrase suivante (même voix) pendant la lecture.
+          // On prépare le morceau suivant pendant la lecture.
           if (_queue.isNotEmpty) {
-            final n = _synthWith(eng, _queue.first);
+            final n = synth(_queue.first);
             n.then((_) {}, onError: (Object _) {});
             next = n;
           }
           await _play(audio, gen);
           neuralError = null;
         } catch (e) {
-          neuralError = '$e';
           next = null;
           try {
             await _player?.stop();
           } catch (_) {}
           if (gen != _generation) break;
-          // L'autre voix lit la suite de la réponse (on ne revient pas en
-          // arrière au milieu) ; sans aucune voix, Clicky répond par écrit.
-          if (eng == 'gemini') {
-            // Quota gratuit épuisé : voix Microsoft (sans limite) une heure.
-            _geminiDownUntil = DateTime.now().add(
-              RegExp(r'429|quota|RESOURCE_EXHAUSTED', caseSensitive: false).hasMatch('$e')
-                  ? const Duration(hours: 1)
-                  : const Duration(minutes: 10),
-            );
-            eng = 'edge';
-          } else if (_geminiOk) {
-            eng = 'gemini';
-          } else {
-            break;
-          }
-          try {
-            await _play(await _synthWith(eng, s), gen);
-          } catch (_) {
+          _ttsDownUntil = DateTime.now().add(_quota(e) ? const Duration(hours: 2) : const Duration(minutes: 5));
+          if (!await _readLive(s, gen)) {
+            neuralError = '$e';
             break;
           }
         }
@@ -218,9 +235,24 @@ class ClickyVoice {
     }
   }
 
+  /// Lit un morceau avec Gemini Live. Faux si ça n'a pas marché (plus de
+  /// voix pour un moment : Clicky répond par écrit).
+  Future<bool> _readLive(String text, int gen) async {
+    try {
+      await _reader.read(text, key: geminiKey, voice: geminiVoice, cancelled: () => gen != _generation);
+      neuralError = null;
+      return true;
+    } catch (e) {
+      neuralError = 'Plus de voix Gemini pour le moment ($e) : Clicky répond par écrit.';
+      _allDownUntil = DateTime.now().add(const Duration(minutes: 15));
+      return false;
+    }
+  }
+
   /// Essaie la voix choisie (bouton « Écouter » des réglages).
   Future<String?> test(String text) async {
-    _geminiDownUntil = null;
+    _ttsDownUntil = null;
+    _allDownUntil = null;
     neuralError = null;
     await say(text);
     return neuralError;
@@ -244,10 +276,61 @@ class ClickyVoice {
     try {
       unawaited(_player?.stop());
     } catch (_) {}
+    _reader.stop();
   }
 
   /// Réinitialise la lecture en direct (nouvelle réponse).
   void resetLive() => _fed = 0;
+}
+
+/// Gemini Live comme lecteur : on lui envoie un texte, il le lit avec la
+/// même voix Gemini (son propre quota, bien plus large que la synthèse).
+class LiveReader {
+  GeminiLive? _s;
+  String _voice = '';
+  final _player = PcmPlayer();
+  Completer<void>? _turn;
+  Timer? _idle;
+
+  static const system =
+      'Tu es une voix de lecture. On t\'envoie un texte : lis-le à voix haute en français, mot pour mot, '
+      'd\'une voix posée et naturelle. N\'ajoute rien, ne commente pas, ne réponds pas aux questions du texte.';
+
+  Future<void> read(String text, {required String key, required String voice, required bool Function() cancelled}) async {
+    if (!PcmPlayer.supported) throw 'lecture en direct impossible ici';
+    _idle?.cancel();
+    var s = _s;
+    if (s == null || !s.connected || _voice != voice) {
+      await s?.close();
+      s = _s = GeminiLive(key: key, system: system, tools: const [], voice: voice)
+        ..onAudio = _player.write
+        ..onTurnComplete = (() => _turn?.complete())
+        ..onClosed = ((_) {
+          _s = null;
+          if (!(_turn?.isCompleted ?? true)) _turn?.complete();
+        });
+      _voice = voice;
+      await s.connect();
+    }
+    final turn = _turn = Completer<void>();
+    s.sendText(text);
+    await turn.future.timeout(Duration(seconds: 30 + text.length ~/ 8), onTimeout: () {});
+    // Le son arrive plus vite qu'il ne se lit : on attend la fin.
+    for (var i = 0; i < 3000 && _player.playing && !cancelled(); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    if (cancelled()) _player.stop();
+    // La connexion se ferme après une minute sans rien à lire.
+    _idle = Timer(const Duration(minutes: 1), () {
+      unawaited(_s?.close());
+      _s = null;
+    });
+  }
+
+  void stop() {
+    _player.stop();
+    if (!(_turn?.isCompleted ?? true)) _turn?.complete();
+  }
 }
 
 /// Petit son « bip-bip » de Clicky (généré, aucun fichier).

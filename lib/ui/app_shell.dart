@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import '../core/hub_controller.dart';
+import '../core/hub_home.dart';
 import '../core/hub_module.dart';
 import '../core/notifications.dart';
 import 'home_page.dart';
+import 'motion.dart';
 import 'settings_page.dart';
 
 /// Squelette de l'appli : menu latéral sur grand écran (PC, tablette),
@@ -33,11 +35,18 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _sub = widget.notifications.banners.stream.listen(_banner);
+    // Bouton « Menu » : retour à l'accueil depuis n'importe où.
+    HubHome.instance.onHome = () {
+      if (mounted && selected != null) setState(() => selected = null);
+    };
   }
 
   @override
   void dispose() {
     unawaited(_sub?.cancel());
+    HubHome.instance
+      ..onHome = null
+      ..setInModule(false);
     super.dispose();
   }
 
@@ -105,6 +114,7 @@ class _AppShellState extends State<AppShell> {
         final modules = widget.controller.enabled;
         final current =
             modules.where((m) => m.id == selected).firstOrNull;
+        HubHome.instance.setInModule(current != null);
         final body = current == null
             ? HomePage(
                 controller: widget.controller,
@@ -136,8 +146,19 @@ class _AppShellState extends State<AppShell> {
                   ),
                 ),
                 Expanded(
+                  // Changement de section : fondu + petite montée (façon Spotify).
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
+                    duration: const Duration(milliseconds: 300),
+                    reverseDuration: const Duration(milliseconds: 140),
+                    switchInCurve: motionCurve,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, a) => FadeTransition(
+                      opacity: a,
+                      child: SlideTransition(
+                        position: Tween(begin: const Offset(0, 0.02), end: Offset.zero).animate(a),
+                        child: child,
+                      ),
+                    ),
                     child: KeyedSubtree(key: ValueKey(selected), child: body),
                   ),
                 ),
@@ -229,16 +250,28 @@ class _SideMenu extends StatelessWidget {
       final sel = i == index;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: Material(
-          color: sel ? color.withValues(alpha: 0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+        // La section choisie s'allume en douceur.
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: motionCurve,
+          decoration: BoxDecoration(
+            color: sel ? color.withValues(alpha: 0.14) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Material(
+          type: MaterialType.transparency,
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: () => onSelect(i),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Row(children: [
-                icon,
+                AnimatedScale(
+                  scale: sel ? 1.15 : 1,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutBack,
+                  child: icon,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(label,
@@ -249,6 +282,7 @@ class _SideMenu extends StatelessWidget {
               ]),
             ),
           ),
+        ),
         ),
       );
     }

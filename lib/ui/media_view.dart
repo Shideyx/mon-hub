@@ -213,7 +213,9 @@ class _MediaViewerState extends State<MediaViewer> {
                       child: Image.network(
                         m.image ?? '',
                         fit: BoxFit.contain,
-                        loadingBuilder: (c, child, prog) => prog == null ? child : const LoadingHint(),
+                        loadingBuilder: (c, child, prog) => prog == null
+                            ? child
+                            : const Center(child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white54)),
                         errorBuilder: (_, _, _) => const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 60),
                       ),
                     ),

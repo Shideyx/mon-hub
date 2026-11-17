@@ -12,6 +12,7 @@ import 'cd_case.dart';
 import 'media_session.dart';
 import 'music_api.dart';
 import 'music_models.dart';
+import '../../ui/motion.dart';
 
 /// Musique : ce que tu écoutes (Spotify, Deezer, ou n'importe quel lecteur
 /// du PC), avec la boîte de CD qui tourne, la pochette et la tracklist ; tes
@@ -570,13 +571,20 @@ class _NowPlayingTileState extends State<NowPlayingTile> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        formatClock(np.positionNow()).split('').join(' '),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            formatClock(np.positionNow()).split('').join(' '),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Les petites barres qui dansent, façon Spotify.
+                          EqualizerBars(color: Colors.white, size: 12, playing: np.playing),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Text(

@@ -242,8 +242,6 @@ class ClickyController extends ChangeNotifier {
     'journal',
     'perApp',
     'alive',
-    'ttsEngine',
-    'neuralVoice',
     'geminiVoice',
     'pc',
     'micEngine',
@@ -538,13 +536,8 @@ class ClickyController extends ChangeNotifier {
 
   bool get _voicePlatform => ClickyEars.supported;
 
-  /// Moteur de voix : 'edge' (voix neurale Microsoft gratuite, sans limite,
-  /// par défaut) ou 'gemini' (clé gratuite AI Studio). La voix de Windows a
-  /// été retirée (l'ancien réglage « Windows » devient Microsoft).
-  String get ttsEngine => _opt('ttsEngine', 'edge') == 'gemini' ? 'gemini' : 'edge';
-  /// Voix Microsoft : Rémy multilingue par défaut (la plus naturelle, la plus
-  /// proche de Gemini, gratuite et sans limite).
-  String get neuralVoice => _opt('neuralVoice', 'fr-FR-RemyMultilingualNeural');
+  /// Une seule voix : celle de Gemini (clé gratuite AI Studio). Les voix de
+  /// Windows et de Microsoft (Edge) ont été retirées.
   String get geminiVoice => _opt('geminiVoice', 'Charon');
 
   /// Clé Gemini (gratuite), gardée chiffrée.
@@ -557,10 +550,7 @@ class ClickyController extends ChangeNotifier {
   }
 
   void _applyVoice({String? lang}) {
-    voiceOut
-      ..engine = ttsEngine
-      ..neuralVoice = neuralVoice
-      ..geminiVoice = geminiVoice;
+    voiceOut.geminiVoice = geminiVoice;
     voiceOut
       ..rate = ttsRate
       ..pitch = ttsPitch
@@ -813,8 +803,10 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  Future<void> speak(String text) async {
-    if (!voice || !_voicePlatform || text.isEmpty) return;
+  /// Lit un texte à voix haute. [force] : même si la voix de Clicky est
+  /// coupée (les briefings sont toujours lus).
+  Future<void> speak(String text, {bool force = false}) async {
+    if ((!voice && !force) || !_voicePlatform || text.isEmpty) return;
     _applyVoice();
     _wake.pause();
     try {
@@ -1039,7 +1031,7 @@ class ClickyController extends ChangeNotifier {
           .then((_) => history.add(id, ChatMsg(mine: false, text: text)))
           .then((_) => history.rename(id, '$title · ${dayLabel(DateTime.now())}')),
     );
-    if (speakIt) await speak(withoutEmoji(text));
+    if (speakIt) await speak(withoutEmoji(text), force: true);
     if (state == ClickyState.speaking) _set(ClickyState.idle);
   }
 
@@ -1482,7 +1474,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         );
         _set(ClickyState.thinking, status: 'Je prépare ton briefing…', reply: '');
         unawaited(ClickyChime.play());
-        await presentTopo('Briefing', await a.morningBriefing(name: callName), speakIt: voice);
+        // Le briefing est toujours lu à voix haute.
+        await presentTopo('Briefing', await a.morningBriefing(name: callName));
       case ClickyCommand.today || ClickyCommand.week:
         final j = Journal.instance;
         await j.load();
@@ -1542,27 +1535,16 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           withScreen: false,
         );
       case ClickyCommand.changeVoice:
-        // « Change de voix pour Rémy » : voix Microsoft ou Gemini.
+        // « Change de voix pour Kore » : une des voix Gemini.
         final wanted = normalize(rest);
-        final edge = EdgeVoice.voices.entries
-            .where((e) => wanted.isNotEmpty && (normalize(e.value).contains(wanted) || normalize(e.key).contains(wanted)))
-            .firstOrNull;
         final gem = GeminiVoice.voices.where((v) => wanted.isNotEmpty && normalize(v) == wanted).firstOrNull;
-        if (edge != null) {
-          await setOption('neuralVoice', edge.key);
-          await setOption('ttsEngine', 'edge');
-          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix ${edge.value.split(' (').first}.');
-        } else if (gem != null && voiceOut.geminiKey.trim().isNotEmpty) {
+        if (gem != null) {
           await setOption('geminiVoice', gem);
-          await setOption('ttsEngine', 'gemini');
-          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix Gemini $gem.');
+          _set(ClickyState.idle, reply: 'Voilà, j\'utilise maintenant la voix $gem.');
         } else {
           _set(
             ClickyState.idle,
-            reply:
-                'Je ne trouve pas cette voix. Voix possibles : '
-                '${EdgeVoice.voices.values.map((v) => v.split(' (').first).take(6).join(', ')}'
-                '${voiceOut.geminiKey.trim().isEmpty ? '' : ', ou les voix Gemini ${GeminiVoice.voices.take(4).join(', ')}'}.',
+            reply: 'Je ne trouve pas cette voix. Voix possibles : ${GeminiVoice.voices.join(', ')}.',
           );
         }
         await speak(reply);
@@ -2938,7 +2920,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
       // L'assistant personnel : il prend les devants (avec ton accord).
       Assistant.instance
         ..notify = ((title, body) => c.notify?.call(title, body))
-        ..present = ((title, text) => c.presentTopo(title, text, speakIt: c.voice))
+        ..present = ((title, text) => c.presentTopo(title, text))
         ..start(
           call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
           tools: () => {for (final t in c.hubTools) t.name},
@@ -2961,10 +2943,11 @@ class _ClickyLayerState extends State<ClickyLayer> {
             if (c.handledElsewhere) {
               await ClickyDesktop.launch();
               await ClickyDesktop.send(
-                'show64 ${base64Encode(utf8.encode(jsonEncode({'t': routine.name, 'x': run.text, 'v': routine.speak})))}',
+                'show64 ${base64Encode(utf8.encode(jsonEncode({'t': routine.name, 'x': run.text, 'v': true})))}',
               );
             } else {
-              await c.presentTopo(routine.name, run.text, speakIt: routine.speak);
+              // Les briefings sont toujours lus à voix haute.
+              await c.presentTopo(routine.name, run.text);
             }
           } else if (run.ok && routine.speak && c.state == ClickyState.idle) {
             unawaited(c.speak('${routine.name}. ${run.text}'));

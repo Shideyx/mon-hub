@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -25,26 +24,7 @@ void main() {
     expect(l.first.toJson()['source'], 'franceinfo');
   });
 
-  test('voix Microsoft : jeton, SSML, messages', () {
-    final g = EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 2, 41));
-    expect(
-      g,
-      EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 4, 59)),
-      reason: 'même tranche de 5 min',
-    );
-    expect(g, isNot(EdgeVoice.secMsGec(DateTime.utc(2026, 11, 17, 6, 5, 1))));
-    expect(RegExp(r'^[0-9A-F]{64}$').hasMatch(g), isTrue);
-    final x = EdgeVoice.ssml("C'est <bon> & prêt", 'fr-FR-HenriNeural', rate: 1.2);
-    expect(x, contains('Microsoft Server Speech Text to Speech Voice (fr-FR, HenriNeural)'));
-    expect(x, contains('C&apos;est &lt;bon&gt; &amp; prêt'));
-    expect(x, contains("rate='+20%'"));
-    final head = utf8.encode('X-RequestId:1\r\nPath:audio\r\n');
-    final msg = Uint8List.fromList([0, head.length, ...head, 1, 2, 3]);
-    final (h, data) = EdgeVoice.splitBinary(msg);
-    expect(h, contains('Path:audio'));
-    expect(data, [1, 2, 3]);
-    expect(EdgeVoice.forLanguage('fr-FR', 'fr-FR-DeniseNeural'), 'fr-FR-DeniseNeural');
-    expect(EdgeVoice.forLanguage('en-US', 'fr-FR-DeniseNeural'), startsWith('en-'));
+  test('voix Gemini : son WAV', () {
     final w = GeminiVoice.wav(Uint8List.fromList([0, 0, 1, 0]));
     expect(String.fromCharCodes(w.sublist(0, 4)), 'RIFF');
     expect(w.length, 48);
