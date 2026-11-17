@@ -43,6 +43,8 @@ import 'routines.dart';
 import 'tutor.dart';
 import 'voice.dart';
 import 'wake.dart';
+import 'whisper.dart';
+import 'mic_test.dart' show openMicFix;
 import 'win.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
@@ -235,6 +237,7 @@ class ClickyController extends ChangeNotifier {
     'neuralVoice',
     'geminiVoice',
     'pc',
+    'micEngine',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -500,7 +503,16 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Voix ----------
 
-  final ClickyEars ears = ClickyEars.create();
+  late final ClickyEars ears = Whisper.supported
+      ? SmartEars(ClickyEars.create(), WhisperEars(), () => micEngine)
+      : ClickyEars.create();
+
+  /// Reconnaissance vocale : 'auto' (Windows, et Whisper dès que Windows ne
+  /// marche pas), 'windows' ou 'whisper' (sur le PC, sans internet).
+  String get micEngine {
+    final v = _opt('micEngine', 'auto');
+    return const ['auto', 'windows', 'whisper'].contains(v) ? v : 'auto';
+  }
   final voiceOut = ClickyVoice();
   late final WakeWord _wake = WakeWord(_onWake);
 
@@ -1227,7 +1239,9 @@ class ClickyController extends ChangeNotifier {
       'micro_active': mic,
       'micro_panne': micProblem?.message,
       'micro_code': micProblem?.code,
-      if (e is WindowsEars) 'micro_lancement': e.launch.label,
+      if (e is SmartEars) 'micro_moteur': e.active is WhisperEars ? 'Whisper (sur le PC)' : 'Windows',
+      if (e is SmartEars && e.windows is WindowsEars) 'micro_lancement': (e.windows as WindowsEars).launch.label,
+      'micro_reglage': micEngine,
       'micro_langue': e.language,
       'derniere_reparation': lastRepair == null
           ? null
@@ -3318,7 +3332,7 @@ class _MicHelp extends StatelessWidget {
               FilledButton.tonalIcon(
                 icon: const Icon(Icons.settings_rounded, size: 16),
                 label: Text(problem.fixLabel ?? 'Ouvrir les réglages'),
-                onPressed: () => launchUrl(Uri.parse(problem.fixUri!)),
+                onPressed: () => openMicFix(context, problem.fixUri!),
               ),
             TextButton.icon(
               icon: const Icon(Icons.refresh_rounded, size: 16),

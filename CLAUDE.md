@@ -11,7 +11,9 @@
 
 ## Repères
 - Flutter (Dart). Clicky = l'assistant IA : `lib/ui/clicky/`.
-- Micro Windows : `ears.dart` (PowerShell lancé en `detachedWithStdio` : ne jamais lire
+- Micro Windows : `SmartEars` (`whisper.dart`) choisit Windows ou Whisper (whisper.cpp v1.8.2 +
+  modèle ggml, dans %APPDATA%\MonHub\whisper, enregistrement avec le paquet `record`).
+  Reconnaissance Windows : `ears.dart` (PowerShell lancé en `detachedWithStdio` : ne jamais lire
   `exitCode` d'un processus détaché, ça lève « Bad state: Process is detached »).
 - Outils de Clicky lui-même (`ClickyController.localTools`) : réparation du micro
   (`clicky_diagnostic`, `clicky_reparer_micro`) et contrôle du PC (`pc.dart` : `pc_commande`,

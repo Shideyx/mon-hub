@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:hub/modules/music/cd_case.dart';
 import 'package:hub/modules/music/music_api.dart';
 import 'package:hub/modules/music/music_models.dart';
+import 'package:material_ui/material_ui.dart' show HSVColor;
 
 void main() {
   test('la boîte de CD tourne : pochette, demi-tour, dos, demi-tour', () {
@@ -24,7 +25,10 @@ void main() {
     }
     final c = pickAccent(px)!;
     expect((c.r * 255).round(), greaterThan((c.g * 255).round() + 60));
-    expect(pickAccent(Uint8List.fromList(List.filled(40, 128))), isNull);
+    // Pochette grise : une couleur calme (avant : aucune, la page gardait la
+    // couleur de l'album précédent).
+    final gray = pickAccent(Uint8List.fromList(List.filled(40, 128)))!;
+    expect(HSVColor.fromColor(gray).saturation, lessThan(0.15));
   });
 
   test('titre en cours retrouvé dans l\'album', () {
