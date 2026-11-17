@@ -22,6 +22,7 @@ import 'ui/app_shell.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
 import 'ui/clicky/tutorial.dart';
+import 'ui/google_welcome.dart';
 import 'ui/login_page.dart';
 import 'ui/theme.dart';
 import 'ui/update_screen.dart';
@@ -150,13 +151,26 @@ class _HubAppState extends State<HubApp> {
   }
 
   Future<void> _tutorial() async {
-    if (ClickyTutorial.seen || widget.controller != null) return;
+    if (widget.controller != null) return;
+    var brain = false;
+    if (!ClickyTutorial.seen) {
+      final ctx = await hubDialogContext(timeout: const Duration(seconds: 20));
+      if (ctx == null || !ctx.mounted || ClickyTutorial.seen) return;
+      await ClickyTutorial.show(ctx, onBrain: () {
+        brain = true;
+        final c = hubNavigatorKey.currentContext;
+        if (c != null) ClaudeModule.showSettings(c);
+      });
+    } else {
+      // Compte déjà là : on laisse l'appli s'ouvrir tranquillement.
+      await Future<void>.delayed(const Duration(seconds: 4));
+    }
+    // Puis Clicky demande le compte Google (Drive, Docs, agenda), une fois.
+    // S'il vient d'ouvrir les réglages du cerveau, ce sera au prochain
+    // démarrage.
+    if (brain) return;
     final ctx = await hubDialogContext(timeout: const Duration(seconds: 20));
-    if (ctx == null || !ctx.mounted || ClickyTutorial.seen) return;
-    await ClickyTutorial.show(ctx, onBrain: () {
-      final c = hubNavigatorKey.currentContext;
-      if (c != null) ClaudeModule.showSettings(c);
-    });
+    if (ctx != null && ctx.mounted) await GoogleWelcome.maybeShow(ctx);
   }
 
   /// Windows : Clicky au-dessus de tout l'écran (petit programme à part).

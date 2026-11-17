@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import 'tidy_page.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
@@ -148,6 +149,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ],
+            section('Rangement'),
+            ListTile(
+              leading: const Icon(Icons.auto_fix_high_rounded),
+              title: const Text('Ranger mon PC et mon Drive'),
+              subtitle: const Text('Téléchargements, Bureau, Documents, Google Drive : par type et par matière, annulable'),
+              onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TidyPage())),
+            ),
             section('Compte'),
             ListTile(
               leading: const Icon(Icons.account_circle_rounded),
