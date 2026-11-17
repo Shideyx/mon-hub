@@ -99,6 +99,14 @@ class ClickyMoreSettings extends StatelessWidget {
           head('Topo du matin et du soir', Icons.wb_twilight_rounded),
           const _TopoSettings(),
 
+          sw(
+            'quick',
+            c.quick,
+            'Réponses instantanées sans IA',
+            'L\'heure, un calcul, un minuteur, la musique, tes devoirs, ton emploi du temps, tes notes, la météo, '
+                'ouvrir une appli, ranger… : Clicky répond tout de suite lui-même. L\'IA (Claude) ne sert que pour le reste.',
+          ),
+
           head('Voix', Icons.record_voice_over_rounded),
           if (Win.supportedHere)
             sw(

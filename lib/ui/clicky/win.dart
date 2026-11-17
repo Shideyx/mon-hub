@@ -480,8 +480,15 @@ class Win {
       'next' => VK_MEDIA_NEXT_TRACK,
       'prev' => VK_MEDIA_PREV_TRACK,
       'stop' => VK_MEDIA_STOP,
+      'volup' => VK_VOLUME_UP,
+      'voldown' => VK_VOLUME_DOWN,
+      'mute' => VK_VOLUME_MUTE,
       _ => VK_MEDIA_PLAY_PAUSE,
     };
-    _keys([(vk, false), (vk, true)]);
+    // Le volume monte ou descend de 10 % (5 crans de 2 %).
+    final times = key == 'volup' || key == 'voldown' ? 5 : 1;
+    for (var i = 0; i < times; i++) {
+      _keys([(vk, false), (vk, true)]);
+    }
   }
 }

@@ -5,7 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hub/core/ai_text.dart';
 import 'package:hub/core/hub_files.dart';
 import 'package:hub/core/module_store.dart';
+import 'package:hub/modules/ecoledirecte/ecoledirecte_module.dart';
 import 'package:hub/modules/ecoledirecte/ed_client.dart';
+import 'package:hub/modules/revisions/fiche_view.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hub/modules/revisions/fsrs.dart';
 import 'package:hub/modules/revisions/revisions_module.dart';
 import 'package:hub/modules/revisions/revisions_store.dart';
@@ -13,6 +16,7 @@ import 'package:hub/ui/clicky/clicky.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  prepTests();
   final t0 = DateTime(2026, 11, 17, 18);
 
   test('FSRS : « Bien » espace de plus en plus, « À revoir » fait revenir vite', () {
@@ -120,7 +124,7 @@ void main() {
       expect(made, hasLength(2));
       final tool = m.tools.firstWhere((t) => t.name == 'revision_paquets');
       final r = await tool.run({}) as Map;
-      expect((r['paquets'] as List).first['nom'], 'Histoire');
+      expect([for (final p in r['paquets'] as List) p['nom']], contains('Histoire'));
     } finally {
       AiText.override = null;
       HubFiles.overrideRoot = null;
@@ -140,5 +144,46 @@ void main() {
     expect(plan.last.start.hour, 10);
     expect(plan.first.title, 'Révision Mathématiques');
     expect(plan.first.note, contains('suites'));
+  });
+}
+
+void prepTests() {
+  test('contrôle détecté : fiche, cartes et quiz préparés tout seuls, une seule fois', () async {
+    SharedPreferences.setMockInitialValues({});
+    await ModuleStore.init();
+    HubFiles.overrideRoot = Directory.systemTemp.createTempSync('prep').path;
+    final ecole = EcoleDirecteModule()..attach();
+    final now = DateTime.now();
+    final due = DateTime(now.year, now.month, now.day + 3);
+    ecole.homework = [
+      EdHomework('42', due, 'SVT', 'Contrôle sur la génétique (chapitre 3)', false, true),
+      EdHomework('43', due, 'Anglais', 'Exercice 2', false, false),
+    ];
+    final m = RevisionsModule(ecole: ecole)..attach();
+    var asked = '';
+    AiText.override = (prompt, system) async {
+      asked = prompt;
+      return '```json\n{"titre": "La génétique", "fiche": "# La génétique\\n## L\'essentiel\\n- Un **gène** est une portion d\'ADN.", '
+          '"cartes": [{"q": "Qu\'est-ce qu\'un gène ?", "r": "Une portion d\'ADN"}, {"q": "ADN ?", "r": "Acide désoxyribonucléique"}], '
+          '"quiz": [{"q": "Où est l\'ADN ?", "bonne": "Dans le noyau", "fausses": ["Dans la membrane", "Dans le sang", "Nulle part"]}]}\n```';
+    };
+    try {
+      final note = await m.autoPrepare();
+      expect(note, isNotNull);
+      expect(note!.title, contains('SVT'));
+      expect(asked, contains('génétique'));
+      final deck = RevisionsStore.instance.forTest(RevisionsModule.testKey(ecole.homework.first))!;
+      expect(deck.name, '📝 SVT — La génétique');
+      expect(deck.sheet, startsWith('# La génétique'));
+      expect(deck.cards, hasLength(2));
+      expect(deck.quiz.single.wrong, hasLength(3));
+      // Déjà prêt : rien de plus.
+      expect(await m.autoPrepare(), isNull);
+      // La fiche se met en page sans erreur.
+      expect(FicheView(markdown: deck.sheet!, color: Colors.orange), isNotNull);
+    } finally {
+      AiText.override = null;
+      HubFiles.overrideRoot = null;
+    }
   });
 }

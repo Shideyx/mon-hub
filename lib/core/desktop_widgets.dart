@@ -15,6 +15,9 @@ class DesktopWidgets extends ChangeNotifier {
 
   static bool get supported => !kIsWeb && Platform.isWindows;
 
+  /// Ce programme est une fenêtre de widget (pas Mon Hub en entier).
+  static bool inWidgetWindow = false;
+
   static const _key = 'hub.detached';
 
   List<String> get ids {

@@ -23,6 +23,7 @@ import 'theme.dart';
 /// tout seul dans sa petite fenêtre, sur le bureau.
 Future<void> runWidgetWindow(String id) async {
   WidgetsFlutterBinding.ensureInitialized();
+  DesktopWidgets.inWidgetWindow = true;
   ErrorLog.install('Widget $id');
   final ServerSocket lock;
   try {
@@ -76,7 +77,9 @@ class _WidgetWindowState extends State<_WidgetWindow> {
   void initState() {
     super.initState();
     // Les données se rafraîchissent toutes les 3 minutes.
-    _timer = Timer.periodic(const Duration(minutes: 3), (_) => setState(() => _refresh++));
+    _timer = Timer.periodic(const Duration(minutes: 3), (_) {
+      if (!m.liveWidget) setState(() => _refresh++);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _place());
   }
 
@@ -176,11 +179,12 @@ class _WidgetWindowState extends State<_WidgetWindow> {
                         icon: Icon(_onTop ? Icons.push_pin_rounded : Icons.push_pin_outlined, size: 18),
                         onPressed: _toggleTop,
                       ),
-                      IconButton(
-                        tooltip: 'Rafraîchir',
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        onPressed: () => setState(() => _refresh++),
-                      ),
+                      if (!m.liveWidget)
+                        IconButton(
+                          tooltip: 'Rafraîchir',
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          onPressed: () => setState(() => _refresh++),
+                        ),
                       IconButton(
                         tooltip: 'Ouvrir en grand',
                         icon: const Icon(Icons.open_in_full_rounded, size: 18),

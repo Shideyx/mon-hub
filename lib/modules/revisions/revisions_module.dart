@@ -15,6 +15,7 @@ import '../docs/docs_module.dart';
 import '../ecoledirecte/ed_client.dart';
 import '../ecoledirecte/ecoledirecte_module.dart';
 import '../schedule/schedule_module.dart';
+import 'fiche_view.dart';
 import 'fsrs.dart';
 import 'revisions_store.dart';
 
@@ -67,8 +68,10 @@ class RevisionsModule extends HubModule {
 
   @override
   Future<List<HubNotification>> poll() async {
+    final prepared = await autoPrepare();
     final n = await refreshBadge();
     final now = DateTime.now();
+    if (prepared != null) return [prepared];
     // Un rappel par jour, en fin d'après-midi, s'il reste des cartes.
     if (n == 0 || now.hour < 17 || now.hour >= 22) return const [];
     final streak = revisions.streak(now);
@@ -130,6 +133,121 @@ class RevisionsModule extends HubModule {
     final cards = parseCards(out);
     if (cards.isEmpty) throw 'Clicky n\'a pas réussi à faire des cartes avec ce contenu';
     return cards;
+  }
+
+  // ------------------------------------------- Contrôles : préparation auto
+
+  bool _preparing = false;
+
+  static String testKey(EdHomework t) => '${t.subject}|${t.due.toIso8601String().substring(0, 10)}';
+
+  /// Le contrôle n'a pas encore été préparé (ni tenté récemment).
+  bool needsPrep(EdHomework t, DateTime now) {
+    if (revisions.forTest(testKey(t)) != null) return false;
+    final failed = store.getJson<int>('prepFail.${testKey(t)}');
+    return failed == null || now.millisecondsSinceEpoch - failed > const Duration(hours: 6).inMilliseconds;
+  }
+
+  static const _prepSystem =
+      'Tu es Clicky, le coach de révision d\'un lycéen français. Tu réponds uniquement en JSON valide.';
+
+  static String prepPrompt(EdHomework t, String material) =>
+      'Prépare la révision d\'un contrôle de ${t.subject} le ${frDays[t.due.weekday - 1]} ${t.due.day} '
+      '${frMonths[t.due.month - 1]}, niveau lycée (programme français).\n'
+      'Ce que le professeur a écrit : « ${t.content.trim().isEmpty ? 'contrôle (sans précision)' : t.content.trim()} ».\n'
+      '${material.isEmpty ? '' : 'Ses cours (extraits) :\n---\n$material\n---\n'}'
+      'Réponds uniquement avec ce JSON :\n'
+      '{"titre": "titre court du chapitre", '
+      '"fiche": "fiche de révision en Markdown : # titre, ## parties, l\'essentiel, définitions en **gras**, '
+      'formules ou dates clés, méthodes, pièges fréquents, puis 5 questions pour se tester", '
+      '"cartes": [{"q": "question", "r": "réponse courte et exacte"}] (15 à 20 cartes), '
+      '"quiz": [{"q": "question", "bonne": "bonne réponse", "fausses": ["piège 1", "piège 2", "piège 3"]}] (10 questions)}';
+
+  /// Ce que la réponse de l'IA contient : (titre, fiche, cartes, quiz).
+  static (String, String, List<(String, String)>, List<QuizQuestion>) parsePrep(String text) {
+    final j = AiText.json(text);
+    if (j is! Map) throw 'Clicky n\'a pas réussi à préparer ce contrôle';
+    final cards = parseCards(jsonEncode(j['cartes'] ?? const []));
+    final quiz = [
+      for (final q in (j['quiz'] as List?) ?? const [])
+        if (q is Map && '${q['q'] ?? ''}'.trim().isNotEmpty && '${q['bonne'] ?? ''}'.trim().isNotEmpty)
+          QuizQuestion(
+            '${q['q']}'.trim(),
+            '${q['bonne']}'.trim(),
+            [
+              for (final w in (q['fausses'] as List?) ?? const [])
+                if ('$w'.trim().isNotEmpty) '$w'.trim(),
+            ].take(3).toList(),
+          ),
+    ];
+    final sheet = '${j['fiche'] ?? ''}'.trim();
+    if (sheet.isEmpty && cards.isEmpty) throw 'Clicky n\'a pas réussi à préparer ce contrôle';
+    return ('${j['titre'] ?? ''}'.trim(), sheet, cards, quiz);
+  }
+
+  /// Fiche + cartes + quiz pour un contrôle (dans un paquet à part).
+  Future<Deck> prepareTest(EdHomework t) async {
+    if (!await AiText.available()) {
+      throw 'Clicky a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
+    }
+    // Les cours de la personne sur Google Docs, s'il y en a pour la matière.
+    final material = StringBuffer();
+    if (GoogleDocs.connected) {
+      try {
+        for (final d in (await GoogleDocs.list(search: t.subject.split(RegExp(r'[ -]')).first, size: 2))) {
+          final txt = await GoogleDocs.text('${d['id']}');
+          material.writeln('[${d['name']}]\n${txt.length > 8000 ? txt.substring(0, 8000) : txt}');
+        }
+      } catch (_) {}
+    }
+    final out = await AiText.ask(prepPrompt(t, '$material'), system: _prepSystem);
+    final (title, sheet, cards, quiz) = parsePrep(out);
+    await revisions.load();
+    final name = '📝 ${t.subject}${title.isEmpty ? '' : ' — $title'}';
+    final deck = Deck(
+      id: '${DateTime.now().microsecondsSinceEpoch}',
+      name: name,
+      color: 0xFFE67E22,
+      sheet: sheet,
+      quiz: quiz,
+      testId: testKey(t),
+      testDate: t.due,
+    );
+    revisions.data.decks.add(deck);
+    await revisions.saveDeck();
+    await revisions.addCards(deck.id, cards);
+    // La fiche aussi dans Google Docs (si Google est connecté).
+    if (GoogleDocs.connected && sheet.isNotEmpty) {
+      try {
+        deck.sheetDoc = await GoogleDocs.create('Fiche — ${t.subject}${title.isEmpty ? '' : ' — $title'}', sheet);
+        await revisions.saveDeck();
+      } catch (_) {}
+    }
+    await refreshBadge();
+    return deck;
+  }
+
+  /// Prépare tout seul le prochain contrôle pas encore prêt (un à la fois).
+  Future<HubNotification?> autoPrepare({DateTime? now}) async {
+    final n = now ?? DateTime.now();
+    if (_preparing || store.getJson<bool>('autoPrep') == false) return null;
+    final next = tests.where((t) => t.due.difference(DateTime(n.year, n.month, n.day)).inDays <= 10).where((t) => needsPrep(t, n)).firstOrNull;
+    if (next == null || !await AiText.available()) return null;
+    _preparing = true;
+    try {
+      final deck = await prepareTest(next);
+      return HubNotification(
+        id: 'prep-${testKey(next)}',
+        title: '📝 Contrôle de ${next.subject} ${_inDays(next.due)}',
+        body: 'Clicky a préparé ta fiche, ${deck.cards.length} cartes et un quiz de ${deck.quiz.length} questions.',
+        moduleId: id,
+      );
+    } catch (_) {
+      await store.setJson('prepFail.${testKey(next)}', n.millisecondsSinceEpoch);
+      return null;
+    } finally {
+      _preparing = false;
+    }
   }
 
   // --------------------------------------------------------- Plan contrôles
@@ -279,6 +397,28 @@ class RevisionsModule extends HubModule {
       },
     ),
     HubTool(
+      name: 'revision_preparer_controle',
+      description:
+          'Prépare un contrôle d\'École Directe : fiche de révision, cartes et quiz (le prochain, ou celui d\'une matière). '
+          'Clicky le fait aussi tout seul dès qu\'il voit un contrôle dans le cahier de texte.',
+      params: {'matiere': ('string', 'Matière (facultatif : le prochain contrôle)')},
+      run: (a) async {
+        final m = '${a['matiere'] ?? ''}'.toLowerCase().trim();
+        final t = tests.where((x) => m.isEmpty || x.subject.toLowerCase().contains(m)).firstOrNull;
+        if (t == null) throw 'Je ne vois pas de contrôle${m.isEmpty ? '' : ' de $m'} dans le cahier de texte';
+        final existing = revisions.forTest(testKey(t));
+        final deck = existing ?? await prepareTest(t);
+        await push(null, () => DeckPage(module: this, deckId: deck.id));
+        return {
+          'ok': true,
+          'paquet': deck.name,
+          'cartes': deck.cards.length,
+          'quiz': deck.quiz.length,
+          'deja_pret': existing != null,
+        };
+      },
+    ),
+    HubTool(
       name: 'revision_planifier',
       description:
           'Propose des séances de révision avant les prochains contrôles (créneaux libres de l\'agenda) ; '
@@ -386,7 +526,8 @@ class _RevisionsSummary extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '📝 ${next.subject} · ${_inDays(next.due)}',
+                            '📝 ${next.subject} · ${_inDays(next.due)}'
+                            '${s.forTest(RevisionsModule.testKey(next)) != null ? ' · fiche prête' : ''}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -433,6 +574,32 @@ class RevisionsHomePage extends StatelessWidget {
     if (name.isEmpty) return;
     final d = await module.revisions.createDeck(name);
     if (context.mounted) await module.push(context, () => DeckPage(module: module, deckId: d.id));
+  }
+
+  /// « Préparer maintenant » un contrôle (Clicky le fait aussi tout seul).
+  Future<void> _prepare(BuildContext context, EdHomework t) async {
+    final nav = Navigator.of(context);
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            const SizedBox(width: 16),
+            Expanded(child: Text('Clicky prépare ta fiche, tes cartes et ton quiz de ${t.subject}…')),
+          ],
+        ),
+      ),
+    ));
+    try {
+      final deck = await module.prepareTest(t);
+      nav.pop();
+      if (context.mounted) await module.push(context, () => DeckPage(module: module, deckId: deck.id));
+    } catch (e) {
+      nav.pop();
+      if (context.mounted) showError(context, e);
+    }
   }
 
   Future<void> _plan(BuildContext context) async {
@@ -601,15 +768,21 @@ class RevisionsHomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 96,
+                    height: 112,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: tests.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 10),
                       itemBuilder: (context, i) {
                         final t = tests[i];
-                        return Container(
-                          width: 200,
+                        final ready = s.forTest(RevisionsModule.testKey(t));
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => ready != null
+                              ? module.push(context, () => DeckPage(module: module, deckId: ready.id))
+                              : _prepare(context, t),
+                          child: Container(
+                          width: 220,
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(18),
@@ -631,15 +804,35 @@ class RevisionsHomePage extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
                               Text(t.content.trim().isEmpty ? dayLabel(t.due) : t.content.trim(),
-                                  maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                              const Spacer(),
+                              Text(
+                                ready != null ? '✓ Fiche, cartes et quiz prêts' : '✨ Préparer maintenant',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: ready != null ? const Color(0xFF23A55A) : const Color(0xFF7C5CFF),
+                                ),
+                              ),
                             ],
+                          ),
                           ),
                         );
                       },
                     ),
                   ),
                 ],
-                const SizedBox(height: 22),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
+                  title: const Text('Préparer mes contrôles automatiquement'),
+                  subtitle: const Text('Dès qu\'un contrôle apparaît dans le cahier de texte : fiche, cartes et quiz, tout seuls.'),
+                  value: module.store.getJson<bool>('autoPrep') != false,
+                  onChanged: (v) async {
+                    await module.store.setJson('autoPrep', v);
+                    await module.revisions.saveDeck();
+                  },
+                ),
+                const SizedBox(height: 12),
                 Text('Mes paquets', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 if (s.decks.isEmpty)
@@ -966,6 +1159,10 @@ class DeckPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
             children: [
+              if (d.sheet != null && d.sheet!.trim().isNotEmpty) ...[
+                _SheetCard(deck: d),
+                const SizedBox(height: 14),
+              ],
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -981,8 +1178,12 @@ class DeckPage extends StatelessWidget {
                     icon: Icons.quiz_rounded,
                     color: const Color(0xFF0B6FB8),
                     title: 'Quiz',
-                    text: enough ? 'QCM, 10 questions' : '4 cartes minimum',
-                    onTap: enough ? () => module.push(context, () => QuizPage(module: module, deck: d)) : null,
+                    text: d.quiz.isNotEmpty
+                        ? 'QCM préparé, ${d.quiz.length} questions'
+                        : enough
+                            ? 'QCM, 10 questions'
+                            : '4 cartes minimum',
+                    onTap: enough || d.quiz.isNotEmpty ? () => module.push(context, () => QuizPage(module: module, deck: d)) : null,
                   ),
                   _Mode(
                     icon: Icons.keyboard_rounded,
@@ -1718,8 +1919,28 @@ class QuizPage extends StatefulWidget {
 
 class _QuizPageState extends State<QuizPage> {
   late final r = widget.random ?? math.Random();
-  late final List<StudyCard> questions = ([...widget.deck.cards]..shuffle(r)).take(widget.length).toList();
-  late List<String> opts = QuizPage.options(questions.first, widget.deck.cards, r);
+
+  /// Le quiz préparé par Clicky (avec de vrais pièges), sinon des questions
+  /// tirées des cartes.
+  late final List<StudyCard> questions = widget.deck.quiz.isNotEmpty
+      ? [
+          for (final (i, q) in ([...widget.deck.quiz]..shuffle(r)).take(widget.length).indexed)
+            StudyCard(id: 'quiz$i', front: q.question, back: q.answer),
+        ]
+      : ([...widget.deck.cards]..shuffle(r)).take(widget.length).toList();
+  late List<String> opts = _options(0);
+
+  List<String> _options(int i) {
+    if (widget.deck.quiz.isEmpty) return QuizPage.options(questions[i], widget.deck.cards, r);
+    final q = widget.deck.quiz.firstWhere((x) => x.question == questions[i].front);
+    final all = {q.answer, ...q.wrong}.toList();
+    // Pas assez de pièges : on complète avec les autres réponses.
+    for (final o in widget.deck.quiz) {
+      if (all.length >= 4) break;
+      if (!all.contains(o.answer)) all.add(o.answer);
+    }
+    return all..shuffle(r);
+  }
   int i = 0;
   int score = 0;
   String? picked;
@@ -1742,7 +1963,7 @@ class _QuizPageState extends State<QuizPage> {
     setState(() {
       i++;
       picked = null;
-      opts = QuizPage.options(questions[i], widget.deck.cards, r);
+      opts = _options(i);
     });
   }
 
@@ -2292,6 +2513,69 @@ class _FocusPageState extends State<FocusPage> {
               'Aujourd\'hui : ${widget.module.revisions.today().minutes} min de révision',
               style: theme.textTheme.bodyMedium,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// La fiche de révision d'un paquet préparé pour un contrôle.
+class _SheetCard extends StatelessWidget {
+  const _SheetCard({required this.deck});
+  final Deck deck;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final date = deck.testDate;
+    final lines = deck.sheet!.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => FichePage(
+            title: deck.name,
+            markdown: deck.sheet!,
+            color: Color(deck.color),
+            docLink: deck.sheetDoc == null ? null : GoogleDocs.edit(deck.sheetDoc!),
+          ),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE67E22), Color(0xFFE0457B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.article_rounded, color: Colors.white, size: 42),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ta fiche de révision${date == null ? '' : ' · contrôle ${_inDays(date)}'}',
+                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    lines.take(3).map((l) => l.replaceAll(RegExp(r'^[#>*\-\s]+'), '')).join(' · '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white),
           ],
         ),
       ),
