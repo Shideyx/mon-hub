@@ -7,6 +7,8 @@ import 'core/claude_bridge.dart';
 import 'core/desktop_widgets.dart';
 import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
+import 'modules/discord/discord_module.dart';
+import 'modules/discord/discord_phone.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
 import 'core/module_store.dart';
@@ -95,6 +97,7 @@ class _HubAppState extends State<HubApp> {
   }
 
   void _close() {
+    DiscordPhone.instance.stop();
     _notifications?.dispose();
     unawaited(_bridge?.stop());
     _hub = null;
@@ -122,6 +125,10 @@ class _HubAppState extends State<HubApp> {
         // Première ouverture du compte : la visite guidée de Clicky.
         unawaited(_tutorial());
         unawaited(n.start());
+        // Appels Discord reçus dans Mon Hub (Discord officiel caché).
+        DiscordPhone.allowed = true;
+        DiscordPhone.instance.notifications = n;
+        hub.available.whereType<DiscordModule>().firstOrNull?.syncPhone();
         // Quand Claude Code (Clicky) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
         // Les outils de Clicky (contrôle du PC, réparation du micro) aussi
@@ -177,7 +184,11 @@ class _HubAppState extends State<HubApp> {
       navigatorKey: hubNavigatorKey,
       // Clicky, le compagnon Claude, au-dessus de toutes les pages.
       builder: (context, child) => UpdateGate(
-        child: ClickyLayer(hub: hub, child: child ?? const SizedBox.shrink()),
+        child: ClickyLayer(
+          hub: hub,
+          // Discord gardé ouvert en fond pour recevoir les appels.
+          child: DiscordPhoneLayer(child: child ?? const SizedBox.shrink()),
+        ),
       ),
       debugShowCheckedModeBanner: false,
       themeMode: session.themeMode,

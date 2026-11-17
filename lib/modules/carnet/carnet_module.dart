@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/news.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import '../claude/claude_module.dart';
 import 'carnet_store.dart';
@@ -461,39 +462,117 @@ class CarnetModule extends HubModule {
       ];
       final now = DateTime.now();
       final (spent, _, _) = c.money(DateTime(now.year, now.month));
-      return ListView(
-        padding: const EdgeInsets.all(10),
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          if (city.isNotEmpty)
-            FutureBuilder(
-              future: Weather.forCity(city),
-              builder: (context, snap) => snap.hasData
-                  ? Text(
-                      '${snap.data!['icone']} ${snap.data!['maintenant']} · ${snap.data!['tenue']}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          const SizedBox(height: 6),
-          if (todos.isEmpty)
-            const Text('Rien à faire 🎉 Dis à Clicky « ajoute … à ma liste ».')
-          else
-            for (final t in todos.take(4))
-              Row(
-                children: [
-                  Icon(Icons.check_box_outline_blank_rounded, size: 16, color: color),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(t, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
+      final theme = Theme.of(context);
+      // La météo en bandeau, les tâches en pastilles, deux chiffres en bas.
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (city.isNotEmpty)
+              FutureBuilder(
+                future: Weather.forCity(city),
+                builder: (context, snap) => !snap.hasData
+                    ? const SizedBox.shrink()
+                    : Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(colors: [
+                            const Color(0xFF4FC3F7).withValues(alpha: 0.25),
+                            const Color(0xFF7C5CFF).withValues(alpha: 0.12),
+                          ]),
+                        ),
+                        child: Row(
+                          children: [
+                            Text('${snap.data!['icone']}', style: const TextStyle(fontSize: 22)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${snap.data!['maintenant']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+                                  Text('${snap.data!['tenue']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.labelSmall),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
-          const SizedBox(height: 6),
-          Text(
-            'Ce mois-ci : ${spent.toStringAsFixed(0)} € dépensés · ${c.list('inbox').length} idée(s) à trier',
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-        ],
+            Expanded(
+              child: todos.isEmpty
+                  ? Center(
+                      child: Text('Rien à faire 🎉\nDis à Clicky « ajoute … à ma liste ».',
+                          textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+                    )
+                  : SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final t in todos.take(6))
+                            Container(
+                              constraints: const BoxConstraints(maxWidth: 190),
+                              padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: color.withValues(alpha: 0.25)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.radio_button_unchecked_rounded, size: 14, color: color),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(t,
+                                        maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (todos.length > 6)
+                            Padding(
+                              padding: const EdgeInsets.all(5),
+                              child: Text('+${todos.length - 6}', style: theme.textTheme.labelSmall),
+                            ),
+                        ],
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: StatTile(
+                    icon: Icons.euro_rounded,
+                    value: '${spent.toStringAsFixed(0)} €',
+                    label: 'dépensés ce mois-ci',
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: StatTile(
+                    icon: Icons.lightbulb_outline_rounded,
+                    value: '${c.list('inbox').length}',
+                    label: 'idées à trier',
+                    color: const Color(0xFFFFB300),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     },
   );

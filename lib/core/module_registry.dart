@@ -9,6 +9,7 @@ import '../modules/mail/mail_module.dart';
 import '../modules/music/music_module.dart';
 import '../modules/roblox/roblox_module.dart';
 import '../modules/schedule/schedule_module.dart';
+import '../modules/youtube/youtube_module.dart';
 import 'hub_module.dart';
 
 /// LA liste des modules du hub.
@@ -27,6 +28,7 @@ List<HubModule> buildModules() {
     DiscordModule(),
     InstagramModule(),
     MusicModule(),
+    YouTubeModule(),
     RobloxModule(),
     BooksModule(),
     DriveModule(),

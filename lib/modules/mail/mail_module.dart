@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 
 class MailSummary {
@@ -404,10 +405,22 @@ class MailModule extends HubModule {
                 return const LoadingHint();
               }
               if (list.isEmpty) return EmptyHint(errors.values.firstOrNull ?? 'Aucun mail');
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                physics: const NeverScrollableScrollPhysics(),
-                children: [for (final m in list.take(4)) _tile(context, m, dense: true)],
+              return ChatsSummary(
+                color: color,
+                items: [
+                  for (final m in list.take(8))
+                    ChatItem(
+                      name: m.from,
+                      preview: m.subject,
+                      unread: !m.seen,
+                      at: m.date,
+                      onTap: () async {
+                        await Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => _MailReadPage(module: this, mail: m)));
+                        store.changed();
+                      },
+                    ),
+                ],
               );
             },
           );

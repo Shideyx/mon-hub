@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/hub_module.dart';
+import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import 'roblox_charts.dart';
 import 'roblox_dashboard.dart';
@@ -340,19 +341,25 @@ class RobloxModule extends HubModule {
             if (list.isEmpty) {
               return const EmptyHint('Ajoute ton jeu ou tes comptes Roblox', icon: Icons.add);
             }
-            return ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                for (final a in list)
-                  ListTile(
-                    dense: true,
-                    leading: _avatar(a, 16),
-                    title: Text(a.displayName),
-                    subtitle: Text('@${a.name}'),
-                    trailing: Text(a.presenceLabel,
-                        style: TextStyle(color: _presenceColor(a.presence))),
-                  ),
-              ],
+            // Les comptes en visages : l'anneau dit s'ils jouent.
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    for (final a in list)
+                      SummaryFace(
+                        name: a.displayName,
+                        url: a.avatarUrl,
+                        color: color,
+                        ring: a.presence == 0 ? null : _presenceColor(a.presence),
+                        sub: a.presenceLabel,
+                      ),
+                  ],
+                ),
+              ),
             );
           },
         ),
