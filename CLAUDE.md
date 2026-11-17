@@ -54,3 +54,12 @@
   `buttonScript`. Seule la fenêtre principale l'ouvre (`DiscordPhone.allowed`).
 - YouTube : `modules/youtube/` = le vrai youtube.com dans `HubWebView`, recherche sans clé
   (`ytInitialData`, cookie `SOCS=CAI`), historique « Reprendre » local.
+- IA simple sans outils (corriger, résumer, faire des cartes) : `core/ai_text.dart` (`AiText.ask` : clé Gemini
+  d'abord — lit photos et PDF —, sinon le cerveau de Clicky ; `AiText.json` ; `AiText.override` pour les tests).
+- Word de Mon Hub : `modules/docs/` (flutter_quill ; `DocFormat` Delta ↔ Markdown ↔ .docx écrit/lu à la main,
+  `DocPdf` police Arial de Windows ; `DocStore` un fichier chiffré par document ; Google Docs via l'export/
+  l'import .docx du Drive). `FlutterQuillLocalizations.delegate` doit rester dans les `MaterialApp`.
+- Révisions : `modules/revisions/` (FSRS-5 dans `fsrs.dart`, `RevisionsStore`, quiz/écrire/associer/minuteur,
+  cartes faites par l'IA, plan avant les contrôles ED dans l'agenda).
+- Google : portée `drive` complète (ranger le Drive, Google Docs) ; les comptes connectés avant la v1.37 n'ont
+  que la lecture → `GoogleAuth.canWriteDrive` / reconnexion.

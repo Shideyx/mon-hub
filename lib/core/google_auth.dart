@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -30,9 +31,26 @@ class GoogleAuth {
     'email',
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
-    // Lecture de ton Drive (dossiers, fichiers, aperçus) pour le module Drive.
-    'https://www.googleapis.com/auth/drive.readonly',
+    // Ton Drive en entier : le lire, y ranger tes fichiers (Clicky), ouvrir
+    // et enregistrer tes Google Docs dans le Word de Mon Hub.
+    driveScope,
   ];
+
+  static const driveScope = 'https://www.googleapis.com/auth/drive';
+
+  /// Le compte Google utilisé pour le Drive et les Docs (celui choisi dans
+  /// le module Drive, sinon le premier).
+  static String? get driveAccount {
+    final saved = (ModuleStore()..bind('drive')).getJson<String>('account');
+    final all = accounts;
+    if (saved != null && all.contains(saved)) return saved;
+    return all.firstOrNull;
+  }
+
+  /// Le compte a donné l'accès complet au Drive (les comptes connectés avant
+  /// la v1.37 n'avaient que la lecture : il faut les reconnecter).
+  static bool canWriteDrive(String email) =>
+      (store.getJson<String>('scopes.$email') ?? '').split(' ').contains(driveScope);
 
   static final ModuleStore store = ModuleStore()..bind('google');
 
@@ -124,6 +142,7 @@ class GoogleAuth {
       final email = (jsonDecode(info.body) as Map<String, dynamic>)['email'] as String;
       final refresh = j['refresh_token'] as String?;
       if (refresh != null) await store.writeSecret('refresh.$email', refresh);
+      if (j['scope'] is String) await store.setJson('scopes.$email', j['scope']);
       _tokens[email] = (
         access,
         DateTime.now().add(Duration(seconds: (j['expires_in'] as int) - 60)),
@@ -164,7 +183,71 @@ class GoogleAuth {
     }
     final access = j['access_token'] as String;
     _tokens[email] = (access, DateTime.now().add(Duration(seconds: (j['expires_in'] as int) - 60)));
+    if (j['scope'] is String) await store.setJson('scopes.$email', j['scope']);
     return access;
+  }
+
+  /// Télécharge un fichier (octets) au nom de [email].
+  static Future<Uint8List> bytes(String email, String url) async {
+    final token = await accessToken(email);
+    final res = await http.get(Uri.parse(url), headers: {'Authorization': 'Bearer $token'});
+    if (res.statusCode >= 400) throw _error(res);
+    return res.bodyBytes;
+  }
+
+  /// Envoie un fichier sur le Drive (nouveau, ou nouvelle version de [id]).
+  /// [convertTo] : le transformer en Google Doc, Sheet…
+  static Future<Map<String, dynamic>> upload(
+    String email, {
+    required String name,
+    required Uint8List data,
+    required String mime,
+    String? id,
+    String? convertTo,
+    String? parent,
+  }) async {
+    final token = await accessToken(email);
+    const fields = 'id,name,webViewLink,mimeType';
+    http.Response res;
+    if (id != null) {
+      res = await http.patch(
+        Uri.parse('https://www.googleapis.com/upload/drive/v3/files/$id?uploadType=media&fields=$fields'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': mime},
+        body: data,
+      );
+    } else {
+      const boundary = 'monhub-boundary-7f3a';
+      final meta = jsonEncode({
+        'name': name,
+        'mimeType': ?convertTo,
+        if (parent != null) 'parents': [parent],
+      });
+      final body = BytesBuilder()
+        ..add(utf8.encode('--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n'))
+        ..add(utf8.encode('--$boundary\r\nContent-Type: $mime\r\n\r\n'))
+        ..add(data)
+        ..add(utf8.encode('\r\n--$boundary--'));
+      res = await http.post(
+        Uri.parse('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=$fields'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'multipart/related; boundary=$boundary'},
+        body: body.toBytes(),
+      );
+    }
+    if (res.statusCode >= 400) throw _error(res);
+    return (jsonDecode(utf8.decode(res.bodyBytes)) as Map).cast<String, dynamic>();
+  }
+
+  static String _error(http.Response res) {
+    try {
+      final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
+      final m = '${(j['error'] as Map?)?['message'] ?? res.statusCode}';
+      if (m.contains('insufficient') || m.contains('scope')) {
+        return 'Google : reconnecte ton compte pour autoriser Mon Hub à modifier ton Drive';
+      }
+      return 'Google : $m';
+    } catch (_) {
+      return 'Google : erreur ${res.statusCode}';
+    }
   }
 
   /// Appel à une API Google au nom de [email].

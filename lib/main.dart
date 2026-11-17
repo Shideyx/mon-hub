@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/certificates.dart';
@@ -194,7 +195,7 @@ class _HubAppState extends State<HubApp> {
       themeMode: session.themeMode,
       locale: const Locale('fr', 'FR'),
       supportedLocales: const [Locale('fr', 'FR'), Locale('en')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: const [...GlobalMaterialLocalizations.delegates, FlutterQuillLocalizations.delegate],
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       home: hub == null || n == null
