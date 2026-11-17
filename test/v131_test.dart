@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hub/core/hub_module.dart';
+import 'package:hub/ui/clicky/clicky.dart';
 import 'package:hub/ui/clicky/live.dart';
 import 'package:hub/ui/clicky/pcm_player.dart';
 import 'package:hub/ui/clicky/tutor.dart';
@@ -123,5 +124,11 @@ void main() {
     expect(((resp['functionResponses'] as List).single as Map)['response']['result']['cours'], 'maths à 8 h');
     expect(got.any((m) => (m['realtimeInput'] as Map?)?['audio']?['mimeType'] == 'audio/pcm;rate=16000'), isTrue);
     await live.close();
+  });
+
+  test('quota Gemini atteint : relais par la voix Microsoft', () {
+    expect(ClickyController.isQuotaError('connexion fermée (RESOURCE_EXHAUSTED: quota exceeded)'), isTrue);
+    expect(ClickyController.isQuotaError('HTTP 429'), isTrue);
+    expect(ClickyController.isQuotaError('connexion fermée'), isFalse);
   });
 }

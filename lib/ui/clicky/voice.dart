@@ -49,6 +49,21 @@ class ClickyVoice {
 
   FlutterTts get _engine => _tts ??= FlutterTts();
 
+  /// La voix de Windows est en train de parler.
+  ///
+  /// IMPORTANT : sous Windows, `FlutterTts.stop()` fait **planter tout le
+  /// programme** s'il n'est pas en train de parler (le module répond à une
+  /// demande qui n'existe pas). On ne l'appelle donc que dans ce cas.
+  bool _ttsSpeaking = false;
+
+  Future<void> _stopTts() async {
+    if (!_ttsSpeaking) return;
+    _ttsSpeaking = false;
+    try {
+      await _tts?.stop();
+    } catch (_) {}
+  }
+
   static List<SystemVoice>? _voices;
 
   /// Voix installées sur l'appareil.
@@ -114,13 +129,17 @@ class ClickyVoice {
     if (cleanText.length < _fed) _fed = 0; // texte reparti de zéro
     final rest = cleanText.substring(_fed);
     // On lit par morceaux d'au moins une phrase complète (et 24 lettres,
-    // pour éviter les micro-coupures).
+    // pour éviter les micro-coupures). Le tout premier morceau part dès la
+    // première virgule : Clicky commence à parler plus tôt.
+    final first = _fed == 0;
+    final cut = first ? RegExp(r'[\s\S]*?[.!?…:;,](?=\s)') : RegExp(r'[\s\S]*?[.!?…:;](?=\s)');
+    final min = first ? 14 : 24;
     var end = 0;
-    for (final s in RegExp(r'[\s\S]*?[.!?…:;](?=\s)').allMatches(rest)) {
+    for (final s in cut.allMatches(rest)) {
       end = s.end;
-      if (end >= 24) break;
+      if (end >= min) break;
     }
-    if (end < 24) return;
+    if (end < min) return;
     _enqueue(rest.substring(0, end));
     _fed += end;
   }
@@ -208,9 +227,7 @@ class ClickyVoice {
     await f.writeAsBytes(bytes, flush: true);
     if (gen != _generation) return;
     // Jamais par-dessus la voix de Windows.
-    try {
-      await _tts?.stop();
-    } catch (_) {}
+    await _stopTts();
     var finished = false;
     final sub = p.onPlayerComplete.listen((_) => finished = true);
     final started = DateTime.now();
@@ -264,7 +281,12 @@ class ClickyVoice {
             if (eng == 'gemini') {
               // Gemini indisponible : la voix Microsoft lit la suite de la
               // réponse (on ne revient pas en arrière au milieu).
-              _geminiDownUntil = DateTime.now().add(const Duration(minutes: 10));
+              // Quota gratuit épuisé : voix Microsoft (illimitée) une heure.
+              _geminiDownUntil = DateTime.now().add(
+                RegExp(r'429|quota|RESOURCE_EXHAUSTED', caseSensitive: false).hasMatch('$e')
+                    ? const Duration(hours: 1)
+                    : const Duration(minutes: 10),
+              );
               eng = 'edge';
               try {
                 await _play(await _synthWith(eng, s), gen);
@@ -281,9 +303,13 @@ class ClickyVoice {
           await _player?.stop();
         } catch (_) {}
         if (gen != _generation) break;
+        _ttsSpeaking = true;
         try {
           await _engine.speak(s);
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+          _ttsSpeaking = false;
+        }
       }
     } catch (_) {
     } finally {
@@ -320,8 +346,8 @@ class ClickyVoice {
     final d = _drained;
     _drained = null;
     d?.complete();
+    unawaited(_stopTts());
     try {
-      unawaited(_tts?.stop());
       unawaited(_player?.stop());
     } catch (_) {}
   }

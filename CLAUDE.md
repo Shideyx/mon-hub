@@ -33,3 +33,5 @@
   activityStart/End, audio PCM 16 kHz → 24 kHz joué par `PcmPlayer` waveOut). Branché dans
   `ClickyController.startListening/stopListening/ask` (`liveReady`). Erreurs : `ErrorLog`
   (`journal-erreurs.log`), Clicky partout surveillé par `ClickyDesktop.watch()`.
+- ⚠️ flutter_tts sous Windows : `FlutterTts.stop()` fait PLANTER le programme s'il n'est pas en train
+  de parler (speakResult nul dans le plugin). Toujours passer par `ClickyVoice._stopTts()`.

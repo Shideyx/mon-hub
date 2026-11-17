@@ -109,7 +109,8 @@ class ClickyMoreSettings extends StatelessWidget {
               c.voiceOut.geminiKey.trim().isEmpty
                   ? 'Ajoute ta clé Gemini gratuite (voix Gemini ci-dessous) : Clicky répondra au tac au tac, en direct.'
                   : 'Ta voix part en direct vers Gemini, qui répond tout de suite en voix (voix Gemini choisie ci-dessous). '
-                        'Pour un tableau, un schéma ou montrer où cliquer, Claude prend le relais.'
+                        'Pour un tableau, un schéma ou montrer où cliquer, Claude prend le relais. Si le quota gratuit '
+                        'de Gemini est atteint, la voix Microsoft (gratuite, sans limite) prend le relais toute seule.'
                         '${c.liveError == null ? '' : '\nDernier souci : ${c.liveError}'}',
             ),
           const _NeuralVoicePicker(),
