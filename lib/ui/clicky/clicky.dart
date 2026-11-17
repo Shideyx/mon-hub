@@ -537,7 +537,9 @@ class ClickyController extends ChangeNotifier {
   /// Moteur de voix : 'edge' (voix neurale Microsoft gratuite, par
   /// défaut), 'gemini' (clé gratuite AI Studio) ou 'system' (Windows).
   String get ttsEngine => _opt('ttsEngine', 'edge');
-  String get neuralVoice => _opt('neuralVoice', 'fr-FR-HenriNeural');
+  /// Voix Microsoft : Rémy multilingue par défaut (la plus naturelle, la plus
+  /// proche de Gemini, gratuite et sans limite).
+  String get neuralVoice => _opt('neuralVoice', 'fr-FR-RemyMultilingualNeural');
   String get geminiVoice => _opt('geminiVoice', 'Charon');
 
   /// Clé Gemini (gratuite), gardée chiffrée.
@@ -2028,8 +2030,19 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
       ..onToolStatus = (name) {
         if (!_liveIgnore) _set(ClickyState.thinking, status: 'J\'utilise ${name.replaceAll('_', ' ')}…');
       }
-      ..onClosed = (_) {
+      ..onClosed = (why) {
         if (identical(_live, l)) _live = null;
+        // Quota atteint au milieu d'une question : Claude et la voix
+        // Microsoft répondent à la place, sans rien perdre.
+        if (isQuotaError(why)) {
+          _liveFailed(why);
+          if (_liveTurn && !_liveIgnore) {
+            _liveTurn = false;
+            _liveWatch?.cancel();
+            final q = _liveIn.trim();
+            if (q.isNotEmpty) unawaited(_askAi(q));
+          }
+        }
       };
     _live = l;
     await l.connect();
@@ -2048,11 +2061,22 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
     try {
       return await _liveSession();
     } catch (e) {
-      liveError = '$e';
-      _liveDownUntil = DateTime.now().add(const Duration(minutes: 10));
-      ErrorLog.record(e, null, where: 'Gemini Live');
+      _liveFailed(e);
       return null;
     }
+  }
+
+  /// Le quota gratuit de Gemini est épuisé (ou la clé refusée) ?
+  static bool isQuotaError(Object e) =>
+      RegExp(r'RESOURCE_EXHAUSTED|quota|rate.?limit|\b429\b|exceeded', caseSensitive: false).hasMatch('$e');
+
+  /// Gemini Live ne marche plus : relais par la voix Microsoft (illimitée)
+  /// pendant un moment — une heure si c'est le quota gratuit.
+  void _liveFailed(Object e) {
+    final quota = isQuotaError(e);
+    liveError = quota ? 'Quota gratuit de Gemini atteint : voix Microsoft (illimitée) en attendant.' : '$e';
+    _liveDownUntil = DateTime.now().add(quota ? const Duration(hours: 1) : const Duration(minutes: 10));
+    ErrorLog.record(e, null, where: 'Gemini Live');
   }
 
   void _liveBegin(String shown) {
