@@ -20,6 +20,7 @@ import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
 import '../../core/session.dart';
+import '../../core/version.dart';
 import '../chat_history.dart';
 import '../widgets.dart';
 import 'board.dart';
@@ -596,7 +597,65 @@ class ClickyController extends ChangeNotifier {
     _micStarting = starting;
     final problem = await starting;
     _micStarting = null;
-    if (problem != null) _micFailed(problem);
+    if (problem == null) return;
+    // Panne de lancement (PowerShell bloqué, planté…) : Clicky se répare
+    // tout seul une fois, au lieu de juste afficher l'erreur.
+    if (isLaunchProblem(problem) && !_autoRepaired) {
+      _autoRepaired = true;
+      await repairMic(auto: true);
+      return;
+    }
+    _micFailed(problem);
+  }
+
+  /// Clicky a déjà tenté de se réparer tout seul depuis le démarrage.
+  bool _autoRepaired = false;
+
+  /// Une réparation est en cours.
+  bool repairing = false;
+
+  /// « Clicky répare » : remet le micro à zéro, essaie toutes les façons de
+  /// le lancer et vérifie qu'il s'ouvre. S'il reste bloqué, l'IA explique
+  /// quoi faire en sachant ce qui a déjà été essayé.
+  Future<void> repairMic({bool auto = false}) async {
+    if (repairing || !_voicePlatform) return;
+    repairing = true;
+    final before = micProblem;
+    micProblem = null;
+    openPanel();
+    _set(
+      ClickyState.thinking,
+      status: auto ? 'Le micro a calé, je le répare…' : 'Je répare le micro…',
+      reply: '',
+    );
+    EarsRepair r;
+    try {
+      r = await ears.repair();
+    } catch (e) {
+      r = EarsRepair(
+        problem: EarsProblem('La réparation du micro a échoué : $e', code: 'repair'),
+        steps: const [],
+      );
+    } finally {
+      repairing = false;
+    }
+    lastRepair = r;
+    if (r.ok) {
+      _set(ClickyState.idle, status: 'Micro réparé ✓', reply: '');
+      await startListening();
+      return;
+    }
+    micProblem = r.problem;
+    _set(ClickyState.idle, status: '', reply: '');
+    // Réparation manuelle : l'IA explique la panne. Automatique : on
+    // affiche le souci (bouton « Clicky répare » pour aller plus loin).
+    if (!auto) {
+      await _askAi(
+        micRepairPrompt(before ?? r.problem!, r, system: kIsWeb ? '' : Platform.operatingSystem),
+        shown: 'Répare mon micro',
+        withScreen: false,
+      );
+    }
   }
 
   /// Le micro est en train de démarrer (premier lancement : 1 à 2 s).
@@ -1096,7 +1155,65 @@ class ClickyController extends ChangeNotifier {
   List<HubTool> get _tools => [
     ...toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
     if (toolsOverride == null) ...McpTools.cached,
+    if (toolsOverride == null && _voicePlatform) ...repairTools,
   ];
+
+  /// Les outils de dépannage de Clicky : l'IA peut voir ce qui ne va pas
+  /// et réparer le micro elle-même (« mon micro ne marche pas »).
+  List<HubTool> get repairTools => [
+    HubTool(
+      name: 'clicky_diagnostic',
+      description:
+          'Diagnostic de Clicky : état du micro (dernière panne, façon de lancer la reconnaissance '
+          'vocale), du mot d\'activation, de la voix et du cerveau (Claude). À utiliser quand la '
+          'personne dit que Clicky, le micro ou la voix ne marche pas.',
+      run: (_) async => diagnostic(),
+    ),
+    HubTool(
+      name: 'clicky_reparer_micro',
+      description:
+          'Répare le micro de Clicky : arrête l\'écoute bloquée, relance la reconnaissance vocale en '
+          'essayant toutes les façons de la démarrer, et vérifie que le micro s\'ouvre. Renvoie ce '
+          'qui a été fait et le souci qui reste (avec le réglage à ouvrir).',
+      run: (_) async {
+        final r = await ears.repair();
+        lastRepair = r;
+        micProblem = r.problem;
+        notifyListeners();
+        return {
+          'repare': r.ok,
+          'etapes': r.steps,
+          if (r.problem != null) 'souci': r.problem!.message,
+          if (r.problem?.code.isNotEmpty ?? false) 'code': r.problem!.code,
+          if (r.problem?.fixUri != null) 'reglage': '${r.problem!.fixLabel} (${r.problem!.fixUri})',
+        };
+      },
+    ),
+  ];
+
+  /// Dernière réparation du micro (pour le diagnostic).
+  EarsRepair? lastRepair;
+
+  /// État de Clicky, lisible par l'IA (outil clicky_diagnostic).
+  Map<String, Object?> diagnostic() {
+    final e = ears;
+    return {
+      'version': appVersion,
+      'systeme': kIsWeb ? 'web' : Platform.operatingSystem,
+      'micro_active': mic,
+      'micro_panne': micProblem?.message,
+      'micro_code': micProblem?.code,
+      if (e is WindowsEars) 'micro_lancement': e.launch.label,
+      'micro_langue': e.language,
+      'derniere_reparation': lastRepair == null
+          ? null
+          : {'reussie': lastRepair!.ok, 'etapes': lastRepair!.steps},
+      'mot_activation': _wake.running,
+      'voix': voice,
+      'cerveau': provider,
+      'etat': state.name,
+    };
+  }
 
   String _system(
     List<ClickyShot> shots, {
@@ -1123,7 +1240,7 @@ ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 ${clickyPersona(callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
-Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.''';
+${_voicePlatform ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.''';
     if (agent) {
       return '''$base
 
@@ -1230,6 +1347,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         newConversation();
       case ClickyCommand.history:
         toggleHistory();
+      case ClickyCommand.repair:
+        if (!_voicePlatform) return false;
+        await repairMic();
       case ClickyCommand.protocol:
         final tool = _tools.where((t) => t.name == 'carnet_protocole').firstOrNull;
         if (tool == null) return false;
@@ -3080,6 +3200,17 @@ class _MicHelp extends StatelessWidget {
           spacing: 6,
           runSpacing: 4,
           children: [
+            FilledButton.icon(
+              icon: c.repairing
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_fix_high_rounded, size: 16),
+              label: const Text('Clicky répare'),
+              onPressed: c.repairing ? null : c.repairMic,
+            ),
             if (problem.fixUri != null)
               FilledButton.tonalIcon(
                 icon: const Icon(Icons.settings_rounded, size: 16),

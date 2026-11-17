@@ -24,6 +24,56 @@ class EarsProblem {
   String toString() => message;
 }
 
+/// Résultat d'une réparation du micro par Clicky.
+class EarsRepair {
+  const EarsRepair({required this.problem, required this.steps});
+
+  /// Le souci qui reste (null : le micro marche).
+  final EarsProblem? problem;
+
+  /// Ce que Clicky a essayé, dans l'ordre (pour l'afficher ou l'expliquer).
+  final List<String> steps;
+
+  bool get ok => problem == null;
+}
+
+/// Les pannes de lancement que Clicky répare tout seul en essayant une
+/// autre façon de démarrer PowerShell (les autres demandent un réglage).
+bool isLaunchProblem(EarsProblem p) =>
+    p.code == 'launch' || p.code == 'died' || p.code == 'timeout' || p.code == 'start-timeout';
+
+/// Façons de lancer le script de reconnaissance vocale, de la meilleure à
+/// la plus robuste.
+enum EarsLaunch {
+  /// Script en paramètre, sans fenêtre (par défaut).
+  encoded('sans fichier, sans fenêtre'),
+
+  /// Fichier .ps1, sans fenêtre (si le paramètre est refusé).
+  file('avec un fichier de script'),
+
+  /// Script en paramètre, processus normal : marche même quand Windows
+  /// refuse le lancement « détaché ».
+  normal('lancement classique');
+
+  const EarsLaunch(this.label);
+  final String label;
+
+  bool get detached => this != EarsLaunch.normal;
+}
+
+/// Ce que Clicky envoie à l'IA quand il n'a pas pu réparer le micro tout
+/// seul : la panne, ce qu'il a déjà essayé, et ce qu'on attend de lui.
+String micRepairPrompt(EarsProblem problem, EarsRepair repair, {String system = ''}) {
+  final tried = repair.steps.isEmpty
+      ? ''
+      : ' Tu as déjà essayé tout seul (inutile de relancer clicky_reparer_micro) : ${repair.steps.join(' ; ')}.';
+  return 'Mon micro ne marche pas avec toi (Clicky, dans Mon Hub${system.isEmpty ? '' : ' sur $system'}). '
+      'Erreur affichée : « ${problem.message} »${problem.code.isEmpty ? '' : ' (code ${problem.code})'}.$tried '
+      'Explique-moi simplement ce qui bloque et comment le régler, étape par étape '
+      '(quel réglage ouvrir, quoi cocher). Rappelle-moi qu\'en attendant je peux écrire, '
+      'ou utiliser la dictée de Windows (Win + H).';
+}
+
 /// Les « oreilles » de Clicky : transforment ce que tu dis en texte.
 ///
 /// * Windows : la reconnaissance vocale moderne de Windows (la même que la
@@ -49,6 +99,15 @@ abstract class ClickyEars {
 
   /// Prépare le micro à l'avance (démarrage plus rapide).
   void warmUp() {}
+
+  /// Remet le micro à zéro et essaie toutes les façons de le relancer.
+  /// Renvoie ce qui a été fait, et le souci s'il reste.
+  Future<EarsRepair> repair() async {
+    try {
+      await cancel();
+    } catch (_) {}
+    return const EarsRepair(problem: null, steps: ['Micro remis à zéro.']);
+  }
 
   /// Langue réellement utilisée (ex. fr-FR), une fois connue.
   String? get language;
@@ -88,9 +147,13 @@ class WindowsEars extends ClickyEars {
 
   bool _warmed = false;
 
-  /// Lancement sans fichier de script (-EncodedCommand) : par défaut, car
-  /// certains PC bloquent les fichiers .ps1 ; le fichier sert de repli.
-  bool _encoded = true;
+  /// Façon de lancer PowerShell. Par défaut sans fichier de script
+  /// (-EncodedCommand), car certains PC bloquent les fichiers .ps1 ; si ça
+  /// ne marche pas, Clicky passe tout seul à la suivante.
+  EarsLaunch _launch = EarsLaunch.encoded;
+
+  /// Façon de lancer utilisée en ce moment.
+  EarsLaunch get launch => _launch;
   int? _exit;
   final _errors = StringBuffer();
 
@@ -122,6 +185,25 @@ class WindowsEars extends ClickyEars {
     return l.length > 220 ? '${l.substring(0, 217)}…' : l;
   }
 
+  /// Paramètres de PowerShell pour une façon de lancer.
+  @visibleForTesting
+  static List<String> launchArgs(EarsLaunch how, String scriptPath) => [
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    if (how == EarsLaunch.file) ...[
+      '-File',
+      scriptPath,
+      '-Lang',
+      'fr-FR',
+    ] else ...[
+      if (how == EarsLaunch.normal) ...['-WindowStyle', 'Hidden'],
+      '-EncodedCommand',
+      encodedScript(),
+    ],
+  ];
+
   /// Une seule fois : si le micro est en panne, on ne relance pas PowerShell
   /// en boucle (le prochain essai se fera quand tu parleras).
   @override
@@ -147,36 +229,25 @@ class WindowsEars extends ClickyEars {
     if (b != null && _proc != null) return b.future;
     final boot = _boot = Completer<EarsProblem?>();
     () async {
+      Process? started;
       try {
         final script = await _writeScript();
         _errors.clear();
+        final how = _launch;
         final p = await Process.start(
           'powershell.exe',
-          _encoded
-              ? [
-                  '-NoProfile',
-                  '-NonInteractive',
-                  '-ExecutionPolicy',
-                  'Bypass',
-                  '-EncodedCommand',
-                  encodedScript(),
-                ]
-              : [
-                  '-NoProfile',
-                  '-NonInteractive',
-                  '-ExecutionPolicy',
-                  'Bypass',
-                  '-File',
-                  script,
-                  '-Lang',
-                  'fr-FR',
-                ],
+          launchArgs(how, script),
           // Sans fenêtre de console, entrées / sorties branchées sur Mon Hub.
-          mode: ProcessStartMode.detachedWithStdio,
+          mode: how.detached ? ProcessStartMode.detachedWithStdio : ProcessStartMode.normal,
         );
+        started = p;
         _proc = p;
         _exit = null;
-        unawaited(p.exitCode.then((c) => _exit = c));
+        // Un processus « détaché » n'a pas de code de sortie : le lire
+        // lève « Bad state: Process is detached ».
+        if (!how.detached) {
+          unawaited(p.exitCode.then((c) => _exit = c, onError: (Object _) => -1));
+        }
         p.stdout
             .transform(utf8.decoder)
             .transform(const LineSplitter())
@@ -196,6 +267,11 @@ class WindowsEars extends ClickyEars {
           }
         });
       } catch (e) {
+        // PowerShell a pu démarrer avant l'erreur : on ne le laisse pas
+        // tourner pour rien.
+        try {
+          started?.kill();
+        } catch (_) {}
         _proc = null;
         _boot = null;
         if (!boot.isCompleted) {
@@ -345,17 +421,8 @@ class WindowsEars extends ClickyEars {
     _final = '';
     _hyp = '';
     _speech = false;
-    var boot = await _ensure();
-    if (boot != null && boot.code == 'died' && _encoded) {
-      // Le lancement sans fichier a échoué : on réessaie avec le fichier.
-      _encoded = false;
-      _kill();
-      boot = await _ensure();
-    }
-    if (boot != null) {
-      _kill();
-      return boot;
-    }
+    final boot = await _bootWithFallback();
+    if (boot != null) return boot;
     final starting = _starting = Completer<EarsProblem?>();
     _listening = true;
     _stopping = false;
@@ -373,6 +440,71 @@ class WindowsEars extends ClickyEars {
     }
     _startWave();
     return null;
+  }
+
+  /// Démarre PowerShell ; s'il ne se lance pas, essaie tout seul les
+  /// autres façons de le lancer (réparation automatique).
+  Future<EarsProblem?> _bootWithFallback({List<String>? log}) async {
+    var boot = await _ensure();
+    // Trop lent : une autre façon de lancer ne changerait rien, sauf
+    // pendant une réparation (log != null) où l'on essaie tout.
+    bool retry(EarsProblem b) => log != null ? isLaunchProblem(b) : b.code == 'launch' || b.code == 'died';
+    while (boot != null && retry(boot) && _launch.index < EarsLaunch.values.length - 1) {
+      log?.add('Échec ${_launch.label} : ${boot.message}');
+      _kill();
+      _launch = EarsLaunch.values[_launch.index + 1];
+      log?.add('J\'essaie autrement (${_launch.label}).');
+      boot = await _ensure();
+    }
+    if (boot != null) _kill();
+    return boot;
+  }
+
+  @override
+  Future<EarsRepair> repair() async {
+    final log = <String>[];
+    if (_listening) {
+      try {
+        await cancel();
+      } catch (_) {}
+    }
+    _listening = false;
+    _stopping = false;
+    _onText = null;
+    _onLevel = null;
+    _onProblem = null;
+    _onFinalPhrase = null;
+    _stopWave();
+    _kill();
+    _warmed = true;
+    log.add('J\'ai arrêté l\'ancienne écoute.');
+    // On repart de la meilleure façon de lancer, puis on descend la liste.
+    _launch = EarsLaunch.encoded;
+    final boot = await _bootWithFallback(log: log);
+    if (boot != null) {
+      log.add('Toujours bloqué : ${boot.message}');
+      return EarsRepair(problem: boot, steps: log);
+    }
+    log.add('La reconnaissance vocale démarre (${_launch.label}, langue ${_lang ?? '?'}).');
+    // Vérifie que le micro s'ouvre vraiment, puis le referme.
+    final starting = _starting = Completer<EarsProblem?>();
+    _send('start');
+    final p = await starting.future.timeout(
+      const Duration(seconds: 6),
+      onTimeout: () => const EarsProblem(
+        'Le micro ne répond pas. Vérifie qu\'il est bien branché.',
+        code: 'start-timeout',
+      ),
+    );
+    if (p != null) {
+      log.add('Le micro ne s\'ouvre pas : ${p.message}');
+      return EarsRepair(problem: p, steps: log);
+    }
+    final done = _stopped = Completer<void>();
+    _send('stop');
+    await done.future.timeout(const Duration(seconds: 3), onTimeout: () {});
+    log.add('Le micro s\'ouvre et se referme correctement.');
+    return EarsRepair(problem: null, steps: log);
   }
 
   @override
