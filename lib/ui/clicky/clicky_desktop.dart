@@ -126,6 +126,13 @@ Future<void> runClickyDesktop() async {
       final cmd = line.trim();
       if (cmd == 'quit') exit(0);
       if (cmd == 'open') c.openPanel();
+      // Topo du matin / du soir préparé par Mon Hub.
+      if (cmd.startsWith('show64 ')) {
+        try {
+          final j = jsonDecode(utf8.decode(base64Decode(cmd.substring(7)))) as Map;
+          unawaited(c.presentTopo('${j['t']}', '${j['x']}', speakIt: j['v'] != false));
+        } catch (_) {}
+      }
       // Question envoyée par Mon Hub (révisions du journal…).
       if (cmd.startsWith('ask ')) {
         c.openPanel();

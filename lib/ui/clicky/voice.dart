@@ -6,6 +6,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import 'neural_voice.dart';
+
 /// Une voix du système (Windows : Paul, Hortense, Julie…).
 class SystemVoice {
   const SystemVoice(this.name, this.locale);
@@ -136,12 +138,88 @@ class ClickyVoice {
     if (!_running) unawaited(_run(_generation));
   }
 
+  /// Moteur : 'edge' (voix neurale Microsoft, gratuite), 'gemini' (clé
+  /// gratuite), 'system' (voix de Windows, hors ligne).
+  String engine = 'edge';
+  String neuralVoice = 'fr-FR-HenriNeural';
+  String geminiKey = '';
+  String geminiVoice = 'Charon';
+
+  /// Dernier souci de la voix neurale (affiché dans les réglages). Après un
+  /// échec, Clicky repasse sur la voix de Windows jusqu'au prochain essai.
+  String? neuralError;
+  DateTime? _neuralDownUntil;
+
+  AudioPlayer? _player;
+
+  bool get _neural =>
+      (engine == 'edge' || engine == 'gemini') &&
+      (_neuralDownUntil == null || DateTime.now().isAfter(_neuralDownUntil!));
+
+  Future<Uint8List> synth(String text) {
+    if (engine == 'gemini') {
+      return GeminiVoice.synthesize(text, key: geminiKey, voice: geminiVoice).catchError(
+        // Quota gratuit épuisé : la voix Microsoft prend le relais.
+        (Object _) => EdgeVoice.synthesize(
+          text,
+          voice: EdgeVoice.forLanguage(language, neuralVoice),
+          rate: rate,
+          pitch: pitch,
+        ),
+      );
+    }
+    return EdgeVoice.synthesize(
+      text,
+      voice: EdgeVoice.forLanguage(language, neuralVoice),
+      rate: rate,
+      pitch: pitch,
+    );
+  }
+
+  int _file = 0;
+
+  /// Joue un son (MP3 ou WAV) et attend la fin.
+  Future<void> _play(Uint8List bytes, int gen) async {
+    final p = _player ??= AudioPlayer();
+    final f = File(
+      '${Directory.systemTemp.path}${Platform.pathSeparator}monhub-voix-${_file++ % 4}.${engine == 'gemini' && bytes.length > 4 && bytes[0] == 0x52 ? 'wav' : 'mp3'}',
+    );
+    await f.writeAsBytes(bytes, flush: true);
+    if (gen != _generation) return;
+    final end = p.onPlayerComplete.first;
+    await p.play(DeviceFileSource(f.path));
+    await end.timeout(const Duration(minutes: 2), onTimeout: () {});
+  }
+
   Future<void> _run(int gen) async {
     _running = true;
     try {
       await _apply();
+      Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
+        if (_neural) {
+          try {
+            final audio = await (next ?? synth(s));
+            next = null;
+            // On prépare la phrase suivante pendant que celle-ci se lit.
+            if (_queue.isNotEmpty) next = synth(_queue.first);
+            if (gen != _generation) break;
+            await _play(audio, gen);
+            if (next != null) {
+              // La phrase préparée sera prise au prochain tour.
+              final first = _queue.isEmpty ? null : _queue.first;
+              if (first == null) next = null;
+            }
+            neuralError = null;
+            continue;
+          } catch (e) {
+            neuralError = '$e';
+            next = null;
+            // Service indisponible : voix de Windows pendant 10 minutes.
+            _neuralDownUntil = DateTime.now().add(const Duration(minutes: 10));
+          }
+        }
         try {
           await _engine.speak(s);
         } catch (_) {}
@@ -154,6 +232,14 @@ class ClickyVoice {
         _drained = null;
       }
     }
+  }
+
+  /// Essaie la voix choisie (bouton « Écouter » des réglages).
+  Future<String?> test(String text) async {
+    _neuralDownUntil = null;
+    neuralError = null;
+    await say(text);
+    return neuralError;
   }
 
   /// Attend que tout soit lu.
@@ -173,6 +259,7 @@ class ClickyVoice {
     d?.complete();
     try {
       unawaited(_tts?.stop());
+      unawaited(_player?.stop());
     } catch (_) {}
   }
 

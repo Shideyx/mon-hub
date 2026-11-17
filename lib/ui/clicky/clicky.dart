@@ -24,6 +24,7 @@ import '../chat_history.dart';
 import '../widgets.dart';
 import 'board.dart';
 import 'capture.dart';
+import 'clicky_desktop.dart';
 import 'claude_code.dart';
 import 'documents.dart';
 import 'drive.dart';
@@ -169,10 +170,9 @@ class ClickyController extends ChangeNotifier {
   static const explainScreenPrompt =
       'Explique-moi ce qu\'il y a à l\'écran comme un prof : de quoi ça parle, les notions '
       'importantes, avec un tableau visuel.';
-  static const briefingPrompt =
-      'Fais-moi le briefing : la météo et quoi mettre, mes cours d\'aujourd\'hui (et ceux annulés), '
-      'les devoirs pour demain, mes dernières notes, mes tâches du carnet, mes messages non lus et mes '
-      'évènements. Court et clair, comme JARVIS.';
+
+  /// « Briefing » : le topo du matin complet.
+  static const briefingPrompt = Routine.topoMorningPrompt;
 
   bool get hasHistory => _memory().isNotEmpty;
 
@@ -229,6 +229,9 @@ class ClickyController extends ChangeNotifier {
     'journal',
     'perApp',
     'alive',
+    'ttsEngine',
+    'neuralVoice',
+    'geminiVoice',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -417,6 +420,9 @@ class ClickyController extends ChangeNotifier {
       r = false;
     }
     final here = desktopMode || !handledElsewhere;
+    try {
+      voiceOut.geminiKey = await ClaudeApi.store.readSecret('gemini.key') ?? '';
+    } catch (_) {}
     // Windows : prépare le micro à l'avance pour ne pas rater le début.
     if (r && enabled && mic && here) ears.warmUp();
     // Mot d'activation (« Clicky »).
@@ -489,7 +495,26 @@ class ClickyController extends ChangeNotifier {
 
   bool get _voicePlatform => ClickyEars.supported;
 
+  /// Moteur de voix : 'edge' (voix neurale Microsoft gratuite, par
+  /// défaut), 'gemini' (clé gratuite AI Studio) ou 'system' (Windows).
+  String get ttsEngine => _opt('ttsEngine', 'edge');
+  String get neuralVoice => _opt('neuralVoice', 'fr-FR-HenriNeural');
+  String get geminiVoice => _opt('geminiVoice', 'Charon');
+
+  /// Clé Gemini (gratuite), gardée chiffrée.
+  Future<void> setGeminiKey(String? key) async {
+    await ClaudeApi.store.writeSecret(
+      'gemini.key',
+      key == null || key.trim().isEmpty ? null : key.trim(),
+    );
+    voiceOut.geminiKey = key?.trim() ?? '';
+  }
+
   void _applyVoice({String? lang}) {
+    voiceOut
+      ..engine = ttsEngine
+      ..neuralVoice = neuralVoice
+      ..geminiVoice = geminiVoice;
     voiceOut
       ..voiceName = ttsVoice
       ..rate = ttsRate
@@ -815,6 +840,7 @@ class ClickyController extends ChangeNotifier {
 
   /// Ferme la boîte (et efface la réponse).
   void closeBox() {
+    _keepReply = false;
     reply = '';
     status = '';
     micProblem = null;
@@ -861,6 +887,7 @@ class ClickyController extends ChangeNotifier {
           !panelOpen &&
           steps.isEmpty &&
           !showHistory &&
+          !_keepReply &&
           (reply.isNotEmpty || status.isNotEmpty)) {
         reply = '';
         status = '';
@@ -870,6 +897,29 @@ class ClickyController extends ChangeNotifier {
   }
 
   Timer? _clear;
+
+  /// La réponse reste affichée jusqu'à ce qu'on ferme la boîte (topos).
+  bool _keepReply = false;
+
+  /// Affiche un topo (matin / soir) en grand, le lit et le range dans
+  /// l'historique.
+  Future<void> presentTopo(String title, String text, {bool speakIt = true}) async {
+    _keepReply = true;
+    steps = const [];
+    target = null;
+    _recent = true;
+    _set(ClickyState.speaking, status: title.toUpperCase(), reply: text);
+    unawaited(ClickyChime.play());
+    final id = 'topo-${DateTime.now().millisecondsSinceEpoch}';
+    unawaited(
+      history
+          .add(id, ChatMsg(mine: true, text: title))
+          .then((_) => history.add(id, ChatMsg(mine: false, text: text)))
+          .then((_) => history.rename(id, '$title · ${dayLabel(DateTime.now())}')),
+    );
+    if (speakIt) await speak(text);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+  }
 
   /// Affiche un petit message dans la boîte.
   void showStatus(String s) {
@@ -1136,6 +1186,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   Future<void> ask(String question) async {
     final q = question.trim();
     if (q.isEmpty) return;
+    _keepReply = false;
     await stopSpeaking();
     input.clear();
     transcript = q;
@@ -1794,9 +1845,24 @@ class _ClickyLayerState extends State<ClickyLayer> {
       // Routines (briefing du matin…) : faites par Mon Hub, qui a les modules.
       final r = Routines.instance
         ..runner = c.runTask
-        ..onDone = (routine, run) {
+        ..onDone = (routine, run) async {
           c.notify?.call(routine.name, run.text);
-          if (run.ok && routine.speak && c.state == ClickyState.idle) {
+          if (routine.isTopo && run.ok) {
+            // Le topo s'affiche en grand chez Clicky (partout ou dans l'appli),
+            // et part sur le téléphone si ntfy est configuré.
+            final topic = Carnet.instance.setting<String>('ntfy', '');
+            if (topic.isNotEmpty) {
+              unawaited(PhoneNotify.send(topic, routine.name, run.text).catchError((Object _) {}));
+            }
+            if (c.handledElsewhere) {
+              await ClickyDesktop.launch();
+              await ClickyDesktop.send(
+                'show64 ${base64Encode(utf8.encode(jsonEncode({'t': routine.name, 'x': run.text, 'v': routine.speak})))}',
+              );
+            } else {
+              await c.presentTopo(routine.name, run.text, speakIt: routine.speak);
+            }
+          } else if (run.ok && routine.speak && c.state == ClickyState.idle) {
             unawaited(c.speak('${routine.name}. ${run.text}'));
           }
         };

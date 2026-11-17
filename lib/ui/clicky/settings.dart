@@ -8,6 +8,8 @@ import 'capture.dart';
 import 'clicky.dart';
 import 'extensions.dart';
 import 'journal.dart';
+import 'routines.dart';
+import 'neural_voice.dart';
 import 'tutorial.dart';
 import 'voice.dart';
 import 'wake.dart';
@@ -92,8 +94,12 @@ class ClickyMoreSettings extends StatelessWidget {
             ),
           ),
 
+          head('Topo du matin et du soir', Icons.wb_twilight_rounded),
+          const _TopoSettings(),
+
           head('Voix', Icons.record_voice_over_rounded),
-          const _VoicePicker(),
+          const _NeuralVoicePicker(),
+          if (c.ttsEngine == 'system') const _VoicePicker(),
           sw(
             'narrate',
             c.narrate,
@@ -602,6 +608,237 @@ class _McpEditorState extends State<_McpEditor> {
             ),
         ],
       ),
+    ),
+  );
+}
+
+/// Voix gratuites de qualité : Microsoft (sans clé) ou Gemini (clé gratuite).
+class _NeuralVoicePicker extends StatefulWidget {
+  const _NeuralVoicePicker();
+
+  @override
+  State<_NeuralVoicePicker> createState() => _NeuralVoicePickerState();
+}
+
+class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
+  final c = ClickyController.instance;
+  final key = TextEditingController();
+  String? info;
+  bool testing = false;
+
+  Future<void> _test() async {
+    setState(() {
+      testing = true;
+      info = null;
+    });
+    final err = await c.voiceOut.test(
+      'Salut${c.callName.isEmpty ? '' : ' ${c.callName}'} ! C\'est Clicky. Voilà ma nouvelle voix.',
+    );
+    if (mounted) {
+      setState(() {
+        testing = false;
+        info = err == null
+            ? null
+            : 'La voix choisie ne répond pas ($err) : Clicky utilise la voix de Windows à la place.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(
+            value: 'edge',
+            icon: Icon(Icons.auto_awesome_rounded),
+            label: Text('Neurale (gratuite)'),
+          ),
+          ButtonSegment(value: 'gemini', icon: Icon(Icons.diamond_rounded), label: Text('Gemini')),
+          ButtonSegment(
+            value: 'system',
+            icon: Icon(Icons.computer_rounded),
+            label: Text('Windows'),
+          ),
+        ],
+        selected: {c.ttsEngine},
+        onSelectionChanged: (v) => c.setOption('ttsEngine', v.first),
+      ),
+      const SizedBox(height: 6),
+      Text(switch (c.ttsEngine) {
+        'edge' =>
+          'Voix neurales de Microsoft (celles de la lecture à voix haute d\'Edge) : très naturelles, '
+              'gratuites, sans clé. Il faut internet ; sinon Clicky reprend la voix de Windows.',
+        'gemini' =>
+          'Voix de Google Gemini avec une clé gratuite (aistudio.google.com → Get API key). Le quota '
+              'gratuit est limité chaque jour : quand il est épuisé, la voix Microsoft prend le relais.',
+        _ => 'Voix installées sur Windows : hors ligne, plus robotiques.',
+      }, style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 8),
+      if (c.ttsEngine == 'edge')
+        DropdownButtonFormField<String>(
+          initialValue: EdgeVoice.voices.containsKey(c.neuralVoice)
+              ? c.neuralVoice
+              : 'fr-FR-HenriNeural',
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Voix', border: OutlineInputBorder()),
+          items: [
+            for (final e in EdgeVoice.voices.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) => c.setOption('neuralVoice', v ?? 'fr-FR-HenriNeural'),
+        ),
+      if (c.ttsEngine == 'gemini') ...[
+        TextField(
+          controller: key,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: c.voiceOut.geminiKey.isEmpty
+                ? 'Clé API Gemini (gratuite)'
+                : 'Clé enregistrée (remplacer…)',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.check_rounded),
+              onPressed: () async {
+                await c.setGeminiKey(key.text);
+                key.clear();
+                setState(() {});
+              },
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: const Text('Créer une clé gratuite'),
+            onPressed: () => openLink(context, 'https://aistudio.google.com/apikey'),
+          ),
+        ),
+        DropdownButtonFormField<String>(
+          initialValue: GeminiVoice.voices.contains(c.geminiVoice) ? c.geminiVoice : 'Charon',
+          decoration: const InputDecoration(labelText: 'Voix Gemini', border: OutlineInputBorder()),
+          items: [for (final v in GeminiVoice.voices) DropdownMenuItem(value: v, child: Text(v))],
+          onChanged: (v) => c.setOption('geminiVoice', v ?? 'Charon'),
+        ),
+      ],
+      if (c.ttsEngine != 'system')
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: testing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_arrow_rounded),
+            label: const Text('Écouter la voix'),
+            onPressed: testing ? null : _test,
+          ),
+        ),
+      if (info != null) Text(info!, style: const TextStyle(color: Colors.orange)),
+    ],
+  );
+}
+
+/// Interrupteurs des topos (matin / soir), heure, et « maintenant ».
+class _TopoSettings extends StatefulWidget {
+  const _TopoSettings();
+
+  @override
+  State<_TopoSettings> createState() => _TopoSettingsState();
+}
+
+class _TopoSettingsState extends State<_TopoSettings> {
+  final r = Routines.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(r.ensureTopos());
+  }
+
+  Widget _row(BuildContext context, String id, String title, String what) {
+    final routine = r.list.where((x) => x.id == id).firstOrNull;
+    final on = routine?.enabled ?? false;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(title),
+          subtitle: Text(
+            '$what${routine == null ? '' : '\nÀ ${two(routine.hour)}:${two(routine.minute)}'
+                      '${id == 'topo-matin' ? ' (ou dès que tu allumes le PC, jusqu\'à midi)' : ''}'}',
+          ),
+          isThreeLine: true,
+          value: on,
+          onChanged: (v) => r.setTopo(id, v),
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            if (routine != null)
+              TextButton.icon(
+                icon: const Icon(Icons.schedule_rounded, size: 18),
+                label: const Text('Changer l\'heure'),
+                onPressed: () async {
+                  final t = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(hour: routine.hour, minute: routine.minute),
+                  );
+                  if (t == null) return;
+                  routine
+                    ..hour = t.hour
+                    ..minute = t.minute;
+                  await r.save(routine);
+                },
+              ),
+            if (routine != null)
+              TextButton.icon(
+                icon: r.running(id)
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Maintenant'),
+                onPressed: r.running(id) ? null : () => r.runNow(id),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: r,
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _row(
+          context,
+          'topo-matin',
+          'Topo du matin',
+          'Météo et tenue, actus France et monde, mails importants, cours, devoirs, notes et messages '
+              'École Directe, tes tâches.',
+        ),
+        _row(
+          context,
+          'topo-soir',
+          'Topo du soir',
+          'Bilan de ta journée, devoirs et emploi du temps de demain, météo de demain, actus du jour, mails importants.',
+        ),
+        Text(
+          'Clicky l\'affiche en grand et le lit avec sa voix ; il arrive aussi sur ton téléphone si ntfy est '
+          'configuré (Carnet → Réglages). Mon Hub doit être ouvert.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     ),
   );
 }

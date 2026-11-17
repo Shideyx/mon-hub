@@ -69,6 +69,16 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 * **Logo et raccourcis** : icône Mon Hub sur toutes les plateformes ; raccourcis Bureau + menu Démarrer créés et réparés automatiquement sur Windows (entrée du menu des applications sur Linux).
 * **Claude** : discussion directe (ton abonnement Claude Pro, ou une clé API) **avec l'historique de toutes tes conversations**, + claude.ai intégré (ton compte habituel). Sur PC, l'extension `claude-extension/` (fichier `MonHub-Claude.mcpb`) permet à l'appli Claude de lire et d'agir dans Mon Hub via un pont local (`lib/core/claude_bridge.dart`, 127.0.0.1 + clé secrète). Chaque module déclare ses actions dans `tools`.
 
+## Topo du matin et du soir
+
+Chaque matin (à 7 h, ou dès que tu allumes le PC jusqu'à midi), Clicky fait ton **topo du matin**, comme JARVIS : météo et quoi mettre, les infos importantes en France et dans le monde (franceinfo, Le Monde, France 24), tes **mails importants** (sans les pubs), et **École Directe** (cours du jour, cours annulés, devoirs et contrôles, nouvelles notes, messages non lus), puis tes tâches. Le soir (20 h 30), le **topo du soir** : bilan de ta journée, devoirs et emploi du temps de demain, météo de demain, actus du jour. Il s'affiche en grand chez Clicky, il est lu avec sa voix, rangé dans l'historique, et envoyé sur ton téléphone si ntfy est configuré. **Désactivables** (et heure réglable) : module Claude → Réglages → *Topo du matin et du soir*. Dis aussi « briefing » à n'importe quel moment.
+
+## Voix de Clicky (gratuite)
+
+* **Voix neurale Microsoft** (par défaut) : les voix de la lecture à voix haute d'Edge (Henri, Denise, Rémy…), très naturelles, **gratuites et sans clé** (accès non officiel, comme l'outil libre edge-tts). Sans internet ou si le service refuse, Clicky reprend la voix de Windows.
+* **Gemini** : la voix de Google, avec une **clé gratuite** d'AI Studio (quota gratuit limité par jour ; quand il est épuisé, la voix Microsoft prend le relais).
+* **Windows** : hors ligne.
+
 ## Mises à jour automatiques (Windows)
 
 Mon Hub vérifie au démarrage puis toutes les 30 minutes s'il existe une version plus récente sur GitHub (page « Releases »). Si oui, l'appli **se met en pause** et un **écran de téléchargement** s'affiche : progression, nouveautés (le message de la mise à jour), vérification de l'empreinte du fichier, puis installation par-dessus et redémarrage tout seul. Tes comptes et réglages ne bougent pas (ils sont dans `%APPDATA%`). « Plus tard » reporte au prochain démarrage ; Réglages → *Vérifier les mises à jour* relance la recherche. Voir `lib/core/updater.dart`.
