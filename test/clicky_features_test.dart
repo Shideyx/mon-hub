@@ -263,50 +263,17 @@ void main() {
   });
 
   group('messages vocaux et likes', () {
-    test('Instagram : vocal, ❤️ et réactions', () {
-      final m = IgMessage.fromJson({
-        'item_id': '1',
-        'user_id': '7',
-        'item_type': 'voice_media',
-        'timestamp': '1763290000000000',
-        'voice_media': {
-          'media': {
-            'audio': {
-              'audio_src': 'https://cdn/x.mp4',
-              'duration': 4370,
-              'waveform_data': [0.1, 0.5],
-            },
-          },
-        },
-        'reactions': {
-          'likes': [
-            {'sender_id': 9},
-          ],
-          'emojis': [
-            {'sender_id': 7, 'emoji': '😂'},
-          ],
-        },
-      });
-      expect(m.isVoice, isTrue);
-      expect(m.audioLength, const Duration(milliseconds: 4370));
-      expect(m.waveform, [0.1, 0.5]);
-      expect(m.reactions, [('❤️', '9'), ('😂', '7')]);
-      final like = IgMessage.fromJson({
-        'item_id': '2',
-        'user_id': '7',
-        'item_type': 'like',
-        'timestamp': '0',
-      });
-      expect(like.isLike, isTrue);
-      final a = IgActivity.fromJson({
-        'story_type': 60,
-        'args': {
-          'rich_text': '{lea|000000|1|user?id=1} a aimé ta publication.',
-          'timestamp': 1763290000.5,
-        },
-      });
-      expect(a.text, 'lea a aimé ta publication.');
-      expect(a.isLike, isTrue);
+    test('Instagram : le vrai site, sans aucune requête automatique', () async {
+      expect(InstagramModule.urlFor('reels'), 'https://www.instagram.com/reels/');
+      expect(InstagramModule.urlFor('messages'), 'https://www.instagram.com/direct/inbox/');
+      expect(InstagramModule.urlFor('fil', name: '@lea.m'), 'https://www.instagram.com/lea.m/');
+      expect(InstagramModule.unreadFromTitle('(3) Instagram'), 3);
+      expect(InstagramModule.unreadFromTitle('Instagram'), isNull);
+      final m = InstagramModule();
+      // Rien ne part vers Instagram tout seul : pas de notifications relevées,
+      // un seul outil (ouvrir la page), jamais de lecture ni d'envoi.
+      expect(await m.poll(), isEmpty);
+      expect([for (final t in m.tools) t.name], ['instagram_ouvrir']);
     });
 
     test('Discord : vocal et réactions', () {
