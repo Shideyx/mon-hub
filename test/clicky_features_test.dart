@@ -7,12 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:hub/core/hub_files.dart';
+import 'package:hub/core/updater.dart';
 import 'package:hub/modules/discord/discord_api.dart';
 import 'package:hub/modules/ecoledirecte/ed_client.dart';
 import 'package:hub/modules/instagram/instagram_module.dart';
 import 'package:hub/ui/chat_history.dart';
 import 'package:hub/ui/clicky/documents.dart';
 import 'package:hub/ui/clicky/drive.dart';
+import 'package:hub/ui/clicky/ears.dart';
 import 'package:hub/ui/clicky/extensions.dart';
 import 'package:hub/ui/clicky/hud.dart';
 import 'package:hub/ui/clicky/journal.dart';
@@ -437,5 +439,46 @@ void main() {
     expect(c.files.single.name, 'autorisation.pdf');
     expect(paths.where((p) => p.contains('/familles/900/messages')).length, 3);
     expect(paths.any((p) => p.contains('/eleves/42/messages')), isFalse);
+  });
+
+  test('micro Windows : lancement sans fichier et erreur lisible', () {
+    final bytes = base64Decode(WindowsEars.encodedScript());
+    final code = String.fromCharCodes([
+      for (var i = 0; i + 1 < bytes.length; i += 2) bytes[i] | (bytes[i + 1] << 8),
+    ]);
+    expect(code, startsWith("\$Lang = 'fr-FR'"));
+    expect(code, isNot(contains('param([string]')));
+    expect(code.length, lessThan(16000), reason: 'tient dans une ligne de commande Windows');
+    expect(
+      WindowsEars.errorDetail(
+        'File C:\\x.ps1 cannot be loaded because running scripts is disabled on this system.\r\n'
+        '+ CategoryInfo : SecurityError',
+      ),
+      startsWith('File C:'),
+    );
+  });
+
+  test('mises à jour : version et release GitHub', () {
+    expect(Updater.versionNumber('v1.22'), 22);
+    expect(Updater.versionNumber('développement'), isNull);
+    final u = UpdateInfo.fromRelease({
+      'tag_name': 'v1.23',
+      'body': 'Nouveautés',
+      'assets': [
+        {'name': 'MonHub-Claude.mcpb', 'browser_download_url': 'x'},
+        {
+          'name': 'MonHub-Windows.zip',
+          'browser_download_url': 'https://github.com/a/b/releases/download/v1.23/MonHub-Windows.zip',
+          'size': 1234,
+          'digest': 'sha256:ABCDEF',
+        },
+      ],
+    })!;
+    expect(u.number, 23);
+    expect(u.url, endsWith('MonHub-Windows.zip'));
+    expect(u.sha256, 'abcdef');
+    expect(u.size, 1234);
+    expect(UpdateInfo.fromRelease({'tag_name': 'v1.24', 'assets': []}), isNull);
+    expect(Updater.installScript, contains('robocopy'));
   });
 }

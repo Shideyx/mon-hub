@@ -6,7 +6,7 @@ name: Build
 env:
   # Connexion Google (secrets du dépôt, facultatifs) + numéro de version
   # affiché dans l'appli (le même que celui de la publication).
-  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} --dart-define=APP_VERSION=v1.${{ github.run_number }}
+  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} --dart-define=APP_VERSION=v1.${{ github.run_number }} --dart-define=UPDATE_REPO=${{ github.repository }}
 
 on:
   push:
@@ -144,7 +144,10 @@ jobs:
       - name: Publier la release (marquée « dernière version »)
         env:
           GH_TOKEN: ${{ github.token }}
+          # Nouveautés montrées sur l'écran de mise à jour de Mon Hub.
+          CHANGES: ${{ github.event.head_commit.message }}
         run: |
+          printf '%s\n\n%s\n' "$CHANGES" "PC Windows : MonHub-Windows.zip · Extension Claude (PC) : MonHub-Claude.mcpb · Guide : INSTALL.md" > notes.md
           files="dist/MonHub-Windows.zip dist/MonHub-Claude.mcpb"
           if [ -f dist/MonHub-Android.apk ]; then files="$files dist/MonHub-Android.apk"; fi
           if [ -f dist/MonHub-iOS.ipa ]; then files="$files dist/MonHub-iOS.ipa"; fi
@@ -155,4 +158,4 @@ jobs:
             --target "${{ github.sha }}" \
             --latest \
             --title "Mon Hub v1.${{ github.run_number }}" \
-            --notes "PC Windows : MonHub-Windows.zip · Extension Claude (PC) : MonHub-Claude.mcpb · Guide : INSTALL.md"
+            --notes-file notes.md

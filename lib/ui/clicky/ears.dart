@@ -88,6 +88,38 @@ class WindowsEars extends ClickyEars {
 
   bool _warmed = false;
 
+  /// Lancement sans fichier de script (-EncodedCommand), après un échec.
+  bool _encoded = false;
+  final _errors = StringBuffer();
+
+  /// Le script en paramètre de PowerShell (UTF-16 en base64), sans fichier :
+  /// marche même quand Windows bloque les fichiers .ps1.
+  static String encodedScript() {
+    final code = windowsScript.replaceFirst(
+      RegExp(r"^\s*param\(\[string\]\$Lang = 'fr-FR'\)"),
+      "\$Lang = 'fr-FR'",
+    );
+    final units = code.codeUnits;
+    final bytes = Uint8List(units.length * 2);
+    for (var i = 0; i < units.length; i++) {
+      bytes[i * 2] = units[i] & 0xFF;
+      bytes[i * 2 + 1] = units[i] >> 8;
+    }
+    return base64Encode(bytes);
+  }
+
+  /// Première ligne utile d'une erreur PowerShell.
+  static String errorDetail(String stderr) {
+    final lines = stderr
+        .split(RegExp(r'[\r\n]+'))
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('+') && !l.startsWith('At ') && !l.startsWith('Au caract'))
+        .toList();
+    if (lines.isEmpty) return '';
+    final l = lines.first;
+    return l.length > 220 ? '${l.substring(0, 217)}…' : l;
+  }
+
   /// Une seule fois : si le micro est en panne, on ne relance pas PowerShell
   /// en boucle (le prochain essai se fera quand tu parleras).
   @override
@@ -115,18 +147,28 @@ class WindowsEars extends ClickyEars {
     () async {
       try {
         final script = await _writeScript();
+        _errors.clear();
         final p = await Process.start(
           'powershell.exe',
-          [
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-File',
-            script,
-            '-Lang',
-            'fr-FR',
-          ],
+          _encoded
+              ? [
+                  '-NoProfile',
+                  '-NonInteractive',
+                  '-ExecutionPolicy',
+                  'Bypass',
+                  '-EncodedCommand',
+                  encodedScript(),
+                ]
+              : [
+                  '-NoProfile',
+                  '-NonInteractive',
+                  '-ExecutionPolicy',
+                  'Bypass',
+                  '-File',
+                  script,
+                  '-Lang',
+                  'fr-FR',
+                ],
           // Sans fenêtre de console, entrées / sorties branchées sur Mon Hub.
           mode: ProcessStartMode.detachedWithStdio,
         );
@@ -135,7 +177,9 @@ class WindowsEars extends ClickyEars {
             .transform(utf8.decoder)
             .transform(const LineSplitter())
             .listen(_line, onDone: () => _died(p), onError: (_) => _died(p));
-        unawaited(p.stderr.drain<void>().catchError((_) {}));
+        p.stderr.transform(utf8.decoder).listen((e) {
+          if (_errors.length < 3000) _errors.write(e);
+        }, onError: (_) {});
         Timer(const Duration(seconds: 20), () {
           if (!boot.isCompleted) {
             boot.complete(
@@ -180,9 +224,11 @@ class WindowsEars extends ClickyEars {
     final boot = _boot;
     _boot = null;
     if (boot != null && !boot.isCompleted) {
+      final detail = errorDetail('$_errors');
       boot.complete(
-        const EarsProblem(
-          'La reconnaissance vocale de Windows s\'est arrêtée tout de suite.',
+        EarsProblem(
+          'La reconnaissance vocale de Windows s\'est arrêtée tout de suite'
+          '${detail.isEmpty ? '.' : ' : $detail'}',
           code: 'died',
         ),
       );
@@ -288,7 +334,14 @@ class WindowsEars extends ClickyEars {
     _final = '';
     _hyp = '';
     _speech = false;
-    final boot = await _ensure();
+    var boot = await _ensure();
+    if (boot != null && boot.code == 'died' && !_encoded) {
+      // PowerShell n'a pas pu lancer le fichier de script (règles de
+      // sécurité de Windows, antivirus…) : on réessaie sans fichier.
+      _encoded = true;
+      _kill();
+      boot = await _ensure();
+    }
     if (boot != null) {
       _kill();
       return boot;
