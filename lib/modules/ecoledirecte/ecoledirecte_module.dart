@@ -366,12 +366,29 @@ class EcoleDirecteModule extends HubModule {
     HubTool(
       name: 'ecole_cloud',
       description:
-          'Fichiers et dossiers de mon cloud École Directe. Sans dossier : la racine ; '
-          'sinon l\'id d\'un dossier donné par un appel précédent.',
+          'Tout mon cloud École Directe (tous les fichiers de tous les dossiers) et les documents '
+          'de l\'établissement (bulletins, vie scolaire…). Avec dossier : seulement ce dossier.',
       params: {'dossier': ('string', 'id du dossier (facultatif)')},
       run: (a) async {
         final id = '${a['dossier'] ?? ''}'.trim();
-        final n = await withSession(() => client.cloud(folderId: id.isEmpty ? null : id));
+        if (id.isEmpty) {
+          // Tout le cloud d'un coup, et les documents de l'établissement.
+          final all = await withSession(() => client.cloudAll());
+          List<EdDocument> docs = const [];
+          try {
+            docs = await withSession(client.documents);
+          } catch (_) {}
+          return {
+            'fichiers_du_cloud': [
+              for (final f in all.allFiles.take(200))
+                {'id': f.id, 'nom': f.name, if (f.size > 0) 'taille': fileSize(f.size), if (f.date != null) 'date': f.date},
+            ],
+            'documents': [
+              for (final d in docs.take(60)) {'id': d.id, 'nom': d.title, 'type': d.category, if (d.date != null) 'date': d.date},
+            ],
+          };
+        }
+        final n = await withSession(() => client.cloud(folderId: id));
         return {
           'dossier': n.name,
           'contenu': [
@@ -1003,7 +1020,9 @@ String fileSize(int bytes) {
   return '${i == 0 ? v.toInt() : v.toStringAsFixed(1).replaceAll('.', ',')} ${units[i]}';
 }
 
-/// Le cloud École Directe : dossiers et fichiers, à ouvrir ou enregistrer.
+/// Le cloud École Directe en entier : ton cloud (tous les dossiers ouverts
+/// d'un coup), les clouds des espaces de travail et les documents de
+/// l'établissement (bulletins, vie scolaire…). Recherche dans tout.
 class _CloudTab extends StatefulWidget {
   const _CloudTab({required this.module});
   final EcoleDirecteModule module;
@@ -1013,9 +1032,11 @@ class _CloudTab extends StatefulWidget {
 }
 
 class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin {
-  /// Chemin parcouru : la racine, puis chaque dossier ouvert.
-  final _path = <EdCloudNode>[];
-  Future<EdCloudNode>? _future;
+  late Future<EdCloudNode> _mine;
+  late Future<List<EdWorkspace>> _spaces;
+  late Future<List<EdDocument>> _docs;
+  final _spaceClouds = <String, Future<EdCloudNode>>{};
+  final search = TextEditingController();
   String? _downloading;
 
   EcoleDirecteModule get m => widget.module;
@@ -1026,54 +1047,38 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
   @override
   void initState() {
     super.initState();
-    _future = _load(null);
+    _reload();
   }
 
-  Future<EdCloudNode> _load(EdCloudNode? folder) async {
-    if (folder != null && folder.loaded && folder.children.isNotEmpty) return folder;
-    final n = await m.withSession(() => m.client.cloud(folderId: folder?.id));
-    return n;
+  void _reload() {
+    _spaceClouds.clear();
+    _mine = m.withSession(() => m.client.cloudAll());
+    // Les requêtes se suivent (jamais en rafale) : le client les espace.
+    _spaces = _mine.then((_) => m.withSession(m.client.workspaces), onError: (_) => m.withSession(m.client.workspaces));
+    _docs = _spaces.then((_) => m.withSession(m.client.documents), onError: (_) => m.withSession(m.client.documents));
   }
 
-  void _open(EdCloudNode folder) {
-    setState(() {
-      _future = _load(folder).then((n) {
-        _path.add(n);
-        return n;
-      });
-    });
-  }
-
-  void _up(int index) {
-    setState(() {
-      _path.removeRange(index + 1, _path.length);
-      final n = _path[index];
-      _future = Future.value(n);
-    });
-  }
-
-  Future<void> _download(EdCloudNode f, {required bool open}) async {
-    setState(() => _downloading = f.id);
+  Future<void> _save(String id, String name, Future<List<int>> Function() fetch, {required bool open}) async {
+    setState(() => _downloading = id);
     try {
-      final bytes = await m.withSession(() => m.client.cloudFile(f));
+      final bytes = await m.withSession(fetch);
       String path;
       if (open) {
-        path = await EcoleDirecteModule.saveDownload(f.name, bytes);
+        path = await EcoleDirecteModule.saveDownload(name, bytes);
+        await launchUrl(Uri.file(path));
       } else {
-        final loc = await getSaveLocation(suggestedName: f.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'));
+        final loc = await getSaveLocation(suggestedName: name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'));
         if (loc == null) return;
         await File(loc.path).writeAsBytes(bytes, flush: true);
         path = loc.path;
-      }
-      if (open) {
-        await launchUrl(Uri.file(path));
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Enregistré : $path'),
-            action: SnackBarAction(label: 'Ouvrir', onPressed: () => launchUrl(Uri.file(path))),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Enregistré : $path'),
+              action: SnackBarAction(label: 'Ouvrir', onPressed: () => launchUrl(Uri.file(path))),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) showError(context, e);
@@ -1082,94 +1087,228 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return FutureBuilder(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return ListView(
-            children: [
-              ErrorBanner('${snap.error}'),
-              Center(
-                child: TextButton.icon(
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Réessayer'),
-                  onPressed: () => setState(() {
-                    _path.clear();
-                    _future = _load(null);
-                  }),
-                ),
-              ),
-            ],
-          );
-        }
-        if (!snap.hasData) return const LoadingHint();
-        if (_path.isEmpty) _path.add(snap.data!);
-        final here = _path.last;
-        final text = Theme.of(context).textTheme;
-        return RefreshIndicator(
-          onRefresh: () async {
-            final again = m.withSession(() => m.client.cloud(folderId: _path.length == 1 ? null : here.id));
-            final n = await again;
-            setState(() {
-              _path[_path.length - 1] = n;
-              _future = Future.value(n);
-            });
-          },
-          child: ListView(
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _path.length; i++) ...[
-                      if (i > 0) const Icon(Icons.chevron_right_rounded, size: 18),
-                      TextButton.icon(
-                        icon: Icon(i == 0 ? Icons.cloud_rounded : Icons.folder_rounded, size: 18),
-                        label: Text(i == 0 ? 'Mon cloud' : _path[i].name),
-                        onPressed: i == _path.length - 1 ? null : () => _up(i),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (here.children.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: EmptyHint('Ce dossier est vide', icon: Icons.folder_open_rounded),
-                ),
-              for (final c in here.children)
-                ListTile(
-                  leading: Icon(
-                    c.folder ? Icons.folder_rounded : _fileIcon(c.name),
-                    color: c.folder ? m.color : null,
+  Widget _busyOr(String id, Widget w) => _downloading == id
+      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+      : w;
+
+  Widget _fileTile(EdCloudNode f, {double indent = 0, bool showPath = false}) {
+    final text = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: EdgeInsets.only(left: 16 + indent, right: 8),
+      leading: Icon(_fileIcon(f.name)),
+      title: Text(f.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        [
+          if (showPath) _folderOf(f.id),
+          if (f.size > 0) fileSize(f.size),
+          if (f.date != null) dayLabel(f.date!),
+        ].where((x) => x.isNotEmpty).join(' · '),
+        style: text.labelSmall,
+      ),
+      trailing: _busyOr(
+        f.id,
+        IconButton(
+          tooltip: 'Enregistrer sous…',
+          icon: const Icon(Icons.download_rounded),
+          onPressed: () => _save(f.id, f.name, () => m.client.cloudFile(f), open: false),
+        ),
+      ),
+      onTap: () => _save(f.id, f.name, () => m.client.cloudFile(f), open: true),
+    );
+  }
+
+  static String _folderOf(String id) {
+    final parts = id.split(RegExp(r'[\\/]')).where((p) => p.isNotEmpty).toList();
+    return parts.length <= 3 ? '' : parts.sublist(2, parts.length - 1).join(' › ');
+  }
+
+  /// Un dossier et tout son contenu (dépliable).
+  List<Widget> _tree(EdCloudNode n, double indent) => [
+    for (final c in n.children)
+      if (c.folder)
+        ExpansionTile(
+          key: PageStorageKey(c.id),
+          tilePadding: EdgeInsets.only(left: 16 + indent, right: 16),
+          leading: Icon(Icons.folder_rounded, color: m.color),
+          title: Text(c.name),
+          subtitle: Text(
+            '${c.allFiles.length} fichier${c.allFiles.length > 1 ? 's' : ''}',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+          children: c.children.isEmpty
+              ? [
+                  Padding(
+                    padding: EdgeInsets.only(left: 32 + indent, bottom: 8),
+                    child: const Align(alignment: Alignment.centerLeft, child: Text('Dossier vide')),
                   ),
-                  title: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    [
-                      if (!c.folder && c.size > 0) fileSize(c.size),
-                      if (c.date != null) dayLabel(c.date!),
-                    ].join(' · '),
-                    style: text.labelSmall,
-                  ),
-                  trailing: c.folder
-                      ? const Icon(Icons.chevron_right_rounded)
-                      : _downloading == c.id
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          tooltip: 'Enregistrer sous…',
-                          icon: const Icon(Icons.download_rounded),
-                          onPressed: () => _download(c, open: false),
-                        ),
-                  onTap: c.folder ? () => _open(c) : () => _download(c, open: true),
-                ),
+                ]
+              : _tree(c, indent + 16),
+        )
+      else
+        _fileTile(c, indent: indent),
+  ];
+
+  Widget _cloudBlock(Future<EdCloudNode> future, String query) => FutureBuilder(
+    future: future,
+    builder: (context, snap) {
+      if (snap.hasError) return ErrorBanner('${snap.error}');
+      if (!snap.hasData) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 12),
+              Text('J\'ouvre tous les dossiers…'),
             ],
           ),
         );
+      }
+      final root = snap.data!;
+      if (query.isNotEmpty) {
+        final hits = root.allFiles.where((f) => f.name.toLowerCase().contains(query)).toList();
+        if (hits.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('Aucun fichier ne correspond.'));
+        return Column(children: [for (final f in hits) _fileTile(f, showPath: true)]);
+      }
+      if (root.children.isEmpty) {
+        return const Padding(padding: EdgeInsets.all(16), child: Text('Rien ici pour l\'instant.'));
+      }
+      return Column(children: _tree(root, 0));
+    },
+  );
+
+  Widget _head(String title, IconData icon, {String? sub}) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+    child: Row(
+      children: [
+        Icon(icon, color: m.color),
+        const SizedBox(width: 8),
+        Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+        if (sub != null) ...[
+          const SizedBox(width: 8),
+          Text(sub, style: Theme.of(context).textTheme.labelSmall),
+        ],
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(_reload);
+        await _mine.then((_) {}, onError: (_) {});
       },
+      child: ListenableBuilder(
+        listenable: search,
+        builder: (context, _) {
+          final q = search.text.trim().toLowerCase();
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  controller: search,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search_rounded),
+                    hintText: 'Chercher un fichier dans tout le cloud et les documents',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              _head('Mon cloud', Icons.cloud_rounded),
+              _cloudBlock(_mine, q),
+              FutureBuilder(
+                future: _spaces,
+                builder: (context, snap) {
+                  final spaces = [for (final w in snap.data ?? const <EdWorkspace>[]) if (w.hasCloud) w];
+                  if (spaces.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _head('Espaces de travail', Icons.groups_rounded),
+                      for (final w in spaces)
+                        ExpansionTile(
+                          key: PageStorageKey('w${w.id}'),
+                          leading: Icon(Icons.folder_shared_rounded, color: m.color),
+                          title: Text(w.title),
+                          initiallyExpanded: q.isNotEmpty,
+                          onExpansionChanged: (open) {
+                            if (open) {
+                              setState(() {
+                                _spaceClouds[w.id] ??= m.withSession(() => m.client.cloudAll(owner: 'W/${w.id}'));
+                              });
+                            }
+                          },
+                          children: [
+                            if (_spaceClouds[w.id] != null) _cloudBlock(_spaceClouds[w.id]!, q),
+                          ],
+                        ),
+                    ],
+                  );
+                },
+              ),
+              _head('Documents de l\'établissement', Icons.description_rounded),
+              FutureBuilder(
+                future: _docs,
+                builder: (context, snap) {
+                  if (snap.hasError) return ErrorBanner('${snap.error}');
+                  if (!snap.hasData) return const Padding(padding: EdgeInsets.all(16), child: LoadingHint());
+                  final docs = [
+                    for (final d in snap.data!)
+                      if (q.isEmpty || d.title.toLowerCase().contains(q) || d.category.toLowerCase().contains(q)) d,
+                  ];
+                  if (docs.isEmpty) {
+                    return const Padding(padding: EdgeInsets.all(16), child: Text('Aucun document.'));
+                  }
+                  final byCat = <String, List<EdDocument>>{};
+                  for (final d in docs) {
+                    (byCat[d.category] ??= []).add(d);
+                  }
+                  return Column(
+                    children: [
+                      for (final e in byCat.entries)
+                        ExpansionTile(
+                          key: PageStorageKey('d${e.key}'),
+                          initiallyExpanded: q.isNotEmpty || byCat.length == 1,
+                          leading: Icon(Icons.folder_special_rounded, color: m.color),
+                          title: Text(e.key),
+                          subtitle: Text('${e.value.length} document${e.value.length > 1 ? 's' : ''}'),
+                          children: [
+                            for (final d in e.value)
+                              ListTile(
+                                contentPadding: const EdgeInsets.only(left: 32, right: 8),
+                                leading: const Icon(Icons.picture_as_pdf_rounded),
+                                title: Text(d.title),
+                                subtitle: d.date == null ? null : Text(dayLabel(d.date!)),
+                                trailing: _busyOr(
+                                  'doc${d.id}',
+                                  IconButton(
+                                    tooltip: 'Enregistrer sous…',
+                                    icon: const Icon(Icons.download_rounded),
+                                    onPressed: () => _save(
+                                      'doc${d.id}',
+                                      '${d.title}.pdf',
+                                      () => m.client.documentFile(d),
+                                      open: false,
+                                    ),
+                                  ),
+                                ),
+                                onTap: () => _save('doc${d.id}', '${d.title}.pdf', () => m.client.documentFile(d), open: true),
+                              ),
+                          ],
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

@@ -88,9 +88,8 @@ Color? pickAccent(Uint8List rgba) {
     final (n, sr, sg, sb) = buckets[key] ?? (0, 0.0, 0.0, 0.0);
     buckets[key] = (n + 1, sr + r, sg + g, sb + b);
   }
-  if (buckets.isEmpty) return null;
-  final best = buckets.values.reduce((a, b) => a.$1 >= b.$1 ? a : b);
-  if (best.$1 < 6) return null;
+  final best = buckets.isEmpty ? null : buckets.values.reduce((a, b) => a.$1 >= b.$1 ? a : b);
+  if (best == null || best.$1 < 6) return _calmAccent(rgba);
   final c = Color.fromARGB(
     255,
     (best.$2 / best.$1).round(),
@@ -102,6 +101,207 @@ Color? pickAccent(Uint8List rgba) {
       .withSaturation(math.max(0.55, hsv.saturation))
       .withValue(hsv.value.clamp(0.45, 0.8))
       .toColor();
+}
+
+/// Pochette sans couleur vive (noir et blanc, tons pastel) : sa couleur
+/// moyenne, gardée assez foncée pour le texte blanc.
+Color? _calmAccent(Uint8List rgba) {
+  var n = 0, r = 0, g = 0, b = 0;
+  for (var i = 0; i + 3 < rgba.length; i += 4) {
+    if (rgba[i + 3] < 128) continue;
+    n++;
+    r += rgba[i];
+    g += rgba[i + 1];
+    b += rgba[i + 2];
+  }
+  if (n == 0) return null;
+  final hsv = HSVColor.fromColor(Color.fromARGB(255, r ~/ n, g ~/ n, b ~/ n));
+  return hsv
+      .withSaturation(hsv.saturation < 0.12 ? hsv.saturation : math.max(0.35, hsv.saturation))
+      .withValue(hsv.value.clamp(0.3, 0.6))
+      .toColor();
+}
+
+/// Un CD avec la pochette de l'album imprimée dessus : trou au centre,
+/// anneau transparent, reflets irisés. Il tourne pendant la lecture.
+class CdDisc extends StatefulWidget {
+  const CdDisc({super.key, this.coverUrl, this.coverBytes, this.color = musicRed, this.spinning = true});
+  final String? coverUrl;
+  final Uint8List? coverBytes;
+  final Color color;
+  final bool spinning;
+
+  @override
+  State<CdDisc> createState() => _CdDiscState();
+}
+
+class _CdDiscState extends State<CdDisc> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(seconds: 4));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.spinning) _a.repeat();
+  }
+
+  @override
+  void didUpdateWidget(CdDisc old) {
+    super.didUpdateWidget(old);
+    if (widget.spinning && !_a.isAnimating) _a.repeat();
+    if (!widget.spinning && _a.isAnimating) _a.stop();
+  }
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: 1,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 6))],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          RotationTransition(
+            turns: _a,
+            child: ClipOval(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CoverImage(url: widget.coverUrl, bytes: widget.coverBytes, color: widget.color),
+                  // Sillons très fins.
+                  CustomPaint(painter: _GroovesPainter()),
+                ],
+              ),
+            ),
+          ),
+          // Reflets (fixes : la lumière ne tourne pas avec le disque).
+          ClipOval(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: SweepGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.28),
+                    const Color(0x2266CCFF),
+                    Colors.white.withValues(alpha: 0.0),
+                    const Color(0x22FF66CC),
+                    Colors.white.withValues(alpha: 0.22),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                  stops: const [0, 0.1, 0.18, 0.35, 0.6, 0.68, 0.8],
+                ),
+              ),
+            ),
+          ),
+          CustomPaint(painter: _HubPainter()),
+        ],
+      ),
+    ),
+  );
+}
+
+class _GroovesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.shortestSide / 2;
+    final p = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6
+      ..color = Colors.black.withValues(alpha: 0.06);
+    for (var k = r * 0.36; k < r; k += 3) {
+      canvas.drawCircle(c, k, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GroovesPainter old) => false;
+}
+
+/// Le centre du CD : anneau transparent, rebord, trou.
+class _HubPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.shortestSide / 2;
+    canvas.drawCircle(c, r * 0.33, Paint()..color = Colors.white.withValues(alpha: 0.28));
+    canvas.drawCircle(
+      c,
+      r * 0.33,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = Colors.white.withValues(alpha: 0.6),
+    );
+    canvas.drawCircle(c, r * 0.2, Paint()..color = const Color(0xFFDADADA).withValues(alpha: 0.85));
+    canvas.drawCircle(c, r * 0.085, Paint()..color = const Color(0xFF2A2626));
+    canvas.drawCircle(
+      c,
+      r - 0.8,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: 0.55),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HubPainter old) => false;
+}
+
+/// La boîte de CD, avec le disque (pochette dessus) qui sort et tourne
+/// pendant la lecture.
+class CaseWithDisc extends StatelessWidget {
+  const CaseWithDisc({
+    super.key,
+    required this.caseWidget,
+    this.coverUrl,
+    this.coverBytes,
+    this.color = musicRed,
+    this.playing = false,
+  });
+  final Widget caseWidget;
+  final String? coverUrl;
+  final Uint8List? coverBytes;
+  final Color color;
+  final bool playing;
+
+  /// Largeur totale / largeur de la boîte.
+  static const extra = 1.38;
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: 1.13 * extra,
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final w = box.maxWidth, h = box.maxHeight;
+        final caseW = w / extra;
+        final d = h * 0.9;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              left: playing ? w - d : caseW - d * 1.02,
+              top: (h - d) / 2,
+              width: d,
+              height: d,
+              child: CdDisc(coverUrl: coverUrl, coverBytes: coverBytes, color: color, spinning: playing),
+            ),
+            Positioned(left: 0, top: 0, width: caseW, height: h, child: caseWidget),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 /// Face avant de la boîte de CD : la charnière à gauche, la pochette.

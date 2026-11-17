@@ -180,7 +180,10 @@ class MusicPlayer extends ChangeNotifier {
   NowPlaying? _win;
   NowPlaying? _spot;
   AlbumInfo? album;
-  Color accent = musicRed;
+  /// Couleur prise sur la pochette : teinte toute la page Musique.
+  final accentColor = ValueNotifier<Color>(musicRed);
+  Color get accent => accentColor.value;
+  set accent(Color c) => accentColor.value = c;
   String? error;
   bool? isLiked;
 
@@ -472,15 +475,21 @@ Widget _case(MusicPlayer p, NowPlaying? np) {
   final album = p.album;
   final tracks = album?.tracks ?? [if (np != null) MusicTrack(title: np.title, artist: np.artist)];
   final current = np == null ? 0 : (album?.indexOf(np.title) ?? 1);
-  return SpinningCdCase(
-    spinning: np?.playing ?? false,
-    front: CdCaseFront(coverUrl: p.coverUrl, coverBytes: np?.coverBytes, color: p.accent),
-    back: CdCaseBack(
-      title: album?.title ?? np?.album ?? np?.title ?? 'Mon Hub',
-      artist: album?.artist ?? np?.artist ?? '',
-      tracks: tracks,
-      current: current == 0 && album == null ? 1 : current,
-      color: p.accent,
+  return CaseWithDisc(
+    playing: np?.playing ?? false,
+    coverUrl: p.coverUrl,
+    coverBytes: np?.coverBytes,
+    color: p.accent,
+    caseWidget: SpinningCdCase(
+      spinning: np?.playing ?? false,
+      front: CdCaseFront(coverUrl: p.coverUrl, coverBytes: np?.coverBytes, color: p.accent),
+      back: CdCaseBack(
+        title: album?.title ?? np?.album ?? np?.title ?? 'Mon Hub',
+        artist: album?.artist ?? np?.artist ?? '',
+        tracks: tracks,
+        current: current == 0 && album == null ? 1 : current,
+        color: p.accent,
+      ),
     ),
   );
 }
@@ -662,8 +671,10 @@ class NowPlayingStage extends StatelessWidget {
     listenable: p,
     builder: (context, _) {
       final np = p.now;
-      return SplitBackground(
-        color: p.accent,
+      return TweenAnimationBuilder<Color?>(
+        tween: ColorTween(end: p.accent),
+        duration: const Duration(milliseconds: 900),
+        builder: (context, color, child) => SplitBackground(color: color ?? p.accent, child: child!),
         child: _EverySecond(
           active: np?.playing ?? false,
           builder: (context) => LayoutBuilder(
@@ -909,6 +920,32 @@ class _MusicPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     module.player.ensureStarted();
+    // Toute la page prend la couleur de l'album en cours (en douceur).
+    return ValueListenableBuilder<Color>(
+      valueListenable: module.player.accentColor,
+      builder: (context, accent, child) {
+        final base = Theme.of(context);
+        final scheme = ColorScheme.fromSeed(seedColor: accent, brightness: base.brightness);
+        return AnimatedTheme(
+          duration: const Duration(milliseconds: 900),
+          data: base.copyWith(
+            colorScheme: scheme,
+            appBarTheme: base.appBarTheme.copyWith(
+              backgroundColor: Color.lerp(scheme.surface, accent, 0.18),
+            ),
+            tabBarTheme: base.tabBarTheme.copyWith(
+              indicatorColor: accent,
+              labelColor: base.brightness == Brightness.dark ? Color.lerp(accent, Colors.white, 0.45) : accent,
+            ),
+          ),
+          child: child!,
+        );
+      },
+      child: _page(context),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     return DefaultTabController(
       length: 6,
       child: Scaffold(
@@ -1032,7 +1069,7 @@ class _TrackListState extends State<_TrackList> with AutomaticKeepAliveClientMix
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final color = widget.module.color;
+    final color = widget.module.player.accent;
     return RefreshIndicator(
       onRefresh: () async {
         setState(() => future = widget.load());
@@ -1197,7 +1234,7 @@ class _PlaylistsState extends State<_Playlists> with AutomaticKeepAliveClientMix
                       aspectRatio: 1,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: CoverImage(url: p.cover, color: m.color),
+                        child: CoverImage(url: p.cover, color: m.player.accent),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1522,7 +1559,7 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
   Timer? _volumeTimer;
 
   SpotifyApi get api => widget.module.spotify;
-  Color get color => widget.module.color;
+  Color get color => widget.module.player.accent;
 
   @override
   bool get wantKeepAlive => true;

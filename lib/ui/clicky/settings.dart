@@ -15,6 +15,8 @@ import 'tutorial.dart';
 import 'voice.dart';
 import 'wake.dart';
 import 'win.dart';
+import 'whisper.dart';
+import 'mic_test.dart' show WhisperInstallDialog;
 
 /// Réglages de Clicky (apparence, voix, écoute, prof, vie privée,
 /// outils), affichés sous le choix du cerveau.
@@ -109,6 +111,7 @@ class ClickyMoreSettings extends StatelessWidget {
           ),
 
           head('Écoute', Icons.hearing_rounded),
+          if (Whisper.supported) const _MicEngine(),
           if (WakeWord.supported) ...[
             sw(
               'wake',
@@ -871,4 +874,85 @@ class _TopoSettingsState extends State<_TopoSettings> {
       ],
     ),
   );
+}
+
+
+/// Choix de la reconnaissance vocale (Windows ou Whisper sur le PC).
+class _MicEngine extends StatefulWidget {
+  const _MicEngine();
+
+  @override
+  State<_MicEngine> createState() => _MicEngineState();
+}
+
+class _MicEngineState extends State<_MicEngine> {
+  late Future<String?> installed = Whisper.installedModel();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ClickyController.instance;
+    final text = Theme.of(context).textTheme;
+    return FutureBuilder(
+      future: installed,
+      builder: (context, snap) {
+        final model = snap.data;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Reconnaissance vocale', style: text.titleSmall),
+            const SizedBox(height: 4),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'auto', label: Text('Automatique')),
+                ButtonSegment(value: 'whisper', label: Text('Whisper (PC)')),
+                ButtonSegment(value: 'windows', label: Text('Windows')),
+              ],
+              selected: {c.micEngine},
+              onSelectionChanged: (v) => c.setOption('micEngine', v.first),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              switch (c.micEngine) {
+                'whisper' => 'Whisper, sur ton PC, sans internet : le texte s\'écrit quand tu as fini de parler.',
+                'windows' => 'La reconnaissance de Windows (comme Win + H) : le texte s\'écrit pendant que tu parles.',
+                _ => 'Windows d\'abord ; s\'il ne marche pas, Whisper prend le relais tout seul.',
+              },
+              style: text.bodySmall,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    model == null
+                        ? 'Whisper n\'est pas installé.'
+                        : 'Whisper installé (modèle ${Whisper.models[model]?.$1 ?? model}).',
+                    style: text.bodySmall,
+                  ),
+                ),
+                TextButton.icon(
+                  icon: Icon(model == null ? Icons.download_rounded : Icons.tune_rounded, size: 18),
+                  label: Text(model == null ? 'Installer Whisper' : 'Changer de modèle'),
+                  onPressed: () async {
+                    await WhisperInstallDialog.show(context);
+                    if (mounted) setState(() => installed = Whisper.installedModel());
+                  },
+                ),
+                if (model != null)
+                  IconButton(
+                    tooltip: 'Désinstaller Whisper',
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    onPressed: () async {
+                      await Whisper.uninstall();
+                      if (c.micEngine == 'whisper') await c.setOption('micEngine', 'auto');
+                      if (mounted) setState(() => installed = Whisper.installedModel());
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
+    );
+  }
 }

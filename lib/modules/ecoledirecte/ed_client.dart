@@ -549,13 +549,13 @@ class EdClient {
   /// [folderId] : la racine de ton cloud.
   ///
   /// Comme le site officiel (`cloud/E/{id}.awp`, compte parent :
-  /// `cloud/P/{id}`) ; les sous-dossiers pas encore chargés se demandent
-  /// avec `idFolder`.
-  Future<EdCloudNode> cloud({String? folderId}) async {
-    final who = familyId != null ? 'P/$familyId' : 'E/$accountId';
-    final q = folderId == null ? '' : '&idFolder=${Uri.encodeQueryComponent(folderId)}';
+  /// `cloud/P/{id}`, espace de travail : `cloud/W/{id}.awp`) ; les
+  /// sous-dossiers pas encore chargés se demandent avec `idfolder`.
+  Future<EdCloudNode> cloud({String? folderId, String? owner}) async {
+    final who = owner ?? (familyId != null ? 'P/$familyId' : 'E/$accountId');
+    final q = folderId == null ? '' : '&idfolder=${Uri.encodeQueryComponent(folderId)}';
     var r = await _post('/cloud/$who.awp?verbe=get$q', {});
-    if (r['code'] != 200 && familyId != null) {
+    if (r['code'] != 200 && owner == null && familyId != null) {
       // Compte parent sans cloud : celui de l'élève.
       r = await _post('/cloud/E/$accountId.awp?verbe=get$q', {});
     }
@@ -569,6 +569,78 @@ class EdClient {
     if (folderId == null) return root;
     // Certains serveurs renvoient tout l'arbre : on retrouve le dossier.
     return root.find(folderId) ?? root;
+  }
+
+  /// Tout le cloud d'un coup : chaque sous-dossier pas encore chargé est
+  /// demandé (jusqu'à [maxFolders] requêtes, espacées comme sur le site).
+  Future<EdCloudNode> cloudAll({String? owner, int maxFolders = 60}) async {
+    var budget = maxFolders;
+    Future<EdCloudNode> fill(EdCloudNode n) async {
+      if (!n.folder) return n;
+      var node = n;
+      if (!node.loaded && budget > 0) {
+        budget--;
+        try {
+          node = await cloud(folderId: node.id, owner: owner);
+        } on EdSessionExpired {
+          rethrow;
+        } catch (_) {}
+      }
+      return node.copyWith(children: [for (final c in node.children) await fill(c)]);
+    }
+
+    return fill(await cloud(owner: owner));
+  }
+
+  /// Espaces de travail (classes, clubs…) auxquels tu as accès.
+  Future<List<EdWorkspace>> workspaces() async {
+    if (accountId == null) return const [];
+    final r = await _post('/E/$accountId/espacestravail.awp?verbe=get', {});
+    if (r['code'] != 200 || r['data'] is! List) return const [];
+    return [
+      for (final w in r['data'] as List)
+        if (w is Map && w['id'] != null)
+          EdWorkspace(
+            '${w['id']}',
+            decodeEntities('${w['titre'] ?? w['libelle'] ?? 'Espace de travail'}'),
+            w['cloud'] != false,
+          ),
+    ];
+  }
+
+  /// Documents de l'établissement : bulletins, relevés de notes, vie
+  /// scolaire, documents administratifs, factures.
+  Future<List<EdDocument>> documents() async {
+    final r = await _post(
+      familyId != null ? '/familleDocuments.awp?archive=&verbe=get' : '/elevesDocuments.awp?archive=&verbe=get',
+      {'forceDownload': 0},
+    );
+    if (r['code'] != 200 || r['data'] is! Map) {
+      if (familyId != null) {
+        final r2 = await _post('/elevesDocuments.awp?archive=&verbe=get', {'forceDownload': 0});
+        if (r2['code'] == 200) return EdDocument.parse(r2['data']);
+      }
+      throw 'Documents indisponibles (${explain(r)})';
+    }
+    return EdDocument.parse(r['data']);
+  }
+
+  /// Télécharge un document de l'établissement.
+  Future<List<int>> documentFile(EdDocument d) async {
+    await _pace();
+    final res = await _http
+        .post(
+          Uri.parse('$_base/telechargement.awp?verbe=get&fichierId=${Uri.encodeQueryComponent(d.id)}&v=$_v'),
+          headers: _headers(),
+          body: body({'forceDownload': 0}),
+        )
+        .timeout(const Duration(seconds: 60));
+    _keep(res);
+    final head = utf8.decode(res.bodyBytes.take(40).toList(), allowMalformed: true).trimLeft();
+    if (res.statusCode >= 400 || res.bodyBytes.isEmpty || head.startsWith('{"code"')) {
+      throw 'Document indisponible (code ${res.statusCode})';
+    }
+    return res.bodyBytes;
   }
 
   /// Télécharge un fichier du cloud.
@@ -740,6 +812,27 @@ class EdCloudNode {
   /// Contenu déjà envoyé par École Directe (sinon : à demander).
   final bool loaded;
 
+  EdCloudNode copyWith({List<EdCloudNode>? children, String? name}) => EdCloudNode(
+    id: id,
+    name: name ?? this.name,
+    folder: folder,
+    size: size,
+    date: date,
+    children: children ?? this.children,
+    loaded: children != null || loaded,
+  );
+
+  /// Tous les fichiers, dans tous les sous-dossiers.
+  Iterable<EdCloudNode> get allFiles sync* {
+    for (final c in children) {
+      if (c.folder) {
+        yield* c.allFiles;
+      } else {
+        yield c;
+      }
+    }
+  }
+
   EdCloudNode? find(String id) {
     if (this.id == id) return this;
     for (final c in children) {
@@ -792,6 +885,55 @@ class EdCloudNode {
         }),
       loaded: folder ? (j['isLoaded'] != false || (kids is List && kids.isNotEmpty)) : true,
     );
+  }
+}
+
+/// Un espace de travail École Directe (avec son propre cloud).
+class EdWorkspace {
+  const EdWorkspace(this.id, this.title, this.hasCloud);
+  final String id;
+  final String title;
+  final bool hasCloud;
+}
+
+/// Un document de l'établissement (bulletin, relevé, certificat…).
+class EdDocument {
+  const EdDocument({required this.id, required this.title, required this.category, this.date});
+  final String id;
+  final String title;
+  final String category;
+  final DateTime? date;
+
+  static const categories = {
+    'notes': 'Notes et bulletins',
+    'viescolaire': 'Vie scolaire',
+    'administratifs': 'Documents administratifs',
+    'inscriptions': 'Inscriptions',
+    'factures': 'Factures',
+    'entreprises': 'Stages',
+    'listesPiecesAVerser': 'Pièces à fournir',
+  };
+
+  static List<EdDocument> parse(Object? data) {
+    if (data is! Map) return const [];
+    final out = <EdDocument>[];
+    for (final e in data.entries) {
+      final list = e.value;
+      if (list is! List) continue;
+      for (final d in list) {
+        if (d is! Map || d['id'] == null) continue;
+        out.add(
+          EdDocument(
+            id: '${d['id']}',
+            title: EdClient.decodeEntities('${d['libelle'] ?? d['titre'] ?? 'Document'}').trim(),
+            category: categories['${e.key}'] ?? '${e.key}',
+            date: DateTime.tryParse('${d['date'] ?? ''}'.replaceFirst(' ', 'T')),
+          ),
+        );
+      }
+    }
+    out.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
+    return out;
   }
 }
 

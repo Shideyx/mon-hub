@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'clicky.dart';
 import 'ears.dart';
+import 'whisper.dart';
 
 /// « Tester le micro » : on parle, on voit tout de suite ce que Clicky
 /// entend, et sinon ce qui bloque (avec le bon réglage à ouvrir).
@@ -181,7 +182,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
                     TextButton.icon(
                       icon: const Icon(Icons.settings_rounded, size: 16),
                       label: Text(p.fixLabel ?? 'Ouvrir les réglages'),
-                      onPressed: () => launchUrl(Uri.parse(p.fixUri!)),
+                      onPressed: () => openMicFix(context, p.fixUri!),
                     ),
                 ],
               ),
@@ -221,6 +222,133 @@ class _MicTestDialogState extends State<MicTestDialog> {
                 : const Icon(Icons.mic_rounded),
             label: Text(done || p != null ? 'Recommencer' : 'Commencer'),
             onPressed: starting || repairing ? null : _start,
+          ),
+      ],
+    );
+  }
+}
+
+/// Ouvre la « solution » d'un souci de micro : une page des réglages de
+/// Windows, ou l'installation de Whisper.
+Future<void> openMicFix(BuildContext context, String uri) async {
+  if (uri == whisperInstallUri) {
+    await WhisperInstallDialog.show(context);
+    return;
+  }
+  await launchUrl(Uri.parse(uri));
+}
+
+/// Installe Whisper (reconnaissance vocale sur le PC) avec une barre de
+/// progression.
+class WhisperInstallDialog extends StatefulWidget {
+  const WhisperInstallDialog({super.key});
+
+  static Future<bool?> show(BuildContext context) =>
+      showDialog<bool>(context: context, barrierDismissible: false, builder: (_) => const WhisperInstallDialog());
+
+  @override
+  State<WhisperInstallDialog> createState() => _WhisperInstallDialogState();
+}
+
+class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
+  String model = 'base';
+  bool running = false;
+  String step = '';
+  double progress = 0;
+  String? error;
+  bool done = false;
+
+  Future<void> _install() async {
+    setState(() {
+      running = true;
+      error = null;
+    });
+    try {
+      await Whisper.install(
+        model: model,
+        onProgress: (s, p) {
+          if (mounted) {
+            setState(() {
+              step = s;
+              progress = p;
+            });
+          }
+        },
+      );
+      // Clicky passe sur Whisper (réglage « Automatique » ou « Whisper »).
+      final c = ClickyController.instance;
+      if (c.micEngine == 'windows') await c.setOption('micEngine', 'auto');
+      c.micProblem = null;
+      if (mounted) setState(() => done = true);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return AlertDialog(
+      icon: Icon(done ? Icons.check_circle_rounded : Icons.graphic_eq_rounded, color: done ? Colors.green : clickyBlue),
+      title: Text(done ? 'Whisper est installé' : 'Installer Whisper'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (done)
+              const Text(
+                'Clicky t\'entend maintenant avec Whisper, directement sur ton PC : rien ne part sur '
+                'internet. Maintiens Ctrl + Alt et parle.',
+              )
+            else ...[
+              const Text(
+                'Whisper est la reconnaissance vocale d\'OpenAI, en version libre (whisper.cpp). Elle '
+                'marche sans internet et sans les réglages de Windows, et comprend très bien le français. '
+                'Tout se passe sur ton PC.',
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: [
+                  for (final e in Whisper.models.entries)
+                    ButtonSegment(value: e.key, label: Text('${e.value.$1} (${e.value.$2} Mo)')),
+                ],
+                selected: {model},
+                onSelectionChanged: running ? null : (v) => setState(() => model = v.first),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                model == 'base'
+                    ? 'Rapide : la phrase s\'écrit en 1 à 2 secondes. Bien pour parler à Clicky.'
+                    : 'Précis : se trompe moins (noms propres, phrases longues), mais met 2 à 3 fois plus de temps.',
+                style: text.bodySmall,
+              ),
+              if (running) ...[
+                const SizedBox(height: 14),
+                Text(step, style: text.bodyMedium),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(value: progress <= 0 ? null : progress, minHeight: 6),
+              ],
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(error!, style: text.bodyMedium?.copyWith(color: Colors.redAccent)),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        if (!running)
+          TextButton(onPressed: () => Navigator.pop(context, done), child: Text(done ? 'Fermer' : 'Annuler')),
+        if (!done)
+          FilledButton.icon(
+            icon: const Icon(Icons.download_rounded),
+            label: const Text('Installer'),
+            onPressed: running ? null : _install,
           ),
       ],
     );
