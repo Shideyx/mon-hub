@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/certificates.dart';
 import '../../core/module_store.dart';
 import 'music_models.dart';
 
@@ -106,6 +107,8 @@ class SpotifyApi {
       await store.setJson('spotify.connected', true);
     } on TimeoutException {
       throw 'Connexion à Spotify trop longue, réessaie';
+    } on HandshakeException catch (e) {
+      throw TrustedCertificates.explain(e)!;
     } finally {
       await server.close(force: true);
     }
@@ -153,11 +156,21 @@ class SpotifyApi {
 
   Future<http.Response> _req(String method, String path, {Object? body}) async {
     final uri = Uri.parse(path.startsWith('http') ? path : 'https://api.spotify.com/v1$path');
-    final h = {'authorization': 'Bearer ${await _token()}', 'content-type': 'application/json'};
+    final String token;
+    try {
+      token = await _token();
+    } on HandshakeException catch (e) {
+      throw TrustedCertificates.explain(e)!;
+    }
+    final h = {'authorization': 'Bearer $token', 'content-type': 'application/json'};
     final req = http.Request(method, uri)..headers.addAll(h);
     if (body != null) req.body = jsonEncode(body);
-    final r = await http.Response.fromStream(await _http.send(req))
-        .timeout(const Duration(seconds: 20));
+    final http.Response r;
+    try {
+      r = await http.Response.fromStream(await _http.send(req)).timeout(const Duration(seconds: 20));
+    } catch (e) {
+      throw TrustedCertificates.explain(e) ?? 'Spotify injoignable : $e';
+    }
     if (r.statusCode == 401) {
       _access = null;
       throw 'Spotify : session expirée, réessaie';

@@ -260,8 +260,6 @@ void main() {
     expect(clickyGreeting('', DateTime(2026, 11, 16, 20)), startsWith('Bonsoir.'));
     expect(clickyPersona('Erik'), contains('« Erik »'));
     expect(clickyPersona('Erik'), contains('Clicky'));
-    expect(const SystemVoice('Microsoft Paul', 'fr-FR').male, isTrue);
-    expect(const SystemVoice('Microsoft Hortense', 'fr-FR').male, isFalse);
   });
 
   group('messages vocaux et likes', () {
