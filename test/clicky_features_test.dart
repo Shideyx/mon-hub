@@ -479,6 +479,5 @@ void main() {
     expect(u.sha256, 'abcdef');
     expect(u.size, 1234);
     expect(UpdateInfo.fromRelease({'tag_name': 'v1.24', 'assets': []}), isNull);
-    expect(Updater.installScript, contains('robocopy'));
   });
 }

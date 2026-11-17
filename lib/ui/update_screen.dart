@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/updater.dart';
 import '../core/version.dart';
@@ -125,10 +126,26 @@ class UpdateScreen extends StatelessWidget {
                         child: Text(error, style: const TextStyle(color: Colors.white)),
                       ),
                       const SizedBox(height: 14),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Réessayer'),
-                        onPressed: u.install,
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          FilledButton.icon(
+                            icon: const Icon(Icons.download_rounded),
+                            label: const Text('Télécharger à la main'),
+                            onPressed: () => launchUrl(
+                              Uri.parse(Updater.releasesUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Réessayer'),
+                            onPressed: u.install,
+                          ),
+                        ],
                       ),
                     ],
                     if (notes.isNotEmpty) ...[
