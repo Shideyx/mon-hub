@@ -11,6 +11,7 @@ import '../../ui/clicky/clicky.dart';
 import '../../ui/clicky/mic_test.dart';
 import '../../ui/clicky/claude_code.dart';
 import '../../ui/clicky/journal.dart';
+import '../../ui/clicky/buddies.dart';
 import '../../ui/clicky/routines.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
@@ -116,7 +117,7 @@ class ClaudeModule extends HubModule {
 
   @override
   Widget buildPage(BuildContext context) => DefaultTabController(
-    length: 5,
+    length: 6,
     child: Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -140,6 +141,7 @@ class ClaudeModule extends HubModule {
             Tab(icon: Icon(Icons.chat_rounded), text: 'Discuter'),
             Tab(icon: Icon(Icons.history_rounded), text: 'Historique Clicky'),
             Tab(icon: Icon(Icons.psychology_rounded), text: 'Journal'),
+            Tab(icon: Icon(Icons.cloud_rounded), text: 'Compagnons'),
             Tab(icon: Icon(Icons.event_repeat_rounded), text: 'Routines'),
             Tab(icon: Icon(Icons.public_rounded), text: 'claude.ai'),
           ],
@@ -170,6 +172,7 @@ class ClaudeModule extends HubModule {
               }
             },
           ),
+          const BuddiesView(),
           RoutinesView(color: color),
           const ClaudeAiTab(),
         ],

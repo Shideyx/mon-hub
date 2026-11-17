@@ -592,20 +592,28 @@ class EdClient {
     return fill(await cloud(owner: owner));
   }
 
-  /// Espaces de travail (classes, clubs…) auxquels tu as accès.
+  /// Espaces de travail (classes, clubs…) : ceux dont tu es membre et
+  /// ceux que tu peux rejoindre.
   Future<List<EdWorkspace>> workspaces() async {
     if (accountId == null) return const [];
     final r = await _post('/E/$accountId/espacestravail.awp?verbe=get', {});
-    if (r['code'] != 200 || r['data'] is! List) return const [];
+    if (r['code'] != 200) throw 'Espaces de travail indisponibles (${explain(r)})';
+    final data = r['data'];
+    final list = data is List ? data : (data is Map ? (data['espacesTravail'] ?? data['espaces'] ?? const []) : const []);
     return [
-      for (final w in r['data'] as List)
-        if (w is Map && w['id'] != null)
-          EdWorkspace(
-            '${w['id']}',
-            decodeEntities('${w['titre'] ?? w['libelle'] ?? 'Espace de travail'}'),
-            w['cloud'] != false,
-          ),
+      for (final w in list as List)
+        if (w is Map && w['id'] != null) EdWorkspace.fromJson(w.cast<String, dynamic>()),
     ];
+  }
+
+  /// Rejoint un espace de travail ouvert.
+  Future<void> joinWorkspace(EdWorkspace w) async {
+    final r = await _post('/E/$accountId/espacestravail/${w.id}/acces.awp?verbe=post', {
+      ...w.raw,
+      'cloudLibelle': w.raw['cloudLibelle'] ?? '',
+      'fullLoaded': false,
+    });
+    if (r['code'] != 200) throw 'Impossible de rejoindre cet espace (${explain(r)})';
   }
 
   /// Documents de l'établissement : bulletins, relevés de notes, vie
@@ -890,10 +898,42 @@ class EdCloudNode {
 
 /// Un espace de travail École Directe (avec son propre cloud).
 class EdWorkspace {
-  const EdWorkspace(this.id, this.title, this.hasCloud);
+  const EdWorkspace(
+    this.id,
+    this.title,
+    this.hasCloud, {
+    this.description = '',
+    this.members = 0,
+    this.member = true,
+    this.createdBy = '',
+    this.discussion = false,
+    this.agenda = false,
+    this.raw = const {},
+  });
+
+  factory EdWorkspace.fromJson(Map<String, dynamic> w) => EdWorkspace(
+    '${w['id']}',
+    EdClient.decodeEntities('${w['titre'] ?? w['libelle'] ?? 'Espace de travail'}').trim(),
+    w['cloud'] != false,
+    description: EdClient.decodeContent('${w['description'] ?? w['resume'] ?? ''}'),
+    members: (w['nbMembres'] as num?)?.toInt() ?? 0,
+    member: w['estMembre'] != false,
+    createdBy: EdClient.decodeEntities('${w['creePar'] ?? ''}').trim(),
+    discussion: w['discussion'] == true,
+    agenda: w['agenda'] == true,
+    raw: w,
+  );
+
   final String id;
   final String title;
   final bool hasCloud;
+  final String description;
+  final int members;
+  final bool member;
+  final String createdBy;
+  final bool discussion;
+  final bool agenda;
+  final Map<String, dynamic> raw;
 }
 
 /// Un document de l'établissement (bulletin, relevé, certificat…).

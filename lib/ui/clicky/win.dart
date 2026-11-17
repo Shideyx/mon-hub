@@ -332,6 +332,108 @@ class Win {
     SendInput(1, input, sizeOf<INPUT>());
   });
 
+  // ---------- Clicky agit : souris visible, glisser, fenêtres ----------
+
+  /// Déplace la souris en douceur jusqu'au point (on la voit bouger).
+  static Future<void> glide(int x, int y, {Duration duration = const Duration(milliseconds: 380)}) async {
+    final from = cursor() ?? (x, y);
+    const steps = 22;
+    for (var i = 1; i <= steps; i++) {
+      final t = i / steps;
+      final e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) * (-2 * t + 2) * (-2 * t + 2) / 2;
+      SetCursorPos((from.$1 + (x - from.$1) * e).round(), (from.$2 + (y - from.$2) * e).round());
+      await Future<void>.delayed(Duration(microseconds: duration.inMicroseconds ~/ steps));
+    }
+    SetCursorPos(x, y);
+  }
+
+  static void _mouse(MOUSE_EVENT_FLAGS flags) => using((a) {
+    final input = a<INPUT>();
+    input.ref.type = INPUT_MOUSE;
+    input.ref.Anonymous.mi.dwFlags = flags;
+    SendInput(1, input, sizeOf<INPUT>());
+  });
+
+  /// Glisser-déposer d'un point à un autre.
+  static Future<void> drag(int x1, int y1, int x2, int y2) async {
+    await glide(x1, y1);
+    _mouse(MOUSEEVENTF_LEFTDOWN);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await glide(x2, y2, duration: const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _mouse(MOUSEEVENTF_LEFTUP);
+  }
+
+  /// Molette horizontale : [notches] positif = vers la droite.
+  static void hscroll(int notches) => using((a) {
+    final input = a<INPUT>();
+    input.ref.type = INPUT_MOUSE;
+    input.ref.Anonymous.mi
+      ..dwFlags = MOUSEEVENTF_HWHEEL
+      ..mouseData = (notches * 120) & 0xFFFFFFFF;
+    SendInput(1, input, sizeOf<INPUT>());
+  });
+
+  /// Les fenêtres ouvertes (visibles, avec un titre) : (numéro, titre,
+  /// programme).
+  static List<(int, String, String)> windowList() {
+    final out = <(int, String, String)>[];
+    int callback(Pointer h, int _) {
+      final hwnd = HWND(h);
+      if (IsWindowVisible(hwnd)) {
+        final t = _title(hwnd);
+        if (t.trim().isNotEmpty && t != 'Clicky' && t != 'Program Manager') {
+          var exe = '';
+          try {
+            exe = _exeOf(hwnd);
+          } catch (_) {}
+          out.add((h.address, t, exe));
+        }
+      }
+      return 1;
+    }
+
+    final cb = NativeCallable<WNDENUMPROC>.isolateLocal(callback, exceptionalReturn: 0);
+    try {
+      EnumWindows(cb.nativeFunction, const LPARAM(0));
+    } catch (_) {
+    } finally {
+      cb.close();
+    }
+    return out;
+  }
+
+  /// Agit sur une fenêtre : 'activer', 'reduire', 'agrandir', 'restaurer'
+  /// ou 'fermer'. Renvoie false si la fenêtre n'existe plus.
+  static bool windowAction(int id, String what) {
+    final hwnd = HWND(Pointer.fromAddress(id));
+    if (!IsWindow(hwnd)) return false;
+    switch (what) {
+      case 'reduire':
+        ShowWindow(hwnd, SW_MINIMIZE);
+      case 'agrandir':
+        ShowWindow(hwnd, SW_MAXIMIZE);
+        _focus(hwnd);
+      case 'restaurer':
+        ShowWindow(hwnd, SW_RESTORE);
+        _focus(hwnd);
+      case 'fermer':
+        PostMessage(hwnd, WM_CLOSE, const WPARAM(0), const LPARAM(0));
+      default:
+        if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+        _focus(hwnd);
+    }
+    return true;
+  }
+
+  /// Met une fenêtre au premier plan (Windows ne le permet que si on
+  /// « appuie » sur Alt juste avant).
+  static void _focus(HWND hwnd) {
+    _keys([(0x12, false), (0x12, true)]);
+    BringWindowToTop(hwnd);
+    SetForegroundWindow(hwnd);
+  }
+
   // ---------- Applis ouvertes (repli musique) ----------
 
   static String _exeOf(HWND h) => using((a) {

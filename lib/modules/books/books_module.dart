@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
 import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../ui/widgets.dart';
 import 'book_finder.dart';
@@ -24,6 +29,7 @@ class Book {
     required this.title,
     this.author = '',
     this.coverUrl,
+    this.coverPath,
     this.status = BookStatus.read,
     DateTime? addedOn,
     this.finishedOn,
@@ -36,6 +42,10 @@ class Book {
   String title;
   String author;
   String? coverUrl;
+
+  /// Couverture enregistrée sur l'appareil (s'affiche toujours, même hors
+  /// ligne ou quand le site des couvertures est lent).
+  String? coverPath;
   BookStatus status;
   DateTime addedOn;
   DateTime? finishedOn;
@@ -49,6 +59,7 @@ class Book {
         'title': title,
         'author': author,
         'coverUrl': coverUrl,
+        'coverPath': coverPath,
         'status': status.name,
         'addedOn': addedOn.toIso8601String(),
         'finishedOn': finishedOn?.toIso8601String(),
@@ -62,6 +73,7 @@ class Book {
         title: j['title'] as String,
         author: j['author'] as String? ?? '',
         coverUrl: j['coverUrl'] as String?,
+        coverPath: j['coverPath'] as String?,
         status: BookStatus.values.asNameMap()[j['status']] ?? BookStatus.read,
         addedOn: DateTime.tryParse(j['addedOn'] as String? ?? '') ??
             DateTime.tryParse(j['finishedOn'] as String? ?? ''),
@@ -113,39 +125,90 @@ class BooksModule extends HubModule {
   /// Retrouve le livre à partir de son titre et complète ce qui manque
   /// (couverture, auteur, pages). Renvoie true si quelque chose a changé.
   Future<bool> complete(Book b, {bool force = false}) async {
-    final m = await finder.find(b.title, author: b.author);
-    if (m == null) return false;
+    final list = await finder.candidates(b.title, author: b.author);
+    final good = [for (final m in list) if (m.score >= 0.55) m];
+    if (good.isEmpty) return false;
+    final best = good.first;
     var changed = false;
-    if ((force || b.coverUrl == null) && m.coverUrl != null) {
-      b.coverUrl = m.coverUrl;
+    if (b.author.trim().isEmpty && best.author.isNotEmpty) {
+      b.author = best.author;
       changed = true;
     }
-    if (b.author.trim().isEmpty && m.author.isNotEmpty) {
-      b.author = m.author;
+    if (b.pages == null && best.pages != null) {
+      b.pages = best.pages;
       changed = true;
     }
-    if (b.pages == null && m.pages != null) {
-      b.pages = m.pages;
-      changed = true;
+    if (force || b.coverPath == null) {
+      // Essaie les couvertures dans l'ordre jusqu'à en avoir une vraie,
+      // enregistrée sur l'appareil.
+      for (final m in good.where((m) => m.coverUrl != null).take(6)) {
+        final path = await saveCover(b.id, m.coverUrl!);
+        if (path != null) {
+          b.coverUrl = m.coverUrl;
+          b.coverPath = path;
+          changed = true;
+          break;
+        }
+      }
     }
     if (changed) await upsert(b);
     return changed;
   }
 
+  /// Télécharge une couverture et la garde sur l'appareil. Renvoie son
+  /// chemin, ou null si ce n'est pas une vraie image de couverture.
+  Future<String?> saveCover(String bookId, String url) async {
+    try {
+      final r = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 25));
+      final b = r.bodyBytes;
+      if (r.statusCode != 200 || b.length < 2500) return null;
+      final jpeg = b[0] == 0xFF && b[1] == 0xD8;
+      final png = b[0] == 0x89 && b[1] == 0x50;
+      final webp = b.length > 12 && String.fromCharCodes(b.sublist(8, 12)) == 'WEBP';
+      if (!jpeg && !png && !webp) return null;
+      final dir = await HubFiles.dir();
+      if (dir == null) return null;
+      final folder = Directory('${dir.path}${Platform.pathSeparator}couvertures');
+      await folder.create(recursive: true);
+      final f = File('${folder.path}${Platform.pathSeparator}$bookId.${png ? 'png' : webp ? 'webp' : 'jpg'}');
+      await f.writeAsBytes(b, flush: true);
+      return f.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Après un ajout ou un changement de couverture : la garde sur
+  /// l'appareil (ou en cherche une autre si le lien ne marche pas).
+  Future<void> ensureCover(Book b) async {
+    if (b.coverPath != null && await File(b.coverPath!).exists()) return;
+    if (b.coverUrl != null) {
+      final path = await saveCover(b.id, b.coverUrl!);
+      if (path != null) {
+        b.coverPath = path;
+        await upsert(b);
+        return;
+      }
+    }
+    await complete(b, force: true);
+  }
+
   bool _filling = false;
 
-  /// Livres sans couverture : on les cherche une fois, en arrière-plan.
+  /// Livres dont la couverture n'est pas encore sur l'appareil : on la
+  /// télécharge (ou on retrouve le livre), en arrière-plan.
   Future<void> fillMissingCovers() async {
     if (_filling) return;
     _filling = true;
     try {
-      final tried = {...(store.getJson<List<dynamic>>('coverTried') ?? const []).cast<String>()};
-      for (final b in books.where((b) => b.coverUrl == null && !tried.contains(b.id))) {
+      final tried = {...(store.getJson<List<dynamic>>('coverTried2') ?? const []).cast<String>()};
+      for (final b in books.where((b) => !tried.contains(b.id))) {
+        if (b.coverPath != null && await File(b.coverPath!).exists()) continue;
         try {
-          await complete(b);
+          await ensureCover(b);
         } catch (_) {}
         tried.add(b.id);
-        await store.setJson('coverTried', tried.toList());
+        await store.setJson('coverTried2', tried.toList());
       }
     } finally {
       _filling = false;
@@ -194,11 +257,10 @@ class BooksModule extends HubModule {
             if (a['a_retenir'] is String) b.takeaway = a['a_retenir'] as String;
             await upsert(b);
             // Retrouve le livre tout seul : couverture, auteur, pages.
-            if (b.coverUrl == null) {
-              try {
-                await complete(b);
-              } catch (_) {}
-            }
+            try {
+              if (b.coverUrl == null) await complete(b);
+              await ensureCover(b);
+            } catch (_) {}
             store.changed();
             return {
               'ok': true,
@@ -210,8 +272,18 @@ class BooksModule extends HubModule {
         ),
       ];
 
+  bool _autoCovers = false;
+
   @override
-  Widget buildSummary(BuildContext context) => ListenableBuilder(
+  Widget buildSummary(BuildContext context) {
+    if (!_autoCovers) {
+      _autoCovers = true;
+      unawaited(fillMissingCovers());
+    }
+    return _summary(context);
+  }
+
+  Widget _summary(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (context, _) {
           final all = books;
@@ -304,6 +376,18 @@ class BookCover extends StatelessWidget {
     );
   }
 
+  /// La couverture : le fichier gardé sur l'appareil, sinon le lien.
+  Widget _image(Widget fallback) {
+    Widget net() => book.coverUrl == null
+        ? fallback
+        : Image.network(book.coverUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback);
+    final path = book.coverPath;
+    if (path != null && !kIsWeb) {
+      return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, _, _) => net());
+    }
+    return net();
+  }
+
   Widget _frame(Widget fallback) {
     return Container(
       decoration: BoxDecoration(
@@ -320,10 +404,7 @@ class BookCover extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            book.coverUrl == null
-                ? fallback
-                : Image.network(book.coverUrl!,
-                    fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback),
+            _image(fallback),
             // Reflet « reliure » à gauche.
             Positioned(
               left: 0,
@@ -675,9 +756,14 @@ class _BookDetailPageState extends State<BookDetailPage> {
               setState(() {
                 b.title = r[0];
                 b.author = r[1];
-                b.coverUrl = r[2].isEmpty ? null : r[2];
+                final url = r[2].isEmpty ? null : r[2];
+                if (url != b.coverUrl) b.coverPath = null;
+                b.coverUrl = url;
               });
-              _save();
+              await _save();
+              unawaited(widget.module.ensureCover(b).then((_) {
+                if (mounted) setState(() {});
+              }));
             },
           ),
           IconButton(
@@ -686,8 +772,10 @@ class _BookDetailPageState extends State<BookDetailPage> {
             onPressed: () async {
               final x = await pickCover(context, widget.module, b);
               if (x == null) return;
+              final path = await widget.module.saveCover(b.id, x.coverUrl!);
               setState(() {
                 b.coverUrl = x.coverUrl;
+                b.coverPath = path;
                 if (b.author.trim().isEmpty) b.author = x.author;
                 b.pages ??= x.pages;
               });
@@ -727,7 +815,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
                 if (b.coverUrl != null)
                   ImageFiltered(
                     imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                    child: Image.network(b.coverUrl!,
+                    child: b.coverPath != null
+                        ? Image.file(File(b.coverPath!), fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox())
+                        : Image.network(b.coverUrl!,
                         fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox()),
                   )
                 else
@@ -901,12 +991,14 @@ class _AddBookSheetState extends State<_AddBookSheet> {
 
   Future<void> _add(Book b, {bool find = false}) async {
     await widget.module.upsert(b);
-    if (find) {
-      // Ajouté à la main : on retrouve quand même le livre tout seul.
+    // La couverture est gardée sur l'appareil (ajouté à la main : on
+    // retrouve d'abord le livre tout seul).
+    unawaited(() async {
       try {
-        await widget.module.complete(b);
+        if (find) await widget.module.complete(b);
+        await widget.module.ensureCover(b);
       } catch (_) {}
-    }
+    }());
     if (!mounted) return;
     Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (_) => BookDetailPage(module: widget.module, book: b)));

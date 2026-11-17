@@ -44,6 +44,10 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
 | **Bibliothèque** | ✅ Local | Étagère visuelle avec couvertures, statut *Lu / En cours / À lire*, étoiles, note « À retenir », statistiques, **retrouve tout seul le livre** à partir du titre (Open Library + Google Livres, meilleur résultat proposé, couverture au format livre 2:3, couvertures manquantes complétées toutes seules, choix parmi les couvertures trouvées). |
 | **Google Drive** | ✅ Officiel (Google) | Ton Drive en visuel : dossiers, fichiers avec miniatures, Récents / Partagés / Suivis, recherche, espace utilisé, ouverture dans l'appli. Via « Se connecter avec Google » (lecture seule). Sans connexion Google : drive.google.com intégré. |
 
+## Notifications
+
+Les alertes (messages, notes, devoirs, compagnons, Clicky) arrivent dans la cloche de l'accueil **et** en bandeau dans la fenêtre de Mon Hub (en haut à droite), en plus de la notification de Windows.
+
 ## Confidentialité et sécurité
 
 * **Aucun serveur** : Mon Hub ne parle qu'aux services que tu utilises (École Directe, Spotify, Google…), directement depuis ton appareil. Le créateur de l'appli n'a accès à aucune donnée de personne.
@@ -69,6 +73,10 @@ Mac et Linux**. Chaque appareil reçoit une vraie appli native installée.
   * **Internet** : recherche web officielle de Claude pour l'actualité, la météo… (désactivable).
   * **Mains libres** : mot d'activation « Clicky » (reconnaissance de Windows en liste fermée, sur le PC, `wake.dart`) ; **dictée partout** : Ctrl + Alt + Maj, le texte est tapé dans l'appli ouverte (ou copié si la fenêtre a changé).
   * **Contrôle du PC** : « Clicky, installe VLC », « range mes téléchargements », « mets le son à 30 % », « combien de place sur mon disque ? »… : il le fait lui-même (commandes PowerShell, fichiers, applis, réglages, `pc.dart`). Par défaut chaque commande s'affiche et attend ton « Autoriser » ; mode « Sans demander » dans les réglages (les commandes dangereuses sont toujours demandées).
+  * **Clicky agit** (Clicky partout) : « prends la main et… », ou demande-lui de faire quelque chose : il regarde l'écran, vole jusqu'à l'endroit, et la vraie souris suit (clic, double-clic, défiler, glisser-déposer, écrire, raccourcis, ouvrir une appli ou un site, passer d'une fenêtre à l'autre), puis regarde de nouveau, jusqu'à 30 actions. Échap ou bouger la souris l'arrête ; jamais de saisie dans une fenêtre sensible (`act.dart`).
+  * **Compagnons** (vidéo « agent buddies ») : quatre questions pour te connaître, puis de petits agents (nom, couleur, petit nuage aux yeux ^^) se proposent d'eux-mêmes ; Non / Ajuster / Oui, fais-le ; ils travaillent en arrière-plan, certains chaque jour, et te préviennent (`buddies.dart`, onglet Compagnons).
+  * **Secrétaire** : il organise ton emploi du temps (créneaux libres entre les cours, planning de révisions enregistré d'un coup avec ta permission) et te conseille.
+  * **Tableau dessiné en direct** : écriture manuscrite sur papier quadrillé, chaque bloc se trace l'un après l'autre.
   * **Clicky pilote** (Clicky partout) : « fais-le pour moi » → un plan de clics / frappe / raccourcis à **relire avant**, Échap ou bouger la souris arrête tout, rien dans les fenêtres sensibles, aucune commande système (`drive.dart`).
   * **Routines** : tâches automatiques (briefing du matin, devoirs du soir, bilan de la semaine…) avec tes modules, résultat lu à voix haute et gardé (onglet Routines, `routines.dart`). Mode **« Agent, … »** pour une tâche de fond ponctuelle.
   * **Capture des gestes** (« qu'est-ce que je viens de faire ? », sans jamais garder les lettres tapées) et **enregistrement de leçon** (compte rendu + captures dans Documents\Mon Hub\Leçons) : menu ⋮ de la boîte (`capture.dart`).

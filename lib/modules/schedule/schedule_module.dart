@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
@@ -477,6 +478,70 @@ class ScheduleModule extends HubModule {
             );
             await savePersonal(e);
             return {'ok': true, 'id': e.id};
+          },
+        ),
+        HubTool(
+          name: 'agenda_creneaux_libres',
+          description: 'Secrétaire : les créneaux libres (sans cours ni évènement) jour par jour, '
+              'pour placer des révisions, devoirs, sport, rendez-vous…',
+          params: {
+            'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
+            'jours': ('integer', 'Nombre de jours (défaut 7)'),
+            'de': ('integer', 'Heure de début de journée (défaut 8)'),
+            'a': ('integer', 'Heure de fin de journée (défaut 21)'),
+            'minimum': ('integer', 'Durée minimale d\'un créneau en minutes (défaut 30)'),
+          },
+          run: (a) async {
+            final now = DateTime.now();
+            final from = DateTime.tryParse('${a['debut'] ?? ''}') ?? DateTime(now.year, now.month, now.day);
+            final days = ((a['jours'] as num?)?.toInt() ?? 7).clamp(1, 31);
+            final items = await itemsBetween(from, from.add(Duration(days: days)));
+            return freeSlots(
+              items.where((e) => !e.cancelled).map((e) => (e.start, e.end)).toList(),
+              from: from,
+              days: days,
+              dayStart: ((a['de'] as num?)?.toInt() ?? 8).clamp(0, 23),
+              dayEnd: ((a['a'] as num?)?.toInt() ?? 21).clamp(1, 24),
+              minimum: Duration(minutes: ((a['minimum'] as num?)?.toInt() ?? 30).clamp(10, 600)),
+              notBefore: now,
+            );
+          },
+        ),
+        HubTool(
+          name: 'agenda_ajouter_plan',
+          description: 'Secrétaire : enregistre tout un emploi du temps d\'un coup (révisions, devoirs, '
+              'activités…) dans l\'agenda de Mon Hub. Propose d\'abord le planning à la personne.',
+          params: {
+            'plan': (
+              'string',
+              'Liste JSON d\'évènements : [{"titre":"Révision maths","debut":"2026-11-20T17:00",'
+                  '"fin":"2026-11-20T18:00","lieu":"","note":"","chaque_semaine":false}]',
+            ),
+          },
+          required: ['plan'],
+          run: (a) async {
+            final raw = a['plan'];
+            final list = raw is List ? raw : jsonDecode('$raw') as List;
+            final ids = <String>[];
+            var n = 0;
+            for (final x in list) {
+              if (x is! Map) continue;
+              final start = DateTime.tryParse('${x['debut'] ?? ''}');
+              if (start == null || '${x['titre'] ?? ''}'.trim().isEmpty) continue;
+              final end = DateTime.tryParse('${x['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
+              final e = PersonalEvent(
+                id: '${DateTime.now().microsecondsSinceEpoch}${n++}',
+                title: '${x['titre']}'.trim(),
+                start: start,
+                end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
+                place: '${x['lieu'] ?? ''}',
+                note: '${x['note'] ?? ''}',
+                weekly: x['chaque_semaine'] == true,
+              );
+              await savePersonal(e);
+              ids.add(e.id);
+            }
+            return {'ajoutes': ids.length, 'ids': ids};
           },
         ),
         HubTool(
@@ -1441,4 +1506,38 @@ class _EventEditorState extends State<_EventEditor> {
       ),
     );
   }
+}
+
+
+/// Créneaux libres jour par jour entre [dayStart] h et [dayEnd] h, en
+/// retirant les moments occupés [busy] (cours, évènements).
+List<Map<String, Object>> freeSlots(
+  List<(DateTime, DateTime)> busy, {
+  required DateTime from,
+  required int days,
+  int dayStart = 8,
+  int dayEnd = 21,
+  Duration minimum = const Duration(minutes: 30),
+  DateTime? notBefore,
+}) {
+  String hm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  final out = <Map<String, Object>>[];
+  for (var i = 0; i < days; i++) {
+    final day = DateTime(from.year, from.month, from.day + i);
+    var cursor = day.add(Duration(hours: dayStart));
+    final end = day.add(Duration(hours: dayEnd));
+    if (notBefore != null && notBefore.isAfter(cursor)) cursor = notBefore;
+    final today = [
+      for (final (a, b) in busy)
+        if (b.isAfter(cursor) && a.isBefore(end)) (a, b),
+    ]..sort((x, y) => x.$1.compareTo(y.$1));
+    final slots = <String>[];
+    for (final (a, b) in today) {
+      if (a.difference(cursor) >= minimum) slots.add('${hm(cursor)}-${hm(a)}');
+      if (b.isAfter(cursor)) cursor = b;
+    }
+    if (end.difference(cursor) >= minimum) slots.add('${hm(cursor)}-${hm(end)}');
+    out.add({'jour': day.toIso8601String().substring(0, 10), 'libre': slots});
+  }
+  return out;
 }

@@ -133,6 +133,13 @@ Future<void> runClickyDesktop() async {
           unawaited(c.presentTopo('${j['t']}', '${j['x']}', speakIt: j['v'] != false));
         } catch (_) {}
       }
+      // « Clicky agit » demandé depuis Mon Hub : c'est Clicky partout (au-
+      // dessus de tout l'écran) qui prend la souris.
+      if (cmd.startsWith('act64 ')) {
+        try {
+          unawaited(c.act(utf8.decode(base64Decode(cmd.substring(6)))));
+        } catch (_) {}
+      }
       // Question envoyée par Mon Hub (révisions du journal…).
       if (cmd.startsWith('ask ')) {
         c.openPanel();

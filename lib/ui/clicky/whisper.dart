@@ -27,9 +27,14 @@ class Whisper {
 
   static bool get supported => !kIsWeb && Platform.isWindows;
 
-  /// Programme Windows (dernière version publiée avec les exécutables).
-  static const binUrl =
-      'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip';
+  /// Programme Windows : les dernières versions publiées avec les
+  /// exécutables (la plus récente d'abord, les autres en secours).
+  static const binUrls = [
+    'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip',
+    'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.1/whisper-bin-x64.zip',
+    'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.0/whisper-bin-x64.zip',
+    'https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.6/whisper-bin-x64.zip',
+  ];
 
   /// Modèles : « rapide » (base, 142 Mo) ou « précis » (small, 466 Mo).
   static const models = {
@@ -38,7 +43,7 @@ class Whisper {
   };
 
   static String modelUrl(String m) =>
-      'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$m.bin';
+      'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$m.bin?download=true';
 
   static String? get folder {
     final base = ClaudeBridge.folder;
@@ -79,6 +84,11 @@ class Whisper {
 
   /// Télécharge et installe whisper.cpp et le modèle [model].
   /// [onProgress] reçoit (étape, fraction 0..1).
+  ///
+  /// Robuste : plusieurs versions du programme, et si le téléchargement
+  /// intégré échoue (antivirus, proxy…), `curl.exe` et `tar.exe` de
+  /// Windows prennent le relais. Chaque erreur est notée dans
+  /// whisper\installation.log.
   static Future<void> install({
     String model = 'base',
     void Function(String step, double progress)? onProgress,
@@ -87,40 +97,79 @@ class Whisper {
     if (f == null) throw 'Dossier de Mon Hub introuvable';
     final sep = Platform.pathSeparator;
     await Directory(f).create(recursive: true);
+    final log = <String>[];
     final client = http.Client();
     try {
       if (await cli() == null) {
-        final zip = await _download(
-          client,
-          binUrl,
-          '$f${sep}whisper-bin.zip',
-          (p) => onProgress?.call('Programme Whisper', p),
-        );
-        onProgress?.call('Installation', 1);
-        final archive = ZipDecoder().decodeBytes(await zip.readAsBytes());
-        final bin = Directory('$f${sep}bin');
-        for (final e in archive) {
-          if (!e.isFile) continue;
-          final name = e.name.replaceAll('/', sep).replaceAll('\\', sep);
-          if (name.contains('..')) continue;
-          final out = File('${bin.path}$sep$name');
-          await out.parent.create(recursive: true);
-          await out.writeAsBytes(e.content, flush: true);
+        Object? last;
+        for (final url in binUrls) {
+          try {
+            final zip = await _download(
+              client,
+              url,
+              '$f${sep}whisper-bin.zip',
+              (p) => onProgress?.call('Programme Whisper', p),
+              log,
+            );
+            onProgress?.call('Installation du programme', 1);
+            await _unzip(zip, Directory('$f${sep}bin'), log);
+            try {
+              await zip.delete();
+            } catch (_) {}
+            if (await cli() != null) break;
+            log.add('$url : whisper-cli.exe absent du fichier');
+          } catch (e) {
+            last = e;
+            log.add('$url : $e');
+          }
         }
-        await zip.delete();
-        if (await cli() == null) throw 'whisper-cli.exe introuvable dans le téléchargement';
+        if (await cli() == null) {
+          throw 'Impossible d\'installer le programme Whisper${last == null ? '' : ' ($last)'}';
+        }
       }
       final mp = modelPath(model)!;
-      if (!await File(mp).exists()) {
+      if (!await File(mp).exists() || await File(mp).length() < 30 * 1024 * 1024) {
         await _download(
           client,
           modelUrl(model),
           mp,
           (p) => onProgress?.call('Modèle ${models[model]?.$1 ?? model} (${models[model]?.$2 ?? '?'} Mo)', p),
+          log,
+          minBytes: 30 * 1024 * 1024,
         );
       }
+    } catch (e) {
+      log.add('Échec : $e');
+      rethrow;
     } finally {
       client.close();
+      try {
+        await File('$f${sep}installation.log').writeAsString(
+          '${DateTime.now()}\n${log.join('\n')}\n\n',
+          mode: FileMode.append,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Décompresse (module intégré, sinon tar.exe de Windows).
+  static Future<void> _unzip(File zip, Directory dest, List<String> log) async {
+    final sep = Platform.pathSeparator;
+    await dest.create(recursive: true);
+    try {
+      final archive = ZipDecoder().decodeBytes(await zip.readAsBytes());
+      for (final e in archive) {
+        if (!e.isFile) continue;
+        final name = e.name.replaceAll('/', sep).replaceAll('\\', sep);
+        if (name.contains('..')) continue;
+        final out = File('${dest.path}$sep$name');
+        await out.parent.create(recursive: true);
+        await out.writeAsBytes(e.content, flush: true);
+      }
+    } catch (e) {
+      log.add('Décompression intégrée : $e → tar.exe');
+      final r = await Process.run('tar', ['-xf', zip.path, '-C', dest.path], runInShell: true);
+      if (r.exitCode != 0) throw 'Décompression impossible : ${r.stderr}';
     }
   }
 
@@ -129,9 +178,45 @@ class Whisper {
     String url,
     String path,
     void Function(double) progress,
+    List<String> log, {
+    int minBytes = 100 * 1024,
+  }) async {
+    try {
+      final f = await _downloadDart(client, url, path, progress);
+      if (await f.length() < minBytes) throw 'fichier incomplet (${await f.length()} octets)';
+      return f;
+    } catch (e) {
+      log.add('Téléchargement intégré de $url : $e → curl.exe');
+      if (!Platform.isWindows) rethrow;
+      progress(0);
+      final part = '$path.part';
+      final r = await Process.run('curl.exe', [
+        '-L', '--fail', '--retry', '3', '--connect-timeout', '20', '-s', '-o', part, url,
+      ], runInShell: true);
+      final f = File(part);
+      if (r.exitCode != 0 || !await f.exists() || await f.length() < minBytes) {
+        throw 'téléchargement impossible (code ${r.exitCode}${'${r.stderr}'.trim().isEmpty ? '' : ' : ${'${r.stderr}'.trim()}'}). '
+            'Vérifie ta connexion internet, ou que ton antivirus ne bloque pas Mon Hub.';
+      }
+      progress(1);
+      final dest = File(path);
+      if (await dest.exists()) await dest.delete();
+      return f.rename(path);
+    }
+  }
+
+  static Future<File> _downloadDart(
+    http.Client client,
+    String url,
+    String path,
+    void Function(double) progress,
   ) async {
-    final res = await client.send(http.Request('GET', Uri.parse(url)));
-    if (res.statusCode != 200) throw 'Téléchargement refusé (code ${res.statusCode}) : $url';
+    final req = http.Request('GET', Uri.parse(url))
+      ..followRedirects = true
+      ..maxRedirects = 10
+      ..headers['user-agent'] = 'MonHub';
+    final res = await client.send(req).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) throw 'refusé (code ${res.statusCode})';
     final total = res.contentLength ?? 0;
     final part = File('$path.part');
     final sink = part.openWrite();
@@ -151,8 +236,9 @@ class Whisper {
     } catch (e) {
       await sink.close();
       if (await part.exists()) await part.delete();
-      throw 'Téléchargement interrompu : $e';
+      throw 'interrompu : $e';
     }
+    if (total > 0 && got < total) throw 'incomplet ($got / $total octets)';
     progress(1);
     final f = File(path);
     if (await f.exists()) await f.delete();
@@ -218,8 +304,122 @@ class Whisper {
       .trim();
 }
 
-/// Les « oreilles » de Clicky avec Whisper : enregistre, puis transcrit.
-class WhisperEars extends ClickyEars {
+/// Les « oreilles » de Clicky avec Whisper : enregistre, puis transcrit
+/// sur le PC.
+class WhisperEars extends RecordingEars {
+  @override
+  String get name => 'Whisper (sur le PC)';
+
+  @override
+  Future<bool> get isReady => Whisper.ready;
+
+  @override
+  Future<String> transcribeFile(String wav) => Whisper.transcribe(wav);
+
+  @override
+  EarsProblem get missing => const EarsProblem(
+    'Whisper n\'est pas encore installé sur ce PC.',
+    fixLabel: 'Installer Whisper',
+    fixUri: whisperInstallUri,
+    code: 'whisper-missing',
+  );
+}
+
+/// Les « oreilles » avec Gemini (ta clé gratuite de Google AI Studio) :
+/// le son est envoyé à Google pour être transcrit. Marche sans rien
+/// installer, mais demande internet.
+class GeminiEars extends RecordingEars {
+  GeminiEars(this.key);
+
+  /// Clé Gemini (celle de la voix de Clicky).
+  final String Function() key;
+
+  @override
+  String get name => 'Gemini (en ligne)';
+
+  @override
+  Future<bool> get isReady async => key().trim().isNotEmpty;
+
+  @override
+  Future<String> transcribeFile(String wav) => GeminiTranscriber.transcribe(wav, key());
+
+  @override
+  EarsProblem get missing => const EarsProblem(
+    'Pas de clé Gemini : ajoute ta clé gratuite (aistudio.google.com) dans Réglages Clicky → Voix.',
+    code: 'gemini-missing',
+  );
+}
+
+/// Transcription par Gemini (audio envoyé à Google).
+class GeminiTranscriber {
+  GeminiTranscriber._();
+
+  static const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+
+  static Future<String> transcribe(String wav, String key, {http.Client? client}) async {
+    if (key.trim().isEmpty) throw 'Pas de clé Gemini';
+    final audio = base64Encode(await File(wav).readAsBytes());
+    final c = client ?? http.Client();
+    Object? last;
+    try {
+      for (final model in models) {
+        try {
+          final r = await c
+              .post(
+                Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
+                headers: {'content-type': 'application/json', 'x-goog-api-key': key.trim()},
+                body: jsonEncode({
+                  'contents': [
+                    {
+                      'parts': [
+                        {
+                          'text': 'Transcris exactement ce qui est dit dans cet enregistrement (en français, '
+                              'ou dans la langue parlée). Réponds uniquement avec le texte transcrit, sans '
+                              'guillemets ni commentaire. S\'il n\'y a pas de parole, réponds par une chaîne vide.',
+                        },
+                        {
+                          'inline_data': {'mime_type': 'audio/wav', 'data': audio},
+                        },
+                      ],
+                    },
+                  ],
+                  'generationConfig': {'temperature': 0},
+                }),
+              )
+              .timeout(const Duration(seconds: 40));
+          if (r.statusCode == 404) {
+            last = 'modèle $model indisponible';
+            continue;
+          }
+          final j = jsonDecode(utf8.decode(r.bodyBytes));
+          if (r.statusCode != 200) {
+            final e = j is Map ? j['error'] : null;
+            final err = e is Map ? e['message'] : null;
+            throw 'Gemini (code ${r.statusCode}) : ${err ?? ''}';
+          }
+          final parts = ((((j as Map)['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
+          return [for (final p in parts ?? const []) if (p is Map && p['text'] != null) '${p['text']}'].join(' ').trim();
+        } on TimeoutException {
+          last = 'Gemini met trop de temps';
+        }
+      }
+      throw '$last';
+    } finally {
+      if (client == null) c.close();
+    }
+  }
+}
+
+/// Oreilles qui enregistrent le micro puis transcrivent le fichier.
+abstract class RecordingEars extends ClickyEars {
+  String get name;
+  Future<bool> get isReady;
+  Future<String> transcribeFile(String wav);
+  EarsProblem get missing;
+
+  /// Dernière erreur de transcription (affichée à la place du texte).
+  String? lastError;
+
   final _rec = AudioRecorder();
   StreamSubscription<Amplitude>? _amp;
   String? _wav;
@@ -231,7 +431,7 @@ class WhisperEars extends ClickyEars {
   void Function(String)? _onText;
 
   @override
-  String? get language => 'fr-FR (Whisper)';
+  String? get language => 'fr-FR ($name)';
 
   @override
   Future<EarsProblem?> start({
@@ -241,14 +441,7 @@ class WhisperEars extends ClickyEars {
     required void Function() onFinalPhrase,
   }) async {
     if (_listening) await cancel();
-    if (!await Whisper.ready) {
-      return const EarsProblem(
-        'Whisper n\'est pas encore installé sur ce PC.',
-        fixLabel: 'Installer Whisper',
-        fixUri: whisperInstallUri,
-        code: 'whisper-missing',
-      );
-    }
+    if (!await isReady) return missing;
     try {
       if (!await _rec.hasPermission()) {
         return const EarsProblem(
@@ -312,9 +505,11 @@ class WhisperEars extends ClickyEars {
     path ??= _wav;
     if (path == null || !await File(path).exists()) return _text;
     try {
-      _text = await Whisper.transcribe(path);
+      _text = await transcribeFile(path);
+      lastError = null;
       _onText?.call(_text);
-    } catch (_) {
+    } catch (e) {
+      lastError = '$e';
       _text = '';
     } finally {
       try {
@@ -338,17 +533,10 @@ class WhisperEars extends ClickyEars {
   @override
   Future<EarsRepair> repair() async {
     await cancel();
-    final ok = await Whisper.ready;
+    final ok = await isReady;
     return EarsRepair(
-      problem: ok
-          ? null
-          : const EarsProblem(
-              'Whisper n\'est pas installé.',
-              fixLabel: 'Installer Whisper',
-              fixUri: whisperInstallUri,
-              code: 'whisper-missing',
-            ),
-      steps: [ok ? 'Whisper est installé et prêt.' : 'Whisper n\'est pas installé.'],
+      problem: ok ? null : missing,
+      steps: [ok ? '$name est prêt.' : missing.message],
     );
   }
 }
@@ -359,15 +547,16 @@ const whisperInstallUri = 'monhub:installer-whisper';
 /// Choisit les oreilles selon le réglage : Windows, Whisper, ou
 /// automatique (Windows, et Whisper dès que Windows ne marche pas).
 class SmartEars extends ClickyEars {
-  SmartEars(this.windows, this.whisper, this.mode);
+  SmartEars(this.windows, this.whisper, this.gemini, this.mode);
 
   final ClickyEars windows;
   final WhisperEars whisper;
+  final GeminiEars gemini;
 
-  /// 'auto', 'windows' ou 'whisper'.
+  /// 'auto', 'windows', 'whisper' ou 'gemini'.
   String Function() mode;
 
-  /// Windows a échoué : on reste sur Whisper jusqu'au redémarrage.
+  /// Windows a échoué : on reste sur le relais jusqu'au redémarrage.
   bool _windowsFailed = false;
   ClickyEars? _current;
 
@@ -378,7 +567,14 @@ class SmartEars extends ClickyEars {
 
   @override
   void warmUp() {
-    if (mode() != 'whisper') windows.warmUp();
+    if (mode() == 'auto' || mode() == 'windows') windows.warmUp();
+  }
+
+  /// Le premier relais prêt : Whisper (sur le PC), sinon Gemini (en ligne).
+  Future<RecordingEars?> _relay() async {
+    if (await whisper.isReady) return whisper;
+    if (await gemini.isReady) return gemini;
+    return null;
   }
 
   @override
@@ -394,17 +590,23 @@ class SmartEars extends ClickyEars {
     }
 
     final m = mode();
-    if (m == 'whisper' || (m == 'auto' && _windowsFailed && await Whisper.ready)) return go(whisper);
+    if (m == 'whisper') return go(whisper);
+    if (m == 'gemini') return go(gemini);
+    if (m == 'auto' && _windowsFailed) {
+      final r = await _relay();
+      if (r != null) return go(r);
+    }
     final p = await go(windows);
     if (p == null || m != 'auto') return p;
-    // Windows ne marche pas : Whisper prend le relais s'il est installé.
-    if (await Whisper.ready) {
+    // Windows ne marche pas : Whisper, sinon Gemini, prend le relais.
+    final r = await _relay();
+    if (r != null) {
       _windowsFailed = true;
-      return go(whisper);
+      return go(r);
     }
     return EarsProblem(
       '${p.message}\n\nSolution sûre : installe Whisper (reconnaissance vocale sur ton PC, '
-      'sans internet, 142 Mo une seule fois).',
+      'sans internet, 142 Mo une seule fois), ou ajoute ta clé Gemini gratuite (Réglages → Voix).',
       fixLabel: 'Installer Whisper',
       fixUri: whisperInstallUri,
       code: p.code,
@@ -420,13 +622,15 @@ class SmartEars extends ClickyEars {
   @override
   Future<EarsRepair> repair() async {
     if (mode() == 'whisper') return whisper.repair();
+    if (mode() == 'gemini') return gemini.repair();
     final r = await windows.repair();
     if (r.ok || mode() != 'auto') return r;
-    if (await Whisper.ready) {
+    final relay = await _relay();
+    if (relay != null) {
       _windowsFailed = true;
       return EarsRepair(
         problem: null,
-        steps: [...r.steps, 'Windows ne marche pas : je passe sur Whisper (installé sur ton PC).'],
+        steps: [...r.steps, 'Windows ne marche pas : je passe sur ${relay.name}.'],
       );
     }
     return EarsRepair(

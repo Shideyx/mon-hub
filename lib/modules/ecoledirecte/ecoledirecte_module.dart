@@ -405,6 +405,32 @@ class EcoleDirecteModule extends HubModule {
       },
     ),
     HubTool(
+      name: 'ecole_espaces_travail',
+      description: 'Mes espaces de travail École Directe (classes, clubs, projets) : titre, description, '
+          'membre ou non, et les fichiers de leur cloud.',
+      run: (_) async {
+        final list = await withSession(client.workspaces);
+        final out = <Map<String, Object?>>[];
+        for (final w in list.take(15)) {
+          List<String> files = const [];
+          if (w.member && w.hasCloud) {
+            try {
+              final c = await withSession(() => client.cloudAll(owner: 'W/${w.id}', maxFolders: 10));
+              files = [for (final f in c.allFiles.take(40)) '${f.name} (id ${f.id})'];
+            } catch (_) {}
+          }
+          out.add({
+            'titre': w.title,
+            if (w.description.isNotEmpty) 'description': w.description,
+            'membre': w.member,
+            if (w.members > 0) 'membres': w.members,
+            if (files.isNotEmpty) 'fichiers': files,
+          });
+        }
+        return out;
+      },
+    ),
+    HubTool(
       name: 'ecole_cloud_telecharger',
       description:
           'Télécharge un fichier de mon cloud École Directe dans Téléchargements\\École Directe '
@@ -590,7 +616,7 @@ class EcoleDirecteModule extends HubModule {
   Widget buildPage(BuildContext context) {
     _ctx = context;
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(name),
@@ -616,6 +642,7 @@ class EcoleDirecteModule extends HubModule {
               Tab(text: 'Notes'),
               Tab(text: 'Messages'),
               Tab(text: 'Cloud'),
+              Tab(text: 'Espaces de travail'),
             ],
           ),
         ),
@@ -651,6 +678,7 @@ class EcoleDirecteModule extends HubModule {
                     wrap(_gradeTiles(context), 'Aucune note pour l\'instant'),
                     _MessagesTab(module: this),
                     _CloudTab(module: this),
+                    _WorkspacesTab(module: this),
                   ],
                 );
               },
@@ -1224,7 +1252,7 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
               FutureBuilder(
                 future: _spaces,
                 builder: (context, snap) {
-                  final spaces = [for (final w in snap.data ?? const <EdWorkspace>[]) if (w.hasCloud) w];
+                  final spaces = [for (final w in snap.data ?? const <EdWorkspace>[]) if (w.hasCloud && w.member) w];
                   if (spaces.isEmpty) return const SizedBox.shrink();
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1325,5 +1353,221 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
       'zip' || 'rar' || '7z' => Icons.folder_zip_rounded,
       _ => Icons.insert_drive_file_rounded,
     };
+  }
+}
+
+
+/// Les espaces de travail : ceux dont tu es membre en premier, avec leur
+/// description et leur cloud.
+class _WorkspacesTab extends StatefulWidget {
+  const _WorkspacesTab({required this.module});
+  final EcoleDirecteModule module;
+
+  @override
+  State<_WorkspacesTab> createState() => _WorkspacesTabState();
+}
+
+class _WorkspacesTabState extends State<_WorkspacesTab> with AutomaticKeepAliveClientMixin {
+  late Future<List<EdWorkspace>> future = widget.module.withSession(widget.module.client.workspaces);
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final m = widget.module;
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => future = m.withSession(m.client.workspaces));
+        await future.then((_) {}, onError: (_) {});
+      },
+      child: FutureBuilder(
+        future: future,
+        builder: (context, snap) {
+          if (snap.hasError) return ListView(children: [ErrorBanner('${snap.error}')]);
+          if (!snap.hasData) return const LoadingHint();
+          final list = [...snap.data!]..sort((a, b) => a.member == b.member ? a.title.compareTo(b.title) : (a.member ? -1 : 1));
+          if (list.isEmpty) {
+            return ListView(
+              children: const [
+                Padding(padding: EdgeInsets.all(32), child: EmptyHint('Aucun espace de travail', icon: Icons.groups_rounded)),
+              ],
+            );
+          }
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              for (final w in list)
+                Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: m.color.withValues(alpha: w.member ? 0.9 : 0.25),
+                      child: Icon(Icons.groups_rounded, color: w.member ? Colors.white : m.color),
+                    ),
+                    title: Text(w.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      [
+                        if (w.description.isNotEmpty) w.description.split('\n').first,
+                        [
+                          w.member ? 'Membre' : 'Pas encore membre',
+                          if (w.members > 0) '${w.members} membres',
+                          if (w.createdBy.isNotEmpty) 'par ${w.createdBy}',
+                        ].join(' · '),
+                      ].join('\n'),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    isThreeLine: w.description.isNotEmpty,
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(builder: (_) => _WorkspacePage(module: m, space: w)),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WorkspacePage extends StatefulWidget {
+  const _WorkspacePage({required this.module, required this.space});
+  final EcoleDirecteModule module;
+  final EdWorkspace space;
+
+  @override
+  State<_WorkspacePage> createState() => _WorkspacePageState();
+}
+
+class _WorkspacePageState extends State<_WorkspacePage> {
+  EcoleDirecteModule get m => widget.module;
+  EdWorkspace get w => widget.space;
+  late Future<EdCloudNode>? cloud = w.member && w.hasCloud ? m.withSession(() => m.client.cloudAll(owner: 'W/${w.id}')) : null;
+  bool joined = false;
+  String? busy;
+
+  Future<void> _open(EdCloudNode f, {required bool saveAs}) async {
+    setState(() => busy = f.id);
+    try {
+      final bytes = await m.withSession(() => m.client.cloudFile(f));
+      if (saveAs) {
+        final loc = await getSaveLocation(suggestedName: f.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'));
+        if (loc == null) return;
+        await File(loc.path).writeAsBytes(bytes, flush: true);
+      } else {
+        await launchUrl(Uri.file(await EcoleDirecteModule.saveDownload(f.name, bytes)));
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => busy = null);
+    }
+  }
+
+  List<Widget> _tree(EdCloudNode n, double indent) => [
+    for (final c in n.children)
+      if (c.folder)
+        ExpansionTile(
+          tilePadding: EdgeInsets.only(left: 16 + indent, right: 16),
+          leading: Icon(Icons.folder_rounded, color: m.color),
+          title: Text(c.name),
+          children: _tree(c, indent + 16),
+        )
+      else
+        ListTile(
+          contentPadding: EdgeInsets.only(left: 16 + indent, right: 8),
+          leading: const Icon(Icons.insert_drive_file_rounded),
+          title: Text(c.name),
+          subtitle: Text([if (c.size > 0) fileSize(c.size), if (c.date != null) dayLabel(c.date!)].join(' · ')),
+          trailing: busy == c.id
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : IconButton(
+                  icon: const Icon(Icons.download_rounded),
+                  tooltip: 'Enregistrer sous…',
+                  onPressed: () => _open(c, saveAs: true),
+                ),
+          onTap: () => _open(c, saveAs: false),
+        ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Scaffold(
+      appBar: AppBar(title: Text(w.title)),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(w.title, style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    w.member || joined ? 'Tu es membre' : 'Tu n\'es pas encore membre',
+                    if (w.members > 0) '${w.members} membres',
+                    if (w.createdBy.isNotEmpty) 'créé par ${w.createdBy}',
+                  ].join(' · '),
+                  style: text.labelMedium,
+                ),
+                if (w.description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(w.description, style: const TextStyle(height: 1.45)),
+                ],
+                if (!w.member && !joined) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.group_add_rounded),
+                    label: const Text('Rejoindre cet espace'),
+                    onPressed: () async {
+                      try {
+                        await m.withSession(() => m.client.joinWorkspace(w));
+                        setState(() {
+                          joined = true;
+                          if (w.hasCloud) cloud = m.withSession(() => m.client.cloudAll(owner: 'W/${w.id}'));
+                        });
+                      } catch (e) {
+                        if (context.mounted) showError(context, e);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (cloud != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.cloud_rounded, color: m.color),
+                  const SizedBox(width: 8),
+                  Text('Cloud de l\'espace', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+            FutureBuilder(
+              future: cloud,
+              builder: (context, snap) {
+                if (snap.hasError) return ErrorBanner('${snap.error}');
+                if (!snap.hasData) return const Padding(padding: EdgeInsets.all(16), child: LoadingHint());
+                final root = snap.data!;
+                if (root.children.isEmpty) {
+                  return const Padding(padding: EdgeInsets.all(16), child: Text('Le cloud de cet espace est vide.'));
+                }
+                return Column(children: _tree(root, 0));
+              },
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
