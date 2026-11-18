@@ -11,6 +11,7 @@ import 'account_sync_view.dart';
 import 'backup_page.dart';
 import 'security_page.dart';
 import 'screen_time_page.dart';
+import 'birthdays_page.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -378,6 +379,13 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: const Text('Temps par appli, limites douces, heure du coucher, mode jeu'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => ScreenTimePage.open(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cake_rounded, color: Color(0xFFE5487B)),
+              title: const Text('Anniversaires des proches'),
+              subtitle: const Text('Google Agenda + ceux que tu ajoutes, rappel la veille et le jour même'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => BirthdaysPage.open(context),
             ),
             section('Confidentialité et sécurité'),
             ListTile(

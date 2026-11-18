@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import '../widgets.dart';
 import 'tutor.dart' show normalize;
+import '../../core/birthdays.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
 typedef QuickTool = Future<Object?> Function(String name, Map<String, dynamic> args);
@@ -38,6 +39,26 @@ class QuickAnswers {
     n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he|alors) )?clicky ?'), '');
     n = n.replaceFirst(RegExp(r' (?:s il te plait|s il vous plait|stp|svp|merci)$'), '');
     return n.trim();
+  }
+
+  /// Retrouve dans la phrase d'origine les mots de [fragment] (avec leurs
+  /// accents et majuscules) : « lea » → « Léa ».
+  static String original(String raw, String fragment) {
+    final want = fragment.trim().split(' ');
+    final words = RegExp(r"[\p{L}\p{N}-]+", unicode: true).allMatches(raw).map((m) => m[0]!).toList();
+    final plain = [for (final w in words) normalize(w)];
+    for (var i = 0; i + want.length <= words.length; i++) {
+      var ok = true;
+      for (var j = 0; j < want.length && ok; j++) {
+        ok = plain[i + j] == want[j];
+      }
+      if (ok) {
+        final s = words.sublist(i, i + want.length).join(' ');
+        return s[0].toUpperCase() + s.substring(1);
+      }
+    }
+    final f = fragment.trim();
+    return f.isEmpty ? f : f[0].toUpperCase() + f.substring(1);
   }
 
   /// Le jour visé par « demain », « aujourd'hui », « jeudi »…
@@ -378,6 +399,46 @@ class QuickAnswers {
         final q = (m[1] ?? m[2] ?? m[3] ?? m[4])!.trim();
         final r = await call('recherche_partout', {'texte': q});
         if (has('recherche_ouvrir')) unawaited(call('recherche_ouvrir', {'texte': q}));
+        if (r is Map) return QuickReply('${r['resume']}');
+      }
+    }
+
+    // Anniversaires.
+    if (has('anniversaire_ajouter')) {
+      final m = RegExp(
+        r'^(?:retiens que |note que |souviens toi que |rappelle toi que |ajoute )?l anniv(?:ersaire)? (?:de |d )'
+        r'([a-z][a-z -]{0,30}?) (?:c est |est |tombe )?(?:le |au )?(\d.*)$',
+      ).firstMatch(n);
+      final date = m == null ? null : Birthdays.parseDate(raw);
+      if (m != null && date != null) {
+        final (month, day, year) = date;
+        final when = '$day/$month${year == null ? '' : '/$year'}';
+        return QuickReply('${await call('anniversaire_ajouter', {'nom': original(raw, m[1]!), 'date': when})}');
+      }
+    }
+    if (has('anniversaires')) {
+      final one = RegExp(
+        r'^(?:c est )?quand (?:est |c est |tombe )?l anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?)$|'
+        r'^l anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?) (?:c est|est|tombe) quand$|'
+        r'^(?:quelle est la )?date (?:de l |d )anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?)$',
+      ).firstMatch(n);
+      if (one != null) {
+        return QuickReply('${await call('anniversaires', {'nom': original(raw, (one[1] ?? one[2] ?? one[3])!)})}');
+      }
+      final list = RegExp(
+        r'^(?:les |mes )?(?:prochains )?anniv(?:ersaire)?s(?: a venir| qui arrivent| de la semaine| cette semaine| du mois| ce mois ci| ce mois)?$|'
+        r'^qui (?:a|fete) son anniv(?:ersaire)? (?:bientot|cette semaine|aujourd hui|demain|ce mois ci|ce mois)$|'
+        r'^c est l anniv(?:ersaire)? de qui(?: aujourd hui| demain)?$|^il y a des anniv(?:ersaire)?s (?:bientot|cette semaine|ce mois ci)$',
+      ).hasMatch(n);
+      if (list) {
+        final days = n.contains('aujourd hui') || n.endsWith('de qui')
+            ? 0
+            : n.contains('demain')
+            ? 1
+            : n.contains('semaine')
+            ? 7
+            : 30;
+        final r = await call('anniversaires', {'jours': days});
         if (r is Map) return QuickReply('${r['resume']}');
       }
     }

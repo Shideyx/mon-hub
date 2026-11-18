@@ -14,6 +14,7 @@ import 'quick.dart' show QuickTool;
 import 'tutor.dart' show normalize;
 import 'school_bag.dart';
 import '../../core/screen_time.dart';
+import '../../core/birthdays.dart';
 
 /// Le texte sans emojis (pour la voix).
 String withoutEmoji(String text) => text
@@ -48,6 +49,9 @@ class AssistantFeature {
     AssistantFeature('sac', Icons.backpack_rounded, Color(0xFF2B6CFF), 'Prépare ton sac',
         'Le soir, d\'après tes cours de demain : les affaires à prendre (tenue de sport, calculatrice…), les devoirs à '
         'rendre et les contrôles.'),
+    AssistantFeature('anniversaires', Icons.cake_rounded, Color(0xFFE5487B), 'Anniversaires',
+        'La veille au soir et le jour même, les anniversaires de tes proches (Google Agenda et ceux que tu ajoutes), '
+        'avec un petit message tout prêt.'),
     AssistantFeature('sommeil', Icons.bedtime_rounded, Color(0xFF5B5BD6), 'Sommeil',
         'Le soir, l\'heure de te coucher d\'après ton premier cours du lendemain (9 h de sommeil, réglable).'),
     AssistantFeature('initiatives', Icons.rocket_launch_rounded, Color(0xFFD35400), 'Initiatives',
@@ -280,6 +284,7 @@ class Assistant extends ChangeNotifier {
       if (on('initiatives')) await _initiatives(hw, n);
       if (on('sac')) await _bag(events, hw, n);
       if (on('sommeil')) await _sleep(events, n);
+      if (on('anniversaires')) await _birthdays(events, n);
     } finally {
       _busy = false;
     }
@@ -326,6 +331,37 @@ class Assistant extends ChangeNotifier {
     if (seen(key)) return;
     await mark(key, n);
     notify?.call('🌙 Bientôt l\'heure de dormir', Sleep.say(first, hours: sleepHours, prep: sleepPrep));
+  }
+
+  // Anniversaires -------------------------------------------------------------
+
+  /// Tous les anniversaires connus : ajoutés à la main + vus dans l'agenda.
+  Future<List<Birthday>> allBirthdays({List<Map>? events, int days = 31}) async {
+    await Birthdays.instance.load();
+    final n = DateTime.now();
+    final ev = events ??
+        _list(await _get('agenda_lire', {'debut': DateTime(n.year, n.month, n.day).toIso8601String().substring(0, 10), 'jours': days}));
+    return [...Birthdays.instance.saved, ...Birthdays.fromEvents(ev)];
+  }
+
+  Future<void> _birthdays(List<Map> events, DateTime n) async {
+    final up = Birthdays.upcoming(await allBirthdays(events: events), n, days: 1);
+    final today = DateTime(n.year, n.month, n.day);
+    for (final (b, d) in up) {
+      final isToday = d == today;
+      // Le jour même à partir de 8 h ; la veille à partir de 19 h.
+      if (isToday ? n.hour < 8 : n.hour < 19) continue;
+      final key = 'anniv|${Birthdays.key(b.name)}|${d.toIso8601String().substring(0, 10)}|${isToday ? 'jour' : 'veille'}';
+      if (seen(key)) continue;
+      await mark(key, n);
+      final age = Birthdays.age(b, d);
+      notify?.call(
+        isToday ? '🎂 C\'est l\'anniversaire de ${b.name} !' : '🎁 Demain : anniversaire de ${b.name}',
+        isToday
+            ? 'Un petit message ? « ${Birthdays.wish(b, d)} »'
+            : '${age == null ? '' : '$age ans. '}Pense au cadeau ou à un petit mot demain.',
+      );
+    }
   }
 
   // Prépare ton sac -----------------------------------------------------------
@@ -1053,6 +1089,67 @@ class Assistant extends ChangeNotifier {
   // Outils (pour Clicky et Claude) ------------------------------------------
 
   List<HubTool> get tools => [
+    HubTool(
+      name: 'anniversaires',
+      description:
+          'Les anniversaires des proches qui arrivent (Google Agenda + ceux ajoutés à Mon Hub), ou la date de celui de '
+          'quelqu\'un.',
+      params: {
+        'jours': ('integer', 'Sur combien de jours (défaut 30)'),
+        'nom': ('string', 'Le prénom de la personne (facultatif)'),
+      },
+      run: (a) async {
+        final n = DateTime.now();
+        final name = '${a['nom'] ?? ''}'.trim();
+        final all = await allBirthdays(days: name.isEmpty ? 31 : 366);
+        if (name.isNotEmpty) {
+          final k = Birthdays.key(name);
+          final b = all.where((b) => Birthdays.key(b.name) == k).firstOrNull ??
+              all.where((b) => Birthdays.key(b.name).split(' ').contains(k) || Birthdays.key(b.name).startsWith(k)).firstOrNull;
+          if (b == null) return 'Je ne connais pas l\'anniversaire de $name. Dis-moi : « l\'anniversaire de $name c\'est le 12 mars ».';
+          final d = Birthdays.next(b, n);
+          final left = d.difference(DateTime(n.year, n.month, n.day)).inDays;
+          final age = Birthdays.age(b, d);
+          return 'L\'anniversaire de ${b.name} : le ${Birthdays.dateText(Birthday(b.name, b.month, b.day))}'
+              '${left == 0 ? ', c\'est aujourd\'hui ! 🎂' : left == 1 ? ', c\'est demain !' : ' (dans $left jours)'}'
+              '${age == null ? '' : ' — $age ans'}.';
+        }
+        final up = Birthdays.upcoming(all, n, days: (a['jours'] as num?)?.toInt() ?? 30);
+        return {
+          'resume': Birthdays.say(up, n),
+          'liste': [
+            for (final (b, d) in up) {'nom': b.name, 'date': d.toIso8601String().substring(0, 10), 'age': ?Birthdays.age(b, d)},
+          ],
+        };
+      },
+    ),
+    HubTool(
+      name: 'anniversaire_ajouter',
+      description: 'Retient l\'anniversaire de quelqu\'un (« l\'anniversaire de Léa c\'est le 12 mars »).',
+      params: {
+        'nom': ('string', 'Le prénom (ou prénom et nom)'),
+        'date': ('string', 'La date : « 12 mars », « 12/03 » ou « 12/03/2011 » (avec l\'année pour savoir l\'âge)'),
+      },
+      required: ['nom', 'date'],
+      run: (a) async {
+        final name = '${a['nom'] ?? ''}'.trim();
+        final d = Birthdays.parseDate('${a['date'] ?? ''}');
+        if (name.isEmpty || d == null) return 'Je n\'ai pas compris la date (par exemple : « 12 mars » ou « 12/03/2011 »).';
+        final (m, day, y) = d;
+        final b = Birthday(name[0].toUpperCase() + name.substring(1), m, day, year: y);
+        await Birthdays.instance.add(b);
+        return 'C\'est noté : anniversaire de ${b.name} le ${Birthdays.dateText(b)}. Je te le rappellerai la veille et le jour même.';
+      },
+    ),
+    HubTool(
+      name: 'anniversaire_supprimer',
+      description: 'Oublie l\'anniversaire ajouté pour quelqu\'un.',
+      params: {'nom': ('string', 'Le prénom')},
+      required: ['nom'],
+      run: (a) async => await Birthdays.instance.remove('${a['nom'] ?? ''}')
+          ? 'Oublié.'
+          : 'Je n\'avais pas d\'anniversaire à ce nom (ceux de Google Agenda se changent dans Google Contacts).',
+    ),
     HubTool(
       name: 'assistant_coucher',
       description: 'L\'heure à laquelle se coucher ce soir, d\'après le premier cours de demain et les heures de sommeil voulues.',
