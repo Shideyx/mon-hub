@@ -24,11 +24,15 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   accord ; les commandes risquées sont toujours montrées avant d'être lancées.
 - **Journal d'erreurs sans secrets** : clés et jetons y sont masqués.
 - **Compte sur plusieurs appareils** (si tu l'actives) : la copie de ton compte
-  vit dans **ton** Google Drive (dossier caché réservé à Mon Hub), compressée
-  puis chiffrée en AES-256-GCM avec une clé tirée de ton mot de passe Mon Hub
-  (PBKDF2-SHA256, 210 000 tours) et liée à ton identifiant. Google ne peut pas
-  la lire, et elle ne passe par aucun serveur à nous. La clé de coffre de
-  chaque PC ne quitte jamais ce PC.
+  vit dans **ton** Google Drive (dossier « Mon Hub - compte synchronisé »),
+  compressée puis chiffrée en AES-256-GCM avec une clé tirée de ton mot de
+  passe Mon Hub (PBKDF2-SHA256, 210 000 tours, sur son empreinte salée) et liée
+  à ton identifiant. Google ne peut pas la lire, et elle ne passe par aucun
+  serveur à nous. La clé de coffre de chaque PC ne quitte jamais ce PC.
+- **Demande depuis un nouvel appareil** : Mon Hub n'envoie la copie de lui-même
+  que si une demande est déposée dans ce même Google Drive (donc par quelqu'un
+  qui a accès à ton compte Google), et la copie reste illisible sans ton mot
+  de passe Mon Hub. Une notification le signale sur le PC qui l'envoie.
 
 ## Réglages GitHub conseillés (à faire une fois)
 

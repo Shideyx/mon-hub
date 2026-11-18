@@ -67,18 +67,9 @@ class GoogleAuth {
     // Ton Drive en entier : le lire, y ranger tes fichiers (Clicky), ouvrir
     // et enregistrer tes Google Docs dans le Word de Mon Hub.
     driveScope,
-    // Le dossier caché de Mon Hub dans ton Drive : la copie chiffrée de ton
-    // compte, pour le retrouver sur tes autres appareils (account_sync.dart).
-    appDataScope,
   ];
 
   static const driveScope = 'https://www.googleapis.com/auth/drive';
-  static const appDataScope = 'https://www.googleapis.com/auth/drive.appdata';
-
-  /// Le compte a autorisé le dossier caché de Mon Hub (synchro du compte).
-  /// Ceux connectés avant la v1.48 doivent être reconnectés une fois.
-  static bool canSync(String email) =>
-      (store.getJson<String>('scopes.$email') ?? '').split(' ').contains(appDataScope);
 
   /// Le compte Google utilisé pour le Drive et les Docs (celui choisi dans
   /// le module Drive, sinon le premier).

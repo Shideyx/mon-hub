@@ -21,13 +21,15 @@ import 'vault.dart';
 ///
 /// Une copie du compte (réglages, modules, connexions, historiques,
 /// carnet, révisions…) est gardée dans **ton** Google Drive, dans le dossier
-/// caché réservé à Mon Hub (« appDataFolder » : invisible dans le Drive,
-/// aucune autre appli ne peut le lire). Elle est chiffrée (AES-256-GCM) avec
-/// une clé tirée de ton mot de passe Mon Hub : Google ne peut pas la lire, et
+/// « Mon Hub - compte synchronisé ». Elle est chiffrée (AES-256-GCM) avec une
+/// clé tirée de ton mot de passe Mon Hub : Google ne peut pas la lire, et
 /// Mon Hub n'a toujours **aucun serveur**.
 ///
 /// Sur un autre appareil : page de connexion → « Retrouver mon compte » →
-/// même compte Google → ton mot de passe Mon Hub, et tout est là.
+/// même compte Google → ton mot de passe Mon Hub, et tout est là. Si l'autre
+/// PC n'a pas activé la synchro (et que tu n'y as pas accès), le nouvel
+/// appareil dépose une **demande** dans le Drive : Mon Hub, ouvert sur l'autre
+/// PC, la voit et envoie le compte tout seul ([answerRequests]).
 ///
 /// Chaque appareil fusionne ses changements avec ceux des autres toutes les
 /// quelques minutes, réglage par réglage et fichier par fichier : le plus
@@ -37,10 +39,13 @@ class AccountSync extends ChangeNotifier {
   static final instance = AccountSync._();
 
   /// Où est gardée la copie (tests : en mémoire).
-  static SyncCloud Function(String email) cloudFor = DriveAppData.new;
+  static SyncCloud Function(String email) cloudFor = DriveFolder.new;
 
   /// Rythme de la synchro quand Mon Hub est ouvert.
   static const every = Duration(minutes: 3);
+
+  /// Rythme de la recherche des demandes d'un autre appareil.
+  static const watchEvery = Duration(minutes: 5);
 
   // Réglages de la synchro : propres à cet appareil, jamais synchronisés.
   static const _emailKey = 'sync.email';
@@ -48,8 +53,11 @@ class AccountSync extends ChangeNotifier {
   static const _lastKey = 'sync.last';
   static const _keyName = 'sync.key';
 
-  /// Nom de la copie dans le dossier caché du Drive.
+  /// Nom de la copie dans le Drive.
   static String fileName(String login) => 'compte-$login.monhub';
+
+  /// Nom de la demande déposée par un nouvel appareil.
+  static String requestName(String login) => 'demande-compte-$login.json';
 
   /// Compte Google qui garde la copie (null : synchro désactivée).
   String? get email => ModuleStore.prefs.getString(_emailKey);
@@ -70,6 +78,10 @@ class AccountSync extends ChangeNotifier {
   /// ici (clés « p:… » réglages, « s:… » connexions, « f:… » fichiers).
   void Function(Set<String> keys)? onApplied;
 
+  /// Pour prévenir la personne (notification) : compte envoyé à la demande
+  /// d'un autre appareil.
+  void Function(String title, String body)? onNotice;
+
   /// Ce que la dernière synchro a vu (empreintes + dates, aucune valeur).
   final _base = JsonFile<Map<String, dynamic>>(
     'sync-base.json',
@@ -79,6 +91,7 @@ class AccountSync extends ChangeNotifier {
   );
 
   Timer? _timer;
+  Timer? _watch;
 
   /// Change à chaque arrêt : une synchro en cours s'arrête avant d'écrire.
   int _gen = 0;
@@ -88,15 +101,19 @@ class AccountSync extends ChangeNotifier {
 
   // ---------- Marche / arrêt ----------
 
-  /// Compte ouvert : synchro maintenant puis toutes les [every].
+  /// Compte ouvert (Mon Hub, pas les widgets ni Clicky partout) : synchro
+  /// maintenant puis toutes les [every], et réponse aux demandes des autres
+  /// appareils toutes les [watchEvery].
   void start() {
     stop();
-    if (!enabled) return;
     final gen = _gen;
-    Future<void>.delayed(const Duration(seconds: 8), () {
-      if (gen == _gen) unawaited(syncNow());
+    Future<void>.delayed(const Duration(seconds: 8), () async {
+      if (gen != _gen) return;
+      if (enabled) await syncNow();
+      if (gen == _gen) await answerRequests();
     });
-    _schedule();
+    _watch = Timer.periodic(watchEvery, (_) => unawaited(answerRequests()));
+    if (enabled) _schedule();
   }
 
   void _schedule() {
@@ -107,6 +124,8 @@ class AccountSync extends ChangeNotifier {
   void stop() {
     _timer?.cancel();
     _timer = null;
+    _watch?.cancel();
+    _watch = null;
     _gen++;
     error = null;
     needsPassword = false;
@@ -120,12 +139,7 @@ class AccountSync extends ChangeNotifier {
     final acc = AppSession.instance.current;
     final mail = email;
     if (acc == null || mail == null || busy) return;
-    final key = await _loadKey();
-    if (key == null) {
-      needsPassword = true;
-      notifyListeners();
-      return;
-    }
+    final key = await _loadKey() ?? await _freshKey(acc);
     await _guard(() => _sync(acc, mail, key));
   }
 
@@ -172,7 +186,17 @@ class AccountSync extends ChangeNotifier {
     if (copy == null) {
       remote = {};
     } else if (copy.version != seen || base.isEmpty || local.unreadable.isNotEmpty) {
-      remote = (await SyncBox.open(SyncBox.header(await cloud.read(copy.id)), key, acc.login)).entries;
+      final h = SyncBox.header(await cloud.read(copy.id));
+      try {
+        remote = (await SyncBox.open(h, key, acc.login)).entries;
+      } on WrongPassword {
+        // Copie refaite ailleurs avec le même mot de passe (autre sel) : on
+        // retrouve la clé sans rien demander.
+        if (h.accountSalt != acc.salt) rethrow;
+        key = await SyncKey.forAccount(acc, salt: h.salt, iterations: h.iterations);
+        remote = (await SyncBox.open(h, key, acc.login)).entries;
+        await _saveKey(key);
+      }
     }
     // remote == null : la copie n'a pas bougé depuis la dernière synchro.
     final merged = SyncMerge.prune(remote == null ? stamped : SyncMerge.merge(stamped, remote), now);
@@ -196,42 +220,39 @@ class AccountSync extends ChangeNotifier {
   // ---------- Activer / arrêter (Réglages) ----------
 
   /// Active la synchro du compte connecté avec le Drive de [mail].
-  Future<void> enable({required String mail, required String password}) async {
+  Future<void> enable({required String mail}) async {
     final acc = AppSession.instance.current;
     if (acc == null) throw 'Connecte-toi d\'abord';
-    if (!AppSession.instance.checkPassword(password)) throw 'Mot de passe incorrect';
     try {
-      await _enable(acc, mail, password);
+      await _guard(rethrowError: true, () => _enable(acc, mail));
     } finally {
       // Même si internet a coupé : on réessaiera tout seul.
       if (enabled) _schedule();
     }
   }
 
-  Future<void> _enable(HubAccount acc, String mail, String password) async {
-    await _guard(rethrowError: true, () async {
-      final cloud = cloudFor(mail);
-      final copy = (await cloud.list()).where((c) => c.name == fileName(acc.login)).firstOrNull;
-      SyncKey key;
-      if (copy != null) {
-        // Déjà gardé (autre appareil, ou synchro réactivée) : même clé.
-        final h = SyncBox.header(await cloud.read(copy.id));
-        key = await SyncKey.derive(password, salt: h.salt, iterations: h.iterations);
-        try {
-          await SyncBox.open(h, key, acc.login);
-        } on WrongPassword {
-          throw 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
-              'avec un autre mot de passe.';
-        }
-      } else {
-        key = await SyncKey.derive(password);
+  Future<void> _enable(HubAccount acc, String mail) async {
+    final cloud = cloudFor(mail);
+    final copy = (await cloud.list()).where((c) => c.name == fileName(acc.login)).firstOrNull;
+    SyncKey key;
+    if (copy != null) {
+      // Déjà gardé (autre appareil, ou synchro réactivée) : même clé.
+      final h = SyncBox.header(await cloud.read(copy.id));
+      key = await SyncKey.forAccount(acc, salt: h.salt, iterations: h.iterations);
+      try {
+        await SyncBox.open(h, key, acc.login);
+      } on WrongPassword {
+        throw 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
+            'avec un autre mot de passe.';
       }
-      await _saveKey(key);
-      await ModuleStore.prefs.setString(_emailKey, mail);
-      await ModuleStore.prefs.remove(_versionKey);
-      await _base.save({});
-      await _sync(acc, mail, key);
-    });
+    } else {
+      key = await SyncKey.forAccount(acc);
+    }
+    await _saveKey(key);
+    await ModuleStore.prefs.setString(_emailKey, mail);
+    await ModuleStore.prefs.remove(_versionKey);
+    await _base.save({});
+    await _sync(acc, mail, key);
   }
 
   /// Arrête la synchro sur cet appareil ([deleteCopy] : supprime aussi la
@@ -251,11 +272,12 @@ class AccountSync extends ChangeNotifier {
     }
     await ModuleStore.deleteSecretRaw(_keyName);
     await _base.save({});
+    // Les demandes des autres appareils restent surveillées.
+    if (acc != null) _watch ??= Timer.periodic(watchEvery, (_) => unawaited(answerRequests()));
     notifyListeners();
   }
 
-  /// Mot de passe retapé (copie chiffrée avec un autre mot de passe, ou clé
-  /// perdue).
+  /// Mot de passe retapé (copie chiffrée ailleurs avec un autre mot de passe).
   Future<void> unlock(String password) async {
     final acc = AppSession.instance.current;
     final mail = email;
@@ -265,10 +287,10 @@ class AccountSync extends ChangeNotifier {
     final copy = (await cloud.list()).where((c) => c.name == fileName(acc.login)).firstOrNull;
     SyncKey key;
     if (copy == null) {
-      key = await SyncKey.derive(password);
+      key = await SyncKey.forAccount(acc);
     } else {
       final h = SyncBox.header(await cloud.read(copy.id));
-      key = await SyncKey.derive(password, salt: h.salt, iterations: h.iterations);
+      key = await SyncKey.fromPassword(h, password);
       try {
         await SyncBox.open(h, key, acc.login);
       } on WrongPassword {
@@ -283,11 +305,64 @@ class AccountSync extends ChangeNotifier {
   /// Juste après « Se connecter » : reprend la synchro si elle attendait le
   /// mot de passe.
   Future<void> afterSignIn(String password) async {
-    if (!enabled) return;
-    if (!needsPassword && await _loadKey() != null) return;
+    if (!enabled || !needsPassword) return;
     try {
       await unlock(password);
     } catch (_) {}
+  }
+
+  // ---------- Demandes d'un autre appareil ----------
+
+  /// Un autre appareil a demandé ce compte (fichier « demande » déposé dans
+  /// le Drive, donc par quelqu'un qui a accès à ce compte Google) : on lui
+  /// envoie, même si personne n'est devant ce PC. La copie est chiffrée : il
+  /// faut le mot de passe Mon Hub pour l'ouvrir.
+  Future<void> answerRequests() async {
+    final acc = AppSession.instance.current;
+    if (acc == null || busy || _joining != null) return;
+    for (final mail in GoogleAuth.accounts.where(GoogleAuth.canWriteDrive)) {
+      try {
+        final cloud = cloudFor(mail);
+        final asks = [for (final c in await cloud.list()) if (c.name == requestName(acc.login)) c];
+        if (asks.isEmpty) continue;
+        final was = enabled;
+        if (!was) {
+          await enable(mail: mail);
+        } else if (email == mail) {
+          await syncNow();
+        } else {
+          // La copie est gardée dans un autre compte Google.
+          continue;
+        }
+        if (error != null || needsPassword) return;
+        for (final a in asks) {
+          await cloud.delete(a.id);
+        }
+        if (!was) {
+          onNotice?.call(
+            'Compte envoyé à ton autre appareil',
+            'Un autre appareil a demandé ton compte « ${acc.login} » : il est maintenant dans ton '
+                'Google Drive ($mail), chiffré avec ton mot de passe, et reste synchronisé. '
+                'Réglages → Mes appareils pour arrêter.',
+          );
+        }
+        return;
+      } catch (_) {}
+    }
+  }
+
+  /// Nouvel appareil : dépose une demande du compte [login] dans le Drive
+  /// de [mail] (Mon Hub, ouvert sur l'autre PC, y répond tout seul).
+  static Future<void> requestCopy(String mail, String login) async {
+    final id = AppSession.normalize(login);
+    if (!RegExp(r'^[a-z0-9._-]{3,}$').hasMatch(id)) throw 'Tape ton identifiant Mon Hub';
+    final cloud = cloudFor(mail);
+    final old = (await cloud.list()).where((c) => c.name == requestName(id)).firstOrNull;
+    await cloud.write(
+      requestName(id),
+      jsonEncode({'app': 'mon-hub-demande', 'identifiant': id, 'demande': DateTime.now().toUtc().toIso8601String()}),
+      id: old?.id,
+    );
   }
 
   // ---------- Nouvel appareil (page de connexion) ----------
@@ -337,8 +412,9 @@ class AccountSync extends ChangeNotifier {
     }
     beginJoin();
     final ns = ModuleStore.profile;
-    final h = SyncBox.header(await cloudFor(mail).read(copy.id));
-    final key = await SyncKey.derive(password, salt: h.salt, iterations: h.iterations);
+    final cloud = cloudFor(mail);
+    final h = SyncBox.header(await cloud.read(copy.id));
+    final key = await SyncKey.fromPassword(h, password);
     final opened = await SyncBox.open(h, key, login);
     final a = opened.account;
     final name = '${a['nom'] ?? login}';
@@ -353,6 +429,12 @@ class AccountSync extends ChangeNotifier {
     await ModuleStore.prefs.setString(_emailKey, mail);
     await _base.save({});
     await _guard(rethrowError: true, () => _sync(acc, mail, key, remoteWins: true));
+    // La demande éventuelle a servi.
+    try {
+      for (final c in await cloud.list()) {
+        if (c.name == requestName(login)) await cloud.delete(c.id);
+      }
+    } catch (_) {}
     await AppSession.instance.adopt(acc);
     _joining = null;
   }
@@ -481,6 +563,13 @@ class AccountSync extends ChangeNotifier {
   }
 
   // ---------- Clé de la copie ----------
+
+  /// Pas encore de clé ici : celle du compte, sans rien demander.
+  Future<SyncKey> _freshKey(HubAccount acc) async {
+    final key = await SyncKey.forAccount(acc);
+    await _saveKey(key);
+    return key;
+  }
 
   Future<SyncKey?> _loadKey() async {
     try {
@@ -614,12 +703,19 @@ class WrongPassword implements Exception {
   String toString() => 'Mot de passe incorrect';
 }
 
-/// Clé de la copie, tirée du mot de passe Mon Hub (PBKDF2-SHA256).
+/// Clé de la copie (PBKDF2-SHA256). Tirée de l'empreinte du mot de passe
+/// Mon Hub : l'appareil où le compte est ouvert la connaît (il peut donc
+/// envoyer la copie sans qu'on lui retape le mot de passe) ; un nouvel
+/// appareil la refait à partir du mot de passe tapé.
 class SyncKey {
-  SyncKey(this.salt, this.bytes, this.iterations);
+  SyncKey(this.salt, this.bytes, this.iterations, {this.accountSalt});
   final List<int> salt;
   final List<int> bytes;
   final int iterations;
+
+  /// Sel du mot de passe du compte (null : ancienne clé, tirée du mot de
+  /// passe lui-même, v1.48).
+  final String? accountSalt;
 
   /// Assez lent pour rendre impossible de deviner le mot de passe.
   @visibleForTesting
@@ -627,12 +723,12 @@ class SyncKey {
 
   static final _rnd = Random.secure();
 
-  static Future<SyncKey> derive(String password, {List<int>? salt, int? iterations}) async {
+  static Future<SyncKey> derive(String secret, {List<int>? salt, int? iterations, String? accountSalt}) async {
     final s = salt ?? List.generate(16, (_) => _rnd.nextInt(256));
     final it = iterations ?? defaultIterations;
     Future<List<int>> run() async {
       final k = await Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: it, bits: 256)
-          .deriveKeyFromPassword(password: password, nonce: s);
+          .deriveKeyFromPassword(password: secret, nonce: s);
       return k.extractBytes();
     }
 
@@ -643,10 +739,27 @@ class SyncKey {
     } catch (_) {
       bytes = await run();
     }
-    return SyncKey(s, bytes, it);
+    return SyncKey(s, bytes, it, accountSalt: accountSalt);
   }
 
-  String toJson() => jsonEncode({'sel': base64.encode(salt), 'cle': base64.encode(bytes), 'iterations': iterations});
+  /// La clé d'un compte ouvert ici.
+  static Future<SyncKey> forAccount(HubAccount acc, {List<int>? salt, int? iterations}) =>
+      derive(acc.hash, salt: salt, iterations: iterations, accountSalt: acc.salt);
+
+  /// Sur un nouvel appareil : la clé de la copie [h], à partir du mot de passe.
+  static Future<SyncKey> fromPassword(SyncHeader h, String password) {
+    final s = h.accountSalt;
+    return s == null
+        ? derive(password, salt: h.salt, iterations: h.iterations)
+        : derive(AppSession.passwordHash(s, password), salt: h.salt, iterations: h.iterations, accountSalt: s);
+  }
+
+  String toJson() => jsonEncode({
+    'sel': base64.encode(salt),
+    'cle': base64.encode(bytes),
+    'iterations': iterations,
+    'compte': ?accountSalt,
+  });
 
   static SyncKey? parse(String? raw) {
     if (raw == null) return null;
@@ -656,6 +769,7 @@ class SyncKey {
         base64.decode('${j['sel']}'),
         base64.decode('${j['cle']}'),
         (j['iterations'] as num).toInt(),
+        accountSalt: j['compte'] as String?,
       );
     } catch (_) {
       return null;
@@ -663,14 +777,15 @@ class SyncKey {
   }
 }
 
-/// En-tête lisible d'une copie (sans le mot de passe : rien d'autre que
-/// l'identifiant et de quoi refaire la clé).
+/// En-tête lisible d'une copie : l'identifiant et de quoi refaire la clé à
+/// partir du mot de passe (rien qui permette de l'ouvrir sans lui).
 class SyncHeader {
-  SyncHeader(this.login, this.salt, this.iterations, this.data);
+  SyncHeader(this.login, this.salt, this.iterations, this.data, [this.accountSalt]);
   final String login;
   final List<int> salt;
   final int iterations;
   final String data;
+  final String? accountSalt;
 }
 
 /// Contenu déchiffré d'une copie.
@@ -698,11 +813,12 @@ class SyncBox {
       'compte': {'nom': account.name, 'sel': account.salt, 'empreinte': account.hash},
       'donnees': {for (final e in entries.entries) e.key: e.value.toJson()},
     });
+    final bytes = key.bytes;
     Future<String> run() async {
       final packed = GZipEncoder().encodeBytes(utf8.encode(inner));
       final box = await AesGcm.with256bits().encrypt(
         packed,
-        secretKey: SecretKey(key.bytes),
+        secretKey: SecretKey(bytes),
         // Lié à l'identifiant : impossible de faire passer la copie d'un
         // compte pour celle d'un autre.
         aad: utf8.encode('$app:$login'),
@@ -718,11 +834,12 @@ class SyncBox {
     }
     return jsonEncode({
       'app': app,
-      'version': 1,
+      'version': key.accountSalt == null ? 1 : 2,
       'identifiant': login,
       'chiffre': 'AES-256-GCM / PBKDF2-SHA256',
       'iterations': key.iterations,
       'sel': base64.encode(key.salt),
+      'sel_compte': ?key.accountSalt,
       'donnees': data,
     });
   }
@@ -736,6 +853,7 @@ class SyncBox {
         base64.decode('${j['sel']}'),
         (j['iterations'] as num).toInt(),
         '${j['donnees']}',
+        j['sel_compte'] as String?,
       );
     } catch (_) {
       throw 'La copie du compte dans le Drive est abîmée';
@@ -788,7 +906,7 @@ class SyncBox {
   }
 }
 
-/// Une copie de compte dans le cloud.
+/// Une copie de compte (ou une demande) dans le cloud.
 class CloudCopy {
   const CloudCopy(this.id, this.name, this.version, [this.modified]);
   final String id;
@@ -813,15 +931,21 @@ abstract class SyncCloud {
   Future<void> delete(String id);
 }
 
-/// Le dossier caché de Mon Hub dans le Google Drive de la personne
-/// (appDataFolder) : invisible dans le Drive, réservé à Mon Hub.
-class DriveAppData implements SyncCloud {
-  DriveAppData(this.email);
+/// Le dossier « Mon Hub - compte synchronisé » du Google Drive de la
+/// personne (accès au Drive déjà donné à Mon Hub depuis la v1.37 : rien à
+/// reconnecter). Le rangement du Drive ne touche pas aux dossiers.
+class DriveFolder implements SyncCloud {
+  DriveFolder(this.email);
   final String email;
 
+  static const folderName = 'Mon Hub - compte synchronisé';
+  static const _folderMime = 'application/vnd.google-apps.folder';
   static const _files = 'https://www.googleapis.com/drive/v3/files';
   static const _upload = 'https://www.googleapis.com/upload/drive/v3/files';
   static const _fields = 'id,name,version,modifiedTime';
+
+  /// Dossiers trouvés, par compte Google.
+  static final _folders = <String, List<String>>{};
 
   Future<Map<String, String>> _auth() async => {
     'Authorization': 'Bearer ${await GoogleAuth.accessToken(email)}',
@@ -840,28 +964,58 @@ class DriveAppData implements SyncCloud {
       m = '${((jsonDecode(utf8.decode(r.bodyBytes)) as Map)['error'] as Map)['message']}';
     } catch (_) {}
     if (r.statusCode == 401 || r.statusCode == 403 || m.contains('scope')) {
-      return 'Google : autorise Mon Hub à garder ton compte dans le Drive '
-          '(Réglages → Mes appareils → reconnecter $email)';
+      return 'Google : reconnecte $email pour autoriser Mon Hub à écrire dans ton Drive '
+          '(Réglages → Mes appareils)';
     }
     return 'Google Drive : $m';
   }
 
-  @override
-  Future<List<CloudCopy>> list() async {
+  Future<List<Map<dynamic, dynamic>>> _query(String q, String fields) async {
     final r = await http.get(
       Uri.parse(_files).replace(
-        queryParameters: {
-          'spaces': 'appDataFolder',
-          'q': 'trashed = false',
-          'pageSize': '100',
-          'fields': 'files($_fields)',
-        },
+        queryParameters: {'q': q, 'pageSize': '100', 'fields': 'files($fields)', 'spaces': 'drive'},
       ),
       headers: await _auth(),
     );
     if (r.statusCode >= 400) throw _error(r);
     final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
-    return [for (final f in (j['files'] as List? ?? const [])) _copy(f as Map)];
+    return [for (final f in (j['files'] as List? ?? const [])) f as Map];
+  }
+
+  Future<List<String>> _folderIds({bool create = false}) async {
+    final known = _folders[email];
+    if (known != null && known.isNotEmpty) return known;
+    final found = [
+      for (final f in await _query(
+        "name = '$folderName' and mimeType = '$_folderMime' and trashed = false and 'me' in owners",
+        'id',
+      ))
+        '${f['id']}',
+    ];
+    if (found.isEmpty && create) {
+      final r = await http.post(
+        Uri.parse('$_files?fields=id'),
+        headers: {...await _auth(), 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': folderName,
+          'mimeType': _folderMime,
+          'description': 'Copie chiffrée de ton compte Mon Hub, pour le retrouver sur tes autres appareils. '
+              'Illisible sans ton mot de passe Mon Hub. Ne pas supprimer.',
+        }),
+      );
+      if (r.statusCode >= 400) throw _error(r);
+      found.add('${(jsonDecode(utf8.decode(r.bodyBytes)) as Map)['id']}');
+    }
+    if (found.isNotEmpty) _folders[email] = found;
+    return found;
+  }
+
+  @override
+  Future<List<CloudCopy>> list() async {
+    final ids = await _folderIds();
+    if (ids.isEmpty) return [];
+    final inside = ids.map((id) => "'$id' in parents").join(' or ');
+    return [for (final f in await _query('($inside) and trashed = false', _fields)) _copy(f)];
   }
 
   @override
@@ -882,10 +1036,11 @@ class DriveAppData implements SyncCloud {
         body: data,
       );
     } else {
+      final folder = (await _folderIds(create: true)).first;
       const boundary = 'monhub-compte-5c1e';
       final meta = jsonEncode({
         'name': name,
-        'parents': ['appDataFolder'],
+        'parents': [folder],
       });
       final body = BytesBuilder()
         ..add(utf8.encode('--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n'))
