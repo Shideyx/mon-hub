@@ -34,6 +34,20 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   qui a accès à ton compte Google), et la copie reste illisible sans ton mot
   de passe Mon Hub. Une notification le signale sur le PC qui l'envoie.
 
+- **Bouclier anti-arnaque** (sur l'appareil, sans IA ni serveur) : les liens
+  et fichiers reçus sur Discord et par mail sont vérifiés (faux Nitro/Robux,
+  sites sosies, espions d'adresse IP, raccourcisseurs, `.exe` « teste mon
+  jeu », connexion par QR code) ; un faux site ne s'ouvre pas sans ton accord.
+- **Bilan de sécurité** : antivirus, pare-feu, mises à jour, UAC, double
+  authentification (lecture seule, sans droits d'administrateur).
+- **Recherche partout** : l'index de Windows est lu avec des mots nettoyés
+  (lettres et chiffres seulement : rien ne peut sortir de la requête).
+- **Temps d'écran** : compté sur ce PC seulement, jamais synchronisé ni envoyé.
+- **Code de liaison iPhone** : la clé de *ton* appli Google (pas un mot de
+  passe : Google la dit non confidentielle pour une appli installée) passe du
+  PC à l'iPhone par ton presse-papier ou ta propre boîte mail, jamais par un
+  serveur.
+
 ## Extension Chrome « Clicky dans le navigateur »
 
 - Elle ne parle qu'à Mon Hub, sur ce PC (`ws://127.0.0.1:47614`), et Mon Hub n'accepte que **cette** extension

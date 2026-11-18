@@ -275,3 +275,29 @@
   fait », long → Google Doc). « Fais mes devoirs (de maths pour lundi) » = `homeworkRequest` → `homeworkTask` → tâche
   de fond `doForMe`. Réglage `helpOnly` (« Aider sans faire à ma place », désactivé par défaut, partagé) remet l'ancien
   comportement.
+- **v1.56 — vie hors école** : bouclier anti-arnaque `core/scam_shield.dart` (`ScamShield.checkUrl/checkMessage`, sans IA,
+  sosies seulement de `_phished`, marques en mots entiers ; Discord `poll` + mails `MailModule.scamOf` → notifications
+  `arnaque:` qui passent toujours ; `Browser.confirmScam`, `HubWebView.onCreateWindow`) ; bilan de sécurité
+  `core/security_check.dart` + `ui/security_page.dart` (PowerShell SecurityCenter2/Defender/pare-feu/HotFix/UAC, 2FA Discord
+  `discord_securite`, autres comptes à cocher `secu.fait`) ; « qu'est-ce que j'ai raté ? » `ui/clicky/catch_up.dart`
+  (`CatchUp.build/short/gather`, `discord_mentions`, pubs filtrées, dit au retour par `autonomyTick`) ; temps d'écran
+  `core/screen_time.dart` (`ScreenTime` tour 15 s dans `HubApp._sync`, `temps-ecran.json` **jamais synchronisé**,
+  `appName` sites d'après le titre, `matchApp`, limites douces, `Sleep.bedtime`, automatisme `sommeil` +
+  `assistant_coucher`), `GameMode` (plein écran ≥ 30 s hors `notGame` : notifications gardées, sauvegarde et synchro en
+  pause, Clicky partout caché, bilan à la fin ; `jeu.auto`), page `ui/screen_time_page.dart` (Réglages → Bien-être) ;
+  recherche partout `core/everywhere_search.dart` (`EverywhereSearch.run` : outils de lecture + index Windows ADODB
+  `pcScript`, `pcQuery` nettoie les mots ; `fromTool` par outil) + `ui/search_page.dart` (`SearchPage.show`, Ctrl + Espace
+  via `HubHome.onSearchText`, Ctrl + Alt + Espace dans Clicky partout → `recherche_ouvrir` + `Win.raiseMain`, bouton 🔍 de
+  l'accueil) ; anniversaires `core/birthdays.dart` (`anniversaires.json` synchronisé, `nameInTitle` agenda, `parseDate`,
+  `upcoming`, `wish`) + automatisme `anniversaires` (veille 19 h, jour même 8 h) + `ui/birthdays_page.dart`. Outils dans
+  `ClickyController.lifeTools` / `jarvisTools` / `Assistant.tools`, groupes `securite`/`recherche`/`ecran`/`anniversaires`
+  du `ToolRouter`, phrases sans IA dans `QuickAnswers` (`original` retrouve les accents d'un prénom).
+- **iPhone (v1.56)** : job `ios` du workflow réactivé (non signé, `MonHub-iOS.ipa` ajouté à la version par `release-ios`
+  sans retarder Windows ; `release` seulement sur main). Installation Sideloadly (INSTALL.md, `ui/phone_setup_page.dart`
+  = Réglages → Mes appareils → Ajouter mon iPhone, Windows seulement). Connexion Google sur iPhone : même client « bureau »,
+  page Google dans Safari intégré (`LaunchMode.inAppBrowserView`, `closeInAppWebView`) + adresse de bouclage. Clé Google
+  du PC → iPhone par **code de liaison** (`GoogleAuth.shareCode/importCode`, `MONHUB-GOOGLE:` base64 ; `PasteGoogleCode`
+  dans `JoinAccountView` et `GoogleSetupPage`), puis « Retrouver mon compte » = `AccountSync` (synchro existante). Pas de
+  mise à jour auto sur iPhone : `Updater.phoneUpdate` → notification. Rien de Windows au démarrage sur iOS (`BrowserLink`
+  bureau seulement).
+
