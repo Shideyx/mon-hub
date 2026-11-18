@@ -33,7 +33,8 @@ class ClaudeBridge {
     }
     final home = env['HOME'];
     if (home == null) return null;
-    return Platform.isMacOS ? '$home/Library/Application Support/MonHub' : '$home/.config/MonHub';
+    // iPhone : seul « Library » de l'appli est accessible en écriture.
+    return Platform.isMacOS || Platform.isIOS ? '$home/Library/Application Support/MonHub' : '$home/.config/MonHub';
   }
 
   Future<void> stop() async {
