@@ -143,6 +143,111 @@ class Win {
 
   static void hide(HWND hwnd) => ShowWindow(hwnd, SW_HIDE);
 
+  /// Change seulement la taille (le coin en haut à gauche ne bouge pas) :
+  /// utile quand Windows fait suivre la souris à la fenêtre (voir [follow]).
+  static void resize(HWND hwnd, int w, int h, {bool show = true}) {
+    SetWindowPos(
+      hwnd,
+      HWND_TOPMOST,
+      0,
+      0,
+      w,
+      h,
+      SET_WINDOW_POS_FLAGS(SWP_NOMOVE | SWP_NOACTIVATE | (show ? SWP_SHOWWINDOW : 0)),
+    );
+  }
+
+  /// Message compris par le lanceur (windows/runner/clicky_follow.h).
+  static const _followMessage = WM_APP + 0x51;
+
+  /// **Clicky colle à la souris** : Windows déplace lui-même la fenêtre à
+  /// chaque mouvement de la souris (jusqu'à 1000 fois par seconde), sans
+  /// attendre le code Dart — c'est ce qui le rend fluide. [dx]/[dy] : où se
+  /// tient la fenêtre par rapport au curseur (pixels physiques).
+  static void follow(HWND hwnd, {required bool on, int dx = 16, int dy = 14}) {
+    PostMessage(hwnd, _followMessage, WPARAM(on ? 1 : 0), LPARAM(packOffset(dx, dy)));
+  }
+
+  /// Le décalage dans un seul nombre, comme le lit le lanceur (x dans les 16
+  /// bits du bas, y dans ceux du haut, avec signe).
+  static int packOffset(int dx, int dy) => ((dy & 0xFFFF) << 16) | (dx & 0xFFFF);
+
+  /// Ce que le lanceur relit (pour les tests).
+  static (int, int) unpackOffset(int packed) {
+    int signed(int v) => v >= 0x8000 ? v - 0x10000 : v;
+    return (signed(packed & 0xFFFF), signed((packed >> 16) & 0xFFFF));
+  }
+
+  /// Position et taille réelles d'une fenêtre (pixels physiques).
+  static (int, int, int, int)? windowRect(HWND hwnd) => using((a) {
+    final r = a<RECT>();
+    if (!GetWindowRect(hwnd, r).value) return null;
+    return (r.ref.left, r.ref.top, r.ref.right - r.ref.left, r.ref.bottom - r.ref.top);
+  });
+
+  static int Function(int, int)? _affinity;
+  static bool _affinityLooked = false;
+
+  /// Retire (ou remet) une fenêtre des captures d'écran (Windows 10 2004 et
+  /// plus) : Clicky reste visible pour toi pendant que la photo de l'écran
+  /// se fait sans lui. Renvoie false si Windows ne sait pas faire.
+  static bool excludeFromCapture(HWND hwnd, bool exclude) {
+    if (!_affinityLooked) {
+      _affinityLooked = true;
+      try {
+        _affinity = DynamicLibrary.open('user32.dll')
+            .lookupFunction<Int32 Function(IntPtr, Uint32), int Function(int, int)>('SetWindowDisplayAffinity');
+      } catch (_) {}
+    }
+    final f = _affinity;
+    if (f == null) return false;
+    // WDA_EXCLUDEFROMCAPTURE = 0x11, WDA_NONE = 0.
+    return f(hwnd.address, exclude ? 0x11 : 0) != 0;
+  }
+
+  /// Attend que Windows ait recomposé l'écran (une image).
+  static void waitComposition() {
+    try {
+      DwmFlush();
+    } catch (_) {}
+  }
+
+  /// Capture une zone de l'écran **déjà réduite** à [tw] × [th] par Windows
+  /// (bien plus rapide que de tout copier puis réduire) : pixels BGRA (le
+  /// canal alpha n'est pas rempli).
+  static Uint8List captureScaled(int x, int y, int w, int h, int tw, int th) {
+    final screen = GetDC(null);
+    final mem = CreateCompatibleDC(screen);
+    final bmp = CreateCompatibleBitmap(screen, tw, th);
+    final old = SelectObject(mem, HGDIOBJ(bmp));
+    final bi = calloc<BITMAPINFO>();
+    final buf = calloc<Uint8>(tw * th * 4);
+    try {
+      if (tw == w && th == h) {
+        BitBlt(mem, 0, 0, w, h, screen, x, y, SRCCOPY);
+      } else {
+        SetStretchBltMode(mem, HALFTONE);
+        StretchBlt(mem, 0, 0, tw, th, screen, x, y, w, h, SRCCOPY);
+      }
+      bi.ref.bmiHeader
+        ..biSize = sizeOf<BITMAPINFOHEADER>()
+        ..biWidth = tw
+        ..biHeight = -th // de haut en bas
+        ..biPlanes = 1
+        ..biBitCount = 32
+        ..biCompression = BI_RGB;
+      GetDIBits(mem, bmp, 0, th, buf, bi, DIB_RGB_COLORS);
+      return Uint8List.fromList(buf.asTypedList(tw * th * 4));
+    } finally {
+      SelectObject(mem, old);
+      DeleteObject(HGDIOBJ(bmp));
+      DeleteDC(mem);
+      ReleaseDC(null, screen);
+      calloc.free(bi);
+      calloc.free(buf);
+    }
+  }
+
   /// Autorise (ou non) la fenêtre à recevoir le clavier, et lui donne le
   /// focus : nécessaire pour écrire une question dans le panneau.
   static void setInteractive(HWND hwnd, bool interactive) {

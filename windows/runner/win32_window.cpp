@@ -3,6 +3,7 @@
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
+#include "clicky_follow.h"
 #include "resource.h"
 
 static void MakeTransparent(HWND hwnd);
@@ -150,7 +151,11 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
-  if (overlay_) MakeTransparent(window);
+  if (overlay_) {
+    MakeTransparent(window);
+    // Clicky suit la souris dans Windows même (voir clicky_follow.h).
+    clicky_follow::Attach(window);
+  }
 
   return OnCreate();
 }
@@ -215,6 +220,9 @@ Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
+  if (overlay_ && clicky_follow::Handle(hwnd, message, wparam, lparam)) {
+    return 0;
+  }
   switch (message) {
     case WM_DESTROY:
       window_handle_ = nullptr;

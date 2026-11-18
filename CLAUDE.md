@@ -229,3 +229,13 @@
   (`_spokenAsk` → `_voiceTurn`, Live : `_liveStop`), `_followUpSoon` attend la fin de la voix et réécoute
   (`following`, `_armFollowTimer` : rien dit en 6 s → arrêt silencieux, 20 s max, 5 tours de suite). Page
   « Ce que Clicky sait faire » = `ClickySkillsPage` (`jarvis_view.dart`), en tête des réglages de Clicky.
+- **Clicky partout colle à la souris (v1.52)** : c'est **Windows** qui déplace la fenêtre, dans le lanceur
+  (`windows/runner/clicky_follow.cpp/.h` : raw input `RIDEV_INPUTSINK` → `SetWindowPos` à chaque mouvement, restant dans
+  l'écran du curseur ; message `WM_APP + 0x51` envoyé par Dart = `Win.follow(on, dx, dy)`, décalage `Win.packOffset`).
+  Dart (`_DesktopState._place`) ne reprend la main que pour les vols, la boîte ouverte, une fenêtre posée et les dessins
+  (`_setNative(false)` relit `Win.windowRect`), vols calculés à chaque image (`Ticker _frames`) ; `Win.resize` (sans
+  bouger) pour la taille et rester au premier plan. `moveCursor` ne redessine plus Clicky en mode partout. Captures :
+  Clicky n'est plus caché (`Win.excludeFromCapture` = `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`, sinon ancien
+  repli), image réduite par Windows (`Win.captureScaled`, StretchBlt HALFTONE), **JPEG** fait dans un Isolate
+  (`shot_encode.dart` `encodeShot` : alpha remis à 255 sinon blanc) ; `png64` peut donc être du JPEG → toujours annoncer
+  `imageMime(b64)`. Le C++ se vérifie ici avec `x86_64-w64-mingw32-g++ -fsyntax-only -Wall -Wextra -Werror`.

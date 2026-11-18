@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
+import 'shot_encode.dart';
 
 /// Cerveau « Claude Pro » de Clicky : ton propre Claude Code, connecté à ton
 /// abonnement Claude (Pro, Max…).
@@ -267,7 +268,7 @@ class ClaudeCode {
             if (i < imageLabels.length) {'type': 'text', 'text': imageLabels[i]},
             {
               'type': 'image',
-              'source': {'type': 'base64', 'media_type': 'image/png', 'data': imagesB64[i]},
+              'source': {'type': 'base64', 'media_type': imageMime(imagesB64[i]), 'data': imagesB64[i]},
             },
           ],
           ...extraBlocks,

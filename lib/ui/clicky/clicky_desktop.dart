@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:material_ui/material_ui.dart';
 import 'package:win32/win32.dart' show HWND;
 
@@ -20,6 +21,7 @@ import '../theme.dart';
 import 'autonomy.dart';
 import 'clicky.dart';
 import 'flight.dart';
+import 'shot_encode.dart';
 import 'win.dart';
 
 /// « Clicky partout » (Windows) : Clicky sort de la fenêtre de Mon Hub.
@@ -227,51 +229,59 @@ List<Offset> _lookSpots() {
   return out;
 }
 
-/// Captures de chaque écran (Clicky est caché pendant la photo).
+/// Captures de chaque écran, **rapides** :
+/// - Clicky reste à l'écran : Windows le retire seulement de la photo (avant,
+///   il disparaissait 80 ms à chaque capture) ;
+/// - Windows réduit l'image pendant la copie (1280 px au plus) ;
+/// - l'image devient un JPEG à côté (Isolate), bien plus léger qu'un PNG à
+///   envoyer à l'IA, pendant que Clicky continue de bouger.
 Future<List<ClickyShot>> _captureScreens() async {
   final hwnd = _DesktopState.hwnd;
-  if (hwnd != null) Win.hide(hwnd);
-  await Future<void>.delayed(const Duration(milliseconds: 80));
-  final shots = <ClickyShot>[];
+  final excluded = hwnd != null && Win.excludeFromCapture(hwnd, true);
+  if (excluded) {
+    // Le temps que Windows recompose l'écran sans lui (une ou deux images).
+    Win.waitComposition();
+    Win.waitComposition();
+  } else if (hwnd != null) {
+    // Ancien Windows : on le cache le temps de la photo.
+    Win.hide(hwnd);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+  }
+  final raw = <(int, Uint8List, int, int, int, int, int)>[];
   try {
     final mons = Win.monitors();
     for (var i = 0; i < mons.length; i++) {
       final (x, y, w, h) = mons[i];
-      final bytes = Win.capture(x, y, w, h);
       // 1280 px sur le grand côté au maximum : assez net pour lire l'écran,
       // et plus léger à envoyer (réponse plus rapide).
       final s = math.min(1.0, 1280 / math.max(w, h));
       final tw = math.max(1, (w * s).round()), th = math.max(1, (h * s).round());
-      final c = Completer<ui.Image>();
-      ui.decodeImageFromPixels(
-        bytes,
-        w,
-        h,
-        ui.PixelFormat.bgra8888,
-        c.complete,
-        targetWidth: tw,
-        targetHeight: th,
-      );
-      final img = await c.future;
-      final png = await img.toByteData(format: ui.ImageByteFormat.png);
-      img.dispose();
-      if (png == null) continue;
-      shots.add(
-        ClickyShot(
-          png64: base64Encode(png.buffer.asUint8List()),
-          label: i == 0 ? 'écran principal' : 'écran ${i + 1}',
-          width: tw,
-          height: th,
-          // Les coordonnées de la couche sont les pixels physiques.
-          origin: Offset(x.toDouble(), y.toDouble()),
-          logicalPerPx: w / tw,
-        ),
-      );
+      raw.add((i, Win.captureScaled(x, y, w, h, tw, th), x, y, w, tw, th));
     }
   } finally {
-    _DesktopState.instance?._show();
+    if (excluded) {
+      Win.excludeFromCapture(hwnd, false);
+    } else {
+      _DesktopState.instance?._show();
+    }
   }
-  return shots;
+  final jpegs = await Future.wait([
+    for (final r in raw)
+      Isolate.run(() => encodeShot(r.$2, r.$6, r.$7)).catchError((Object _) => Uint8List(0)),
+  ]);
+  return [
+    for (var k = 0; k < raw.length; k++)
+      if (jpegs[k].isNotEmpty)
+        ClickyShot(
+          png64: base64Encode(jpegs[k]),
+          label: raw[k].$1 == 0 ? 'écran principal' : 'écran ${raw[k].$1 + 1}',
+          width: raw[k].$6,
+          height: raw[k].$7,
+          // Les coordonnées de la couche sont les pixels physiques.
+          origin: Offset(raw[k].$3.toDouble(), raw[k].$4.toDouble()),
+          logicalPerPx: raw[k].$5 / raw[k].$6,
+        ),
+  ];
 }
 
 /// Actions de Mon Hub, via le pont local (Mon Hub doit être ouvert).
@@ -387,7 +397,7 @@ const _compact = Size(390, 330);
 const _withPanel = Size(420, 400);
 const _withBoard = Size(560, 760);
 
-class _DesktopState extends State<_Desktop> {
+class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin {
   static _DesktopState? instance;
   static HWND? hwnd;
 
@@ -416,6 +426,27 @@ class _DesktopState extends State<_Desktop> {
 
   /// Position qui suit la souris (avec un petit ressort).
   Offset? _follow;
+
+  /// Windows fait suivre la souris à la fenêtre (voir `Win.follow`) : c'est
+  /// le mode normal, le plus fluide. Dart ne reprend la main que pour les
+  /// vols (vers une cible, un regard…), la boîte ouverte et les dessins.
+  bool _native = false;
+
+  /// Les vols sont calculés à chaque image de l'écran (et pas avec un
+  /// minuteur qui tombe entre deux images) : arcs bien lisses.
+  late final Ticker _frames = createTicker((_) => _place());
+
+  void _setNative(HWND h, bool on) {
+    if (on == _native) return;
+    _native = on;
+    Win.follow(h, on: on);
+    if (!on) {
+      // Dart reprend la main là où Windows a laissé la fenêtre.
+      final r = Win.windowRect(h);
+      if (r != null) _pos = Offset(r.$1.toDouble(), r.$2.toDouble());
+      _follow = null;
+    }
+  }
 
   double get _dpr => View.of(context).devicePixelRatio;
 
@@ -456,6 +487,7 @@ class _DesktopState extends State<_Desktop> {
   void dispose() {
     _tick?.cancel();
     _slow?.cancel();
+    _frames.dispose();
     c.removeListener(_onChange);
     super.dispose();
   }
@@ -467,6 +499,9 @@ class _DesktopState extends State<_Desktop> {
   Offset? get _goal => c.target ?? c.gaze ?? _scan;
 
   void _fly(Offset? to) {
+    // La fenêtre était menée par Windows : on part de là où elle est vraiment.
+    final h = hwnd;
+    if (h != null && _native) _setNative(h, false);
     final from = _pos;
     _flightTo = to;
     final dest = to ?? (c.cursor ?? from);
@@ -475,6 +510,7 @@ class _DesktopState extends State<_Desktop> {
       return;
     }
     _flight = ClickyFlight(from, to == null ? dest + const Offset(16, 14) : dest + const Offset(1, 1), DateTime.now(), dpr: _dpr);
+    if (!_frames.isActive) unawaited(_frames.start());
   }
 
   void _onChange() {
@@ -516,6 +552,10 @@ class _DesktopState extends State<_Desktop> {
 
   /// Réglages changés dans Mon Hub, Mon Hub fermé…
   Future<void> _housekeeping() async {
+    // Toujours au-dessus des autres fenêtres (sans le déplacer : c'est
+    // Windows qui le fait suivre la souris).
+    final h = hwnd, sz = _size;
+    if (h != null && _native && !_hidden && sz != null) Win.resize(h, sz.width.round(), sz.height.round());
     ClaudeApi.forget(); // clé ajoutée / retirée dans Mon Hub
     await c.refreshReady();
     if (!c.active || !c.everywhere) exit(0);
@@ -556,7 +596,8 @@ class _DesktopState extends State<_Desktop> {
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
     _scanStep();
-    _place();
+    // Pendant un vol, c'est l'horloge des images qui place la fenêtre.
+    if (!_frames.isActive) _place();
   }
 
   void _place({bool force = false}) {
@@ -572,11 +613,50 @@ class _DesktopState extends State<_Desktop> {
         Win.hide(h);
         _hidden = true;
       }
+      if (_frames.isActive) _frames.stop();
       return;
     }
     final dpr = _dpr;
     final cur = c.cursor;
     if (cur == null) return;
+    // Il suit simplement la souris : c'est Windows qui déplace la fenêtre,
+    // à chaque mouvement (fluide, même quand Clicky réfléchit ou capture).
+    final follow = _flightTo == null && _flight == null && !_interactive && !_pinned && c.marks.isEmpty;
+    if (follow) {
+      if (_frames.isActive) _frames.stop();
+      final size = c.board != null || c.holo != null
+          ? _withBoard
+          : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty
+          ? _pointing
+          : c.boxOpen
+          ? _compact
+          : _cursorOnly;
+      final w = (size.width * dpr).round(), hh = (size.height * dpr).round();
+      final sz = Size(w.toDouble(), hh.toDouble());
+      if (_inside != Offset.zero) {
+        _inside = Offset.zero;
+        if (mounted) setState(() {});
+      }
+      if (!_native || _hidden || force) {
+        // Premier placement (ou réapparition) : juste à côté du curseur,
+        // puis Windows prend le relais.
+        final (vx, vy, vw, vh) = Win.virtualScreen();
+        final x = (cur.dx + 16).round().clamp(vx, math.max(vx, vx + vw - w)).toInt();
+        final y = (cur.dy + 14).round().clamp(vy, math.max(vy, vy + vh - hh)).toInt();
+        Win.place(h, x, y, w, hh);
+        _hidden = false;
+        _size = sz;
+        _native = false;
+        _setNative(h, true);
+      } else if (_size != sz) {
+        Win.resize(h, w, hh);
+        _size = sz;
+      }
+      _pos = null;
+      _follow = null;
+      return;
+    }
+    if (_native) _setNative(h, false);
     // Le bout du curseur bleu est en haut à gauche de la fenêtre.
     Offset want;
     final to = _flightTo;
@@ -604,6 +684,8 @@ class _DesktopState extends State<_Desktop> {
         _flight = null;
         _follow = want;
         c.setFlight(0, 1);
+        // Vol fini : plus besoin de recalculer à chaque image.
+        if (_frames.isActive) _frames.stop();
       }
     }
     // Fenêtre juste assez grande : minuscule autour du curseur, plus grande
