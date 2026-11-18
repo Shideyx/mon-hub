@@ -86,6 +86,8 @@ Le micro de Windows doit comprendre le français : *Paramètres → Heure et lan
 
 **Tu n'as pas accès à ton PC habituel ?** À l'étape 2, si ton compte n'est pas trouvé : tape ton identifiant Mon Hub → **Demander mon compte à mon PC principal**, et laisse la page ouverte. Si Mon Hub est ouvert sur ton PC habituel (avec le même compte Google connecté dans Mon Hub), il voit la demande et envoie ton compte tout seul, en général en moins de 10 minutes (jusqu'à 1 h s'il doit d'abord se mettre à jour). Tu tapes alors ton mot de passe Mon Hub et c'est fini. S'il est éteint, ça se fera dès qu'il sera rallumé avec Mon Hub ouvert.
 
+**Ton PC habituel est éteint et tu ne peux pas attendre ?** Crée ton compte sur le nouvel appareil avec **le même identifiant et le même mot de passe**, reconnecte tes services (Google, École Directe…), puis **Réglages → Mes appareils → Récupérer les données de mon PC principal**. Utilise Mon Hub normalement : quand ton PC habituel sera rallumé avec Mon Hub ouvert, il enverra ses données ; tu tapes ton mot de passe et tout est fusionné (rien de ce que tu as fait entre-temps n'est perdu ; en cas de doublon, la version du PC habituel gagne).
+
 La copie est rangée dans le dossier « Mon Hub - compte synchronisé » de **ton** Google Drive, chiffrée avec ton mot de passe Mon Hub : personne d'autre ne peut la lire. Ne supprime pas ce dossier.
 
 Sans internet, l'ancienne méthode existe toujours : **Réglages → Mes appareils → Sans internet : passer par un fichier** → *Exporter*, puis *Importer* sur l'autre appareil (supprime ensuite le fichier : il contient tes mots de passe).

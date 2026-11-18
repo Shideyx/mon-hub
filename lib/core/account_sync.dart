@@ -53,6 +53,9 @@ class AccountSync extends ChangeNotifier {
   static const _lastKey = 'sync.last';
   static const _keyName = 'sync.key';
 
+  /// Compte Google où cet appareil a demandé les données du PC principal.
+  static const _askKey = 'sync.ask';
+
   /// Nom de la copie dans le Drive.
   static String fileName(String login) => 'compte-$login.monhub';
 
@@ -99,6 +102,16 @@ class AccountSync extends ChangeNotifier {
   /// Espace du compte en train d'arriver (page de connexion).
   String? _joining;
 
+  /// Demande au PC principal en cours : on guette l'arrivée de sa copie.
+  Timer? _askTimer;
+
+  /// Le compte Google où la demande a été déposée (null : aucune).
+  String? get askedIn => ModuleStore.prefs.getString(_askKey);
+
+  /// La copie du PC principal est arrivée : il ne manque que le mot de passe
+  /// ([mergeFrom]).
+  CloudCopy? arrived;
+
   // ---------- Marche / arrêt ----------
 
   /// Compte ouvert (Mon Hub, pas les widgets ni Clicky partout) : synchro
@@ -111,9 +124,16 @@ class AccountSync extends ChangeNotifier {
       if (gen != _gen) return;
       if (enabled) await syncNow();
       if (gen == _gen) await answerRequests();
+      if (gen == _gen && askedIn != null) await checkArrival();
     });
     _watch = Timer.periodic(watchEvery, (_) => unawaited(answerRequests()));
     if (enabled) _schedule();
+    if (askedIn != null) _watchArrival();
+  }
+
+  void _watchArrival() {
+    _askTimer?.cancel();
+    _askTimer = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(checkArrival()));
   }
 
   void _schedule() {
@@ -126,6 +146,9 @@ class AccountSync extends ChangeNotifier {
     _timer = null;
     _watch?.cancel();
     _watch = null;
+    _askTimer?.cancel();
+    _askTimer = null;
+    arrived = null;
     _gen++;
     error = null;
     needsPassword = false;
@@ -162,7 +185,13 @@ class AccountSync extends ChangeNotifier {
     }
   }
 
-  Future<void> _sync(HubAccount acc, String mail, SyncKey key, {bool remoteWins = false}) async {
+  Future<void> _sync(
+    HubAccount acc,
+    String mail,
+    SyncKey key, {
+    bool remoteWins = false,
+    bool replace = false,
+  }) async {
     final gen = _gen;
     final profile = ModuleStore.profile;
     bool still() => gen == _gen && ModuleStore.profile == profile;
@@ -183,7 +212,8 @@ class AccountSync extends ChangeNotifier {
     final copy = (await cloud.list()).where((c) => c.name == name).firstOrNull;
     final seen = ModuleStore.prefs.getString(_versionKey);
     Map<String, SyncEntry>? remote;
-    if (copy == null) {
+    if (copy == null || replace) {
+      // [replace] : la copie (illisible avec la clé d'ici) est remplacée.
       remote = {};
     } else if (copy.version != seen || base.isEmpty || local.unreadable.isNotEmpty) {
       final h = SyncBox.header(await cloud.read(copy.id));
@@ -220,21 +250,27 @@ class AccountSync extends ChangeNotifier {
   // ---------- Activer / arrêter (Réglages) ----------
 
   /// Active la synchro du compte connecté avec le Drive de [mail].
-  Future<void> enable({required String mail}) async {
+  ///
+  /// [takeOver] (réponse à une demande d'un autre appareil) : si une copie de
+  /// ce compte existe déjà avec une autre clé (compte recréé sur le nouvel
+  /// appareil), celle d'ici la remplace ; l'autre appareil fusionnera après
+  /// avoir retapé le mot de passe.
+  Future<void> enable({required String mail, bool takeOver = false}) async {
     final acc = AppSession.instance.current;
     if (acc == null) throw 'Connecte-toi d\'abord';
     try {
-      await _guard(rethrowError: true, () => _enable(acc, mail));
+      await _guard(rethrowError: true, () => _enable(acc, mail, takeOver: takeOver));
     } finally {
       // Même si internet a coupé : on réessaiera tout seul.
       if (enabled) _schedule();
     }
   }
 
-  Future<void> _enable(HubAccount acc, String mail) async {
+  Future<void> _enable(HubAccount acc, String mail, {bool takeOver = false}) async {
     final cloud = cloudFor(mail);
     final copy = (await cloud.list()).where((c) => c.name == fileName(acc.login)).firstOrNull;
     SyncKey key;
+    var replace = false;
     if (copy != null) {
       // Déjà gardé (autre appareil, ou synchro réactivée) : même clé.
       final h = SyncBox.header(await cloud.read(copy.id));
@@ -242,8 +278,13 @@ class AccountSync extends ChangeNotifier {
       try {
         await SyncBox.open(h, key, acc.login);
       } on WrongPassword {
-        throw 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
-            'avec un autre mot de passe.';
+        if (!takeOver) {
+          throw 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
+              'faite sur un autre appareil : là-bas, Réglages → Mes appareils → « Récupérer les données '
+              'de mon PC principal ».';
+        }
+        key = await SyncKey.forAccount(acc);
+        replace = true;
       }
     } else {
       key = await SyncKey.forAccount(acc);
@@ -252,7 +293,7 @@ class AccountSync extends ChangeNotifier {
     await ModuleStore.prefs.setString(_emailKey, mail);
     await ModuleStore.prefs.remove(_versionKey);
     await _base.save({});
-    await _sync(acc, mail, key);
+    await _sync(acc, mail, key, replace: replace);
   }
 
   /// Arrête la synchro sur cet appareil ([deleteCopy] : supprime aussi la
@@ -299,6 +340,9 @@ class AccountSync extends ChangeNotifier {
     }
     await _saveKey(key);
     needsPassword = false;
+    await ModuleStore.prefs.remove(_askKey);
+    _askTimer?.cancel();
+    arrived = null;
     await syncNow();
   }
 
@@ -327,7 +371,7 @@ class AccountSync extends ChangeNotifier {
         if (asks.isEmpty) continue;
         final was = enabled;
         if (!was) {
-          await enable(mail: mail);
+          await enable(mail: mail, takeOver: true);
         } else if (email == mail) {
           await syncNow();
         } else {
@@ -349,6 +393,93 @@ class AccountSync extends ChangeNotifier {
         return;
       } catch (_) {}
     }
+  }
+
+  /// Compte recréé ici (même identifiant, même mot de passe) pendant que le
+  /// PC principal était éteint : on lui demande ses données. Elles arriveront
+  /// quand il sera rallumé avec Mon Hub ouvert ; il faudra alors le mot de
+  /// passe ([mergeFrom]).
+  Future<void> askMainPc(String mail) async {
+    final acc = AppSession.instance.current;
+    if (acc == null) throw 'Connecte-toi d\'abord';
+    await requestCopy(mail, acc.login);
+    await ModuleStore.prefs.setString(_askKey, mail);
+    arrived = null;
+    _watchArrival();
+    notifyListeners();
+    await checkArrival();
+  }
+
+  /// La copie du PC principal est-elle arrivée ?
+  Future<void> checkArrival() async {
+    final acc = AppSession.instance.current;
+    final mail = askedIn;
+    if (acc == null || mail == null || arrived != null) return;
+    try {
+      final copy = (await copies(mail)).where((c) => c.login == acc.login).firstOrNull;
+      if (copy == null) return;
+      if (enabled && email == mail) {
+        // Synchro déjà active ici : la prochaine synchro demandera le mot de
+        // passe (copie refaite par le PC principal).
+        await syncNow();
+        if (!needsPassword) return;
+      }
+      arrived = copy;
+      _askTimer?.cancel();
+      notifyListeners();
+      onNotice?.call(
+        'Tes données sont arrivées',
+        'Ton PC principal a envoyé ton compte « ${acc.login} ». Réglages → Mes appareils → tape ton '
+            'mot de passe pour tout récupérer.',
+      );
+    } catch (_) {}
+  }
+
+  /// Récupère les données du PC principal et les fusionne avec celles d'ici
+  /// (en cas de doublon, celles du PC principal gagnent). Ensuite, les deux
+  /// restent synchronisés.
+  Future<void> mergeFrom(String password) async {
+    final acc = AppSession.instance.current;
+    final mail = askedIn ?? email;
+    if (acc == null || mail == null) return;
+    if (!AppSession.instance.checkPassword(password)) throw 'Mot de passe incorrect';
+    final cloud = cloudFor(mail);
+    final copy = arrived ?? (await cloud.list()).where((c) => c.name == fileName(acc.login)).firstOrNull;
+    if (copy == null) throw 'Ton PC principal n\'a pas encore envoyé ton compte';
+    final h = SyncBox.header(await cloud.read(copy.id));
+    final key = await SyncKey.fromPassword(h, password);
+    try {
+      await SyncBox.open(h, key, acc.login);
+    } on WrongPassword {
+      throw 'Ce n\'est pas le mot de passe du compte sur ton PC principal';
+    }
+    stop();
+    await _saveKey(key);
+    await ModuleStore.prefs.setString(_emailKey, mail);
+    await ModuleStore.prefs.remove(_versionKey);
+    await _base.save({});
+    await _guard(rethrowError: true, () => _sync(acc, mail, key, remoteWins: true));
+    await ModuleStore.prefs.remove(_askKey);
+    arrived = null;
+    start();
+    notifyListeners();
+  }
+
+  /// Annule la demande au PC principal.
+  Future<void> cancelAsk() async {
+    final acc = AppSession.instance.current;
+    final mail = askedIn;
+    _askTimer?.cancel();
+    arrived = null;
+    await ModuleStore.prefs.remove(_askKey);
+    notifyListeners();
+    if (acc == null || mail == null) return;
+    try {
+      final cloud = cloudFor(mail);
+      for (final c in await cloud.list()) {
+        if (c.name == requestName(acc.login)) await cloud.delete(c.id);
+      }
+    } catch (_) {}
   }
 
   /// Nouvel appareil : dépose une demande du compte [login] dans le Drive

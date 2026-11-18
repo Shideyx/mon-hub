@@ -156,6 +156,111 @@ class AccountSyncSection extends StatelessWidget {
     }
   }
 
+  static Future<void> _askMainPc(BuildContext context) async {
+    try {
+      final mail = await pickSyncGoogle(context);
+      if (mail == null || !context.mounted) return;
+      await AccountSync.instance.askMainPc(mail);
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  static Future<void> _merge(BuildContext context) async {
+    final pass = await askMonHubPassword(
+      context,
+      message: 'Le mot de passe de ton compte sur ton PC principal (le même qu\'ici).',
+    );
+    if (pass == null || !context.mounted) return;
+    try {
+      await AccountSync.instance.mergeFrom(pass);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tes données sont récupérées et restent synchronisées ✅')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  /// Compte recréé ici pendant que le PC principal est éteint : ses
+  /// données arriveront quand il sera rallumé.
+  static Widget _mainPc(BuildContext context, AccountSync s) {
+    final cs = Theme.of(context).colorScheme;
+    if (s.askedIn != null && s.arrived != null) {
+      return Card(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        color: cs.primaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tes données sont arrivées de ton PC principal 🎉',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tape ton mot de passe pour les récupérer. Ce que tu as fait ici est gardé ; en cas de '
+                'doublon, c\'est la version du PC principal qui gagne.',
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                icon: s.busy ? _spinner : const Icon(Icons.download_done_rounded),
+                label: const Text('Récupérer mes données'),
+                onPressed: s.busy ? null : () => _merge(context),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (s.askedIn != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.hourglass_top_rounded),
+            title: const Text('Demande envoyée à ton PC principal'),
+            subtitle: Text(
+              'Dès qu\'il sera allumé avec Mon Hub ouvert sur ton compte (et le compte Google '
+              '${s.askedIn} connecté dans Mon Hub), tes données arriveront ici toutes seules. '
+              'Tu peux utiliser Mon Hub en attendant : rien de ce que tu fais ici n\'est perdu.',
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: TextButton(
+              onPressed: () => unawaited(AccountSync.instance.cancelAsk()),
+              child: const Text('Annuler la demande'),
+            ),
+          ),
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.restore_rounded),
+            label: const Text('Récupérer les données de mon PC principal'),
+            onPressed: s.busy ? null : () => _askMainPc(context),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tu as recréé ton compte ici (même identifiant, même mot de passe) parce que ton PC '
+            'principal est éteint ou loin ? Ses données arriveront dès qu\'il sera rallumé avec Mon Hub ouvert.',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
   static Future<void> _disable(BuildContext context) async {
     final choice = await showDialog<String>(
       context: context,
@@ -211,6 +316,7 @@ class AccountSyncSection extends StatelessWidget {
                 onPressed: s.busy ? null : () => _enable(context),
               ),
             ),
+            _mainPc(context, s),
           ],
         );
       }
@@ -249,6 +355,7 @@ class AccountSyncSection extends StatelessWidget {
                 onPressed: () => _reconnect(context),
               ),
             ),
+          if (!s.needsPassword) _mainPc(context, s),
           const ListTile(
             leading: Icon(Icons.add_to_queue_rounded),
             title: Text('Sur ton autre appareil'),
@@ -456,7 +563,9 @@ class _JoinAccountViewState extends State<JoinAccountView> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Ou, sur ce PC principal : Réglages → Mes appareils → « Activer la synchronisation ».',
+            'PC principal éteint ou inaccessible ? Reviens en arrière et crée ton compte ici avec le même '
+            'identifiant et le même mot de passe, puis Réglages → Mes appareils → « Récupérer les données '
+            'de mon PC principal » : tes anciennes données arriveront dès qu\'il sera rallumé.',
             textAlign: TextAlign.center,
             style: muted.copyWith(fontSize: 12),
           ),

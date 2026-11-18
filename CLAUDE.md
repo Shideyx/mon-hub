@@ -177,7 +177,11 @@
   connectés) → active la synchro tout seul, efface la demande, notification (`onNotice`). Nouvel appareil : page de
   connexion → « Retrouver mon compte d'un autre appareil » (`ui/account_sync_view.dart` `JoinAccountView` : `beginJoin`
   prépare l'espace où se range la connexion Google, bouton « Demander mon compte à mon PC principal » + attente toutes les
-  20 s, `join` → `AppSession.adopt`, `cancelJoin` efface). Réglages → Mes appareils = `AccountSyncSection` ; l'export/import
+  20 s, `join` → `AppSession.adopt`, `cancelJoin` efface). **PC principal éteint** : compte recréé ici (même identifiant +
+  mot de passe) → Réglages → « Récupérer les données de mon PC principal » (`askMainPc` : demande + `sync.ask`, `checkArrival`
+  chaque minute, `arrived`) ; le PC principal répond avec `enable(takeOver: true)` (copie illisible pour lui → remplacée,
+  `_sync(replace:)`) ; ici `mergeFrom(mot de passe)` = `_sync(remoteWins:)` (le PC principal gagne les doublons) ou
+  `unlock` si la synchro était déjà active. Réglages → Mes appareils = `AccountSyncSection` ; l'export/import
   fichier reste dans « Sans internet ». Toujours **aucun serveur à nous**.
 - Animations : `ui/clicky/alive.dart` (`ClickyBounce` : rebond à chaque état, halo en réflexion, saut de joie, coucou
   rare ; rien en boucle au repos), cartes de l'accueil soulevées au survol, 👋 qui salue une fois.

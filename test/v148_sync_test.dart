@@ -352,6 +352,102 @@ void main() {
       expect(ModuleStore.prefs.getString('mod.ecoledirecte.user'), 'erik.portable');
     });
 
+    Future<void> google() async {
+      await ModuleStore.prefs.setString('mod.google.accounts', jsonEncode([mail]));
+      await ModuleStore.prefs.setString('mod.google.scopes.$mail', jsonEncode('openid ${GoogleAuth.driveScope}'));
+    }
+
+    test('PC principal éteint : compte recréé ici, ses données arrivent quand il revient', () async {
+      final pc = device('pc', 1);
+      final laptop = device('portable', 2);
+
+      // PC principal : l'ancien compte, avec ses données.
+      await _use(pc);
+      await AppSession.instance.register('erik', 'Erik', 'motdepasse1');
+      await google();
+      await ModuleStore.prefs.setString('mod.ecoledirecte.user', 'erik.m');
+      await ModuleStore.prefs.setStringList('hub.order', ['musique', 'agenda']);
+      final carnet = (await HubFiles.file('carnet.json'))!;
+      await carnet.writeAsString(await Vault.seal('{"facts":["aime le foot"]}'));
+
+      // Il est éteint : on recrée le compte ici (même identifiant, même mot de passe).
+      await _use(laptop);
+      await AppSession.instance.register('erik', 'Erik', 'motdepasse1');
+      await google();
+      await ModuleStore.prefs.setStringList('hub.order', ['agenda']);
+      await ModuleStore.prefs.setString('mod.carnet.note', 'fait sur le portable');
+      await AccountSync.instance.askMainPc(mail);
+      expect(AccountSync.instance.askedIn, mail);
+      expect(AccountSync.instance.arrived, isNull);
+      expect(cloud.files.values.single.$1, 'demande-compte-erik.json');
+
+      // Le PC principal est rallumé, Mon Hub s'ouvre : il répond tout seul.
+      await _use(pc);
+      await AccountSync.instance.answerRequests();
+      expect(AccountSync.instance.enabled, isTrue);
+      expect(cloud.files.values.map((f) => f.$1), ['compte-erik.monhub']);
+
+      // Ici : les données sont arrivées, il ne manque que le mot de passe.
+      await _use(laptop);
+      expect(AccountSync.instance.askedIn, mail);
+      await AccountSync.instance.checkArrival();
+      expect(AccountSync.instance.arrived, isNotNull);
+      await expectLater(AccountSync.instance.mergeFrom('mauvais'), throwsA('Mot de passe incorrect'));
+      await AccountSync.instance.mergeFrom('motdepasse1');
+      expect(AccountSync.instance.error, isNull);
+      expect(AccountSync.instance.askedIn, isNull);
+      expect(AccountSync.instance.enabled, isTrue);
+      expect(ModuleStore.prefs.getString('mod.ecoledirecte.user'), 'erik.m');
+      expect(ModuleStore.prefs.getStringList('hub.order'), ['musique', 'agenda'], reason: 'le PC principal gagne');
+      expect(ModuleStore.prefs.getString('mod.carnet.note'), 'fait sur le portable', reason: 'rien de perdu ici');
+      final here = (await HubFiles.file('carnet.json'))!;
+      expect(await Vault.open(await here.readAsString()), contains('foot'));
+
+      // Et le PC principal reçoit ce qui a été fait sur le portable.
+      await _use(pc);
+      await AccountSync.instance.syncNow();
+      expect(AccountSync.instance.error, isNull);
+      expect(ModuleStore.prefs.getString('mod.carnet.note'), 'fait sur le portable');
+      expect(ModuleStore.prefs.getString('mod.ecoledirecte.user'), 'erik.m');
+    });
+
+    test('compte recréé ici avec la synchro déjà active : le PC principal reprend la main', () async {
+      final pc = device('pc', 1);
+      final laptop = device('portable', 2);
+      await _use(pc);
+      await AppSession.instance.register('erik', 'Erik', 'motdepasse1');
+      await google();
+      await ModuleStore.prefs.setString('mod.ecoledirecte.user', 'erik.m');
+
+      await _use(laptop);
+      await AppSession.instance.register('erik', 'Erik', 'motdepasse1');
+      await google();
+      await ModuleStore.prefs.setString('mod.carnet.note', 'portable');
+      await AccountSync.instance.enable(mail: mail);
+      await AccountSync.instance.askMainPc(mail);
+      expect(AccountSync.instance.arrived, isNull);
+
+      // Le PC principal ne peut pas ouvrir la copie du portable : il la remplace.
+      await _use(pc);
+      await AccountSync.instance.answerRequests();
+      expect(AccountSync.instance.error, isNull);
+      expect(AccountSync.instance.enabled, isTrue);
+
+      // Le portable : mot de passe une fois, puis tout est fusionné.
+      await _use(laptop);
+      await AccountSync.instance.checkArrival();
+      expect(AccountSync.instance.needsPassword, isTrue);
+      await AccountSync.instance.unlock('motdepasse1');
+      expect(AccountSync.instance.needsPassword, isFalse);
+      expect(AccountSync.instance.askedIn, isNull);
+      expect(ModuleStore.prefs.getString('mod.ecoledirecte.user'), 'erik.m');
+      expect(ModuleStore.prefs.getString('mod.carnet.note'), 'portable');
+
+      await _use(pc);
+      await AccountSync.instance.syncNow();
+      expect(ModuleStore.prefs.getString('mod.carnet.note'), 'portable');
+    });
+
     test('ancienne copie (v1.48, clé du mot de passe) : toujours lisible', () async {
       await _use(device('pc', 1));
       await AppSession.instance.register('erik', '', 'motdepasse1');

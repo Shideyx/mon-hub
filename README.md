@@ -129,7 +129,7 @@ Mon Hub vérifie tes comptes toutes les 2 minutes (réglable) et affiche une ale
 
 Sur le premier appareil : *Réglages → Mes appareils → Activer la synchronisation* (choisis ton compte Google). Sur les autres : page de connexion → *Retrouver mon compte d'un autre appareil* → le même compte Google → ton mot de passe Mon Hub. Modules, réglages, connexions, historiques, carnet et révisions arrivent tout seuls, puis restent synchronisés (le plus récent gagne, réglage par réglage). Ce qui est propre à un PC (widgets posés sur le bureau, raccourcis) reste sur ce PC.
 
-**Pas accès au premier PC ?** Sur le nouveau : *Retrouver mon compte d'un autre appareil* → ton compte Google → *Demander mon compte à mon PC principal*. Si Mon Hub est ouvert sur le PC principal (avec ce compte Google connecté), il voit la demande et envoie le compte tout seul, chiffré, en quelques minutes.
+**Pas accès au premier PC ?** Sur le nouveau : *Retrouver mon compte d'un autre appareil* → ton compte Google → *Demander mon compte à mon PC principal*. Si Mon Hub est ouvert sur le PC principal (avec ce compte Google connecté), il voit la demande et envoie le compte tout seul, chiffré, en quelques minutes. PC principal éteint ? Recrée ton compte avec le même identifiant et le même mot de passe, puis *Réglages → Mes appareils → Récupérer les données de mon PC principal* : ses données arrivent et se fusionnent dès qu'il est rallumé.
 
 Sans internet : *Réglages → Mes appareils → Sans internet : passer par un fichier* (exporter / importer). Le fichier contient tes identifiants : ne le partage pas.
 
