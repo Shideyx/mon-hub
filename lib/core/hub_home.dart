@@ -190,7 +190,18 @@ class _HomeTab extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+              // La maison sautille quand la souris arrive.
+              AnimatedScale(
+                scale: expanded ? 1.15 : 1,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutBack,
+                child: AnimatedRotation(
+                  turns: expanded ? -0.04 : 0,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutBack,
+                  child: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+                ),
+              ),
               AnimatedSize(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOutCubic,

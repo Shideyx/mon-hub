@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/browser.dart';
 import '../../core/hub_module.dart';
 import '../../core/powershell.dart';
+import '../../core/safe_open.dart';
 import '../../core/tidy.dart';
 
 /// Clicky agit sur ton ordinateur quand tu le lui demandes : commandes
@@ -169,9 +170,55 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
       r'|reg(\.exe)?\s+delete\s+hk(lm|ey_local_machine)|remove-item\s+.*hklm:'
       r'|set-mppreference|disable-?realtime|netsh\s+advfirewall\s+set\s+.*state\s+off'
       r'|(remove-item|\brm\b|\bdel\b|\brd\b|rmdir)\b[^|;\n]*(\s-r\b|-recurse|\s/s\b|\s-rf\b|\s-fr\b)'
-      r'|\bmkfs|\bdd\s+if=|:\(\)\s*\{|chmod\s+-r\s+777\s+/|\bshutdown\b|stop-computer|restart-computer',
+      r'|\bmkfs|\bdd\s+if=|:\(\)\s*\{|chmod\s+-r\s+777\s+/|\bshutdown\b|stop-computer|restart-computer'
+      // Télécharger puis exécuter, code caché (base64), scripts lancés en douce.
+      r'|\biex\b|invoke-expression|downloadstring|downloadfile|net\.webclient|frombase64string'
+      r'|\s-e(nc|ncodedcommand)?\s+[a-z0-9+/=]{16,}|start-bitstransfer|bitsadmin|certutil[^\n]*-(urlcache|decode)'
+      r'|\b(iwr|irm|invoke-webrequest|invoke-restmethod|curl(\.exe)?|wget)\b[^\n]*\|\s*(powershell|pwsh|cmd|sh|bash|python)'
+      r'|\bmshta\b|\brundll32\b|\bregsvr32\b|\bwscript\b|\bcscript\b|\bmsiexec\b[^\n]*https?:'
+      // Données envoyées vers un site, mots de passe et clés.
+      r'|-method\s+(post|put)|send-mailmessage|-infile\b|\bcurl(\.exe)?\b[^\n]*\s(-d|--data|-f|-t|--upload-file)\s'
+      r'|login data|\bcookies\b|local state|key4\.db|logins\.json|bridge\.json|vault\.key|\\credentials\b|\\protect\\|\.ssh|id_rsa|\.kdbx|cmdkey|vaultcmd|mimikatz|lsass'
+      // S'installer pour se relancer tout seul, désactiver les protections.
+      r'|schtasks[^\n]*/create|register-scheduledtask|new-service|\bsc(\.exe)?\s+create|currentversion\\run'
+      r'|\\startup\\|start menu\\programs\\startup|shell:startup|add-mppreference|set-mppreference'
+      r'|set-executionpolicy\s+(unrestricted|bypass)|new-localuser|\bnet\s+user\b|add-localgroupmember|net\s+localgroup'
+      r'|wevtutil\s+cl|clear-eventlog|\btakeown\b|icacls[^\n]*/grant|\buac\b|enablelua|disable-computerrestore',
     ).hasMatch(c);
   }
+
+  /// Fichiers que Clicky ne lit **jamais** : mots de passe des navigateurs,
+  /// cookies, clés (SSH, coffres), la clé du pont de Mon Hub, les secrets de
+  /// Windows… Même si on le lui demande (ou si un message piégé le lui demande).
+  static bool secretPath(String path) {
+    final p = path.toLowerCase().replaceAll('/', '\\');
+    return RegExp(
+      r'\\monhub\\(bridge\.json|.*\.key|clicky-mcp\.json)$|\\clicky-claude-code\\clicky-mcp\.json$'
+      r'|\\(login data|login data for account|cookies|web data|local state|key4\.db|logins\.json|cookies\.sqlite|signons\.sqlite)$'
+      r'|\\\.ssh(\\|$)|\\\.aws\\|\\\.gnupg(\\|$)|\\\.azure\\|\\\.kube\\|\\\.docker\\config\.json$'
+      r'|\\\.claude\\\.credentials\.json$|\\\.git-credentials$|\\\.npmrc$|\\\.pypirc$|\\\.netrc$|\\\.env(\.[a-z]+)?$'
+      r'|\.(kdbx|kdb|pfx|p12|pem|key|ppk|ovpn|rdp)$|\\id_(rsa|dsa|ecdsa|ed25519)[^\\]*$|wallet\.dat$'
+      r'|\\microsoft\\(credentials|protect|vault)(\\|$)|\\config\\(sam|security|system)$|ntuser\.dat|\\flutter_secure_storage',
+    ).hasMatch(p);
+  }
+
+  /// Écritures qui peuvent faire lancer un programme plus tard (démarrage de
+  /// Windows, profil PowerShell, scripts) ou toucher au système : toujours
+  /// demandées, même en mode auto.
+  static bool riskyWrite(String path) {
+    final p = expand(path).toLowerCase().replaceAll('/', '\\');
+    return secretPath(p) ||
+        SafeOpen.risky(p) ||
+        RegExp(
+          r'\\startup\\|\\start menu\\|\\windows\\|\\program files|\\programdata\\|\\system32'
+          r'|powershell\\.*profile\.ps1$|\\\.(bashrc|profile|zshrc|bash_profile)$|\\autostart\\|\\launchagents\\'
+          r'|\\monhub\\|\\appdata\\roaming\\microsoft\\windows\\',
+        ).hasMatch(p);
+  }
+
+  /// Demande la permission avant d'ouvrir quelque chose qui peut lancer un
+  /// programme ([SafeOpen.risky]). Sans réponse : refusé.
+  static Future<bool> Function(String target)? confirmRisky;
 
   /// Lance une commande et renvoie sa sortie.
   static Future<Map<String, Object?>> run(
@@ -281,20 +328,25 @@ $command
     if (t.isEmpty) throw 'Rien à ouvrir.';
     // Pages web : dans Google Chrome (réglage « Ouvrir les liens »).
     if (RegExp(r'^https?://', caseSensitive: false).hasMatch(t) && await Browser.open(t)) return 'Ouvert : $t';
-    if (Platform.isWindows) {
-      await Process.start('cmd', ['/c', 'start', '', t], mode: ProcessStartMode.detached);
-    } else if (Platform.isMacOS) {
-      final isApp = !t.contains('/') && !t.contains(':');
-      await Process.start('open', isApp ? ['-a', t] : [t], mode: ProcessStartMode.detached);
-    } else {
-      await Process.start('xdg-open', [t], mode: ProcessStartMode.detached);
+    // Un programme, un script, un raccourci, un partage réseau : seulement
+    // avec l'accord de la personne.
+    if (SafeOpen.risky(t)) {
+      final ask = confirmRisky;
+      if (ask == null || !await ask(t)) {
+        throw 'Je n\'ouvre pas « $t » sans ton accord (ça peut lancer un programme).';
+      }
     }
+    // Comme un double-clic : aucune commande n'est interprétée.
+    if (!await SafeOpen.launch(t)) throw 'Impossible d\'ouvrir « $t ».';
     return 'Ouvert : $t';
   }
 
   /// Lit un fichier (début) ou liste un dossier.
   static Future<Object> read(String path) async {
     final p = expand(path);
+    if (secretPath(p)) {
+      throw 'Fichier protégé : Clicky ne lit jamais les mots de passe, cookies, clés ou fichiers de connexion.';
+    }
     if (await Directory(p).exists()) {
       final items = <String>[];
       await for (final e in Directory(p).list(followLinks: false)) {
@@ -325,6 +377,7 @@ $command
   static Future<String> write(String path, String content, {bool append = false}) async {
     final p = expand(path);
     if (p.isEmpty) throw 'Chemin vide.';
+    if (secretPath(p)) throw 'Fichier protégé : Clicky ne modifie pas les fichiers de mots de passe ou de clés.';
     final f = File(p);
     await f.parent.create(recursive: true);
     await f.writeAsString(content, mode: append ? FileMode.append : FileMode.write, flush: true);

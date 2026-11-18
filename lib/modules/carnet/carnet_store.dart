@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/safe_open.dart';
 import '../../core/hub_files.dart';
 
 /// Une ligne du carnet (tâche, note, idée, dépense, séance…).
@@ -479,10 +480,9 @@ Future<void> openApp(String name) async {
     'paramètres': 'ms-settings:',
     'parametres': 'ms-settings:',
   };
-  await Process.start('cmd', [
-    '/c',
-    'start',
-    '',
-    aliases[n] ?? name,
-  ], mode: ProcessStartMode.detached);
+  // Comme un double-clic (aucune commande interprétée), et jamais un
+  // programme ou un script inconnu sans accord.
+  final target = aliases[n] ?? name;
+  if (SafeOpen.risky(target)) throw 'Je ne lance pas « $target » tout seul : ouvre-le toi-même.';
+  await SafeOpen.launch(target);
 }

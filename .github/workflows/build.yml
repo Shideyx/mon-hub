@@ -13,11 +13,22 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Sécurité : par défaut, les tâches ne peuvent que LIRE le dépôt. Seule la
+# publication de la version (plus bas) a le droit d'écrire.
+permissions:
+  contents: read
+
+# Deux constructions de suite sur main : la plus récente gagne.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter pub get
@@ -29,6 +40,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter build windows --release ${{ env.GOOGLE_DEFINES }}
@@ -65,6 +77,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       # CocoaPods (et non Swift Package Manager) pour pouvoir relever la
@@ -86,6 +99,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter config --no-enable-swift-package-manager

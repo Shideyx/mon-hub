@@ -28,6 +28,9 @@ class ClaudeCode {
 
   static const models = {
     '': 'Celui de ton abonnement (par défaut)',
+    // Conseillé : Clicky n'appelle plus Claude que pour les demandes
+    // difficiles, autant qu'elles aient le meilleur.
+    'claude-opus-5-5': 'Claude Opus 5.5 (conseillé)',
     'sonnet': 'Sonnet (rapide)',
     'opus': 'Opus (le plus malin)',
     'haiku': 'Haiku (le plus rapide)',
@@ -175,7 +178,7 @@ class ClaudeCode {
   }
 
   /// Actions de Mon Hub : adresse du pont local, lue dans bridge.json.
-  static Map<String, dynamic>? _mcpConfig() {
+  static Map<String, dynamic>? _mcpConfig([Set<String>? groups]) {
     final dir = ClaudeBridge.folder;
     if (dir == null) return null;
     try {
@@ -185,7 +188,10 @@ class ClaudeCode {
         'mcpServers': {
           'monhub': {
             'type': 'http',
-            'url': 'http://127.0.0.1:${info['port']}/mcp',
+            // Clicky économe : seulement les actions utiles à la question.
+            'url':
+                'http://127.0.0.1:${info['port']}/mcp'
+                '${groups == null || groups.isEmpty ? '' : '?groupes=${Uri.encodeQueryComponent(groups.join(','))}'}',
             'headers': {'Authorization': 'Bearer ${info['key']}'},
           },
         },
@@ -205,6 +211,7 @@ class ClaudeCode {
     bool withTools = true,
     String? effort,
     bool web = false,
+    Set<String>? groups,
     List<Map<String, dynamic>> extraBlocks = const [],
     void Function(String text)? onText,
     void Function(String status)? onStatus,
@@ -217,7 +224,7 @@ class ClaudeCode {
     final sep = Platform.pathSeparator;
     final sysFile = File('${dir.path}${sep}clicky-system.txt');
     await sysFile.writeAsString(system);
-    final mcp = withTools ? _mcpConfig() : null;
+    final mcp = withTools ? _mcpConfig(groups) : null;
     final mcpFile = File('${dir.path}${sep}clicky-mcp.json');
     if (mcp != null) await mcpFile.writeAsString(jsonEncode(mcp));
 

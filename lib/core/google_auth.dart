@@ -129,7 +129,10 @@ class GoogleAuth {
           await () async {
             await for (final req in server) {
               final q = req.uri.queryParameters;
-              if (q['state'] != state && q['code'] == null && q['error'] == null) {
+              // Une réponse sans le bon « state » ne vient pas de Google pour
+              // cette connexion : ignorée (elle ne peut ni connecter un autre
+              // compte, ni annuler la connexion en cours).
+              if (q['state'] != state) {
                 req.response.statusCode = 404;
                 await req.response.close();
                 continue;

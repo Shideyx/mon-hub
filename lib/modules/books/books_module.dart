@@ -133,7 +133,7 @@ class ReadLink {
   String get progress {
     if (at == null) return '';
     if (isManga) return [?chapterLabel, 'page ${page + 1}'].join(' · ');
-    if (source == 'gutenberg' && (total ?? 0) > 0) return '${(100 * page / total!).round()} % lu';
+    if (ReadMatch.textSources.contains(source) && (total ?? 0) > 0) return '${(100 * page / total!).round()} % lu';
     return '';
   }
 
@@ -310,6 +310,7 @@ class BooksModule extends HubModule {
                 'statut': b.status.label,
                 if (b.rating > 0) 'etoiles': b.rating,
                 if (b.takeaway.isNotEmpty) 'a_retenir': b.takeaway,
+                if (b.read?.progress.isNotEmpty ?? false) 'progression': b.read!.progress,
               },
           ],
         ),
@@ -1060,7 +1061,7 @@ class _ReadButton extends StatelessWidget {
     final where = link == null
         ? 'Je trouve les scans ou le livre tout seul'
         : [
-            link.isManga ? 'Scans' : link.source == 'gutenberg' ? 'Livre libre' : 'Livre scanné',
+            link.isManga ? 'Scans' : ReadMatch.textSources.contains(link.source) ? 'Livre libre' : 'Livre scanné',
             if (link.progress.isNotEmpty) link.progress,
           ].join(' · ');
     Future<void> go({bool choose = false}) async {

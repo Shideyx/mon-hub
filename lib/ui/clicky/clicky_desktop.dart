@@ -297,6 +297,9 @@ class _BridgeTools {
     try {
       final req = await client.openUrl(method, Uri.parse('http://127.0.0.1:${info['port']}$path'));
       req.headers.set('authorization', 'Bearer ${info['key']}');
+      // Clicky partout a déjà demandé ton accord dans sa propre bulle : Mon
+      // Hub ne redemande pas une deuxième fois.
+      req.headers.set('x-monhub-client', 'clicky');
       req.headers.contentType = ContentType.json;
       if (body != null) req.write(jsonEncode(body));
       final res = await req.close().timeout(const Duration(minutes: 2));
@@ -339,7 +342,7 @@ class _BridgeTools {
               },
               required: [for (final r in (schema['required'] as List?) ?? const []) '$r'],
               run: (args) async {
-                final r = await _request('POST', '/call', {'name': m['name'], 'arguments': args});
+                final r = await _request('POST', '/call', {'name': m['name'], 'arguments': args, 'confirme': true});
                 if (r is Map && r['error'] != null) throw '${r['error']}';
                 return r is Map ? r['result'] : r;
               },

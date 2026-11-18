@@ -85,7 +85,7 @@ void main() {
     });
     final f = ReadFinder(client);
     final found = await f.find("L'Attaque des Titans - Tome 1");
-    expect(asked.toSet(), {'api.mangadex.org', 'gutendex.com', 'openlibrary.org'});
+    expect(asked.toSet(), {'api.mangadex.org', 'gutendex.com', 'fr.wikisource.org', 'openlibrary.org'});
     expect(found.first.id, 'm1');
     expect(found.first.isManga, true);
     expect(found.first.author, 'Isayama Hajime');

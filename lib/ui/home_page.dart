@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../core/custom_modules.dart';
 import '../core/desktop_widgets.dart';
 import '../core/session.dart';
 
@@ -9,6 +11,8 @@ import '../core/hub_controller.dart';
 import '../core/hub_module.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
+import 'add_module.dart';
+import 'hub_feed_view.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'clicky/win.dart';
@@ -33,8 +37,14 @@ class HomePage extends StatelessWidget {
           final desk = DesktopWidgets.instance;
           final all = controller.enabled;
           // Les widgets détachés vivent sur le bureau, pas dans l'accueil.
-          final modules = [for (final m in all) if (!desk.isDetached(m.id)) m];
-          final away = [for (final m in all) if (desk.isDetached(m.id)) m];
+          final modules = [
+            for (final m in all)
+              if (!desk.isDetached(m.id)) m,
+          ];
+          final away = [
+            for (final m in all)
+              if (desk.isDetached(m.id)) m,
+          ];
           return RefreshIndicator(
             onRefresh: notifications.pollNow,
             child: CustomScrollView(
@@ -44,6 +54,10 @@ class HomePage extends StatelessWidget {
                     offset: 10,
                     child: _Header(controller: controller, notifications: notifications, modules: all),
                   ),
+                ),
+                // Ce qui compte maintenant, relié entre les modules.
+                SliverToBoxAdapter(
+                  child: HubFeedStrip(controller: controller, onOpen: onOpen),
                 ),
                 if (away.isNotEmpty)
                   SliverToBoxAdapter(
@@ -70,9 +84,7 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                 if (modules.isEmpty)
-                  const SliverFillRemaining(
-                    child: EmptyHint('Aucun module actif. Active-en dans les réglages.'),
-                  )
+                  const SliverFillRemaining(child: EmptyHint('Aucun module actif. Active-en dans les réglages.'))
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -83,26 +95,60 @@ class HomePage extends StatelessWidget {
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
-                      itemCount: modules.length,
+                      // La dernière carte : « + Ajouter un module ».
+                      itemCount: modules.length + 1,
                       // Les cartes arrivent en cascade et s'enfoncent quand on appuie.
-                      itemBuilder: (context, i) => EnterAnimation(
-                        key: ValueKey('enter-${modules[i].id}'),
-                        index: i + 1,
-                        child: PressScale(
-                          scale: 0.975,
-                          child: ModuleCard(
-                            module: modules[i],
-                            onOpen: onOpen,
-                            // Glisser une carte sur une autre : elles échangent leur place.
-                            onDropped: (dragged) {
-                              final order = controller.ordered.map((m) => m.id).toList();
-                              final from = order.indexOf(dragged.id);
-                              final to = order.indexOf(modules[i].id);
-                              if (from >= 0 && to >= 0 && from != to) controller.reorder(from, to);
-                            },
-                          ),
-                        ),
-                      ),
+                      itemBuilder: (context, i) => i == modules.length
+                          ? EnterAnimation(
+                              key: const ValueKey('enter-add'),
+                              index: i + 1,
+                              child: AddModuleCard(controller: controller),
+                            )
+                          : EnterAnimation(
+                              key: ValueKey('enter-${modules[i].id}'),
+                              index: i + 1,
+                              child: PressScale(
+                                scale: 0.975,
+                                child: ModuleCard(
+                                  module: modules[i],
+                                  onOpen: onOpen,
+                                  onRemove: CustomModules.isCustom(modules[i].id)
+                                      ? () async {
+                                          final m = modules[i];
+                                          final ok = await showDialog<bool>(
+                                            context: context,
+                                            builder: (c) => AlertDialog(
+                                              title: Text('Retirer « ${m.name} » ?'),
+                                              content: const Text(
+                                                'Le module disparaît de ton accueil. Tu pourras le rajouter quand tu veux.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(c, false),
+                                                  child: const Text('Annuler'),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () => Navigator.pop(c, true),
+                                                  child: const Text('Retirer'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (ok != true) return;
+                                          await CustomModules.remove(m.id);
+                                          controller.remove(m.id);
+                                        }
+                                      : null,
+                                  // Glisser une carte sur une autre : elles échangent leur place.
+                                  onDropped: (dragged) {
+                                    final order = controller.ordered.map((m) => m.id).toList();
+                                    final from = order.indexOf(dragged.id);
+                                    final to = order.indexOf(modules[i].id);
+                                    if (from >= 0 && to >= 0 && from != to) controller.reorder(from, to);
+                                  },
+                                ),
+                              ),
+                            ),
                     ),
                   ),
               ],
@@ -143,11 +189,7 @@ class _Header extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF7C5CFF).withValues(alpha: 0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
+          BoxShadow(color: const Color(0xFF7C5CFF).withValues(alpha: 0.3), blurRadius: 30, offset: const Offset(0, 12)),
         ],
       ),
       child: SafeArea(
@@ -159,10 +201,11 @@ class _Header extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}'
-                        .toUpperCase(),
+                    '${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}'.toUpperCase(),
                     style: theme.textTheme.labelMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85), letterSpacing: 1.2),
+                      color: Colors.white.withValues(alpha: 0.85),
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
                 ListenableBuilder(
@@ -178,21 +221,21 @@ class _Header extends StatelessWidget {
                     onPressed: () {
                       notifications.markRead();
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => NotificationsPage(
-                                  notifications: notifications, controller: controller)));
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NotificationsPage(notifications: notifications, controller: controller),
+                        ),
+                      );
                     },
                   ),
                 ),
                 IconButton(
                   tooltip: theme.brightness == Brightness.dark ? 'Mode clair' : 'Mode sombre',
                   color: Colors.white,
-                  icon: Icon(theme.brightness == Brightness.dark
-                      ? Icons.light_mode_rounded
-                      : Icons.dark_mode_rounded),
+                  icon: Icon(theme.brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
                   onPressed: () => AppSession.instance.setThemeMode(
-                      theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark),
+                    theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark,
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Réglages',
@@ -201,17 +244,29 @@ class _Header extends StatelessWidget {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) =>
-                            SettingsPage(controller: controller, notifications: notifications)),
+                      builder: (_) => SettingsPage(controller: controller, notifications: notifications),
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              '$_greeting${userName.isEmpty ? '' : ' $userName'} 👋',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                  color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    '$_greeting${userName.isEmpty ? '' : ' $userName'}',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // La main fait coucou une fois, à l'ouverture.
+                const _WavingHand(),
+              ],
             ),
             const SizedBox(height: 14),
             ListenableBuilder(
@@ -221,9 +276,15 @@ class _Header extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _HeaderChip(icon: Icons.schedule_rounded, text: hhmm(now)),
-                  for (final m in modules)
-                    if (m.badge.value > 0)
-                      _HeaderChip(icon: m.icon, text: '${m.badge.value} · ${m.name}'),
+                  for (final (n, m) in [for (final m in modules) if (m.badge.value > 0) m].indexed)
+                    // Les pastilles arrivent l'une après l'autre.
+                    EnterAnimation(
+                      key: ValueKey('chip-${m.id}-${m.badge.value}'),
+                      index: n + 1,
+                      step: 70,
+                      offset: 8,
+                      child: _HeaderChip(icon: m.icon, text: '${m.badge.value} · ${m.name}'),
+                    ),
                 ],
               ),
             ),
@@ -234,6 +295,44 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// 👋 qui fait coucou une seule fois (pas d'animation sans fin).
+class _WavingHand extends StatefulWidget {
+  const _WavingHand();
+  @override
+  State<_WavingHand> createState() => _WavingHandState();
+}
+
+class _WavingHandState extends State<_WavingHand> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+  Timer? _start;
+
+  @override
+  void initState() {
+    super.initState();
+    _start = Timer(const Duration(milliseconds: 450), () {
+      if (mounted) _a.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _start?.cancel();
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _a,
+    builder: (context, child) {
+      final t = _a.value;
+      final angle = math.sin(t * math.pi * 5) * 0.45 * (1 - t);
+      return Transform.rotate(angle: angle, alignment: const Alignment(0.3, 0.8), child: child);
+    },
+    child: Text('👋', style: Theme.of(context).textTheme.headlineMedium),
+  );
+}
+
 class _HeaderChip extends StatelessWidget {
   const _HeaderChip({required this.icon, required this.text});
   final IconData icon;
@@ -241,26 +340,30 @@ class _HeaderChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(30),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(30)),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: Colors.white),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 15, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(text,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-        ]),
-      );
+      ],
+    ),
+  );
 }
 
 class ModuleCard extends StatefulWidget {
-  const ModuleCard({super.key, required this.module, this.onOpen, this.onDropped});
+  const ModuleCard({super.key, required this.module, this.onOpen, this.onDropped, this.onRemove});
 
   final HubModule module;
   final ValueChanged<HubModule>? onOpen;
+
+  /// Module perso : on peut le retirer (bouton de la carte).
+  final VoidCallback? onRemove;
 
   /// Une autre carte a été lâchée sur celle-ci (pour les réordonner).
   final ValueChanged<HubModule>? onDropped;
@@ -304,24 +407,42 @@ class _ModuleCardState extends State<ModuleCard> {
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 6),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              gradient: LinearGradient(
-                colors: [m.color, Color.lerp(m.color, Colors.black, 0.3)!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Au survol, l'icône se redresse et grandit un peu (une fois).
+          AnimatedRotation(
+            turns: hover && !dragging ? -0.025 : 0,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutBack,
+            child: AnimatedScale(
+              scale: hover && !dragging ? 1.12 : 1,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(11),
+                  gradient: LinearGradient(
+                    colors: [m.color, Color.lerp(m.color, Colors.black, 0.3)!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    if (hover && !dragging)
+                      BoxShadow(color: m.color.withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Icon(m.icon, color: Colors.white, size: 20),
               ),
             ),
-            child: Icon(m.icon, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(m.name,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                overflow: TextOverflow.ellipsis),
+            child: Text(
+              m.name,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           ValueListenableBuilder(
             valueListenable: m.badge,
@@ -329,15 +450,21 @@ class _ModuleCardState extends State<ModuleCard> {
                 ? const SizedBox.shrink()
                 : Container(
                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: m.color,
-                      borderRadius: BorderRadius.circular(20),
+                    decoration: BoxDecoration(color: m.color, borderRadius: BorderRadius.circular(20)),
+                    child: Text(
+                      '$n',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
                     ),
-                    child: Text('$n',
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
                   ),
           ),
+          if (!dragging && widget.onRemove != null)
+            IconButton(
+              tooltip: 'Retirer ce module perso',
+              visualDensity: VisualDensity.compact,
+              color: theme.colorScheme.onSurfaceVariant,
+              icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
+              onPressed: widget.onRemove,
+            ),
           if (!dragging && DesktopWidgets.supported)
             IconButton(
               tooltip: 'Détacher sur le bureau (ou glisse la carte hors de Mon Hub)',
@@ -359,9 +486,21 @@ class _ModuleCardState extends State<ModuleCard> {
     final card = MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
-      child: AnimatedScale(
-        scale: hover ? 1.015 : 1,
-        duration: const Duration(milliseconds: 160),
+      // Au survol : la carte se soulève, avec une ombre de sa couleur.
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(0, hover ? -4 : 0, 0),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: m.color.withValues(alpha: hover ? 0.28 : 0),
+              blurRadius: hover ? 26 : 0,
+              offset: Offset(0, hover ? 12 : 0),
+            ),
+          ],
+        ),
         child: Card(
           clipBehavior: Clip.antiAlias,
           child: Stack(
@@ -375,10 +514,7 @@ class _ModuleCardState extends State<ModuleCard> {
                   height: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: RadialGradient(colors: [
-                      m.color.withValues(alpha: 0.22),
-                      m.color.withValues(alpha: 0),
-                    ]),
+                    gradient: RadialGradient(colors: [m.color.withValues(alpha: 0.22), m.color.withValues(alpha: 0)]),
                   ),
                 ),
               ),
@@ -403,9 +539,7 @@ class _ModuleCardState extends State<ModuleCard> {
                               color: theme.cardTheme.color ?? theme.colorScheme.surface,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(color: m.color),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6)),
-                              ],
+                              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6))],
                             ),
                             child: _header(context, dragging: true),
                           ),
