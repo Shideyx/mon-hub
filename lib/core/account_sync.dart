@@ -17,6 +17,7 @@ import 'module_store.dart';
 import 'session.dart';
 import 'vault.dart';
 import 'freeze_watch.dart';
+import 'screen_time.dart';
 
 /// Ton compte Mon Hub sur tous tes appareils, **sans export**.
 ///
@@ -160,6 +161,8 @@ class AccountSync extends ChangeNotifier {
   /// Fusionne cet appareil avec la copie du Drive (sans jamais lever
   /// d'erreur : elle est gardée dans [error]).
   Future<void> syncNow() async {
+    // Pendant une partie (mode jeu) : la synchro attend la fin.
+    if (GameMode.instance.active) return;
     FreezeWatch.note('synchronise le compte');
     final acc = AppSession.instance.current;
     final mail = email;
@@ -589,6 +592,8 @@ class AccountSync extends ChangeNotifier {
       !name.startsWith('rangement-') &&
       // La sauvegarde des travaux est propre à ce PC (ses fichiers à lui).
       name != 'sauvegarde.json' &&
+      // Le temps d'écran est propre à ce PC.
+      name != 'temps-ecran.json' &&
       !name.startsWith('sync-');
 
   /// Fichiers déjà lus : (date de modification, contenu, empreinte). Un

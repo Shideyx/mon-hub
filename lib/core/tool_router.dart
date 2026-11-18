@@ -41,7 +41,8 @@ class ToolRouter {
     ),
     'assistant': (
       ['assistant_'],
-      ['briefing', 'priorit', 'objectif', 'planifie', 'organise', 'ma journee', 'programme', 'plan'],
+      ['briefing', 'priorit', 'objectif', 'planifie', 'organise', 'ma journee', 'programme', 'plan', 'coucher', 'dormir',
+        'sommeil', 'sac'],
     ),
     'mail': (['mail_', 'mails_'], ['mail', 'courriel', 'email', 'e-mail', 'boite']),
     'discord': (['discord_'], ['discord', 'serveur', 'salon', 'vocal', 'appel', 'appelle', 'dm']),
@@ -65,8 +66,22 @@ class ToolRouter {
     'clicky': (
       ['clicky_'],
       ['micro', 'entends', 'marche pas', 'voix', 'repare', 'bug', 'panne', 'concentration', 'focus', 'deranger',
-        'quand j ouvre', 'rappel', 'situation', 'le point'],
+        'quand j ouvre', 'rappel', 'situation', 'le point', 'rate', 'loupe', 'quoi de neuf', 'absence', 'nouvelles'],
     ),
+    'securite': (
+      ['securite_'],
+      ['securite', 'antivirus', 'virus', 'arnaque', 'lien', 'pirate', 'hack', 'double authentification', '2fa', 'protege',
+        'pare-feu', 'mot de passe', 'phishing', 'nitro', 'robux gratuit'],
+    ),
+    'recherche': (
+      ['recherche_'],
+      ['cherche', 'retrouve', 'trouve', 'ou est', 'ou j ai mis', 'perdu', 'partout'],
+    ),
+    'ecran': (
+      ['temps_ecran'],
+      ['temps d ecran', 'temps passe', 'combien de temps', 'limite', 'trop joue', 'accro', 'pause'],
+    ),
+    'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),
     'perso': (['perso_'], ['ouvre', 'module', 'site']),

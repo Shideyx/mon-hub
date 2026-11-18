@@ -89,11 +89,10 @@ jobs:
           name: MonHub-macOS
           path: build/macos/Build/Products/Release/*.app
 
+  # L'appli iPhone (iPhone 12 et plus récents) : ajoutée à la publication
+  # dès qu'elle est prête, sans retarder la mise à jour du PC.
   ios:
     needs: test
-    # Désactivé : seule la version Windows est compilée (mettre true pour
-    # recompiler iPhone).
-    if: false
     runs-on: macos-latest
     # Appli iPhone non signée : à installer avec Sideloadly (voir INSTALL.md).
     continue-on-error: true
@@ -139,7 +138,8 @@ jobs:
     # Seul Windows est indispensable : Android est ajouté s'il est prêt,
     # l'iPhone n'est jamais attendu (bonus).
     needs: [windows]
-    if: ${{ always() && needs.windows.result == 'success' }}
+    # Seulement depuis main (un essai sur une autre branche ne publie rien).
+    if: ${{ always() && needs.windows.result == 'success' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -173,3 +173,26 @@ jobs:
             --latest \
             --title "Mon Hub v1.${{ github.run_number }}" \
             --notes-file notes.md
+
+  # L'appli iPhone, ajoutée à la publication quand elle est prête.
+  release-ios:
+    needs: [release, ios]
+    if: ${{ always() && needs.release.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: MonHub-iOS
+          path: dist
+      - name: Ajouter MonHub-iOS.ipa à la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f dist/MonHub-iOS.ipa ]; then
+            gh release upload "v1.${{ github.run_number }}" dist/MonHub-iOS.ipa --clobber --repo "${{ github.repository }}"
+          else
+            echo "Pas d'appli iPhone cette fois (la compilation iPhone a échoué)."
+          fi

@@ -35,6 +35,14 @@ Apple n'autorise que l'App Store, sauf pour les applis « installées par le dé
 5. Sur l'iPhone : **Réglages → Général → VPN et gestion de l'appareil** → ton identifiant → **Faire confiance**. Puis **Réglages → Confidentialité et sécurité → Mode développeur** → activer (l'iPhone redémarre).
 6. Ouvre Mon Hub et autorise les notifications.
 
+**Le même compte que sur le PC, synchronisé** (rien à recréer) :
+
+7. Sur le PC : **Réglages → Mes appareils → Ajouter mon iPhone** → **M'envoyer le code par mail** (le code de ta connexion Google, envoyé par ta propre boîte mail).
+8. Sur l'iPhone : Mon Hub → **Retrouver mon compte d'un autre appareil** → ouvre le mail, copie-le → **Coller le code de mon PC** → **Se connecter avec Google** (le même compte Google que sur le PC).
+9. **Demander mon compte à mon PC principal** : laisse Mon Hub ouvert sur le PC, il envoie ton compte tout seul (moins de 10 minutes). Ensuite, ce que tu changes d'un côté arrive de l'autre (toutes les 3 minutes, copie chiffrée dans ton Google Drive).
+
+> Nouvelle version : l'iPhone te prévient (Apple interdit les mises à jour automatiques hors App Store). Retélécharge **MonHub-iOS.ipa** sur le PC et refais l'étape 4 : tes données restent sur l'iPhone.
+
 > Avec un identifiant Apple gratuit, Apple limite l'installation à **7 jours** : il suffit de refaire l'étape 4 (Sideloadly peut le faire tout seul quand l'iPhone est sur le même Wi-Fi). Pour éviter ça, il faut le compte développeur Apple (99 €/an) ou une publication sur l'App Store.
 
 ## 3. Créer ton compte Mon Hub

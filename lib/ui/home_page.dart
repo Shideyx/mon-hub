@@ -14,6 +14,7 @@ import '../core/notifications.dart';
 import 'add_module.dart';
 import 'hub_feed_view.dart';
 import 'notifications_page.dart';
+import 'search_page.dart';
 import 'settings_page.dart';
 import 'clicky/win.dart';
 import 'motion.dart';
@@ -208,6 +209,12 @@ class _Header extends StatelessWidget {
                       letterSpacing: 1.2,
                     ),
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Chercher partout (Ctrl + Espace)',
+                  color: Colors.white,
+                  icon: const Icon(Icons.search_rounded),
+                  onPressed: () => SearchPage.show(),
                 ),
                 ListenableBuilder(
                   listenable: notifications,

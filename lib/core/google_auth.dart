@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'module_store.dart';
 import 'browser.dart';
@@ -57,6 +58,54 @@ class GoogleAuth {
       throw 'Ce n\'est pas un identifiant client Google (il finit par « .apps.googleusercontent.com »)';
     }
     await ModuleStore.prefs.setString(_customKey, jsonEncode({'id': i, 'secret': secret.trim()}));
+  }
+
+  /// Le « code de liaison » à donner à un autre appareil (l'iPhone) : la
+  /// clé de l'appli Google de la personne, pour qu'il se connecte sans
+  /// refaire les 5 étapes. Passe par toi (copier-coller, ton propre mail) :
+  /// jamais par un serveur.
+  static const codePrefix = 'MONHUB-GOOGLE:';
+
+  static String? shareCode() {
+    if (!available) return null;
+    final raw = utf8.encode(jsonEncode({'id': clientId, 'secret': clientSecret}));
+    return '$codePrefix${base64Url.encode(raw).replaceAll('=', '')}';
+  }
+
+  /// Lit un code de liaison (dans un texte collé, un mail…). Renvoie false
+  /// s'il n'y en a pas.
+  static Future<bool> importCode(String text) async {
+    final m = RegExp('${RegExp.escape(codePrefix)}\\s*([A-Za-z0-9_-]{20,})').firstMatch(text);
+    if (m == null) return false;
+    final Object? j;
+    try {
+      j = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(m[1]!))));
+    } catch (_) {
+      throw 'Ce code est abîmé : recopie-le en entier depuis ton PC.';
+    }
+    if (j is! Map) throw 'Ce code est abîmé : recopie-le en entier depuis ton PC.';
+    await setClient('${j['id'] ?? ''}', '${j['secret'] ?? ''}');
+    return true;
+  }
+
+  /// Sur iPhone (et Android) : la page Google s'ouvre **dans** Mon Hub
+  /// (Safari intégré), pour que l'appli reste ouverte et reçoive la réponse.
+  static bool get _mobile => !Platform.isWindows && !Platform.isMacOS && !Platform.isLinux;
+
+  static Future<bool> _openSignIn(Uri url) async {
+    if (!_mobile) return Browser.open(url.toString());
+    try {
+      return await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+    } catch (_) {
+      return Browser.open(url.toString());
+    }
+  }
+
+  static Future<void> _closeSignIn() async {
+    if (!_mobile) return;
+    try {
+      await closeInAppWebView();
+    } catch (_) {}
   }
 
   static const scopes = [
@@ -122,7 +171,7 @@ class GoogleAuth {
       'prompt': 'consent select_account',
     });
     try {
-      if (!await Browser.open(url.toString())) {
+      if (!await _openSignIn(url)) {
         throw 'Impossible d\'ouvrir le navigateur';
       }
       final code =
@@ -187,6 +236,7 @@ class GoogleAuth {
       return email;
     } finally {
       await server.close(force: true);
+      unawaited(_closeSignIn());
     }
   }
 

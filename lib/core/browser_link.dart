@@ -54,7 +54,8 @@ class BrowserLink extends ChangeNotifier {
   }
 
   Future<void> start() async {
-    if (kIsWeb || _server != null) return;
+    // L'extension Chrome vit sur l'ordinateur (pas sur l'iPhone).
+    if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux) || _server != null) return;
     try {
       final s = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
       _server = s;

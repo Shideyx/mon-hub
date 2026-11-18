@@ -119,6 +119,29 @@ class ClickySkillsPage extends StatelessWidget {
       '« Briefing » : le topo du matin, quand tu veux',
       '« Organise mes révisions avant le contrôle de maths »',
     ]),
+    ('Ce que tu as raté', Icons.mark_chat_unread_rounded, Color(0xFF7C5CFF), [
+      '« Qu\'est-ce que j\'ai raté ? » : messages Discord, mentions, mails importants (sans les pubs), École Directe',
+      'Quand tu reviens devant le PC, il te le dit tout seul (et qui attend ta réponse)',
+    ]),
+    ('Retrouver n\'importe quoi', Icons.search_rounded, Color(0xFF0EA5E9), [
+      'Ctrl + Espace dans Mon Hub (Ctrl + Alt + Espace partout) : PC, Drive, Google Docs, mails, Discord, cours…',
+      '« Cherche mon exposé sur la Révolution partout », « Retrouve le fichier de maths »',
+    ]),
+    ('Sécurité', Icons.shield_rounded, Color(0xFF16A34A), [
+      'Bouclier anti-arnaque : faux Nitro/Robux, faux sites, espions d\'IP, « teste mon jeu » avec un .exe',
+      '« Ce lien est sûr ? » (après l\'avoir copié)',
+      '« Bilan de sécurité » : antivirus, pare-feu, mises à jour, double authentification',
+    ]),
+    ('Bien-être', Icons.hourglass_bottom_rounded, Color(0xFF5B5BD6), [
+      '« Mon temps d\'écran », « Combien de temps j\'ai passé sur Roblox cette semaine ? »',
+      '« Limite YouTube à 1 h par jour » : il te prévient (rien n\'est bloqué)',
+      '« À quelle heure je dois me coucher ? » : d\'après ton premier cours de demain',
+      'Mode jeu : un jeu en plein écran, et Mon Hub se fait oublier jusqu\'à la fin de la partie',
+    ]),
+    ('Tes proches', Icons.cake_rounded, Color(0xFFE5487B), [
+      '« L\'anniversaire de Léa c\'est le 12 mars » : rappel la veille et le jour même, avec un message tout prêt',
+      '« Les prochains anniversaires », « C\'est quand l\'anniversaire de Tom ? »',
+    ]),
     ('Concentration', Icons.self_improvement_rounded, Color(0xFF10B981), [
       '« Mode concentration 45 minutes » (ou « je dois travailler une heure »)',
       'Il ne te dérange plus et garde les notifications pour la fin',

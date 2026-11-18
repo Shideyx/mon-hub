@@ -48,6 +48,7 @@ class DiscordMessage {
     this.reactions = const [],
     this.videos = const [],
     this.embeds = const [],
+    this.files = const [],
   ]);
   final String id;
   final DiscordUser author;
@@ -66,6 +67,12 @@ class DiscordMessage {
 
   /// Aperçus de liens (titre, description, image, site).
   final List<DiscordEmbed> embeds;
+
+  /// Les noms des fichiers joints (pour repérer un .exe piégé).
+  final List<String> files;
+
+  /// Le texte et les liens du message (pour le bouclier anti-arnaque).
+  String get scanText => [content, for (final e in embeds) '${e.title ?? ''} ${e.url ?? ''}'].join(' ');
 
   bool get isVoice => audioUrl != null;
 
@@ -161,6 +168,7 @@ class DiscordMessage {
       ],
       videos,
       embeds,
+      [for (final a in atts) if (a is Map && a['filename'] != null) '${a['filename']}'],
     );
   }
 }
@@ -378,6 +386,20 @@ class DiscordApi {
     final r = await _send(() => _http.get(Uri.parse('$_base$path'), headers: _headers));
     return _check(r);
   }
+
+  /// Les messages récents où tu es mentionné (@toi), dans tes serveurs :
+  /// (message, id du salon, id du serveur).
+  Future<List<(DiscordMessage, String, String?)>> mentions({int limit = 25}) async {
+    final list = await _get('/users/@me/mentions?limit=$limit&roles=true&everyone=false');
+    return [
+      for (final m in (list is List ? list : const []))
+        if (m is Map)
+          (DiscordMessage.fromJson(m.cast<String, dynamic>()), '${m['channel_id']}', m['guild_id'] as String?),
+    ];
+  }
+
+  /// La double authentification est-elle activée sur ce compte ?
+  Future<bool> mfaEnabled() async => (await _get('/users/@me') as Map)['mfa_enabled'] == true;
 
   Future<DiscordUser> me() async =>
       DiscordUser.fromJson(await _get('/users/@me') as Map<String, dynamic>);

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
 import '../core/browser.dart';
+import '../core/scam_shield.dart';
 import '../core/freeze_watch.dart';
 
 const _desktopUa =
@@ -411,6 +412,11 @@ class _HubWebViewState extends State<HubWebView> {
               onCreateWindow: (c, action) async {
                 if (!mounted) return false;
                 final to = action.request.url;
+                // Bouclier anti-arnaque : un faux site ne s'ouvre pas tout seul.
+                if (to != null) {
+                  final v = ScamShield.checkUrl(to.toString());
+                  if (v.danger && !(await Browser.confirmScam?.call(to.toString(), v) ?? false)) return true;
+                }
                 if (widget.sameSiteInPlace && !_isLogin(to) && _sameSite(to, await c.getUrl())) {
                   // false : le lien s'ouvre ici même.
                   return false;

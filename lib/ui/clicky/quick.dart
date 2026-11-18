@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import '../widgets.dart';
 import 'tutor.dart' show normalize;
+import '../../core/birthdays.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
 typedef QuickTool = Future<Object?> Function(String name, Map<String, dynamic> args);
@@ -38,6 +41,26 @@ class QuickAnswers {
     return n.trim();
   }
 
+  /// Retrouve dans la phrase d'origine les mots de [fragment] (avec leurs
+  /// accents et majuscules) : « lea » → « Léa ».
+  static String original(String raw, String fragment) {
+    final want = fragment.trim().split(' ');
+    final words = RegExp(r"[\p{L}\p{N}-]+", unicode: true).allMatches(raw).map((m) => m[0]!).toList();
+    final plain = [for (final w in words) normalize(w)];
+    for (var i = 0; i + want.length <= words.length; i++) {
+      var ok = true;
+      for (var j = 0; j < want.length && ok; j++) {
+        ok = plain[i + j] == want[j];
+      }
+      if (ok) {
+        final s = words.sublist(i, i + want.length).join(' ');
+        return s[0].toUpperCase() + s.substring(1);
+      }
+    }
+    final f = fragment.trim();
+    return f.isEmpty ? f : f[0].toUpperCase() + f.substring(1);
+  }
+
   /// Le jour visé par « demain », « aujourd'hui », « jeudi »…
   static DateTime? dayFrom(String n, DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
@@ -62,7 +85,8 @@ class QuickAnswers {
     return '${frDays[d.weekday - 1]} ${d.day} ${frMonths[d.month - 1]}';
   }
 
-  static String _hour(DateTime d) => d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
+  static String _hour(DateTime d) =>
+      d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
 
   static String _short(String s, [int max = 90]) {
     final t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -142,7 +166,8 @@ class QuickAnswers {
     }
 
     // L'heure, la date.
-    if (RegExp(r'^(?:quelle heure (?:est il|il est)|il est quelle heure|c est quelle heure|l heure|donne moi l heure)$').hasMatch(n)) {
+    if (RegExp(r'^(?:quelle heure (?:est il|il est)|il est quelle heure|c est quelle heure|l heure|donne moi l heure)$')
+        .hasMatch(n)) {
       return QuickReply('Il est ${_hour(t)}.');
     }
     if (RegExp(
@@ -166,12 +191,19 @@ class QuickAnswers {
         ).hasMatch(n)) {
       final r = await call('assistant_priorites', const {});
       if (r is Map) {
-        final l = [for (final x in (r['priorites'] as List?) ?? const []) if (x is Map) x];
+        final l = [
+          for (final x in (r['priorites'] as List?) ?? const [])
+            if (x is Map) x,
+        ];
         if (l.isEmpty) return const QuickReply('Rien d\'urgent : tu es à jour, bravo !');
-        return QuickReply([
-          r['trop_de_choses'] == true ? 'Ça fait beaucoup, alors concentre-toi sur les 3 premières :' : 'Par quoi commencer :',
-          for (final (i, t) in l.take(5).indexed) '${i + 1}. ${t['tache']} (${t['pourquoi']})',
-        ].join('\n'));
+        return QuickReply(
+          [
+            r['trop_de_choses'] == true
+                ? 'Ça fait beaucoup, alors concentre-toi sur les 3 premières :'
+                : 'Par quoi commencer :',
+            for (final (i, t) in l.take(5).indexed) '${i + 1}. ${t['tache']} (${t['pourquoi']})',
+          ].join('\n'),
+        );
       }
     }
     if (has('assistant_planifier_journee') &&
@@ -182,12 +214,17 @@ class QuickAnswers {
       final r = await call('assistant_planifier_journee', const {});
       if (r is String) return QuickReply(r);
       if (r is Map) {
-        final plan = [for (final x in (r['plan_propose'] as List?) ?? const []) if (x is Map) x];
-        return QuickReply([
-          'Voici ce que je te propose :',
-          for (final p in plan) '• ${'${p['debut']}'.substring(11, 16)} ${p['titre']}',
-          'Clique sur « Mettre dans l\'agenda » pour l\'enregistrer.',
-        ].join('\n'));
+        final plan = [
+          for (final x in (r['plan_propose'] as List?) ?? const [])
+            if (x is Map) x,
+        ];
+        return QuickReply(
+          [
+            'Voici ce que je te propose :',
+            for (final p in plan) '• ${'${p['debut']}'.substring(11, 16)} ${p['titre']}',
+            'Clique sur « Mettre dans l\'agenda » pour l\'enregistrer.',
+          ].join('\n'),
+        );
       }
     }
     if (has('assistant_objectifs') && RegExp(r'^(?:quels sont |c est quoi )?mes objectifs$').hasMatch(n)) {
@@ -197,16 +234,20 @@ class QuickAnswers {
           for (final g in r)
             if (g is Map && g['atteint'] != true) '${g['objectif']}',
         ];
-        return QuickReply(open.isEmpty
-            ? 'Tu n\'as pas encore d\'objectif. Dis-moi « mon objectif est de… » et je le retiens.'
-            : 'Tes objectifs : ${open.join(' · ')}.');
+        return QuickReply(
+          open.isEmpty
+              ? 'Tu n\'as pas encore d\'objectif. Dis-moi « mon objectif est de… » et je le retiens.'
+              : 'Tes objectifs : ${open.join(' · ')}.',
+        );
       }
     }
 
     // ---- Façon JARVIS : état du PC, fenêtres, concentration, rappels ----
 
     // Le point de la situation (« rapport », « fais le point »).
-    if (RegExp(r'^(?:fais(?: moi)? (?:le |un )?)?(?:rapport|point)(?: de (?:la )?situation)?$|^(?:statut|situation) (?:general|generale|actuelle)$|^fais le point$').hasMatch(n) &&
+    if (RegExp(
+          r'^(?:fais(?: moi)? (?:le |un )?)?(?:rapport|point)(?: de (?:la )?situation)?$|^(?:statut|situation) (?:general|generale|actuelle)$|^fais le point$',
+        ).hasMatch(n) &&
         (has('clicky_situation') || has('pc_etat'))) {
       final sit = has('clicky_situation') ? await call('clicky_situation', {}) : null;
       final pc = has('pc_etat') ? await call('pc_etat', {}) : null;
@@ -226,8 +267,11 @@ class QuickAnswers {
 
     // L'état du PC.
     if (has('pc_etat')) {
-      final why = RegExp(r'^pourquoi (?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:si )?lent|bug|bugue|ralentit)$|^(?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:trop )?lent)$').hasMatch(n);
-      final status = why ||
+      final why = RegExp(
+        r'^pourquoi (?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:si )?lent|bug|bugue|ralentit)$|^(?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:trop )?lent)$',
+      ).hasMatch(n);
+      final status =
+          why ||
           RegExp(
             r'^(?:etat|statut|diagnostic|bilan|sante) (?:du |de mon |de l )?(?:pc|ordi|ordinateur|systeme|systemes)$|'
             r'^comment (?:va|se porte) (?:mon |le )?(?:pc|ordi|ordinateur)$|^(?:diagnostic|diagnostic systeme|statut systeme|etat des systemes)$|'
@@ -247,7 +291,8 @@ class QuickAnswers {
 
     // Le texte surligné : corriger, reformuler, traduire.
     if (has('clicky_corriger_selection')) {
-      final sel = r'(?:ce que j ai (?:surligne|selectionne|ecrit)|le texte (?:surligne|selectionne)|la selection|mon texte|ce texte)';
+      final sel =
+          r'(?:ce que j ai (?:surligne|selectionne|ecrit)|le texte (?:surligne|selectionne)|la selection|mon texte|ce texte)';
       final fix = RegExp('^(?:corrige|relis|verifie l orthographe de) $sel\$').hasMatch(n);
       final re = RegExp('^(?:reformule|ameliore) $sel\$').hasMatch(n);
       final tr = RegExp('^traduis $sel en (\\w+)\$|^traduis en (\\w+) $sel\$').firstMatch(n);
@@ -255,6 +300,157 @@ class QuickAnswers {
         final mode = fix ? 'corriger' : (re ? 'reformuler' : 'traduire:${tr!.group(1) ?? tr.group(2)}');
         return QuickReply('${await call('clicky_corriger_selection', {'mode': mode})}');
       }
+    }
+
+    // « Qu'est-ce que j'ai raté ? »
+    if (has('clicky_rate') &&
+        RegExp(
+          r'^(?:qu est ce que j ai rate|j ai rate quoi|j ai loupe quoi|qu est ce que j ai loupe|quoi de neuf|du nouveau|'
+          r'on m a ecrit|quelqu un m a ecrit|j ai des messages|des nouvelles|resume(?: moi)? (?:mes |les )?messages)'
+          r'(?: sur discord| pendant mon absence| aujourd hui| depuis ce matin| depuis hier)?$',
+        ).hasMatch(n)) {
+      final hours = RegExp(r'depuis hier').hasMatch(n)
+          ? 24
+          : (RegExp(r'aujourd hui|depuis ce matin').hasMatch(n) ? (t.hour + 1) : 12);
+      return QuickReply('${await call('clicky_rate', {'heures': hours})}');
+    }
+
+    // Bilan de sécurité.
+    if (has('securite_bilan') &&
+        RegExp(
+          r'^(?:fais(?: moi)? (?:un |le )?)?(?:bilan|check|verification|controle) (?:de )?(?:la |ma )?securite(?: du pc| de mon pc| de mes comptes)?$|'
+          r'^(?:verifie|controle) (?:la |ma )?securite(?: du pc| de mon pc| de mes comptes)?$|'
+          r'^(?:est ce que )?(?:mon pc|mon ordi|mon ordinateur) (?:est|il est) (?:bien )?protege$|'
+          r'^(?:est ce que )?j ai (?:un|bien un) antivirus(?: actif)?$',
+        ).hasMatch(n)) {
+      final r = await call('securite_bilan', {});
+      if (r is Map) return QuickReply('${r['resume']}');
+    }
+
+    // Bouclier anti-arnaque (le lien copié).
+    if (has('securite_lien') &&
+        RegExp(
+          r'^(?:est ce que )?(?:ce|le|mon) (?:lien|site|message) (?:est|il est) (?:sur|fiable|dangereux|safe|une arnaque|legit)$|'
+          r'^(?:c est|est ce que c est|est ce) une arnaque$|^(?:verifie|regarde|check) (?:ce|le|mon) (?:lien|site|message)(?: copie)?$|'
+          r'^je peux (?:cliquer|ouvrir) (?:sur )?ce lien$',
+        ).hasMatch(n)) {
+      final r = await call('securite_lien', {});
+      if (r is Map) return QuickReply('${r['resume']}');
+    }
+
+    // Temps d'écran.
+    if (has('temps_ecran')) {
+      const when = r'(?: (aujourd hui|ce jour|hier|cette semaine|la semaine|sur la semaine|depuis une semaine))?';
+      final all = RegExp(
+        '^(?:(?:c est )?combien (?:de temps )?(?:j ai passe |je suis reste )?(?:sur|devant) (?:l ecran|le pc|mon pc|l ordi)|'
+        '(?:mon |le |quel est mon )?temps (?:d ecran|devant l ecran|passe sur le pc))$when\$',
+      ).firstMatch(n);
+      final one = RegExp(
+        '^combien de temps (?:(?:j ai passe|je suis reste|j ai joue|j ai regarde) (?:sur|a jouer a|a regarder|a)|sur) '
+        '(?:l |la |le |les )?([a-z0-9+]+(?: [a-z0-9+]+){0,2}?)$when\$',
+      ).firstMatch(n);
+      final m = all ?? one;
+      if (m != null && !(one != null && RegExp(r'^(?:l ecran|le pc|mon pc|l ordi)$').hasMatch(one[1]!))) {
+        final w = (all != null ? all[1] : one![2]) ?? '';
+        final periode = w.contains('hier') ? 'hier' : (w.contains('semaine') ? 'semaine' : 'jour');
+        final r = await call('temps_ecran', {
+          'periode': periode,
+          if (one != null && all == null) 'appli': one[1]!.trim(),
+        });
+        if (r is Map) return QuickReply('${r['resume']}');
+      }
+    }
+    if (has('temps_ecran_limite')) {
+      const app = r'([a-z0-9+][a-z0-9+ ]{1,29}?)';
+      // « limite de 1 h par jour sur Roblox »
+      final b = RegExp(
+        '^(?:mets? |fixe )?(?:moi )?(?:une )?limite de (.+?) (?:par jour )?(?:sur|pour|a) (?:l |la |le )?$app\$',
+      ).firstMatch(n);
+      // « limite Roblox à 1 h (par jour) », « mets une limite sur YouTube de 30 min »
+      final a = b != null
+          ? null
+          : RegExp(
+              '^(?:mets? (?:moi )?(?:une )?limite (?:sur |pour |a )?|limite )(?:mon temps (?:sur|de) |le temps (?:sur|de) )?'
+              '(?:l |la |le )?$app (?:a|de|pendant) (.+?)(?: par jour)?\$',
+            ).firstMatch(n);
+      if (b != null || a != null) {
+        final (name, dur) = b != null ? (b[2]!, b[1]!) : (a![1]!, a[2]!);
+        final d = FocusDuration.parse(dur);
+        if (d != null) {
+          return QuickReply('${await call('temps_ecran_limite', {'appli': name.trim(), 'minutes': d.inMinutes})}');
+        }
+      }
+      final off = RegExp(
+        r'^(?:enleve|supprime|retire) (?:la )?limite (?:de temps )?(?:sur |de |pour )?([a-z0-9+ ]{2,30})$',
+      ).firstMatch(n);
+      if (off != null) {
+        return QuickReply('${await call('temps_ecran_limite', {'appli': off[1]!.trim(), 'minutes': 0})}');
+      }
+    }
+
+    // Recherche partout.
+    if (has('recherche_partout')) {
+      final m = RegExp(
+        r'^(?:cherche|recherche|trouve|retrouve)(?: moi)? (.{2,60}?) partout$|^(?:cherche|recherche) partout (.{2,60})$|'
+        r'^(?:retrouve|trouve)(?: moi)? (?:le|mon|ma|la|les|mes) (?:fichier|document|doc|mail|message|note|pdf|expose) (?:sur |de |du |avec |qui parle de )?(.{2,60})$|'
+        r'^ou est (?:le|mon|ma|la) (?:fichier|document|doc|pdf|expose) (?:sur |de |du )?(.{2,60})$',
+      ).firstMatch(n);
+      if (m != null) {
+        final q = (m[1] ?? m[2] ?? m[3] ?? m[4])!.trim();
+        final r = await call('recherche_partout', {'texte': q});
+        if (has('recherche_ouvrir')) unawaited(call('recherche_ouvrir', {'texte': q}));
+        if (r is Map) return QuickReply('${r['resume']}');
+      }
+    }
+
+    // Anniversaires.
+    if (has('anniversaire_ajouter')) {
+      final m = RegExp(
+        r'^(?:retiens que |note que |souviens toi que |rappelle toi que |ajoute )?l anniv(?:ersaire)? (?:de |d )'
+        r'([a-z][a-z -]{0,30}?) (?:c est |est |tombe )?(?:le |au )?(\d.*)$',
+      ).firstMatch(n);
+      final date = m == null ? null : Birthdays.parseDate(raw);
+      if (m != null && date != null) {
+        final (month, day, year) = date;
+        final when = '$day/$month${year == null ? '' : '/$year'}';
+        return QuickReply('${await call('anniversaire_ajouter', {'nom': original(raw, m[1]!), 'date': when})}');
+      }
+    }
+    if (has('anniversaires')) {
+      final one = RegExp(
+        r'^(?:c est )?quand (?:est |c est |tombe )?l anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?)$|'
+        r'^l anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?) (?:c est|est|tombe) quand$|'
+        r'^(?:quelle est la )?date (?:de l |d )anniv(?:ersaire)? (?:de |d )([a-z][a-z -]{0,30}?)$',
+      ).firstMatch(n);
+      if (one != null) {
+        return QuickReply('${await call('anniversaires', {'nom': original(raw, (one[1] ?? one[2] ?? one[3])!)})}');
+      }
+      final list = RegExp(
+        r'^(?:les |mes )?(?:prochains )?anniv(?:ersaire)?s(?: a venir| qui arrivent| de la semaine| cette semaine| du mois| ce mois ci| ce mois)?$|'
+        r'^qui (?:a|fete) son anniv(?:ersaire)? (?:bientot|cette semaine|aujourd hui|demain|ce mois ci|ce mois)$|'
+        r'^c est l anniv(?:ersaire)? de qui(?: aujourd hui| demain)?$|^il y a des anniv(?:ersaire)?s (?:bientot|cette semaine|ce mois ci)$',
+      ).hasMatch(n);
+      if (list) {
+        final days = n.contains('aujourd hui') || n.endsWith('de qui')
+            ? 0
+            : n.contains('demain')
+            ? 1
+            : n.contains('semaine')
+            ? 7
+            : 30;
+        final r = await call('anniversaires', {'jours': days});
+        if (r is Map) return QuickReply('${r['resume']}');
+      }
+    }
+
+    // L'heure du coucher.
+    if (has('assistant_coucher') &&
+        RegExp(
+          r'^(?:a )?quelle heure (?:je dois|dois je|il faut que je|est ce que je dois|je devrais) (?:me coucher|aller (?:me coucher|dormir|au lit)|dormir)(?: ce soir)?$|'
+          r'^(?:quand|a quelle heure) (?:est ce que )?(?:je )?(?:dois|devrais) (?:me coucher|dormir)(?: ce soir)?$|^(?:mon |l )?heure (?:du|de) coucher(?: ce soir)?$|'
+          r'^je me couche a quelle heure(?: ce soir)?$',
+        ).hasMatch(n)) {
+      return QuickReply('${await call('assistant_coucher', {})}');
     }
 
     // Les fenêtres.
@@ -265,14 +461,19 @@ class QuickAnswers {
         return const QuickReply('C\'est fait.');
       }
 
-      if (RegExp(r'^(?:montre|affiche)(?: moi)? le bureau$|^(?:reduis|cache|baisse) tout(?:es les fenetres)?$|^(?:reduis|cache) toutes les fenetres$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:montre|affiche)(?: moi)? le bureau$|^(?:reduis|cache|baisse) tout(?:es les fenetres)?$|^(?:reduis|cache) toutes les fenetres$',
+      ).hasMatch(n)) {
         return win('bureau');
       }
-      if (RegExp(r'^(?:mets|met|passe)(?: cette fenetre| la fenetre| ca)? en (?:plein ecran|grand)$|^agrandis(?: la| cette)? fenetre$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:mets|met|passe)(?: cette fenetre| la fenetre| ca)? en (?:plein ecran|grand)$|^agrandis(?: la| cette)? fenetre$',
+      ).hasMatch(n)) {
         return win('agrandir');
       }
       if (RegExp(r'^(?:reduis|cache)(?: la| cette)? fenetre$').hasMatch(n)) return win('reduire');
-      final side = RegExp(r'^(?:mets|met|place|range|colle) (.+?) (?:a|sur la|sur le cote|du cote) (gauche|droite)$').firstMatch(n);
+      final side = RegExp(r'^(?:mets|met|place|range|colle) (.+?) (?:a|sur la|sur le cote|du cote) (gauche|droite)$')
+          .firstMatch(n);
       if (side != null) {
         final app = side.group(1)!;
         final here = RegExp(r'^(?:ca|cette fenetre|la fenetre|cette appli|l appli)$').hasMatch(app);
@@ -316,8 +517,9 @@ class QuickAnswers {
 
     // « Rappelle-moi de … quand j'ouvre … ».
     if (has('clicky_rappel_appli')) {
-      final m = RegExp(r'^(?:rappelle|redis|redit)(?: moi)? (?:de |d |que |qu )?(.+?) (?:quand|des que|la prochaine fois que) (?:j ouvre|j ouvrirai|je lance|je vais sur|j allume|j arrive sur) (.+)$')
-          .firstMatch(n);
+      final m = RegExp(
+        r'^(?:rappelle|redis|redit)(?: moi)? (?:de |d |que |qu )?(.+?) (?:quand|des que|la prochaine fois que) (?:j ouvre|j ouvrirai|je lance|je vais sur|j allume|j arrive sur) (.+)$',
+      ).firstMatch(n);
       if (m != null) {
         // Le texte d'origine (avec ses accents) quand on le retrouve.
         final o = RegExp(
@@ -336,8 +538,9 @@ class QuickAnswers {
       r'^(?:mets |met |lance |demarre |fais )?(?:moi )?(?:un |le )?(?:minuteur|chrono|timer|compte a rebours)(?: de| pour)? '
       r'(\d+) ?(secondes?|sec|s|minutes?|min|mn|heures?|h)$',
     ).firstMatch(n);
-    final remind = RegExp(r'^(?:rappelle moi|previens moi) dans (\d+) ?(secondes?|minutes?|min|heures?|h)(?: de | pour | que | d )?(.*)$')
-        .firstMatch(n);
+    final remind = RegExp(
+      r'^(?:rappelle moi|previens moi) dans (\d+) ?(secondes?|minutes?|min|heures?|h)(?: de | pour | que | d )?(.*)$',
+    ).firstMatch(n);
     final tm = timer ?? remind;
     if (tm != null) {
       final v = int.parse(tm.group(1)!);
@@ -345,11 +548,15 @@ class QuickAnswers {
       final d = unit.startsWith('h')
           ? Duration(hours: v)
           : unit.startsWith('s')
-              ? Duration(seconds: v)
-              : Duration(minutes: v);
+          ? Duration(seconds: v)
+          : Duration(minutes: v);
       if (d.inSeconds < 1 || d.inHours > 24) return null;
       final label = remind?.group(3)?.trim() ?? '';
-      final what = unit.startsWith('h') ? '$v heure${v > 1 ? 's' : ''}' : unit.startsWith('s') ? '$v seconde${v > 1 ? 's' : ''}' : '$v minute${v > 1 ? 's' : ''}';
+      final what = unit.startsWith('h')
+          ? '$v heure${v > 1 ? 's' : ''}'
+          : unit.startsWith('s')
+          ? '$v seconde${v > 1 ? 's' : ''}'
+          : '$v minute${v > 1 ? 's' : ''}';
       return QuickReply(
         label.isEmpty ? 'C\'est parti pour $what.' : 'D\'accord, je te le rappelle dans $what.',
         timer: d,
@@ -375,21 +582,29 @@ class QuickAnswers {
         return QuickReply(say);
       }
 
-      if (RegExp(r'^(?:mets |met )?(?:la musique )?(?:en )?pause(?: la musique)?$|^(?:arrete|stoppe|stop) la musique$').hasMatch(n)) {
+      if (RegExp(r'^(?:mets |met )?(?:la musique )?(?:en )?pause(?: la musique)?$|^(?:arrete|stoppe|stop) la musique$')
+          .hasMatch(n)) {
         return music('pause', 'Pause.');
       }
-      if (RegExp(r'^(?:(?:musique|chanson|titre|son|morceau) suivante?|(?:passe|mets|met) (?:a )?(?:la )?(?:musique|chanson) suivante|suivant(?:e)? (?:musique|chanson|titre)|next|skip)$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:(?:musique|chanson|titre|son|morceau) suivante?|(?:passe|mets|met) (?:a )?(?:la )?(?:musique|chanson) suivante|suivant(?:e)? (?:musique|chanson|titre)|next|skip)$',
+      ).hasMatch(n)) {
         return music('suivant', 'Suivante !');
       }
-      if (RegExp(r'^(?:(?:musique|chanson|titre|morceau) precedente?|(?:remets|mets|met) (?:la )?(?:musique|chanson) precedente|precedent(?:e)? (?:musique|chanson|titre))$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:(?:musique|chanson|titre|morceau) precedente?|(?:remets|mets|met) (?:la )?(?:musique|chanson) precedente|precedent(?:e)? (?:musique|chanson|titre))$',
+      ).hasMatch(n)) {
         return music('precedent', 'La précédente.');
       }
-      if (RegExp(r'^(?:remets|relance|reprends|rejoue) la musique$|^(?:play|lecture|joue de la musique)$').hasMatch(n)) {
+      if (RegExp(r'^(?:remets|relance|reprends|rejoue) la musique$|^(?:play|lecture|joue de la musique)$')
+          .hasMatch(n)) {
         return music('lecture', 'C\'est reparti.');
       }
     }
     if (has('musique_en_cours') &&
-        RegExp(r'^(?:c est quoi|quelle est|c est quelle|quel est) (?:cette|la|ce) (?:musique|chanson|son|titre|morceau)(?: qu on ecoute)?$|^(?:qu est ce qu on ecoute|on ecoute quoi)$').hasMatch(n)) {
+        RegExp(
+          r'^(?:c est quoi|quelle est|c est quelle|quel est) (?:cette|la|ce) (?:musique|chanson|son|titre|morceau)(?: qu on ecoute)?$|^(?:qu est ce qu on ecoute|on ecoute quoi)$',
+        ).hasMatch(n)) {
       final r = await call('musique_en_cours', {});
       if (r is Map) return QuickReply('C\'est « ${r['titre']} » de ${r['artiste']}.');
       return const QuickReply('Rien n\'est en écoute pour l\'instant.');
@@ -416,7 +631,9 @@ class QuickAnswers {
           ]..sort((a, b) => _date(a['pour_le'])!.compareTo(_date(b['pour_le'])!));
           if (tests.isEmpty) return const QuickReply('Je ne vois aucun contrôle prévu dans le cahier de texte.');
           final first = tests.first;
-          final more = tests.length > 1 ? ' Puis ${[for (final x in tests.skip(1).take(3)) '${x['matiere']} ${_dayName(_date(x['pour_le'])!, t)}'].join(', ')}.' : '';
+          final more = tests.length > 1
+              ? ' Puis ${[for (final x in tests.skip(1).take(3)) '${x['matiere']} ${_dayName(_date(x['pour_le'])!, t)}'].join(', ')}.'
+              : '';
           final c = '${first['contenu'] ?? ''}'.trim();
           return QuickReply(
             'Ton prochain contrôle : ${first['matiere']} ${_dayName(_date(first['pour_le'])!, t)}${c.isEmpty ? '' : ' (${_short(c, 70)})'}.$more',
@@ -457,10 +674,9 @@ class QuickAnswers {
       if (next || day) {
         final target = next ? DateTime(t.year, t.month, t.day) : (dayFrom(n, t) ?? DateTime(t.year, t.month, t.day));
         final items = [
-          for (final e in _list(await call('agenda_lire', {
-            'debut': target.toIso8601String().substring(0, 10),
-            'jours': next ? 7 : 1,
-          })))
+          for (final e in _list(
+            await call('agenda_lire', {'debut': target.toIso8601String().substring(0, 10), 'jours': next ? 7 : 1}),
+          ))
             if (e['annule'] != true) e,
         ]..sort((a, b) => _date(a['debut'])!.compareTo(_date(b['debut'])!));
         if (next) {
@@ -468,13 +684,15 @@ class QuickAnswers {
           if (up == null) return const QuickReply('Je ne vois pas de cours à venir cette semaine.');
           final d = _date(up['debut'])!;
           final lieu = '${up['lieu'] ?? ''}'.trim();
-          return QuickReply('Ton prochain cours : ${up['titre']}, ${_dayName(d, t)} à ${_hour(d)}${lieu.isEmpty ? '' : ' (salle $lieu)'}.');
+          return QuickReply(
+            'Ton prochain cours : ${up['titre']}, ${_dayName(d, t)} à ${_hour(d)}${lieu.isEmpty ? '' : ' (salle $lieu)'}.',
+          );
         }
         final cancelled = RegExp(r'\bapres midi\b').hasMatch(n)
             ? items.where((e) => _date(e['debut'])!.hour >= 12).toList()
             : RegExp(r'\bmatin\b').hasMatch(n)
-                ? items.where((e) => _date(e['debut'])!.hour < 12).toList()
-                : items;
+            ? items.where((e) => _date(e['debut'])!.hour < 12).toList()
+            : items;
         if (cancelled.isEmpty) return QuickReply('Rien de prévu ${_dayName(target, t)} 😎');
         final parts = [for (final e in cancelled.take(9)) '${_hour(_date(e['debut'])!)} ${e['titre']}'];
         final end = _date(cancelled.last['fin']);
@@ -496,11 +714,14 @@ class QuickAnswers {
 
     // Moyennes : la note qu'il faut, la moyenne d'une matière, le bilan.
     if (has('ecole_moyenne')) {
-      final need = RegExp(
-        r'^(?:il me faut|il faut que j aie|je dois avoir|j ai besoin de|faut que j ai|faut que j aie) combien|'
-        r'^quelle note (?:il me faut|je dois avoir|dois je avoir|faut il)',
-      ).hasMatch(n)
-          ? RegExp(r'\b(?:en|de) (.+?) pour (?:avoir|atteindre|monter a|remonter a|etre a|passer a) (\d{1,2})(?: (\d))?(?: de moyenne)?$').firstMatch(n)
+      final need =
+          RegExp(
+            r'^(?:il me faut|il faut que j aie|je dois avoir|j ai besoin de|faut que j ai|faut que j aie) combien|'
+            r'^quelle note (?:il me faut|je dois avoir|dois je avoir|faut il)',
+          ).hasMatch(n)
+          ? RegExp(
+              r'\b(?:en|de) (.+?) pour (?:avoir|atteindre|monter a|remonter a|etre a|passer a) (\d{1,2})(?: (\d))?(?: de moyenne)?$',
+            ).firstMatch(n)
           : null;
       if (need != null) {
         final target = double.parse('${need.group(2)}${need.group(3) == null ? '' : '.${need.group(3)}'}');
@@ -514,7 +735,9 @@ class QuickAnswers {
         if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
         if (r is Map && r['message'] != null) return QuickReply('${r['message']}');
       }
-      final avg = RegExp(r'^(?:c est quoi |quelle est |combien j ai de |j ai combien de )?(?:ma |de )?moyenne(?: generale)?(?: (?:en|de) (.+?))?$').firstMatch(n);
+      final avg = RegExp(
+        r'^(?:c est quoi |quelle est |combien j ai de |j ai combien de )?(?:ma |de )?moyenne(?: generale)?(?: (?:en|de) (.+?))?$',
+      ).firstMatch(n);
       if (avg != null) {
         final subject = avg.group(1);
         final r = await call('ecole_moyenne', {'matiere': subject ?? ''});
@@ -522,19 +745,25 @@ class QuickAnswers {
           return QuickReply('Ta moyenne générale est de ${r['generale']} pour l\'instant.');
         }
         if (r is Map && r['moyenne'] != null) {
-          return QuickReply('Ta moyenne en ${subject ?? r['matiere']} est de ${r['moyenne']} (${r['nombre_de_notes']} notes ce trimestre).');
+          return QuickReply(
+            'Ta moyenne en ${subject ?? r['matiere']} est de ${r['moyenne']} (${r['nombre_de_notes']} notes ce trimestre).',
+          );
         }
         if (r is Map && r['message'] != null) return QuickReply('${r['message']}');
       }
     }
     if (has('ecole_bilan_notes') &&
-        RegExp(r'^(?:fais(?: moi)? (?:le |un )?)?bilan (?:de |des )?(?:mes )?notes(?: de la semaine)?$|^comment (?:vont|sont) mes notes(?: cette semaine)?$').hasMatch(n)) {
+        RegExp(
+          r'^(?:fais(?: moi)? (?:le |un )?)?bilan (?:de |des )?(?:mes )?notes(?: de la semaine)?$|^comment (?:vont|sont) mes notes(?: cette semaine)?$',
+        ).hasMatch(n)) {
       return QuickReply('${await call('ecole_bilan_notes', {})}');
     }
 
     // Notes.
     if (has('ecole_notes') &&
-        RegExp(r'^(?:mes |quelles sont mes |c est quoi mes |j ai eu quoi comme |j ai quoi comme |montre moi mes )?(?:dernieres |nouvelles )?notes$').hasMatch(n)) {
+        RegExp(
+          r'^(?:mes |quelles sont mes |c est quoi mes |j ai eu quoi comme |j ai quoi comme |montre moi mes )?(?:dernieres |nouvelles )?notes$',
+        ).hasMatch(n)) {
       final list = _list(await call('ecole_notes', {}));
       if (list.isEmpty) return const QuickReply('Je ne vois pas encore de notes.');
       final parts = [for (final g in list.take(5)) '${g['matiere']} ${g['note']}'];
@@ -555,33 +784,46 @@ class QuickAnswers {
       }
       return QuickReply(
         '${w['icone'] ?? ''} ${w['maintenant']} à ${w['ville']}. Entre ${w['min']} et ${w['max']} °C, '
-        '${w['pluie_pourcent']} % de risque de pluie. ${w['tenue'] ?? ''}'.trim(),
+                '${w['pluie_pourcent']} % de risque de pluie. ${w['tenue'] ?? ''}'
+            .trim(),
       );
     }
 
     // Révisions.
-    final mock = RegExp(r'^(?:(?:fais|fait|prepare|lance|donne)(?: moi)? |je veux )?(?:un |une )?(?:controle|interro|interrogation|devoir|examen|ds) blanc(?:he)? (?:de |d |en |sur (?:le |la |les )?)(.+)$').firstMatch(n);
+    final mock = RegExp(
+      r'^(?:(?:fais|fait|prepare|lance|donne)(?: moi)? |je veux )?(?:un |une )?(?:controle|interro|interrogation|devoir|examen|ds) blanc(?:he)? (?:de |d |en |sur (?:le |la |les )?)(.+)$',
+    ).firstMatch(n);
     if (mock != null && has('revision_controle_blanc')) {
       await call('revision_controle_blanc', {'matiere': mock.group(1)!});
-      return QuickReply('Je te prépare un contrôle blanc de ${mock.group(1)} : il s\'ouvre dans Mon Hub. Bon courage !');
+      return QuickReply(
+        'Je te prépare un contrôle blanc de ${mock.group(1)} : il s\'ouvre dans Mon Hub. Bon courage !',
+      );
     }
     if (has('revision_lancer')) {
-      if (RegExp(r'^(?:lance |mets |demarre )?(?:le |un )?(?:pomodoro|minuteur de (?:travail|concentration|revision|revisions))$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:lance |mets |demarre )?(?:le |un )?(?:pomodoro|minuteur de (?:travail|concentration|revision|revisions))$',
+      ).hasMatch(n)) {
         await call('revision_lancer', {'mode': 'minuteur'});
         return const QuickReply('Minuteur de concentration ouvert. Bon courage !');
       }
-      if (RegExp(r'^(?:lance |commence |on fait |je veux faire )?(?:une |mes |ma )?(?:revision|revisions|seance de revision)(?: du jour)?$|^(?:fais moi reviser|revise avec moi|on revise)$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:lance |commence |on fait |je veux faire )?(?:une |mes |ma )?(?:revision|revisions|seance de revision)(?: du jour)?$|^(?:fais moi reviser|revise avec moi|on revise)$',
+      ).hasMatch(n)) {
         await call('revision_lancer', {'mode': 'cartes'});
         return const QuickReply('C\'est parti, ta séance est ouverte.');
       }
     }
     if (has('revision_paquets') &&
-        RegExp(r'^(?:combien (?:de cartes|j ai de cartes)(?: a reviser| a revoir)?|ma serie|c est quoi ma serie|j en suis ou dans mes revisions)$').hasMatch(n)) {
+        RegExp(
+          r'^(?:combien (?:de cartes|j ai de cartes)(?: a reviser| a revoir)?|ma serie|c est quoi ma serie|j en suis ou dans mes revisions)$',
+        ).hasMatch(n)) {
       final r = await call('revision_paquets', {});
       if (r is! Map) return null;
       final due = r['a_revoir_aujourdhui'];
       final s = r['serie_jours'];
-      return QuickReply('$due carte${due == 1 ? '' : 's'} à revoir aujourd\'hui, série de $s jour${s == 1 ? '' : 's'} 🔥');
+      return QuickReply(
+        '$due carte${due == 1 ? '' : 's'} à revoir aujourd\'hui, série de $s jour${s == 1 ? '' : 's'} 🔥',
+      );
     }
 
     // Ranger.
@@ -595,7 +837,9 @@ class QuickAnswers {
         if (count == 0) return const QuickReply('C\'est déjà rangé ✨');
         final r = await call('pc_ranger', {'dossier': folder});
         final done = r is Map ? r['ranges'] : 0;
-        return QuickReply('C\'est rangé : $done fichier${done == 1 ? '' : 's'} dans des dossiers. Dis « annule le rangement » pour revenir en arrière.');
+        return QuickReply(
+          'C\'est rangé : $done fichier${done == 1 ? '' : 's'} dans des dossiers. Dis « annule le rangement » pour revenir en arrière.',
+        );
       }
       if (RegExp(r'^(?:mon |le )?(?:google )?drive$').hasMatch(what) && has('drive_ranger')) {
         final r = await call('drive_ranger', {});
@@ -610,7 +854,8 @@ class QuickAnswers {
     }
 
     // YouTube.
-    final yt = RegExp(r'^(?:mets|met|lance|joue|montre moi|cherche|mets moi)(?: moi)? (.+?) sur youtube$').firstMatch(n);
+    final yt = RegExp(r'^(?:mets|met|lance|joue|montre moi|cherche|mets moi)(?: moi)? (.+?) sur youtube$')
+        .firstMatch(n);
     if (yt != null && has('youtube_lire')) {
       await call('youtube_lire', {'recherche': yt.group(1)!});
       return QuickReply('Je lance « ${yt.group(1)} » sur YouTube.');
@@ -646,18 +891,23 @@ class QuickAnswers {
 
     // Nouveau document.
     if (has('doc_nouveau') &&
-        RegExp(r'^(?:cree|ouvre|fais|commence|nouveau)(?: moi)?(?: un)?(?: nouveau)? (?:document|doc|google doc|word)(?: vierge)?$').hasMatch(n)) {
+        RegExp(
+          r'^(?:cree|ouvre|fais|commence|nouveau)(?: moi)?(?: un)?(?: nouveau)? (?:document|doc|google doc|word)(?: vierge)?$',
+        ).hasMatch(n)) {
       await call('doc_nouveau', {});
       return const QuickReply('Voilà un nouveau document.');
     }
 
     // Liste de tâches.
-    final todo = RegExp(r'^(?:ajoute|note|mets|rajoute) (.+?) (?:a|dans|sur) (?:ma|la) (?:liste|todo|to do)(?: de taches| de choses a faire| de trucs a faire)?$')
-        .firstMatch(n);
+    final todo = RegExp(
+      r'^(?:ajoute|note|mets|rajoute) (.+?) (?:a|dans|sur) (?:ma|la) (?:liste|todo|to do)(?: de taches| de choses a faire| de trucs a faire)?$',
+    ).firstMatch(n);
     if (todo != null && has('carnet_taches_notes')) {
       // Le texte d'origine (avec ses accents) quand on le retrouve.
-      final m = RegExp(r'(?:ajoute|note|mets|rajoute)\s+(.+?)\s+(?:à|a|dans|sur)\s+(?:ma|la)\s+(?:liste|todo|to do)', caseSensitive: false)
-          .firstMatch(raw);
+      final m = RegExp(
+        r'(?:ajoute|note|mets|rajoute)\s+(.+?)\s+(?:à|a|dans|sur)\s+(?:ma|la)\s+(?:liste|todo|to do)',
+        caseSensitive: false,
+      ).firstMatch(raw);
       final text = (m?.group(1) ?? todo.group(1)!).trim();
       await call('carnet_taches_notes', {'action': 'ajouter_tache', 'texte': text});
       return QuickReply('Ajouté à ta liste : $text.');
@@ -693,7 +943,12 @@ class Calc {
     var s = raw.toLowerCase().trim();
     s = s.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis) )?clicky[, ]*'), '');
     final before = s;
-    s = s.replaceFirst(RegExp(r'^(?:combien (?:font|fait|ça fait|ca fait|ça donne|ca donne)|calcule(?:-moi)?|c.est combien|ça fait combien|ca fait combien|résultat de|resultat de)\s*'), '');
+    s = s.replaceFirst(
+      RegExp(
+        r'^(?:combien (?:font|fait|ça fait|ca fait|ça donne|ca donne)|calcule(?:-moi)?|c.est combien|ça fait combien|ca fait combien|résultat de|resultat de)\s*',
+      ),
+      '',
+    );
     // « Calcule… », « … divisé par … » : c'est sûr que c'est un calcul.
     final asked = s != before || RegExp(r'[a-zàâçéèêëîïôûù]').hasMatch(s);
     s = s.replaceFirst(RegExp(r'\s*(?:\?|=|égale? combien|egale? combien|ça fait combien|ca fait combien)\s*$'), '');
@@ -806,10 +1061,24 @@ class FocusDuration {
 
   static Duration? parse(String n) {
     var t = n.trim().replaceFirst(RegExp(r'^(?:pendant|pour|durant) '), '');
-    t = t.replaceAll(RegExp(r'\b(?:une )?demi heure\b'), '30 min').replaceAll(RegExp(r'\b(?:un )?quart d heure\b'), '15 min');
-    const words = {'une': 1, 'un': 1, 'deux': 2, 'trois': 3, 'quatre': 4, 'cinq': 5, 'dix': 10, 'quinze': 15, 'vingt': 20, 'trente': 30};
-    final m = RegExp(r'^(\d{1,3}|une|un|deux|trois|quatre|cinq|dix|quinze|vingt|trente) ?(h|heures?|min|minutes?|mn)(?: ?(?:et )?(\d{1,2}|demie|quart)(?: ?(?:min|minutes?|mn))?)?$')
-        .firstMatch(t);
+    t = t
+        .replaceAll(RegExp(r'\b(?:une )?demi heure\b'), '30 min')
+        .replaceAll(RegExp(r'\b(?:un )?quart d heure\b'), '15 min');
+    const words = {
+      'une': 1,
+      'un': 1,
+      'deux': 2,
+      'trois': 3,
+      'quatre': 4,
+      'cinq': 5,
+      'dix': 10,
+      'quinze': 15,
+      'vingt': 20,
+      'trente': 30,
+    };
+    final m = RegExp(
+      r'^(\d{1,3}|une|un|deux|trois|quatre|cinq|dix|quinze|vingt|trente) ?(h|heures?|min|minutes?|mn)(?: ?(?:et )?(\d{1,2}|demie|quart)(?: ?(?:min|minutes?|mn))?)?$',
+    ).firstMatch(t);
     if (m == null) return null;
     final v = int.tryParse(m[1]!) ?? words[m[1]!]!;
     final hours = m[2]!.startsWith('h');

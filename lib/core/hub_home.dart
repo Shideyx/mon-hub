@@ -18,6 +18,9 @@ class HubHome extends ChangeNotifier {
   /// Le squelette de l'appli revient à l'accueil (sélection vide).
   VoidCallback? onHome;
 
+  /// Ctrl + Espace : la recherche partout (avec un texte déjà tapé).
+  void Function(String text)? onSearchText;
+
   /// D'autres choses à fermer (fenêtre d'appel Discord…).
   final closers = <VoidCallback>[];
 
@@ -92,6 +95,12 @@ class _HubHomeLayerState extends State<HubHomeLayer> {
     if (!widget.enabled || e is! KeyDownEvent) return false;
     if (e.logicalKey == LogicalKeyboardKey.home && HardwareKeyboard.instance.isAltPressed) {
       HubHome.instance.go();
+      return true;
+    }
+    final search = HubHome.instance.onSearchText;
+    if (search != null && e.logicalKey == LogicalKeyboardKey.space && HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed) {
+      search('');
       return true;
     }
     return false;

@@ -9,6 +9,10 @@ import '../core/browser.dart';
 import '../core/error_log.dart';
 import 'account_sync_view.dart';
 import 'backup_page.dart';
+import 'security_page.dart';
+import 'screen_time_page.dart';
+import 'birthdays_page.dart';
+import 'phone_setup_page.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -369,7 +373,29 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
             ],
+            section('Bien-être'),
+            ListTile(
+              leading: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFF5B5BD6)),
+              title: const Text('Temps d\'écran et sommeil'),
+              subtitle: const Text('Temps par appli, limites douces, heure du coucher, mode jeu'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => ScreenTimePage.open(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cake_rounded, color: Color(0xFFE5487B)),
+              title: const Text('Anniversaires des proches'),
+              subtitle: const Text('Google Agenda + ceux que tu ajoutes, rappel la veille et le jour même'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => BirthdaysPage.open(context),
+            ),
             section('Confidentialité et sécurité'),
+            ListTile(
+              leading: const Icon(Icons.verified_user_rounded, color: Colors.green),
+              title: const Text('Bilan de sécurité'),
+              subtitle: const Text('Antivirus, pare-feu, mises à jour, double authentification, bouclier anti-arnaque'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => SecurityPage.open(context),
+            ),
             const ListTile(
               leading: Icon(Icons.lock_rounded),
               title: Text('Tout reste sur cet appareil'),
@@ -402,6 +428,14 @@ class _SettingsPageState extends State<SettingsPage> {
             section('Mes appareils'),
             // Le compte sur tous tes appareils, sans export (Google Drive).
             const AccountSyncSection(),
+            if (Platform.isWindows)
+              ListTile(
+                leading: const Icon(Icons.phone_iphone_rounded),
+                title: const Text('Ajouter mon iPhone'),
+                subtitle: const Text('Mon Hub sur l\'iPhone, synchronisé avec ce PC'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => PhoneSetupPage.open(context),
+              ),
             ExpansionTile(
               leading: const Icon(Icons.folder_zip_rounded),
               title: const Text('Sans internet : passer par un fichier'),
