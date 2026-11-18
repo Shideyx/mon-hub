@@ -90,11 +90,16 @@ class FileViewer extends StatefulWidget {
 
   /// L'IA lit un document (PDF, photo, Word, texte) et en donne l'essentiel
   /// pour un lycéen : ce qu'il faut faire, puis le contenu en quelques points.
-  static Future<String> summarize(String name, Uint8List bytes, {String? text}) async {
-    const ask =
-        'Voici un document (pièce jointe d\'un devoir, d\'un message ou d\'un mail). Résume-le pour un lycéen, '
-        'en français : d\'abord ce qu\'il faut faire (consignes, à rendre, dates), puis l\'essentiel du contenu en '
-        'quelques points courts. Pas d\'introduction.';
+  ///
+  /// [full] : recopie **tout** le texte (l'énoncé complet d'un devoir, pour
+  /// le faire), au lieu de le résumer.
+  static Future<String> summarize(String name, Uint8List bytes, {String? text, bool full = false}) async {
+    final ask = full
+        ? 'Recopie intégralement tout le texte de ce document, dans l\'ordre : consignes, énoncés, questions, données, '
+              'tableaux (en texte), formules. Ne résume pas, ne réponds pas aux questions, n\'ajoute rien.'
+        : 'Voici un document (pièce jointe d\'un devoir, d\'un message ou d\'un mail). Résume-le pour un lycéen, '
+              'en français : d\'abord ce qu\'il faut faire (consignes, à rendre, dates), puis l\'essentiel du contenu en '
+              'quelques points courts. Pas d\'introduction.';
     final kind = kindOf(name, bytes.take(16).toList());
     if (kind == FileKind.pdf) {
       if (!await AiText.hasGemini()) {
@@ -111,6 +116,8 @@ class FileViewer extends StatefulWidget {
       t = await Isolate.run(() => _FileViewerState._decodeText(bytes));
     }
     if (t == null || t.trim().isEmpty) throw 'Je ne sais pas lire ce type de fichier';
+    // Un Word ou un texte : son texte tel quel suffit pour l'énoncé.
+    if (full) return t.length > 60000 ? '${t.substring(0, 60000)}…' : t;
     return AiText.ask('$ask\n\n---\n${t.length > 60000 ? t.substring(0, 60000) : t}');
   }
 

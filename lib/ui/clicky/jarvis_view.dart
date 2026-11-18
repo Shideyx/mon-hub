@@ -140,6 +140,8 @@ class ClickySkillsPage extends StatelessWidget {
       '« Retiens que mon oral d\'anglais est jeudi »',
     ]),
     ('École', Icons.school_rounded, Color(0xFFE5484D), [
+      '« Fais mes devoirs de maths » : il lit le cahier de texte et les fichiers du prof, fait tout et le range dans un Google Doc',
+      '« Fais cet exercice » (à l\'écran) : la solution détaillée, avec « comment j\'ai fait »',
       '« Écoute le cours » : il prend tes notes en direct dans un Google Doc, puis fait le compte rendu',
       '« Il me faut combien en maths pour avoir 14 ? », « Bilan de mes notes »',
       '« Qu\'est-ce que je dois prendre demain ? » (et le rappel du sac le soir)',

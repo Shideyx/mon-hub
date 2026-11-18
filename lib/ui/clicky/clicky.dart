@@ -250,6 +250,7 @@ class ClickyController extends ChangeNotifier {
   // gardent leurs préférences en mémoire sans relire le disque : on passe
   // donc par un petit fichier commun, relu toutes les 2 secondes.
   static const _sharedKeys = [
+    'helpOnly',
     'followUp',
     'enabled',
     'voice',
@@ -413,6 +414,10 @@ class ClickyController extends ChangeNotifier {
   // Modes « prof ».
   bool get slow => _opt('slow', false);
   bool get quizMode => _opt('quiz', false);
+
+  /// « Aider sans faire à ma place » : il explique et guide au lieu de faire
+  /// les devoirs (désactivé par défaut : il fait ce qu'on lui demande).
+  bool get helpOnly => _opt('helpOnly', false);
   bool get codeMode => _opt('codeMode', true);
   bool get multilang => _opt('multilang', false);
   bool get ocr => _opt('ocr', true);
@@ -2355,7 +2360,7 @@ Tu es Clicky, un compagnon IA qui vit à côté du curseur de la personne, dans 
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
-${clickyPersona(callName)}
+${clickyPersona(callName, helpOnly: helpOnly)}
 ${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
@@ -2363,7 +2368,8 @@ ${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\
 $thinkingRules
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
-Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir. Pendant un devoir noté, aide à comprendre sans faire le travail à sa place.
+Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir.
+${homeworkRules(helpOnly)}
 Ranger : « range mes téléchargements / mon bureau / mon Drive » → pc_ranger_apercu ou drive_ranger_apercu, dis en une phrase ce qui va bouger, puis pc_ranger ou drive_ranger ; « annule le rangement » → pc_ranger_annuler ou drive_ranger_annuler.''';
     if (agent) {
       return '''$base
@@ -2377,7 +2383,8 @@ ${BrowserLink.instance.connected ? '${BrowserLink.guide}\n' : ''}Tu travailles e
 Ta réponse est lue à voix haute :
 - ${multilang ? 'réponds dans la langue de la question (français par défaut)' : 'réponds en français'}, comme à l'oral, clair et précis, en 1 à 4 phrases courtes ;
 - pas de markdown, pas de listes à puces, pas d'émojis ;
-- si on te demande d'expliquer quelque chose (un devoir, une notion, un logiciel), explique simplement, étape par étape, sans faire le travail à la place de l'élève : tu es un prof patient qui aide à comprendre (comparaisons de la vie de tous les jours, exemples concrets), et tu vérifies que c'est compris ;
+- si on te demande d'EXPLIQUER quelque chose (une notion, un logiciel, une méthode), explique simplement, étape par étape, comme un prof patient (comparaisons de la vie de tous les jours, exemples concrets) ;
+- si on te demande de FAIRE un devoir ou un exercice, fais-le (voir « Devoirs ») : à l'oral, dis juste le résultat en une phrase et où trouver le travail complet (le Google Doc ou le tableau) ;
 - « où est… ? » : montre-le et explique en une phrase à quoi il sert.
 ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les vraies données (agenda, notes, devoirs, messages…) ou agir ; celles qui envoient ou modifient quelque chose demandent la permission.'}
 ${webSearch && provider != 'ollama' ? 'Tu peux chercher sur internet quand la question porte sur l\'actualité ou des faits récents ; cite brièvement la source à l\'oral (« d\'après … »).' : ''}
@@ -2412,6 +2419,33 @@ Blocs possibles (2 à 5 par tableau, textes très courts, adaptés à un·e él�
 - {"type":"retenir","items":["…"]} : à retenir
 - {"type":"quiz","question":"…","choix":["…","…","…"],"reponse":0,"explication":"…"} : pour vérifier que c'est compris (reponse = numéro du bon choix, à partir de 0) ; plusieurs blocs quiz pour un quiz de plusieurs questions
 Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une phrase (« regarde le schéma »). Pas de tableau pour une simple question pratique.''';
+
+  /// « Fais mes devoirs », « fais mon DM de maths pour lundi » : (matière,
+  /// quand), ou null. « Fais cet exercice » (à l'écran) n'en est pas un.
+  static (String?, String?)? homeworkRequest(String q) {
+    final n = QuickAnswers.clean(q);
+    final m = RegExp(
+      r'^(?:fais|fait|termine|finis|fini|resous|redige|complete|occupe toi de)(?: moi)? (?:mon|ma|mes|le|la|les|tous mes) '
+      r'(?:devoirs?|dm|exercices?|exos?|travail|redaction|expose|dissertation|commentaire|fiche d exercices)'
+      r'(?: (?:de|d|en|du) ([a-z0-9 ]+?))?'
+      r'(?: (?:pour|a rendre pour|a faire pour) (demain|apres demain|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|ce soir|la semaine prochaine))?$',
+    ).firstMatch(n);
+    if (m == null) return null;
+    return (m.group(1)?.trim(), m.group(2));
+  }
+
+  /// La tâche donnée à l'agent pour faire les devoirs.
+  static String homeworkTask(String? subject, String? when, {String request = ''}) {
+    final what = subject == null || subject.isEmpty ? 'mes devoirs à faire' : 'mon devoir de $subject';
+    final due = when == null ? 'les plus proches (pas encore faits)' : 'pour $when';
+    return '${request.isEmpty ? '' : 'La demande : « $request ». '}'
+        'Fais $what ($due), en entier, comme le demandent les consignes « Devoirs ». '
+        'Lis-les dans le cahier de texte (ecole_devoirs) et lis aussi l\'énoncé complet des fichiers joints '
+        '(ecole_fichier_lire avec mode=enonce). Pour chaque devoir : toutes les réponses, justes et détaillées, au niveau '
+        'de la classe, avec « Comment j\'ai fait » après chaque exercice. Écris tout dans un Google Doc par matière '
+        '(doc_creer, titre « Matière — devoir pour le … ») et donne les liens à la fin. Si un énoncé est introuvable '
+        '(ni dans le cahier de texte ni dans un fichier), dis-le au lieu d\'inventer.';
+  }
 
   /// « Fais-le à ma place », « fais ça pour moi », « en arrière-plan ».
   static final forMeRe = RegExp(
@@ -2451,6 +2485,14 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     ).firstMatch(q);
     if (take != null && DriveRunner.supported) {
       unawaited(act(take.group(1)!.trim()));
+      return;
+    }
+    // « Fais mes devoirs de maths » : il lit le cahier de texte et les
+    // fichiers joints, fait tout, et le range dans un Google Doc (en
+    // arrière-plan).
+    final hw = helpOnly ? null : homeworkRequest(q);
+    if (hw != null) {
+      unawaited(doForMe(homeworkTask(hw.$1, hw.$2, request: q)));
       return;
     }
     // « Agent, … », « Fais-le à ma place : … » : une tâche en arrière-plan.
@@ -3117,7 +3159,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       r = (await AiText.ask(
         '${context.isEmpty ? '' : 'Début de la conversation :\n$context\n\n'}Question : $q',
         system:
-            '${clickyPersona(callName)}\n${PromptShield.rule}\nRéponds en français, à l\'oral : 1 à 4 phrases courtes, '
+            '${clickyPersona(callName, helpOnly: helpOnly)}\n${PromptShield.rule}\nRéponds en français, à l\'oral : 1 à 4 phrases courtes, '
             'sans markdown ni liste. Si la question demande des données de Mon Hub (agenda, notes, messages) ou d\'agir, '
             'réponds seulement : CLAUDE',
         geminiOnly: true,
@@ -3172,7 +3214,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final modules = hub?.enabled ?? const <HubModule>[];
     final now = DateTime.now();
     return '''
-${clickyPersona(callName)}
+${clickyPersona(callName, helpOnly: helpOnly)}
 ${ClickyMind.instance.promptBlock(name: callName)}
 Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
@@ -3184,6 +3226,16 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
 ${_situation.isEmpty ? '' : 'En ce moment (données de Mon Hub) :\n$_situation'}
 $thinkingRules''';
   }
+
+  /// Ce que Clicky fait quand on lui demande ses devoirs.
+  static String homeworkRules(bool helpOnly) => helpOnly
+      ? 'Devoirs : la personne a choisi « Aider sans faire à ma place » dans tes réglages : explique la méthode, donne '
+            'des pistes et corrige ce qu\'elle propose, mais ne donne pas la réponse complète.'
+      : '''Devoirs : quand la personne te demande de faire un devoir, un exercice, un DM, une rédaction, un commentaire, une dissertation ou de répondre à des questions, FAIS-LE vraiment et en entier : c'est son choix, ne refuse pas et ne fais pas la morale.
+- Trouve l'énoncé : à l'écran, dans le cahier de texte (ecole_devoirs), dans un fichier joint (ecole_fichier_lire avec mode=enonce), un PDF, une photo ou un Google Doc.
+- Fais un travail juste et complet, au niveau de la classe (lycée, programme français) : toutes les questions, les calculs détaillés, les justifications, une vraie rédaction avec introduction et conclusion quand il en faut. Vérifie tes résultats.
+- Après chaque exercice, une ou deux phrases « Comment j'ai fait » pour qu'elle puisse comprendre et refaire seule au contrôle.
+- Où écrire : un travail long (rédaction, plusieurs exercices, exposé) va dans un Google Doc (doc_creer, titre « Matière — devoir pour le … ») ; un exercice court va dans le tableau (bloc « etapes » ou « exemple »). Si la personne écrit dans un document ouvert, tu peux aussi le compléter (doc_ecrire).''';
 
   /// Comment Clicky réfléchit (comme un vrai assistant personnel).
   static const thinkingRules = '''Ta façon de penser :

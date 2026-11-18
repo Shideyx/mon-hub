@@ -203,7 +203,10 @@ class ClickyMoreSettings extends StatelessWidget {
 
         // ---- Aide aux devoirs ----
         sw('teach', 'steps', c.stepsMode, 'Leçons pas à pas', 'Pour « comment faire… », une étape à la fois : dis « suivant » quand c\'est fait.');
-        sw('teach', 'quiz', c.quizMode, 'Mode quiz', 'Il te pose des questions au lieu de donner la réponse.');
+        sw('teach', 'helpOnly', c.helpOnly, 'Aider sans faire à ma place',
+        'Désactivé : quand tu lui demandes tes devoirs, il les fait en entier (avec « comment j\'ai fait »). '
+            'Activé : il explique et guide seulement, sans donner les réponses.');
+    sw('teach', 'quiz', c.quizMode, 'Mode quiz', 'Il te pose des questions au lieu de donner la réponse.');
         sw('teach', 'annotate', c.annotate, 'Dessiner sur l\'écran', 'Flèches, cercles, soulignés et étiquettes.');
         sw('teach', 'slow', c.slow, 'Mode lent', 'Le curseur vole plus lentement et les dessins restent plus longtemps.');
         sw('teach', 'journal', c.journalOn, 'Journal des connaissances', 'Chaque notion est notée pour la réviser au bon moment (1, 3, 7, 14, 30… jours).');
