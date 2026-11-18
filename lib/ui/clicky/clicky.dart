@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show File, Platform;
+import 'dart:io' show File, Platform, pid;
 import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -73,6 +73,13 @@ import 'shot_encode.dart';
 import 'text_fix.dart';
 import '../../core/browser_link.dart';
 import 'background_tasks.dart';
+import '../../core/scam_shield.dart';
+import '../../core/browser.dart';
+import '../../core/security_check.dart';
+import 'catch_up.dart';
+import '../../core/screen_time.dart';
+import '../../core/everywhere_search.dart';
+import '../../core/hub_home.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -1231,8 +1238,9 @@ class ClickyController extends ChangeNotifier {
       target == null &&
       !_keepReply &&
       idea == null &&
-      // Mode concentration : il ne dit rien de lui-même.
-      !FocusMode.instance.active;
+      // Mode concentration ou mode jeu : il ne dit rien de lui-même.
+      !FocusMode.instance.active &&
+      !GameMode.instance.active;
 
   int _presenceN = 0;
 
@@ -1634,10 +1642,11 @@ class ClickyController extends ChangeNotifier {
       }
       return null;
     }
-    if (focus.active) return null;
+    if (focus.active || GameMode.instance.active) return null;
     if (_deciding || !active || idea != null) return null;
     final windows = DriveRunner.supported;
     final idle = idleSeconds ?? (windows ? Win.idleSeconds() : 0);
+    final away = _lastIdle;
     final back = _lastIdle >= 20 * 60 && idle < 60;
     _lastIdle = idle;
     try {
@@ -1656,7 +1665,14 @@ class ClickyController extends ChangeNotifier {
       final top = HubFeed.instance.top;
       final extra = HubFeed.say(top);
       if (top != null && extra != null) _nudged.add(top.id);
-      if (propose) unawaited(think(extra == null ? hello : '$hello $extra'));
+      // Ce que tu as raté pendant ton absence (messages, mentions, mails).
+      var missed = '';
+      if (propose && toolsOverride == null) {
+        try {
+          missed = CatchUp.short(await _catchUp(Duration(seconds: away + 120)).timeout(const Duration(seconds: 10)));
+        } catch (_) {}
+      }
+      if (propose) unawaited(think([hello, missed, ?extra].where((t) => t.isNotEmpty).join(' ')));
       return null;
     }
     // Quelque chose d'important arrive (cours dans 30 min, contrôle demain) :
@@ -1836,6 +1852,49 @@ class ClickyController extends ChangeNotifier {
         params: {'mode': ('string', 'corriger (défaut), reformuler, ou traduire:anglais (ou une autre langue)')},
         run: (a) async => fixSelection(mode: '${a['mode'] ?? 'corriger'}'),
       ),
+    if (SecurityCheck.supported)
+      HubTool(
+        name: 'securite_bilan',
+        description:
+            'Bilan de sécurité du PC et des comptes : antivirus, pare-feu, mises à jour de Windows, contrôle des comptes, '
+            'double authentification (Discord, Google, Roblox…).',
+        run: (_) async {
+          final items = await SecurityCheck.run(discord: _discord2fa, pcControl: pcControl);
+          return {
+            'resume': SecurityCheck.say(items),
+            'points': [
+              for (final i in items) {'quoi': i.title, 'ok': i.ok, 'detail': i.detail},
+            ],
+          };
+        },
+      ),
+    HubTool(
+      name: 'clicky_rate',
+      description:
+          '« Qu\'est-ce que j\'ai raté ? » : messages privés Discord, mentions dans les serveurs, mails importants (sans '
+          'les pubs), messages École Directe, et qui attend une réponse.',
+      params: {'heures': ('integer', 'Sur combien d\'heures (défaut 12)')},
+      run: (a) async {
+        final text = await _catchUp(Duration(hours: (a['heures'] as num?)?.toInt() ?? 12));
+        return text.isEmpty ? 'Rien de nouveau : personne ne t\'a écrit.' : text;
+      },
+    ),
+    HubTool(
+      name: 'securite_lien',
+      description:
+          'Bouclier anti-arnaque : vérifie un lien ou un message (faux Nitro/Robux, faux site, espion d\'IP, .exe…). '
+          'Sans rien : vérifie ce qui est copié dans le presse-papier.',
+      params: {'texte': ('string', 'Le lien ou le message à vérifier (facultatif)')},
+      run: (a) async {
+        var t = '${a['texte'] ?? ''}'.trim();
+        if (t.isEmpty) t = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
+        if (t.isEmpty) return {'resume': 'Copie le lien (clic droit → Copier le lien), puis redemande-moi.'};
+        final v = ScamShield.links(t).length == 1 && t.split(RegExp(r'\s+')).length == 1
+            ? ScamShield.checkUrl(t)
+            : ScamShield.checkMessage(t);
+        return {'niveau': v.level.name, 'raisons': v.reasons, 'resume': v.say()};
+      },
+    ),
     HubTool(
       name: 'clicky_concentration',
       description:
@@ -1962,6 +2021,128 @@ class ClickyController extends ChangeNotifier {
         } catch (_) {}
       }
     }
+  }
+
+  /// Ce qui est arrivé pendant [since] (messages, mentions, mails…).
+  Future<String> _catchUp(Duration since) {
+    final byName = {for (final t in _tools) t.name: t};
+    return CatchUp.gather((n, a) async => byName[n]?.run(a), byName.keys.toSet(), since: since);
+  }
+
+  /// Temps d'écran, recherche partout, anniversaires (dans Mon Hub).
+  List<HubTool> get lifeTools => [
+    HubTool(
+      name: 'temps_ecran',
+      description:
+          'Temps d\'écran sur ce PC (compté seulement quand la personne est devant) : par appli et par site '
+          '(Roblox, YouTube, Discord…), aujourd\'hui, hier ou sur la semaine, et les limites fixées.',
+      params: {
+        'periode': ('string', 'jour (défaut), hier ou semaine'),
+        'appli': ('string', 'Une appli ou un site précis (facultatif)'),
+      },
+      run: (a) async {
+        final st = ScreenTime.instance;
+        await st.load();
+        if (!st.on) return {'resume': 'Le temps d\'écran n\'est pas suivi (Réglages → Temps d\'écran pour l\'activer).'};
+        final now = DateTime.now();
+        final p = ToolRouter.normalize('${a['periode'] ?? 'jour'}');
+        final (m, label) = p.startsWith('sem')
+            ? (st.week(now), 'Ces 7 derniers jours')
+            : p.startsWith('hier')
+            ? (st.day(now.subtract(const Duration(days: 1))), 'Hier')
+            : (st.day(now), 'Aujourd\'hui');
+        final app = '${a['appli'] ?? ''}'.trim();
+        if (app.isNotEmpty) {
+          final key = ScreenTime.matchApp(app, m.keys);
+          final secs = key == null ? 0 : m[key]!;
+          final limit = key == null ? null : st.limits[key];
+          return {
+            'resume': '$label : ${ScreenTime.say(secs)} sur ${key ?? app}'
+                '${limit == null ? '' : ' (limite : ${ScreenTime.say(limit * 60)} par jour)'}.',
+          };
+        }
+        return {
+          'resume': ScreenTime.summary(m, when: label),
+          'applis': [for (final e in ScreenTime.sorted(m).take(10)) {'appli': e.key, 'temps': ScreenTime.say(e.value)}],
+          'limites': {for (final e in st.limits.entries) e.key: ScreenTime.say(e.value * 60)},
+        };
+      },
+    ),
+    HubTool(
+      name: 'temps_ecran_limite',
+      description:
+          'Fixe une limite douce de temps par jour pour une appli ou un site (prévenu quand elle est atteinte, rien '
+          'n\'est bloqué). 0 minute = enlever la limite.',
+      params: {
+        'appli': ('string', 'L\'appli ou le site (Roblox, YouTube, TikTok…)'),
+        'minutes': ('integer', 'Minutes par jour (0 pour enlever)'),
+      },
+      required: ['appli', 'minutes'],
+      run: (a) async {
+        final st = ScreenTime.instance;
+        await st.load();
+        final raw = '${a['appli'] ?? ''}'.trim();
+        final app = ScreenTime.matchApp(raw, {...st.week(DateTime.now()).keys, ...ScreenTime.knownApps}) ?? raw;
+        final mins = (a['minutes'] as num?)?.toInt() ?? 0;
+        await st.setLimit(app, mins);
+        return mins <= 0
+            ? 'Plus de limite pour $app.'
+            : 'D\'accord : je te préviens après ${ScreenTime.say(mins * 60)} de $app par jour.';
+      },
+    ),
+    HubTool(
+      name: 'recherche_partout',
+      description:
+          'Cherche un mot partout : fichiers du PC (noms et contenu), Drive, Google Docs, mails, Discord, École Directe '
+          '(messages, devoirs), Carnet, presse-papier, comptes rendus de cours, révisions et livres.',
+      params: {'texte': ('string', 'Ce qu\'il faut retrouver')},
+      required: ['texte'],
+      run: (a) async {
+        final q = '${a['texte'] ?? ''}'.trim();
+        final hits = await search(q);
+        return {
+          'resume': EverywhereSearch.say(q, hits),
+          'resultats': [for (final h in hits.take(15)) h.toJson()],
+        };
+      },
+    ),
+    HubTool(
+      name: 'recherche_ouvrir',
+      description: 'Ouvre la recherche partout de Mon Hub (Ctrl + Espace), avec un texte déjà tapé si besoin.',
+      params: {'texte': ('string', 'Le texte à chercher (facultatif)')},
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        HubHome.instance.onSearchText?.call('${a['texte'] ?? ''}');
+        return 'Recherche ouverte.';
+      },
+    ),
+  ];
+
+  /// La recherche partout, avec les outils de lecture de Mon Hub.
+  Future<List<SearchHit>> search(String query, {void Function(List<SearchHit>)? onPart}) {
+    final byName = {for (final t in _tools) t.name: t};
+    return EverywhereSearch.run(query, (n, a) async => byName[n]?.run(a), byName.keys.toSet(), onPart: onPart);
+  }
+
+  /// Ctrl + Alt + Espace (Clicky partout) ou Ctrl + Espace (Mon Hub).
+  Future<void> openSearch([String text = '']) async {
+    if (hub != null && !desktopMode) {
+      HubHome.instance.onSearchText?.call(text);
+      return;
+    }
+    final t = _tools.where((t) => t.name == 'recherche_ouvrir').firstOrNull;
+    if (t == null) return;
+    try {
+      await t.run({'texte': text});
+    } catch (_) {}
+  }
+
+  /// Discord : la double authentification (null si Discord n'est pas branché).
+  Future<bool?> _discord2fa() async {
+    final t = _tools.where((t) => t.name == 'discord_securite').firstOrNull;
+    if (t == null) return null;
+    final r = await t.run(const {}).timeout(const Duration(seconds: 10));
+    return r is Map ? r['double_authentification'] == true : null;
   }
 
   /// Range les fenêtres de Windows (sans IA).
@@ -2261,6 +2442,8 @@ class ClickyController extends ChangeNotifier {
       ),
     ],
     if (toolsOverride == null) ...jarvisTools,
+    // Temps d'écran, recherche partout, anniversaires : dans Mon Hub.
+    if (hub != null && toolsOverride == null && !desktopMode) ...lifeTools,
     if (hub != null && toolsOverride == null && CourseListener.supported) ...courseTools,
     if (pcControl != 'off') ...PcControl.tools(),
     // L'assistant personnel vit dans Mon Hub (qui a les modules).
@@ -3986,6 +4169,29 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     _fadeSoon();
   }
 
+  /// Un lien piège qu'on allait ouvrir : « ouvrir quand même ? » (non par
+  /// défaut).
+  Future<bool> confirmScamLink(String url, ScamVerdict v) async {
+    final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+    if (ctx == null || !ctx.mounted) return false;
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.gpp_bad_rounded, color: Colors.red, size: 36),
+        title: const Text('Ce lien ressemble à une arnaque'),
+        content: Text(
+          '${v.reasons.join('\n')}\n\n$url\n\nCes faux sites volent les comptes (Discord, Roblox, Steam…). '
+          'Ne te connecte pas et ne télécharge rien.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ouvrir quand même')),
+          FilledButton(onPressed: () => Navigator.pop(c, false), child: const Text('Ne pas ouvrir')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   /// Une action dans le navigateur qui envoie, publie, paie ou supprime.
   Future<bool> confirmBrowser(String what) async {
     notify?.call('Clicky attend ton accord', 'Il veut $what dans ton navigateur.');
@@ -4299,6 +4505,8 @@ class _ClickyLayerState extends State<ClickyLayer> {
           unawaited(c.think(body.length > 220 ? '${body.substring(0, 220)}…' : body));
         };
       BrowserLink.confirm = c.confirmBrowser;
+      // Bouclier anti-arnaque sur les liens ouverts depuis Mon Hub.
+      Browser.confirmScam = c.confirmScamLink;
       final r = Routines.instance
         // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
         // autres routines par le cerveau de Clicky.

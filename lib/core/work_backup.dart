@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'error_log.dart';
 import 'google_auth.dart';
 import 'hub_files.dart';
+import 'screen_time.dart';
 
 /// **Sauvegarde de tes travaux** : tes exposés, devoirs, présentations…
 /// (Documents et Bureau, ou les dossiers que tu choisis) sont copiés tout
@@ -206,7 +207,8 @@ class WorkBackup extends ChangeNotifier {
 
   /// Sauvegarde maintenant (fichiers nouveaux ou modifiés).
   Future<int> runNow() async {
-    if (running) return 0;
+    // Pendant une partie (mode jeu), rien de lourd en fond.
+    if (running || GameMode.instance.active) return 0;
     await _state.load();
     if (!on) return 0;
     final account = GoogleAuth.available ? GoogleAuth.driveAccount : null;

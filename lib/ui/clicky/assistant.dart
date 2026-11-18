@@ -13,6 +13,7 @@ import 'initiatives.dart';
 import 'quick.dart' show QuickTool;
 import 'tutor.dart' show normalize;
 import 'school_bag.dart';
+import '../../core/screen_time.dart';
 
 /// Le texte sans emojis (pour la voix).
 String withoutEmoji(String text) => text
@@ -47,6 +48,8 @@ class AssistantFeature {
     AssistantFeature('sac', Icons.backpack_rounded, Color(0xFF2B6CFF), 'Prépare ton sac',
         'Le soir, d\'après tes cours de demain : les affaires à prendre (tenue de sport, calculatrice…), les devoirs à '
         'rendre et les contrôles.'),
+    AssistantFeature('sommeil', Icons.bedtime_rounded, Color(0xFF5B5BD6), 'Sommeil',
+        'Le soir, l\'heure de te coucher d\'après ton premier cours du lendemain (9 h de sommeil, réglable).'),
     AssistantFeature('initiatives', Icons.rocket_launch_rounded, Color(0xFFD35400), 'Initiatives',
         'Prendre les devants sur tout le reste : un rendez-vous ou une date limite dans un message, une mauvaise '
         'note à rattraper, ta série de révisions à sauver, un message qui attend ta réponse, la pluie demain, '
@@ -276,9 +279,53 @@ class Assistant extends ChangeNotifier {
       }
       if (on('initiatives')) await _initiatives(hw, n);
       if (on('sac')) await _bag(events, hw, n);
+      if (on('sommeil')) await _sleep(events, n);
     } finally {
       _busy = false;
     }
+  }
+
+  // Sommeil -------------------------------------------------------------------
+
+  double get sleepHours => (store.getJson<num>('sommeil.heures') ?? 9).toDouble();
+  int get sleepPrep => store.getJson<int>('sommeil.prep') ?? 60;
+  Future<void> setSleep({double? hours, int? prep}) async {
+    if (hours != null) await store.setJson('sommeil.heures', hours);
+    if (prep != null) await store.setJson('sommeil.prep', prep);
+    notifyListeners();
+  }
+
+  /// Le premier cours de [day] (École Directe), s'il y en a un.
+  static DateTime? firstLesson(List<Map> events, DateTime day) {
+    final starts = [
+      for (final e in events)
+        if (e['annule'] != true && '${e['source'] ?? ''}'.toLowerCase().contains('cole'))
+          if (_date(e['debut']) case final d? when d.year == day.year && d.month == day.month && d.day == day.day) d,
+    ]..sort();
+    return starts.firstOrNull;
+  }
+
+  /// L'heure du coucher pour ce soir (texte), ou null s'il n'y a pas cours demain.
+  Future<String?> bedtimeTonight({List<Map>? events}) async {
+    final n = DateTime.now();
+    final tomorrow = DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
+    final ev = events ??
+        _list(await _get('agenda_lire', {'debut': tomorrow.toIso8601String().substring(0, 10), 'jours': 1}));
+    final first = firstLesson(ev, tomorrow);
+    return first == null ? null : Sleep.say(first, hours: sleepHours, prep: sleepPrep);
+  }
+
+  Future<void> _sleep(List<Map> events, DateTime n) async {
+    final tomorrow = DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
+    final first = firstLesson(events, tomorrow);
+    if (first == null) return;
+    final bed = Sleep.bedtime(first, hours: sleepHours, prep: sleepPrep);
+    // Une demi-heure avant, et jusqu'à 3 h après (si tu es encore là).
+    if (n.isBefore(bed.subtract(const Duration(minutes: 30))) || n.isAfter(bed.add(const Duration(hours: 3)))) return;
+    final key = 'sommeil|${n.toIso8601String().substring(0, 10)}';
+    if (seen(key)) return;
+    await mark(key, n);
+    notify?.call('🌙 Bientôt l\'heure de dormir', Sleep.say(first, hours: sleepHours, prep: sleepPrep));
   }
 
   // Prépare ton sac -----------------------------------------------------------
@@ -1006,6 +1053,11 @@ class Assistant extends ChangeNotifier {
   // Outils (pour Clicky et Claude) ------------------------------------------
 
   List<HubTool> get tools => [
+    HubTool(
+      name: 'assistant_coucher',
+      description: 'L\'heure à laquelle se coucher ce soir, d\'après le premier cours de demain et les heures de sommeil voulues.',
+      run: (_) async => await bedtimeTonight() ?? 'Pas cours demain : pas d\'heure imposée, mais dors bien quand même.',
+    ),
     HubTool(
       name: 'assistant_sac',
       description: 'Prépare ton sac : les affaires à prendre pour les cours de demain (ou d\'un autre jour), les devoirs '

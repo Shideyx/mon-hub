@@ -405,7 +405,9 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   Timer? _tick, _slow;
   bool _wasBoth = false;
   bool _wasEsc = false;
-  bool _wasFix = false;
+  bool _wasFix = false, _wasFind = false;
+  bool _fullscreen = false;
+  int _n = 0;
   bool _interactive = false;
   bool _hidden = true;
   int _deadChecks = 0;
@@ -583,6 +585,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final fix = both && Win.down(0x43);
     if (fix && !_wasFix) unawaited(c.fixSelection());
     _wasFix = fix;
+    // Ctrl + Alt + Espace : la recherche partout (dans Mon Hub).
+    final find = both && Win.down(0x20);
+    if (find && !_wasFind) unawaited(c.openSearch());
+    _wasFind = find;
     if (both && Win.otherKeyDown()) {
       c.hotkey(down: true, other: true);
     } else if (both && !_wasBoth) {
@@ -601,6 +607,8 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
     _scanStep();
+    // Plein écran ? (vérifié deux fois par seconde, pas à chaque image)
+    if (++_n % 30 == 0) _fullscreen = Win.foregroundFullscreen();
     // Pendant un vol, c'est l'horloge des images qui place la fenêtre.
     if (!_frames.isActive) _place();
   }
@@ -608,7 +616,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    final visible = c.active && (c.buddyVisible || c.boxOpen || c.board != null);
+    // Un jeu ou une vidéo en plein écran : Clicky disparaît tant qu'on ne
+    // l'appelle pas (rien par-dessus le jeu, aucun ralentissement).
+    final quiet = _fullscreen && c.state == ClickyState.idle && !c.boxOpen && c.board == null && c.holo == null && c.target == null;
+    final visible = c.active && !quiet && (c.buddyVisible || c.boxOpen || c.board != null);
     if (_pinned && !c.boxOpen && c.board == null && c.holo == null) {
       _pinned = false;
       _dragFrom = null;

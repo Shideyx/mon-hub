@@ -13,6 +13,7 @@ import '../../ui/media_view.dart';
 import '../../ui/voice_note.dart';
 import '../docs/doc_format.dart';
 import '../../ui/widgets.dart';
+import '../../core/scam_shield.dart';
 import 'discord_api.dart';
 import 'discord_phone.dart';
 
@@ -195,9 +196,41 @@ class DiscordModule extends HubModule {
                   'id': d.id,
                   'nom': d.name,
                   if (d.last != null) 'dernier': '${d.last!.author.name} : ${d.last!.preview}',
+                  if (d.last != null) 'date': d.last!.at,
+                  if (d.last != null) 'de_moi': d.last!.author.id == me?.id,
                   'non_lu': isUnread(d),
                 },
             ];
+          },
+        ),
+        HubTool(
+          name: 'discord_mentions',
+          description: 'Discord : les messages récents où on te mentionne (@toi) dans tes serveurs.',
+          params: {'heures': ('integer', 'Depuis combien d\'heures (défaut 24)')},
+          run: (a) async {
+            final api = await _client();
+            if (api == null) throw 'Discord n\'est pas connecté';
+            final since = DateTime.now().subtract(Duration(hours: (a['heures'] as num?)?.toInt() ?? 24));
+            final names = <String, String>{};
+            try {
+              for (final g in await guilds()) {
+                names[g.id] = g.name;
+              }
+            } catch (_) {}
+            return [
+              for (final (m, _, guild) in await api.mentions())
+                if (m.at.isAfter(since))
+                  {'de': m.author.name, if (guild != null) 'serveur': names[guild] ?? 'un serveur', 'texte': m.preview, 'date': m.at},
+            ];
+          },
+        ),
+        HubTool(
+          name: 'discord_securite',
+          description: 'Discord : la double authentification (A2F) est-elle activée sur le compte ?',
+          run: (_) async {
+            final api = await _client();
+            if (api == null) throw 'Discord n\'est pas connecté';
+            return {'double_authentification': await api.mfaEnabled()};
           },
         ),
         HubTool(
@@ -332,12 +365,20 @@ class DiscordModule extends HubModule {
     store.changed();
     return [
       for (final d in dms.take(8))
-        if (d.last != null && d.last!.author.id != me?.id)
+        if (d.last != null && d.last!.author.id != me?.id) ...[
           HubNotification(
             id: d.last!.id,
             title: 'Discord · ${d.last!.author.name}',
             body: d.last!.preview,
           ),
+          // Le bouclier anti-arnaque : faux Nitro, faux site, .exe…
+          if (ScamShield.checkMessage(d.last!.scanText, files: d.last!.files) case final v when v.suspect)
+            HubNotification(
+              id: 'arnaque:${d.last!.id}',
+              title: v.danger ? '⚠️ Arnaque probable : message de ${d.last!.author.name}' : '⚠️ Message louche de ${d.last!.author.name}',
+              body: '${v.reasons.join(' ; ')}. N\'ouvre pas le lien, ne télécharge rien, ne donne aucun code.',
+            ),
+        ],
     ];
   }
 

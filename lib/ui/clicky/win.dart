@@ -128,6 +128,22 @@ class Win {
     return owner.value == myPid ? h : null;
   });
 
+  /// Ramène la fenêtre principale de Mon Hub au premier plan (de ce
+  /// programme : [myPid]).
+  static bool raiseMain(int myPid) => using((a) {
+    final h = FindWindow(
+      'FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a),
+      'Mon Hub'.toPcwstr(allocator: a),
+    ).value;
+    if (h.address == 0) return false;
+    final owner = a<Uint32>();
+    GetWindowThreadProcessId(h, owner);
+    if (owner.value != myPid) return false;
+    if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
+    _focus(h);
+    return true;
+  });
+
   /// Place la fenêtre (pixels physiques), au premier plan, sans voler le focus.
   static void place(HWND hwnd, int x, int y, int w, int h) {
     SetWindowPos(
@@ -343,6 +359,15 @@ class Win {
   }
 
   /// Titre de la fenêtre au premier plan (« Document1 - Word »).
+  /// Le programme de la fenêtre au premier plan (« RobloxPlayerBeta.exe »).
+  static String foregroundExe() {
+    try {
+      return _exeOf(GetForegroundWindow());
+    } catch (_) {
+      return '';
+    }
+  }
+
   static String foregroundTitle() {
     try {
       return _title(GetForegroundWindow());

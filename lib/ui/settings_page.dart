@@ -9,6 +9,8 @@ import '../core/browser.dart';
 import '../core/error_log.dart';
 import 'account_sync_view.dart';
 import 'backup_page.dart';
+import 'security_page.dart';
+import 'screen_time_page.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -369,7 +371,22 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
             ],
+            section('Bien-être'),
+            ListTile(
+              leading: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFF5B5BD6)),
+              title: const Text('Temps d\'écran et sommeil'),
+              subtitle: const Text('Temps par appli, limites douces, heure du coucher, mode jeu'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => ScreenTimePage.open(context),
+            ),
             section('Confidentialité et sécurité'),
+            ListTile(
+              leading: const Icon(Icons.verified_user_rounded, color: Colors.green),
+              title: const Text('Bilan de sécurité'),
+              subtitle: const Text('Antivirus, pare-feu, mises à jour, double authentification, bouclier anti-arnaque'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => SecurityPage.open(context),
+            ),
             const ListTile(
               leading: Icon(Icons.lock_rounded),
               title: Text('Tout reste sur cet appareil'),

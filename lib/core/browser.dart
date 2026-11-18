@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'module_store.dart';
+import 'scam_shield.dart';
 
 /// Ouvre les pages web : dans **Google Chrome** s'il est installé (réglage
 /// par défaut), sinon dans le navigateur par défaut de Windows.
@@ -70,10 +71,18 @@ class Browser {
 
   /// Ouvre un lien. Les pages web vont dans Chrome ; le reste (spotify:,
   /// ms-settings:, fichiers…) dans l'appli qui convient.
+  /// Demande « ouvrir quand même ? » pour un lien piège (posé par Mon Hub).
+  static Future<bool> Function(String url, ScamVerdict v)? confirmScam;
+
   static Future<bool> open(String url) async {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return false;
     final web = uri.scheme == 'http' || uri.scheme == 'https';
+    // Bouclier anti-arnaque : un faux site ne s'ouvre pas sans ton accord.
+    if (web) {
+      final v = ScamShield.checkUrl(url);
+      if (v.danger && !(await confirmScam?.call(url, v) ?? false)) return false;
+    }
     if (web && choice == 'chrome') {
       final chrome = chromePath();
       if (chrome != null) {

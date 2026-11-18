@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import 'core/account_sync.dart';
 import 'core/browser_link.dart';
 import 'core/work_backup.dart';
+import 'core/screen_time.dart';
+import 'ui/clicky/win.dart';
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
 import 'core/desktop_widgets.dart';
@@ -33,6 +35,7 @@ import 'ui/login_page.dart';
 import 'ui/theme.dart';
 import 'ui/update_screen.dart';
 import 'ui/widget_window.dart';
+import 'ui/search_page.dart';
 
 Future<void> main(List<String> args) async {
   // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
@@ -106,6 +109,7 @@ class _HubAppState extends State<HubApp> {
 
   void _close() {
     WorkBackup.instance.stop();
+    ScreenTime.instance.stop();
     unawaited(BrowserLink.instance.stop());
     AccountSync.instance
       ..onApplied = null
@@ -163,6 +167,28 @@ class _HubAppState extends State<HubApp> {
         WorkBackup.instance.start();
         // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
         unawaited(BrowserLink.instance.start());
+        // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier
+        // plan toutes les 15 s (sur ce PC seulement).
+        if (Win.supportedHere) {
+          final st = ScreenTime.instance;
+          st.alert = (title, body) {
+            unawaited(n.post(HubNotification(id: 'temps:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
+          };
+          st
+            ..onTick = () async {
+              try {
+                final exe = Win.foregroundExe(), title = Win.foregroundTitle();
+                await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
+                final end = GameMode.instance.tick(exe: exe, fullscreen: Win.foregroundFullscreen());
+                if (end != null) {
+                  unawaited(n.post(HubNotification(id: 'jeu:${DateTime.now().millisecondsSinceEpoch}', title: '🎮 Partie terminée', body: end)));
+                }
+              } catch (_) {}
+            }
+            ..start();
+        }
+        // Ctrl + Espace (ici) ou Ctrl + Alt + Espace (partout) : la recherche.
+        HubHome.instance.onSearchText = (text) => unawaited(SearchPage.show(text));
         // Première ouverture du compte : la visite guidée de Clicky.
         unawaited(_tutorial());
         unawaited(n.start());

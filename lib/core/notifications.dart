@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'hub_controller.dart';
 import 'module_store.dart';
 import 'freeze_watch.dart';
+import 'screen_time.dart';
 import '../ui/clicky/jarvis.dart';
 
 /// Une alerte produite par un module (nouveau mail, nouveau message…).
@@ -89,7 +90,7 @@ class NotificationCenter extends ChangeNotifier {
 
   /// Ce qui passe toujours tout de suite (un appel qui sonne…).
   static bool urgent(HubNotification n) =>
-      n.moduleId.isEmpty || n.id.startsWith('discord-appel') || n.id.startsWith('annule:');
+      n.moduleId.isEmpty || n.id.startsWith('discord-appel') || n.id.startsWith('annule:') || n.id.startsWith('arnaque:');
 
   /// Le résumé : « 3 messages Discord, 1 mail… » puis quelques lignes.
   static HubNotification digestOf(List<HubNotification> items, Map<String, String> names, {DateTime? at}) {
@@ -156,6 +157,12 @@ class NotificationCenter extends ChangeNotifier {
     await focus.sync();
     if (focus.active && !n.id.startsWith('discord-appel')) {
       await focus.holdOne();
+      return;
+    }
+    // Mode jeu : gardée pour la fin de la partie (sauf un appel, une arnaque).
+    final game = GameMode.instance;
+    if (game.active && !n.id.startsWith('discord-appel') && !n.id.startsWith('arnaque:')) {
+      game.held++;
       return;
     }
     // Regroupées : un seul résumé toutes les 30 min (ou 1 h).

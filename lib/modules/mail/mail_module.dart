@@ -2,6 +2,7 @@ import 'package:enough_mail/enough_mail.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
+import '../../core/scam_shield.dart';
 import '../../core/hub_module.dart';
 import '../../ui/file_viewer.dart';
 import '../../ui/summary.dart';
@@ -327,13 +328,30 @@ class MailModule extends HubModule {
     store.changed();
     return [
       for (final m in list)
-        if (!m.seen)
+        if (!m.seen) ...[
           HubNotification(
             id: '${m.account}|${m.uid ?? m.date?.millisecondsSinceEpoch}|${m.subject}',
             title: '✉️ ${m.from}',
             body: m.subject,
           ),
+          // Faux expéditeur (support@dlscord.com…) ou sujet piège.
+          if (MailModule.scamOf(m) case final v when v.suspect)
+            HubNotification(
+              id: 'arnaque:mail:${m.account}|${m.uid}',
+              title: '⚠️ Mail louche : ${m.from}',
+              body: '${v.reasons.join(' ; ')}. N\'ouvre pas ses liens.',
+            ),
+        ],
     ];
+  }
+
+  /// Un mail qui se fait passer pour Discord, Roblox, Steam… (adresse de
+  /// l'expéditeur sosie, ou sujet piège).
+  static ScamVerdict scamOf(MailSummary m) {
+    final domain = m.fromEmail.contains('@') ? m.fromEmail.split('@').last : '';
+    final byDomain = domain.isEmpty ? const ScamVerdict(ScamLevel.ok, []) : ScamShield.checkUrl('https://$domain');
+    final bySubject = ScamShield.checkMessage(m.subject);
+    return byDomain.level.index >= bySubject.level.index ? byDomain : bySubject;
   }
 
   Future<void> _addAccount(BuildContext context) async {
