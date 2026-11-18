@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File, Platform;
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -68,6 +69,7 @@ import '../../core/freeze_watch.dart';
 import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
+import 'shot_encode.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -587,7 +589,10 @@ class ClickyController extends ChangeNotifier {
         notifyListeners();
       }
     }
-    if (follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
+    // Clicky partout : c'est Windows qui déplace sa fenêtre avec la souris,
+    // rien à redessiner (avant : tout Clicky était redessiné 60 fois par
+    // seconde dès que la souris bougeait).
+    if (!desktopMode && follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
   }
 
   // ---------- Voix ----------
@@ -2103,13 +2108,16 @@ class ClickyController extends ChangeNotifier {
       if (size.isEmpty) return const [];
       final ratio = math.min(1.0, 1280 / math.max(size.width, size.height));
       final img = await b.toImage(pixelRatio: ratio);
-      final data = await img.toByteData(format: ui.ImageByteFormat.png);
+      final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
       final w = img.width, h = img.height;
       img.dispose();
       if (data == null) return const [];
+      // JPEG fabriqué à côté : plus léger à envoyer, l'appli ne fige pas.
+      final pixels = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      final jpeg = await Isolate.run(() => encodeShot(pixels, w, h, rgba: true));
       return [
         ClickyShot(
-          png64: base64Encode(data.buffer.asUint8List()),
+          png64: base64Encode(jpeg),
           label: 'fenêtre de Mon Hub',
           width: w,
           height: h,
@@ -2739,7 +2747,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
                 {'type': 'text', 'text': 'Écran ${shots.indexOf(s) + 1} (${s.label}) :'},
                 {
                   'type': 'image',
-                  'source': {'type': 'base64', 'media_type': 'image/png', 'data': s.png64},
+                  'source': {'type': 'base64', 'media_type': imageMime(s.png64), 'data': s.png64},
                 },
               ],
               ...docBlocks,
@@ -2928,7 +2936,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
               'content': [
                 {
                   'type': 'image',
-                  'source': {'type': 'base64', 'media_type': 'image/png', 'data': img},
+                  'source': {'type': 'base64', 'media_type': imageMime(img), 'data': img},
                 },
                 {'type': 'text', 'text': PrecisePointer.question(label)},
               ],
@@ -3483,7 +3491,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                   {'type': 'text', 'text': labels[i]},
                   {
                     'type': 'image',
-                    'source': {'type': 'base64', 'media_type': 'image/png', 'data': shots[i].png64},
+                    'source': {'type': 'base64', 'media_type': imageMime(shots[i].png64), 'data': shots[i].png64},
                   },
                 ],
                 {'type': 'text', 'text': prompt},

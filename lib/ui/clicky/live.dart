@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../core/hub_module.dart';
+import 'shot_encode.dart';
 
 /// Gemini Live : la conversation **en direct**, comme le JARVIS « Mark LII »
 /// (Gemini Live API). Le micro part vers Gemini pendant que tu parles, et la
@@ -315,7 +316,7 @@ class GeminiVision {
                   'parts': [
                     for (final p in png64)
                       {
-                        'inline_data': {'mime_type': 'image/png', 'data': p},
+                        'inline_data': {'mime_type': imageMime(p), 'data': p},
                       },
                     {
                       'text': 'Voici l\'écran de la personne. $question\nRéponds en français, précisément et brièvement '
