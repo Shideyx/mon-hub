@@ -104,6 +104,7 @@ class _HubAppState extends State<HubApp> {
   void _close() {
     AccountSync.instance
       ..onApplied = null
+      ..onNotice = null
       ..stop();
     DiscordPhone.instance.stop();
     _notifications?.dispose();
@@ -139,6 +140,18 @@ class _HubAppState extends State<HubApp> {
               unawaited(ClickyController.instance.loadMemory());
               unawaited(ClickyController.instance.shareOptions());
             }
+          }
+          ..onNotice = (title, body) {
+            unawaited(
+              n.post(
+                HubNotification(
+                  id: 'sync:${DateTime.now().millisecondsSinceEpoch}',
+                  title: title,
+                  body: body,
+                  moduleId: 'drive',
+                ),
+              ),
+            );
           }
           ..start();
         // Première ouverture du compte : la visite guidée de Clicky.

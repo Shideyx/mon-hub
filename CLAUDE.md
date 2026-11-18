@@ -162,16 +162,26 @@
 - **Lecture** : `modules/books/free_classics.dart` (`FreeClassics` : 1984 / La Ferme des animaux via Gutenberg
   Australie, libres en France ; `Wikisource` FR via l'API + ws-export). **Anime-sama refusé** (site pirate) : seulement
   sources légales (MANGA Plus, WEBTOON, MangaDex…).
-- **Compte sur plusieurs appareils, sans export (v1.48)** : `core/account_sync.dart` (`AccountSync`). Copie du compte
-  dans le Drive **de la personne**, dossier caché `appDataFolder` (portée `GoogleAuth.appDataScope`, `GoogleAuth.canSync` ;
-  comptes Google d'avant : reconnexion), fichier `compte-<identifiant>.monhub` = `SyncBox` (gzip + AES-256-GCM, clé
-  `SyncKey` = PBKDF2 du mot de passe Mon Hub, gardée dans le coffre `sync.key` ; AAD = identifiant). Contenu : préférences
-  `p:`, secrets `s:`, fichiers `f:` (JSON de `HubFiles`), chacun `[valeur, date, empreinte]` ; fusion `SyncMerge` clé par
-  clé, **le plus récent gagne**, suppressions gardées 90 j, garde-fou `checkNotWiped`. `sync-base.json` = empreintes de la
-  dernière synchro. Jamais synchronisé : `sync.*`, `app.*`, `shortcut.*`, `hub.detached*`, `vault.key`, `rangement-*`.
-  Toutes les 3 min (`start` dans `HubApp._sync`, `onApplied` → `HubController.reload`, Clicky). Nouvel appareil : page de
-  connexion → « Retrouver mon compte » (`ui/account_sync_view.dart` `JoinAccountView` : `beginJoin` prépare l'espace où se
-  range la connexion Google, `join` → `AppSession.adopt`, `cancelJoin` efface). Réglages → Mes appareils =
-  `AccountSyncSection` ; l'export/import fichier reste dans « Sans internet ». Toujours **aucun serveur à nous**.
+- **Compte sur plusieurs appareils, sans export (v1.48–1.49)** : `core/account_sync.dart` (`AccountSync`). Copie du
+  compte dans le Drive **de la personne**, dossier visible « Mon Hub - compte synchronisé » (`DriveFolder`, portée `drive`
+  déjà donnée depuis la v1.37 → `GoogleAuth.canWriteDrive`, rien à reconnecter ; le rangement du Drive ne touche pas aux
+  dossiers). Fichier `compte-<identifiant>.monhub` = `SyncBox` (gzip + AES-256-GCM, AAD = identifiant). Clé `SyncKey` =
+  PBKDF2 de l'**empreinte** du mot de passe (`forAccount` : l'appareil connecté la connaît, aucune saisie ; nouvel appareil
+  `fromPassword` avec `sel_compte` de l'en-tête ; copies v1.48 sans `sel_compte` = mot de passe brut), gardée dans le coffre
+  `sync.key`. Contenu : préférences `p:`, secrets `s:`, fichiers `f:` (JSON de `HubFiles`), chacun `[valeur, date,
+  empreinte]` ; fusion `SyncMerge` clé par clé, **le plus récent gagne**, suppressions gardées 90 j, garde-fou
+  `checkNotWiped`. `sync-base.json` = empreintes de la dernière synchro. Jamais synchronisé : `sync.*`, `app.*`,
+  `shortcut.*`, `hub.detached*`, `vault.key`, `rangement-*`. Toutes les 3 min (`start` dans `HubApp._sync`, `onApplied` →
+  `HubController.reload`, Clicky). **PC principal hors de portée** : le nouvel appareil dépose `demande-compte-<id>.json`
+  (`requestCopy`) ; Mon Hub ouvert sur le PC principal la voit (`answerRequests`, toutes les 5 min, tous les comptes Google
+  connectés) → active la synchro tout seul, efface la demande, notification (`onNotice`). Nouvel appareil : page de
+  connexion → « Retrouver mon compte d'un autre appareil » (`ui/account_sync_view.dart` `JoinAccountView` : `beginJoin`
+  prépare l'espace où se range la connexion Google, bouton « Demander mon compte à mon PC principal » + attente toutes les
+  20 s, `join` → `AppSession.adopt`, `cancelJoin` efface). **PC principal éteint** : compte recréé ici (même identifiant +
+  mot de passe) → Réglages → « Récupérer les données de mon PC principal » (`askMainPc` : demande + `sync.ask`, `checkArrival`
+  chaque minute, `arrived`) ; le PC principal répond avec `enable(takeOver: true)` (copie illisible pour lui → remplacée,
+  `_sync(replace:)`) ; ici `mergeFrom(mot de passe)` = `_sync(remoteWins:)` (le PC principal gagne les doublons) ou
+  `unlock` si la synchro était déjà active. Réglages → Mes appareils = `AccountSyncSection` ; l'export/import
+  fichier reste dans « Sans internet ». Toujours **aucun serveur à nous**.
 - Animations : `ui/clicky/alive.dart` (`ClickyBounce` : rebond à chaque état, halo en réflexion, saut de joie, coucou
   rare ; rien en boucle au repos), cartes de l'accueil soulevées au survol, 👋 qui salue une fois.

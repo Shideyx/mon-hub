@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/account_sync.dart';
 import '../core/google_auth.dart';
 import '../core/module_store.dart';
+import '../core/session.dart';
 import 'google_setup.dart';
 import 'widgets.dart';
 
@@ -17,8 +18,8 @@ String syncAgo(DateTime t, {DateTime? now}) {
   return 'le ${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}';
 }
 
-/// Connexion Google avec l'accès au dossier caché de Mon Hub (où vit la
-/// copie du compte). Renvoie l'adresse, ou null si on a annulé.
+/// Connexion Google avec l'accès au Drive (où vit la copie du compte).
+/// Renvoie l'adresse, ou null si on a annulé.
 Future<String?> connectGoogleForSync(BuildContext context) async {
   String? email;
   if (!GoogleAuth.available) {
@@ -27,26 +28,25 @@ Future<String?> connectGoogleForSync(BuildContext context) async {
     final before = GoogleAuth.accounts.toSet();
     await GoogleSetupPage.open(context);
     final now = GoogleAuth.accounts;
-    email = now.where((a) => !before.contains(a)).firstOrNull ?? now.where(GoogleAuth.canSync).firstOrNull;
+    email = now.where((a) => !before.contains(a)).firstOrNull ?? now.where(GoogleAuth.canWriteDrive).firstOrNull;
     if (email == null) return null;
   } else {
     email = await GoogleAuth.signIn();
   }
   final drive = ModuleStore()..bind('drive');
   if (drive.getJson<String>('account') == null) await drive.setJson('account', email);
-  if (!GoogleAuth.canSync(email)) {
-    throw 'Google n\'a pas donné l\'accès au dossier de Mon Hub : recommence et laisse cochée '
-        'la case « données de configuration dans Google Drive ».';
+  if (!GoogleAuth.canWriteDrive(email)) {
+    throw 'Google n\'a pas donné l\'accès à ton Drive : recommence et laisse cochée la case du Drive.';
   }
   return email;
 }
 
-/// Le compte Google qui garde la copie : un compte déjà connecté (s'il a
-/// l'accès au dossier caché), sinon une connexion.
+/// Le compte Google qui garde la copie : un compte déjà connecté (s'il peut
+/// écrire dans le Drive), sinon une connexion.
 Future<String?> pickSyncGoogle(BuildContext context) async {
   final all = GoogleAuth.accounts;
   if (all.isNotEmpty) {
-    final choice = all.length == 1 && GoogleAuth.canSync(all.first)
+    final choice = all.length == 1 && GoogleAuth.canWriteDrive(all.first)
         ? all.first
         : await showDialog<String>(
             context: context,
@@ -59,7 +59,7 @@ Future<String?> pickSyncGoogle(BuildContext context) async {
                     child: ListTile(
                       leading: const Icon(Icons.account_circle_rounded),
                       title: Text(a),
-                      subtitle: GoogleAuth.canSync(a)
+                      subtitle: GoogleAuth.canWriteDrive(a)
                           ? null
                           : const Text('Google va te redemander ton accord une fois'),
                     ),
@@ -75,7 +75,7 @@ Future<String?> pickSyncGoogle(BuildContext context) async {
             ),
           );
     if (choice == null) return null;
-    if (choice.isNotEmpty && GoogleAuth.canSync(choice)) return choice;
+    if (choice.isNotEmpty && GoogleAuth.canWriteDrive(choice)) return choice;
   }
   if (!context.mounted) return null;
   return connectGoogleForSync(context);
@@ -122,12 +122,7 @@ class AccountSyncSection extends StatelessWidget {
     try {
       final mail = await pickSyncGoogle(context);
       if (mail == null || !context.mounted) return;
-      final pass = await askMonHubPassword(
-        context,
-        message: 'Il chiffre la copie de ton compte. Sur ton autre appareil, tu le taperas pour la retrouver.',
-      );
-      if (pass == null || !context.mounted) return;
-      await AccountSync.instance.enable(mail: mail, password: pass);
+      await AccountSync.instance.enable(mail: mail);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ton compte est synchronisé avec $mail ✅')),
@@ -159,6 +154,111 @@ class AccountSyncSection extends StatelessWidget {
     } catch (e) {
       if (context.mounted) showError(context, e);
     }
+  }
+
+  static Future<void> _askMainPc(BuildContext context) async {
+    try {
+      final mail = await pickSyncGoogle(context);
+      if (mail == null || !context.mounted) return;
+      await AccountSync.instance.askMainPc(mail);
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  static Future<void> _merge(BuildContext context) async {
+    final pass = await askMonHubPassword(
+      context,
+      message: 'Le mot de passe de ton compte sur ton PC principal (le même qu\'ici).',
+    );
+    if (pass == null || !context.mounted) return;
+    try {
+      await AccountSync.instance.mergeFrom(pass);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tes données sont récupérées et restent synchronisées ✅')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  /// Compte recréé ici pendant que le PC principal est éteint : ses
+  /// données arriveront quand il sera rallumé.
+  static Widget _mainPc(BuildContext context, AccountSync s) {
+    final cs = Theme.of(context).colorScheme;
+    if (s.askedIn != null && s.arrived != null) {
+      return Card(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        color: cs.primaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tes données sont arrivées de ton PC principal 🎉',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tape ton mot de passe pour les récupérer. Ce que tu as fait ici est gardé ; en cas de '
+                'doublon, c\'est la version du PC principal qui gagne.',
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                icon: s.busy ? _spinner : const Icon(Icons.download_done_rounded),
+                label: const Text('Récupérer mes données'),
+                onPressed: s.busy ? null : () => _merge(context),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (s.askedIn != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.hourglass_top_rounded),
+            title: const Text('Demande envoyée à ton PC principal'),
+            subtitle: Text(
+              'Dès qu\'il sera allumé avec Mon Hub ouvert sur ton compte (et le compte Google '
+              '${s.askedIn} connecté dans Mon Hub), tes données arriveront ici toutes seules. '
+              'Tu peux utiliser Mon Hub en attendant : rien de ce que tu fais ici n\'est perdu.',
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: TextButton(
+              onPressed: () => unawaited(AccountSync.instance.cancelAsk()),
+              child: const Text('Annuler la demande'),
+            ),
+          ),
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.restore_rounded),
+            label: const Text('Récupérer les données de mon PC principal'),
+            onPressed: s.busy ? null : () => _askMainPc(context),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tu as recréé ton compte ici (même identifiant, même mot de passe) parce que ton PC '
+            'principal est éteint ou loin ? Ses données arriveront dès qu\'il sera rallumé avec Mon Hub ouvert.',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
   }
 
   static Future<void> _disable(BuildContext context) async {
@@ -204,7 +304,7 @@ class AccountSyncSection extends StatelessWidget {
               subtitle: Text(
                 'Connecte-toi sur un autre PC et retrouve tout (modules, connexions, historiques, '
                 'carnet, révisions…) sans rien exporter, et les changements suivent tout seuls. '
-                'Ton compte est gardé dans ton Google Drive, dans un dossier caché réservé à Mon Hub, '
+                'Ton compte est gardé dans ton Google Drive (dossier « Mon Hub - compte synchronisé »), '
                 'chiffré avec ton mot de passe Mon Hub : ni Google ni personne d\'autre ne peut le lire.',
               ),
             ),
@@ -216,6 +316,7 @@ class AccountSyncSection extends StatelessWidget {
                 onPressed: s.busy ? null : () => _enable(context),
               ),
             ),
+            _mainPc(context, s),
           ],
         );
       }
@@ -254,6 +355,7 @@ class AccountSyncSection extends StatelessWidget {
                 onPressed: () => _reconnect(context),
               ),
             ),
+          if (!s.needsPassword) _mainPc(context, s),
           const ListTile(
             leading: Icon(Icons.add_to_queue_rounded),
             title: Text('Sur ton autre appareil'),
@@ -289,7 +391,12 @@ class JoinAccountView extends StatefulWidget {
 
 class _JoinAccountViewState extends State<JoinAccountView> {
   final _pass = TextEditingController();
+  final _login = TextEditingController();
   String? _mail;
+
+  /// Demande envoyée à l'autre PC : on guette l'arrivée du compte.
+  String? _asked;
+  Timer? _poll;
   List<CloudCopy>? _copies;
   CloudCopy? _chosen;
   bool _hide = true;
@@ -305,7 +412,9 @@ class _JoinAccountViewState extends State<JoinAccountView> {
 
   @override
   void dispose() {
+    _poll?.cancel();
     _pass.dispose();
+    _login.dispose();
     // Retour (ou fermeture) sans avoir fini : on efface ce qui a été préparé.
     unawaited(AccountSync.instance.cancelJoin());
     super.dispose();
@@ -338,9 +447,29 @@ class _JoinAccountViewState extends State<JoinAccountView> {
     if (!mounted) return;
     setState(() {
       _copies = list;
-      if (list.length == 1) _chosen = list.first;
+      final asked = _asked;
+      if (asked != null) {
+        // Le compte demandé est arrivé.
+        _chosen = list.where((c) => c.login == asked).firstOrNull;
+        if (_chosen != null) _poll?.cancel();
+      } else if (list.length == 1) {
+        _chosen = list.first;
+      }
     });
   }
+
+  /// Dépose la demande dans le Drive ; Mon Hub, ouvert sur l'autre PC, y
+  /// répond tout seul.
+  Future<void> _ask() => _run(() async {
+    final login = AppSession.normalize(_login.text);
+    await AccountSync.requestCopy(_mail!, login);
+    _asked = login;
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_busy) unawaited(_find().catchError((Object _) {}));
+    });
+    if (mounted) setState(() {});
+  });
 
   Future<void> _join() => _run(() async {
     final copy = _chosen;
@@ -359,8 +488,8 @@ class _JoinAccountViewState extends State<JoinAccountView> {
     if (_mail == null) {
       children.addAll([
         Text(
-          'Sur ton autre appareil, active d\'abord Réglages → Mes appareils → « Activer la '
-          'synchronisation ». Ensuite, connecte ici le même compte Google.',
+          'Connecte le compte Google que tu utilises dans Mon Hub sur ton PC principal. Si la '
+          'synchronisation n\'y est pas activée, tu pourras lui demander ton compte à distance.',
           textAlign: TextAlign.center,
           style: muted,
         ),
@@ -372,19 +501,77 @@ class _JoinAccountViewState extends State<JoinAccountView> {
           onPressed: _busy ? null : _google,
         ),
       ]);
+    } else if (_asked != null && chosen == null) {
+      children.addAll([
+        const Icon(Icons.mark_email_read_rounded, size: 40),
+        const SizedBox(height: 8),
+        Text(
+          'Demande envoyée pour « $_asked ». Dès que Mon Hub, ouvert sur ton PC principal, la voit, '
+          'il envoie ton compte ici tout seul. En général moins de 10 minutes ; jusqu\'à 1 heure '
+          's\'il doit d\'abord se mettre à jour. Laisse cette page ouverte.',
+          textAlign: TextAlign.center,
+          style: muted,
+        ),
+        const SizedBox(height: 16),
+        const LinearProgressIndicator(),
+        const SizedBox(height: 12),
+        Text(
+          'Il faut que ton PC principal soit allumé, avec Mon Hub ouvert sur ton compte et ce compte '
+          'Google ($_mail) connecté dans Mon Hub.',
+          textAlign: TextAlign.center,
+          style: muted.copyWith(fontSize: 12),
+        ),
+        TextButton.icon(
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Vérifier maintenant'),
+          onPressed: _busy ? null : () => _run(_find),
+        ),
+      ]);
     } else if (copies == null || copies.isEmpty) {
       children.addAll([
         Text(
           copies == null
               ? 'Recherche dans le Drive de $_mail…'
-              : 'Aucun compte Mon Hub dans le Drive de $_mail. Sur ton autre appareil : Réglages → '
-                    'Mes appareils → « Activer la synchronisation » (avec ce compte Google), puis réessaie.',
+              : 'Ton compte n\'est pas encore dans le Drive de $_mail.',
           textAlign: TextAlign.center,
           style: muted,
         ),
-        const SizedBox(height: 16),
-        FilledButton.tonalIcon(
-          icon: _busy ? _spinner : const Icon(Icons.refresh_rounded),
+        if (copies != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            'Pas accès à ton PC principal ? S\'il est allumé avec Mon Hub ouvert (et ce compte Google '
+            'connecté dans Mon Hub), il peut t\'envoyer ton compte tout seul :',
+            textAlign: TextAlign.center,
+            style: muted,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _login,
+            autofillHints: const [AutofillHints.username],
+            onSubmitted: (_) => _busy ? null : _ask(),
+            decoration: const InputDecoration(
+              labelText: 'Ton identifiant Mon Hub',
+              prefixIcon: Icon(Icons.alternate_email_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            icon: _busy ? _spinner : const Icon(Icons.send_to_mobile_rounded),
+            label: const Text('Demander mon compte à mon PC principal'),
+            onPressed: _busy ? null : _ask,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'PC principal éteint ou inaccessible ? Reviens en arrière et crée ton compte ici avec le même '
+            'identifiant et le même mot de passe, puis Réglages → Mes appareils → « Récupérer les données '
+            'de mon PC principal » : tes anciennes données arriveront dès qu\'il sera rallumé.',
+            textAlign: TextAlign.center,
+            style: muted.copyWith(fontSize: 12),
+          ),
+        ],
+        TextButton.icon(
+          icon: const Icon(Icons.refresh_rounded),
           label: const Text('Réessayer'),
           onPressed: _busy ? null : () => _run(_find),
         ),

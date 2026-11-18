@@ -71,7 +71,7 @@ Au démarrage, Mon Hub fait confiance aux certificats de Windows (dont ceux d'un
 * **Aucun serveur** : Mon Hub ne parle qu'aux services que tu utilises (École Directe, Spotify, Google…), directement depuis ton appareil. Le créateur de l'appli n'a accès à aucune donnée de personne.
 * **Mots de passe et jetons** : dans le coffre du système (Gestionnaire d'identification Windows, Trousseau, Keystore Android).
 * **Données locales chiffrées** : historiques de Clicky, journal, carnet, routines sont chiffrés en AES-256-GCM, avec une clé par compte rangée dans le coffre du système (`lib/core/vault.dart`).
-* **Compte sur plusieurs appareils** (si tu l'actives) : une copie de ton compte est gardée dans **ton** Google Drive, dans le dossier caché réservé à Mon Hub, chiffrée avec ton mot de passe Mon Hub (PBKDF2 + AES-256-GCM) : ni Google ni le créateur de l'appli ne peuvent la lire (`lib/core/account_sync.dart`).
+* **Compte sur plusieurs appareils** (si tu l'actives) : une copie de ton compte est gardée dans **ton** Google Drive, dans le dossier « Mon Hub - compte synchronisé », chiffrée avec ton mot de passe Mon Hub (PBKDF2 + AES-256-GCM) : ni Google ni le créateur de l'appli ne peuvent la lire (`lib/core/account_sync.dart`).
 * **Export protégé** par un mot de passe (PBKDF2 + AES-256-GCM) : le fichier est illisible sans lui.
 * **Connexion Mon Hub** : après 5 mots de passe faux, attente de plus en plus longue (jusqu'à 15 min).
 
@@ -127,7 +127,9 @@ Mon Hub vérifie tes comptes toutes les 2 minutes (réglable) et affiche une ale
 
 ## Configurer une seule fois pour tous tes appareils
 
-Sur le premier appareil : *Réglages → Mes appareils → Activer la synchronisation* (choisis ton compte Google et tape ton mot de passe Mon Hub). Sur les autres : page de connexion → *Retrouver mon compte d'un autre appareil* → le même compte Google → ton mot de passe Mon Hub. Modules, réglages, connexions, historiques, carnet et révisions arrivent tout seuls, puis restent synchronisés (le plus récent gagne, réglage par réglage). Ce qui est propre à un PC (widgets posés sur le bureau, raccourcis) reste sur ce PC.
+Sur le premier appareil : *Réglages → Mes appareils → Activer la synchronisation* (choisis ton compte Google). Sur les autres : page de connexion → *Retrouver mon compte d'un autre appareil* → le même compte Google → ton mot de passe Mon Hub. Modules, réglages, connexions, historiques, carnet et révisions arrivent tout seuls, puis restent synchronisés (le plus récent gagne, réglage par réglage). Ce qui est propre à un PC (widgets posés sur le bureau, raccourcis) reste sur ce PC.
+
+**Pas accès au premier PC ?** Sur le nouveau : *Retrouver mon compte d'un autre appareil* → ton compte Google → *Demander mon compte à mon PC principal*. Si Mon Hub est ouvert sur le PC principal (avec ce compte Google connecté), il voit la demande et envoie le compte tout seul, chiffré, en quelques minutes. PC principal éteint ? Recrée ton compte avec le même identifiant et le même mot de passe, puis *Réglages → Mes appareils → Récupérer les données de mon PC principal* : ses données arrivent et se fusionnent dès qu'il est rallumé.
 
 Sans internet : *Réglages → Mes appareils → Sans internet : passer par un fichier* (exporter / importer). Le fichier contient tes identifiants : ne le partage pas.
 

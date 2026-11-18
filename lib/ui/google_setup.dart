@@ -164,6 +164,38 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
               onPressed: busy ? null : _connect,
             ),
           if (!builtIn) ...[
+            // L'appli Google est dans le compte Google, pas sur le PC : sur un
+            // nouveau PC, pas besoin de la recréer (Google ne remontre plus un
+            // code secret, mais on peut en ajouter un).
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: theme.colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tu as déjà créé l\'appli Google (sur un autre PC) ?',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Ne refais pas les 5 étapes : elle est dans ton compte Google. Ouvre la liste de tes clients '
+                      '→ clique sur ton client « Mon Hub » → « Ajouter un code secret » → copie l\'ID client et le '
+                      'nouveau code secret, puis colle-les plus bas dans « Ou colle l\'ID et le code secret à la '
+                      'main ». Ne désactive pas l\'ancien code : ton autre PC l\'utilise encore.',
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.tonalIcon(
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Ouvrir mes clients Google'),
+                      onPressed: () => Browser.open('https://console.cloud.google.com/auth/clients'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             for (final (title, text, url) in GoogleSetupPage.steps)
               Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
