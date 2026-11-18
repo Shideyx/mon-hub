@@ -179,8 +179,17 @@ class DocsModule extends HubModule {
   @override
   ApiAccess get access => ApiAccess.official;
 
+  /// Google Docs s'ouvre dans sa propre fenêtre (Chrome ou Edge en mode
+  /// appli) plutôt que dans Mon Hub : plus fluide, aucun souci de clic.
+  bool get ownWindow => store.getJson<bool>('window') == true;
+  Future<void> setOwnWindow(bool v) async {
+    await store.setJson('window', v);
+    store.changed();
+  }
+
   /// Ouvre Google Docs (un document, l'accueil, un nouveau) dans Mon Hub.
   Future<void> open(BuildContext? context, String url) async {
+    if (ownWindow && webLoginSupported && await Browser.openAppWindow(url)) return;
     final ctx = context ?? await hubDialogContext();
     if (ctx == null || !ctx.mounted) throw 'Mon Hub n\'est pas affiché';
     if (!webLoginSupported) {
@@ -444,7 +453,8 @@ class _Thumb extends StatelessWidget {
 }
 
 /// Le vrai Google Docs dans Mon Hub (ton compte Google, tes documents,
-/// tous les outils de Google : mise en page, commentaires, partage…).
+/// tous les outils de Google : mise en page, commentaires, partage…), ou
+/// dans sa propre fenêtre si tu préfères (plus fluide).
 class GoogleDocsPage extends StatefulWidget {
   const GoogleDocsPage({super.key, required this.module, required this.url});
   final DocsModule module;
@@ -456,12 +466,45 @@ class GoogleDocsPage extends StatefulWidget {
 
 class _GoogleDocsPageState extends State<GoogleDocsPage> {
   InAppWebViewController? _c;
+  late bool _window = widget.module.ownWindow && webLoginSupported;
+  bool _tipClosed = false;
 
-  Future<void> _go(String url) async => _c?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+  DocsModule get m => widget.module;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_window) unawaited(Browser.openAppWindow(widget.url));
+  }
+
+  Future<void> _go(String url) async {
+    if (_window) {
+      await Browser.openAppWindow(url);
+      return;
+    }
+    await _c?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+  }
+
+  /// Passe le document ouvert dans sa propre fenêtre.
+  Future<void> _popOut({bool always = false}) async {
+    final url = '${await _c?.getUrl() ?? widget.url}';
+    if (always) await m.setOwnWindow(true);
+    final ok = await Browser.openAppWindow(url);
+    if (!mounted) return;
+    if (!ok) {
+      showError(context, 'Impossible d\'ouvrir une fenêtre Chrome ou Edge');
+      return;
+    }
+    if (always) {
+      setState(() => _window = true);
+    } else {
+      Navigator.maybePop(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final m = widget.module;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -488,27 +531,119 @@ class _GoogleDocsPageState extends State<GoogleDocsPage> {
             icon: const Icon(Icons.folder_open_rounded),
             onPressed: () => _go(GoogleDocs.home),
           ),
-          IconButton(
-            tooltip: 'Ouvrir dans Chrome',
-            icon: const Icon(Icons.open_in_new_rounded),
-            onPressed: () async => Browser.open('${await _c?.getUrl() ?? widget.url}'),
-          ),
+          if (!_window) ...[
+            IconButton(
+              tooltip: 'Recharger',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: () => _c?.reload(),
+            ),
+            IconButton(
+              tooltip: 'Ouvrir dans sa propre fenêtre (plus fluide)',
+              icon: const Icon(Icons.open_in_new_rounded),
+              onPressed: _popOut,
+            ),
+          ],
           const SizedBox(width: 6),
         ],
       ),
       body: Column(
         children: [
           const _OldDocsBanner(),
+          if (!_window && !_tipClosed && webLoginSupported)
+            Material(
+              color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.6),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.speed_rounded, size: 18),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Ça rame ou les clics ne répondent pas bien ? Google Docs marche mieux dans sa propre fenêtre.',
+                      ),
+                    ),
+                    TextButton(onPressed: () => _popOut(always: true), child: const Text('Toujours en fenêtre')),
+                    IconButton(
+                      tooltip: 'Fermer',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () => setState(() => _tipClosed = true),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
-            child: webLoginSupported
-                ? HubWebView(url: widget.url, desktopUserAgent: true, onController: (c) => _c = c)
-                : EmptyHint(
+            child: !webLoginSupported
+                ? EmptyHint(
                     'Google Docs s\'ouvre dans ton navigateur sur cet appareil.',
                     icon: Icons.description_rounded,
                     action: ('Ouvrir Google Docs', () => Browser.open(widget.url)),
-                  ),
+                  )
+                : _window
+                    ? _WindowMode(
+                        onReopen: () => Browser.openAppWindow(widget.url),
+                        onInside: () async {
+                          await m.setOwnWindow(false);
+                          if (mounted) setState(() => _window = false);
+                        },
+                      )
+                    : HubWebView(
+                        url: widget.url,
+                        desktopUserAgent: true,
+                        // Le bouton flottant cachait « Partager » de Google
+                        // Docs : « Recharger » est dans la barre du haut.
+                        reloadButton: false,
+                        sameSiteInPlace: true,
+                        onController: (c) => _c = c,
+                      ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Google Docs est ouvert dans sa propre fenêtre.
+class _WindowMode extends StatelessWidget {
+  const _WindowMode({required this.onReopen, required this.onInside});
+  final VoidCallback onReopen;
+  final VoidCallback onInside;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.open_in_new_rounded, size: 56, color: theme.colorScheme.primary),
+            const SizedBox(height: 12),
+            Text('Google Docs est ouvert dans sa propre fenêtre', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              'C\'est le vrai Google Docs, dans Chrome (ou Edge) : rapide, et tous les clics marchent.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton.icon(
+                  icon: const Icon(Icons.description_rounded),
+                  label: const Text('Rouvrir la fenêtre'),
+                  onPressed: onReopen,
+                ),
+                OutlinedButton(onPressed: onInside, child: const Text('Plutôt dans Mon Hub')),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -562,13 +697,17 @@ class _OldDocsBannerState extends State<_OldDocsBanner> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Lu une seule fois (avant : relu à chaque redessin de la page).
+    unawaited(DocStore.instance.load());
+  }
+
+  @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: DocStore.instance,
-    builder: (context, _) => FutureBuilder(
-      future: DocStore.instance.load(),
-      initialData: DocStore.instance.docs,
-      builder: (context, snap) {
-        final n = (snap.data ?? const []).length;
+    builder: (context, _) {
+        final n = DocStore.instance.docs.length;
         if (n == 0) return const SizedBox.shrink();
         return MaterialBanner(
           leading: const Icon(Icons.history_edu_rounded),
@@ -582,7 +721,6 @@ class _OldDocsBannerState extends State<_OldDocsBanner> {
               TextButton(onPressed: () => GoogleSetupPage.open(context), child: const Text('Connecter Google')),
           ],
         );
-      },
-    ),
+    },
   );
 }

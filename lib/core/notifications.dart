@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'hub_controller.dart';
 import 'module_store.dart';
+import 'freeze_watch.dart';
 
 /// Une alerte produite par un module (nouveau mail, nouveau message…).
 class HubNotification {
@@ -144,6 +145,7 @@ class NotificationCenter extends ChangeNotifier {
 
   Future<void> pollNow() async {
     if (_polling) return;
+    FreezeWatch.note('vérifie les notifications');
     _polling = true;
     try {
       final prefs = ModuleStore.prefs;

@@ -25,6 +25,11 @@ class ToolRouter {
       ['revision_'],
       ['revis', 'carte', 'fiche', 'quiz', 'interroge', 'apprendre', 'memoriser', 'exercice', 'controle', 'minuteur'],
     ),
+    'cours': (
+      ['cours_'],
+      ['compte rendu', 'comptes rendus', 'ecoute le cours', 'ecouter le cours', 'ecoute mon cours', 'enregistre le cours',
+        'prends le cours', 'arrete le cours', 'ce qu on a vu en'],
+    ),
     'carnet': (
       ['carnet_'],
       ['retiens', 'souviens', 'note ca', 'idee', 'tache', 'todo', 'a faire', 'budget', 'depense', 'sport', 'meteo',

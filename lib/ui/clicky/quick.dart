@@ -436,6 +436,34 @@ class QuickAnswers {
       return QuickReply('Je lance « ${yt.group(1)} » sur YouTube.');
     }
 
+    // Écouter un cours en entier, puis le compte rendu.
+    if (has('cours_ecouter')) {
+      final stop = RegExp(
+        r'^(?:arrete|stop|stoppe|termine|finis|fini|coupe) (?:d ecouter |l ecoute (?:du |de )?|l enregistrement (?:du |de )?|d enregistrer )?(?:le |mon |ce )?cours$|'
+        r'^le cours est (?:fini|termine)$|^c est la fin du cours$',
+      ).hasMatch(n);
+      final start = RegExp(
+        r'^(?:ecoute|enregistre|suis) (?:le |mon |ce |tout le )?cours(?: en entier)?(?: (?:et|pour) (?:fais|fait|faire) (?:moi )?(?:un |le )?compte rendu)?$|'
+        r'^(?:fais|fait) (?:moi )?(?:un |le )?compte rendu (?:du|de mon|de ce) cours$|'
+        r'^prends? (?:le cours )?en notes?$|^prends? des notes(?: du cours)?$',
+      ).hasMatch(n);
+      if (stop) {
+        final r = await call('cours_arreter', {});
+        if (r is Map && r['ok'] == false) return QuickReply('${r['message'] ?? 'Je n\'écoutais pas de cours.'}');
+        return const QuickReply('Cours terminé : je finis la transcription et je rédige ton compte rendu.');
+      }
+      if (start) {
+        final r = await call('cours_ecouter', {});
+        if (r is Map && r['ok'] == false) return QuickReply('${r['message'] ?? 'Impossible d\'écouter le cours.'}');
+        final subject = r is Map ? '${r['matiere'] ?? ''}' : '';
+        final end = r is Map ? '${r['fin'] ?? ''}' : '';
+        return QuickReply(
+          'Je t\'écoute${subject.isEmpty ? '' : ' en $subject'} : je prends tout le cours en notes'
+          '${end.isEmpty ? '' : ' jusqu\'à $end'}. Dis « arrête le cours » à la fin et je te fais le compte rendu.',
+        );
+      }
+    }
+
     // Nouveau document.
     if (has('doc_nouveau') &&
         RegExp(r'^(?:cree|ouvre|fais|commence|nouveau)(?: moi)?(?: un)?(?: nouveau)? (?:document|doc|google doc|word)(?: vierge)?$').hasMatch(n)) {

@@ -18,6 +18,7 @@ import 'settings_page.dart';
 import 'clicky/win.dart';
 import 'motion.dart';
 import 'widgets.dart';
+import '../core/freeze_watch.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key, required this.controller, required this.notifications, this.onOpen});
@@ -394,6 +395,7 @@ class _ModuleCardState extends State<ModuleCard> {
 
   void _open(BuildContext context) {
     final m = widget.module;
+    FreezeWatch.note('ouvre ${m.name}');
     widget.onOpen != null
         ? widget.onOpen!(m)
         : Navigator.push(context, MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)));

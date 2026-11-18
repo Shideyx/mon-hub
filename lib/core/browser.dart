@@ -40,6 +40,34 @@ class Browser {
     return null;
   }
 
+  /// Où est installé Edge (toujours là sur Windows 10/11).
+  static String? edgePath() {
+    if (kIsWeb || !Platform.isWindows) return null;
+    final env = Platform.environment;
+    for (final base in [env['ProgramFiles(x86)'], env['ProgramFiles']]) {
+      if (base == null) continue;
+      final p = '$base\\Microsoft\\Edge\\Application\\msedge.exe';
+      if (File(p).existsSync()) return p;
+    }
+    return null;
+  }
+
+  /// Ouvre une page web dans **sa propre fenêtre**, sans barre d'adresse,
+  /// comme une appli (Chrome, sinon Edge, en mode « --app ») : le site
+  /// tourne dans le vrai navigateur, donc vite et sans souci de clics.
+  static Future<bool> openAppWindow(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) return false;
+    for (final exe in [if (choice == 'chrome') chromePath(), edgePath(), chromePath()]) {
+      if (exe == null) continue;
+      try {
+        await Process.start(exe, ['--app=$uri'], mode: ProcessStartMode.detached);
+        return true;
+      } catch (_) {}
+    }
+    return open(url);
+  }
+
   /// Ouvre un lien. Les pages web vont dans Chrome ; le reste (spotify:,
   /// ms-settings:, fichiers…) dans l'appli qui convient.
   static Future<bool> open(String url) async {

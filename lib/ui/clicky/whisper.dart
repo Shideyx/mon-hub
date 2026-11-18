@@ -252,7 +252,7 @@ class Whisper {
   }
 
   /// Transcrit un fichier WAV (16 kHz mono) en texte.
-  static Future<String> transcribe(String wav, {String lang = 'fr'}) async {
+  static Future<String> transcribe(String wav, {String lang = 'fr', Duration timeout = const Duration(seconds: 90)}) async {
     final exe = await cli();
     final model = await installedModel();
     if (exe == null || model == null) throw 'Whisper n\'est pas installé';
@@ -282,7 +282,7 @@ class Whisper {
     final out = await p.stdout
         .transform(const Utf8Decoder(allowMalformed: true))
         .join()
-        .timeout(const Duration(seconds: 90), onTimeout: () {
+        .timeout(timeout, onTimeout: () {
           p.kill();
           throw 'Whisper met trop de temps (essaie le modèle « Rapide »)';
         });
@@ -356,7 +356,12 @@ class GeminiTranscriber {
 
   static const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
 
-  static Future<String> transcribe(String wav, String key, {http.Client? client}) async {
+  static Future<String> transcribe(
+    String wav,
+    String key, {
+    http.Client? client,
+    Duration timeout = const Duration(seconds: 40),
+  }) async {
     if (key.trim().isEmpty) throw 'Pas de clé Gemini';
     final audio = base64Encode(await File(wav).readAsBytes());
     final c = client ?? http.Client();
@@ -386,7 +391,7 @@ class GeminiTranscriber {
                   'generationConfig': {'temperature': 0},
                 }),
               )
-              .timeout(const Duration(seconds: 40));
+              .timeout(timeout);
           if (r.statusCode == 404) {
             last = 'modèle $model indisponible';
             continue;

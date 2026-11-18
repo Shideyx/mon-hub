@@ -64,6 +64,9 @@ import 'wake.dart';
 import 'whisper.dart';
 import 'mic_test.dart' show openMicFix;
 import 'win.dart';
+import '../../core/freeze_watch.dart';
+import 'course_listener.dart';
+import 'course_page.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -1579,13 +1582,39 @@ class ClickyController extends ChangeNotifier {
   /// Affiche un petit message dans la boîte.
   void showStatus(String s) {
     status = s;
+    // Il avance : le garde-fou repart de zéro.
+    _armStuck(state);
     panelOpen = true;
     onInteractive?.call(true);
     notifyListeners();
   }
 
+  /// Garde-fou : Clicky resté coincé sur « j'écoute » ou « je réfléchis »
+  /// (réseau qui ne répond plus, micro bloqué…) n'acceptait plus rien. Sans
+  /// nouvelle pendant trop longtemps, il se débloque tout seul.
+  Timer? _stuck;
+  void _armStuck(ClickyState s) {
+    _stuck?.cancel();
+    final limit = switch (s) {
+      ClickyState.listening => const Duration(minutes: 2),
+      ClickyState.thinking => const Duration(minutes: 4),
+      ClickyState.pointing => const Duration(minutes: 3),
+      _ => null,
+    };
+    if (limit == null) return;
+    _stuck = Timer(limit, () {
+      if (state != s) return;
+      ErrorLog.record('Clicky est resté bloqué sur « ${s.name} » ($status)', StackTrace.current, where: 'Clicky');
+      unawaited(
+        cancel().then((_) => _set(ClickyState.idle, status: 'Je m\'étais coincé : c\'est reparti, redemande-moi.')),
+      );
+    });
+  }
+
   void _set(ClickyState s, {String? status, String? reply}) {
+    _armStuck(s);
     state = s;
+    FreezeWatch.note('Clicky : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
     if (status != null) this.status = status;
     if (reply != null) this.reply = reply;
     if (s != ClickyState.idle) {
@@ -1594,6 +1623,64 @@ class ClickyController extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Écouter un cours en entier et en faire le compte rendu.
+  List<HubTool> get courseTools => [
+    HubTool(
+      name: 'cours_ecouter',
+      description:
+          'Clicky écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
+          'rendu à la fin. Matière et heure de fin trouvées dans l\'emploi du temps si possible.',
+      params: {'matiere': ('string', 'Matière ou thème (facultatif)')},
+      run: (a) async {
+        final l = CourseListener.instance;
+        if (l.recording) return {'ok': true, 'deja': true, 'matiere': l.current?.subject};
+        final lesson = await currentLesson();
+        final subject = '${a['matiere'] ?? ''}'.trim().isNotEmpty ? '${a['matiere']}'.trim() : (lesson?.$1 ?? '');
+        final err = await l.start(subject: subject, stopAt: lesson?.$2);
+        if (err != null) return {'ok': false, 'message': err};
+        unawaited(CoursePage.show());
+        return {
+          'ok': true,
+          'matiere': subject,
+          if (lesson != null) 'fin': '${lesson.$2.hour} h ${lesson.$2.minute.toString().padLeft(2, '0')}',
+        };
+      },
+    ),
+    HubTool(
+      name: 'cours_arreter',
+      description: 'Arrête l\'écoute du cours et rédige le compte rendu (affiché dans Mon Hub).',
+      run: (_) async {
+        final l = CourseListener.instance;
+        if (!l.recording) return {'ok': false, 'message': 'Je n\'écoutais pas de cours.'};
+        unawaited(l.stop().then((n) {
+          if (n != null && n.done) {
+            notify?.call('Compte rendu prêt', n.title);
+            unawaited(CoursePage.show());
+          }
+        }));
+        return {'ok': true};
+      },
+    ),
+    HubTool(
+      name: 'cours_comptes_rendus',
+      description: 'Les comptes rendus des cours écoutés par Clicky (les plus récents d\'abord).',
+      params: {'recherche': ('string', 'Matière ou mot (facultatif)')},
+      run: (a) async {
+        final q = '${a['recherche'] ?? ''}'.toLowerCase().trim();
+        final all = await CourseListener.instance.list();
+        return [
+          for (final n in all.where((n) => q.isEmpty || '${n.subject} ${n.summary}'.toLowerCase().contains(q)).take(5))
+            {
+              'matiere': n.title,
+              'date': n.start,
+              'minutes': n.length.inMinutes,
+              'compte_rendu': n.summary.length > 6000 ? '${n.summary.substring(0, 6000)}…' : n.summary,
+            },
+        ];
+      },
+    ),
+  ];
 
   // ---------- Historique (une conversation par appli) ----------
 
@@ -1765,6 +1852,7 @@ class ClickyController extends ChangeNotifier {
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
     if (_voicePlatform) ...repairTools,
+    if (hub != null && toolsOverride == null && CourseListener.supported) ...courseTools,
     if (pcControl != 'off') ...PcControl.tools(),
     // L'assistant personnel vit dans Mon Hub (qui a les modules).
     if (hub != null && toolsOverride == null) ...Assistant.instance.tools,

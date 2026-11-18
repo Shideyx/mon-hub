@@ -185,3 +185,31 @@
   fichier reste dans « Sans internet ». Toujours **aucun serveur à nous**.
 - Animations : `ui/clicky/alive.dart` (`ClickyBounce` : rebond à chaque état, halo en réflexion, saut de joie, coucou
   rare ; rien en boucle au repos), cartes de l'accueil soulevées au survol, 👋 qui salue une fois.
+- **v1.50** — Pièces jointes **vues dans Mon Hub** : `ui/file_viewer.dart` (`FileViewer.open(context, nom, chargeur)` :
+  PDF et audio/vidéo par WebView2 en `file://` (dossier temporaire `MonHub-apercus`, effacé après 1 j), photos,
+  texte, Word → texte (`DocFormat` dans un Isolate), sinon « Ouvrir avec l'appli du PC » (`SafeOpen`, accord si
+  `risky`) ; bouton « Résumer » = `FileViewer.summarize` (Gemini lit les PDF) ; `AttachmentChip`). Devoirs ED :
+  `EdHomework.files` (`EdClient.homeworkFiles` : `aFaire.documents`, `ressourceDocuments`, `contenuDeSeance.documents`,
+  type `FICHIER_CDT`) + `lesson` (fait en classe) ; outil `ecole_fichier_lire`. Messages / cloud / documents ED
+  s'ouvrent dans la visionneuse. Mails : `MailModule.readMail` → `MailContent` + `attachmentsOf` (page de lecture
+  Stateful : plus de reconnexion IMAP à chaque redessin).
+- Google Docs plus fluide : `HubWebView` (progression en `ValueNotifier` = le navigateur n'est plus reconstruit à chaque
+  %, réglages créés une fois, vérif « page blanche » légère en `textContent`, `reloadButton: false` pour ne plus cacher
+  « Partager », `sameSiteInPlace` : un lien du même site s'ouvre ici, `_PopupWindow` avec titre + « ouvrir dans le
+  navigateur »), identité Chrome = **vraie version du moteur** (`desktopUserAgent`, `WebViewEnvironment.getAvailableVersion`).
+  Mode **fenêtre à part** : `Browser.openAppWindow` (Chrome/Edge `--app=`), `DocsModule.ownWindow` (bandeau « Toujours en
+  fenêtre »).
+- Gels : `core/freeze_watch.dart` (`FreezeWatch` : guetteur dans un Isolate, note « figé » dans `journal-erreurs.log`
+  après 4 s sans battement, avec `FreezeWatch.note(...)` = ce que l'appli faisait ; démarré par `ErrorLog.install`,
+  pas en debug). Photos de Révisions réduites hors du fil (`Photo.toJpeg`). Clicky coincé : `_armStuck` (écoute 2 min,
+  réflexion 4 min sans nouvelle → `cancel()` + message, noté dans le journal).
+- **Écouter un cours** : `ui/clicky/course_listener.dart` (`CourseListener` : micro `record` en WAV 16 kHz par morceaux de
+  4 min, transcrits pendant le cours — Whisper d'abord (`Whisper.transcribe(timeout:)`), sinon `GeminiTranscriber` —,
+  gardés au fur et à mesure dans `comptes-rendus.json` (`_put` par id), arrêt auto à la fin du cours (agenda) ou 4 h,
+  compte rendu `AiText.ask(prompt)`), `ui/clicky/course_page.dart` (`CoursePage`, `CourseNotePage` → Google Doc
+  `doc_creer` / cartes `revision_generer`, `CourseRecLayer` = pastille rouge dans le builder de `HubApp`). Outils
+  `cours_ecouter` / `cours_arreter` / `cours_comptes_rendus` (groupe `cours` du `ToolRouter`), phrases sans IA dans
+  `QuickAnswers` (« écoute le cours », « arrête le cours »). Bouton dans Révisions.
+- Réglages de Clicky **rangés** : `ui/clicky/clicky_settings_page.dart` (`ClickySettingsPage` : recherche, « L'essentiel »,
+  rubriques `ClickySection.all` → `ClickyMoreSettings(section:)` ou `(query:)`), `ClaudeModule.showSettings` = cette page,
+  `ClaudeModule.showBrain` = le cerveau seul. Réglages de Mon Hub : une seule entrée « Réglages de Clicky ».

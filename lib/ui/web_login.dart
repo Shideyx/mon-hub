@@ -6,10 +6,33 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
 import '../core/browser.dart';
+import '../core/freeze_watch.dart';
 
 const _desktopUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-    'Chrome/131.0.0.0 Safari/537.36';
+    'Chrome/142.0.0.0 Safari/537.36';
+
+/// Identité « Chrome de bureau » avec la **vraie** version du moteur (Edge
+/// WebView2 = Chromium) : une version figée vieillit, et Google Docs finit
+/// par croire que le navigateur est trop ancien (fonctions coupées, bandeau).
+String desktopUserAgent([String? engineVersion]) {
+  final major = RegExp(r'^(\d{2,4})\.').firstMatch(engineVersion ?? '')?.group(1);
+  if (major == null) return _desktopUa;
+  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+      'Chrome/$major.0.0.0 Safari/537.36';
+}
+
+String? _engineUa;
+Future<String>? _engineUaLoading;
+
+/// La version du moteur, demandée une seule fois.
+Future<String> _loadEngineUa() => _engineUaLoading ??= () async {
+  String? v;
+  try {
+    if (!kIsWeb && Platform.isWindows) v = await WebViewEnvironment.getAvailableVersion();
+  } catch (_) {}
+  return _engineUa = desktopUserAgent(v);
+}();
 
 /// Le navigateur intégré existe sur Windows, Android, iPhone et Mac.
 /// Sur Linux, on retombe sur la saisie manuelle.
@@ -233,9 +256,21 @@ class HubWebView extends StatefulWidget {
     this.desktopUserAgent = false,
     this.onController,
     this.onTitleChanged,
+    this.reloadButton = true,
+    this.sameSiteInPlace = false,
   });
   final String url;
   final bool desktopUserAgent;
+
+  /// Le petit bouton « Recharger » flottant en haut à droite. À couper quand
+  /// la page a ses propres boutons à cet endroit (Google Docs : « Partager »)
+  /// et que l'écran a déjà « Recharger » dans sa barre.
+  final bool reloadButton;
+
+  /// Un lien du même site qui veut s'ouvrir dans un nouvel onglet s'ouvre
+  /// ici (Google Docs : « Nouveau document », « Ouvrir dans un nouvel
+  /// onglet ») au lieu d'une fenêtre sans boutons.
+  final bool sameSiteInPlace;
 
   /// Le titre de la page a changé (ex. « (2) Instagram » : 2 non lus).
   final void Function(String? title)? onTitleChanged;
@@ -249,12 +284,19 @@ class HubWebView extends StatefulWidget {
 
 class _HubWebViewState extends State<HubWebView> {
   InAppWebViewController? _c;
-  double _progress = 0;
+
+  /// La barre de chargement : seule elle se redessine pendant le chargement
+  /// (avant : toute la page, navigateur compris, à chaque pourcent).
+  final _progress = ValueNotifier<double>(0);
   bool _blank = false;
   Timer? _blankCheck;
+  bool get _wantsUa => widget.desktopUserAgent && !(Platform.isAndroid || Platform.isIOS);
 
-  InAppWebViewSettings get _settings => InAppWebViewSettings(
-    userAgent: widget.desktopUserAgent && !(Platform.isAndroid || Platform.isIOS) ? _desktopUa : null,
+  /// Les réglages ne changent pas : créés une fois.
+  late InAppWebViewSettings _settings = _makeSettings();
+
+  InAppWebViewSettings _makeSettings() => InAppWebViewSettings(
+    userAgent: _wantsUa ? (_engineUa ?? _desktopUa) : null,
     javaScriptEnabled: true,
     thirdPartyCookiesEnabled: true,
     supportMultipleWindows: true,
@@ -265,8 +307,22 @@ class _HubWebViewState extends State<HubWebView> {
     databaseEnabled: true,
   );
 
+  @override
+  void initState() {
+    super.initState();
+    FreezeWatch.note('ouvre la page ${Uri.tryParse(widget.url)?.host ?? ''}');
+    if (_wantsUa && _engineUa == null) {
+      // La première fois, on attend la version du moteur (quelques ms).
+      unawaited(_loadEngineUa().then((_) {
+        if (mounted) setState(() => _settings = _makeSettings());
+      }));
+    }
+  }
+
   /// Après chargement, vérifie que la page n'est pas restée blanche (site qui
-  /// attend une fenêtre de connexion, script bloqué…).
+  /// attend une fenêtre de connexion, script bloqué…). Vérification légère :
+  /// `textContent` ne fait pas recalculer la mise en page (avant :
+  /// `innerText` sur tout un Google Doc, très lourd).
   void _scheduleBlankCheck() {
     _blankCheck?.cancel();
     _blankCheck = Timer(const Duration(seconds: 6), () async {
@@ -274,8 +330,9 @@ class _HubWebViewState extends State<HubWebView> {
       if (c == null || !mounted) return;
       try {
         final n = await c.evaluateJavascript(
-          source: "(document.body ? document.body.innerText.trim().length + "
-              "document.body.querySelectorAll('img,svg,canvas,video,input,button').length : 0)",
+          source: "(function(){var b=document.body;if(!b)return 0;"
+              "if(b.querySelector('img,svg,canvas,video,input,button,iframe,[contenteditable]'))return 1;"
+              "return (b.textContent||'').trim().length>0?1:0;})()",
         );
         final blank = (n is num ? n : num.tryParse('$n') ?? 1) == 0;
         if (mounted && blank != _blank) setState(() => _blank = blank);
@@ -286,8 +343,28 @@ class _HubWebViewState extends State<HubWebView> {
   @override
   void dispose() {
     _blankCheck?.cancel();
+    _c = null;
+    _progress.dispose();
     super.dispose();
   }
+
+  static bool _isLogin(Uri? u) {
+    if (u == null) return true;
+    final h = u.host.toLowerCase();
+    final p = u.path.toLowerCase();
+    return u.toString() == 'about:blank' ||
+        h.isEmpty ||
+        h.startsWith('accounts.') ||
+        h.contains('login') ||
+        h.contains('auth') ||
+        p.contains('oauth') ||
+        p.contains('login') ||
+        p.contains('signin') ||
+        p.contains('/auth');
+  }
+
+  /// Deux adresses du même site (docs.google.com / drive.google.com non).
+  static bool _sameSite(Uri? a, Uri? b) => a != null && b != null && a.host.isNotEmpty && a.host == b.host;
 
   Future<void> _reload() async {
     setState(() => _blank = false);
@@ -313,58 +390,72 @@ class _HubWebViewState extends State<HubWebView> {
       },
       child: Stack(
         children: [
-          InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-            initialSettings: _settings,
-            onWebViewCreated: (c) {
-              _c = c;
-              widget.onController?.call(c);
-            },
-            onProgressChanged: (_, p) => setState(() => _progress = p / 100),
-            onLoadStop: (_, _) => _scheduleBlankCheck(),
-            onTitleChanged: widget.onTitleChanged == null ? null : (_, t) => widget.onTitleChanged!(t),
-            onUpdateVisitedHistory: (_, _, _) => _scheduleBlankCheck(),
-            // Fenêtres « pop-up » (connexion Google, Apple…) : on les ouvre
-            // dans une vraie fenêtre liée à la page, pour que le site reçoive
-            // la réponse (sinon la page restait blanche après connexion).
-            onCreateWindow: (c, action) async {
-              if (!mounted) return false;
-              unawaited(
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    fullscreenDialog: true,
-                    builder: (_) => _PopupWindow(action: action, settings: _settings),
-                  ),
-                ).then((_) => _scheduleBlankCheck()),
-              );
-              return true;
-            },
-            onPermissionRequest: (_, req) async => PermissionResponse(
-              resources: req.resources,
-              action: PermissionResponseAction.GRANT,
-            ),
-          ),
-          if (_progress < 1)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: LinearProgressIndicator(value: _progress, minHeight: 3),
-            ),
-          Positioned(
-            right: 12,
-            top: 12,
-            child: Material(
-              color: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
-              shape: const CircleBorder(),
-              child: IconButton(
-                tooltip: 'Recharger',
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                onPressed: _reload,
+          if (_wantsUa && _engineUa == null)
+            const SizedBox.expand()
+          else
+            InAppWebView(
+              key: const ValueKey('hub-webview'),
+              initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+              initialSettings: _settings,
+              onWebViewCreated: (c) {
+                _c = c;
+                widget.onController?.call(c);
+              },
+              onProgressChanged: (_, p) => _progress.value = p / 100,
+              onLoadStop: (_, _) => _scheduleBlankCheck(),
+              onTitleChanged: widget.onTitleChanged == null ? null : (_, t) => widget.onTitleChanged!(t),
+              onUpdateVisitedHistory: (_, _, _) => _scheduleBlankCheck(),
+              // Fenêtres « pop-up » (connexion Google, Apple…) : on les ouvre
+              // dans une vraie fenêtre liée à la page, pour que le site reçoive
+              // la réponse (sinon la page restait blanche après connexion).
+              onCreateWindow: (c, action) async {
+                if (!mounted) return false;
+                final to = action.request.url;
+                if (widget.sameSiteInPlace && !_isLogin(to) && _sameSite(to, await c.getUrl())) {
+                  // false : le lien s'ouvre ici même.
+                  return false;
+                }
+                if (!context.mounted) return false;
+                unawaited(
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      fullscreenDialog: true,
+                      builder: (_) => _PopupWindow(action: action, settings: _settings, login: _isLogin(to)),
+                    ),
+                  ).then((_) => _scheduleBlankCheck()),
+                );
+                return true;
+              },
+              onPermissionRequest: (_, req) async => PermissionResponse(
+                resources: req.resources,
+                action: PermissionResponseAction.GRANT,
               ),
             ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ValueListenableBuilder<double>(
+              valueListenable: _progress,
+              builder: (context, p, _) =>
+                  p < 1 ? LinearProgressIndicator(value: p, minHeight: 3) : const SizedBox.shrink(),
+            ),
           ),
+          if (widget.reloadButton)
+            Positioned(
+              right: 12,
+              top: 12,
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  tooltip: 'Recharger',
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  onPressed: _reload,
+                ),
+              ),
+            ),
           if (_blank)
             Positioned(
               left: 16,
@@ -397,19 +488,48 @@ class _HubWebViewState extends State<HubWebView> {
   }
 }
 
-/// Fenêtre ouverte par un site (connexion Google…), reliée à la page d'origine.
-class _PopupWindow extends StatelessWidget {
-  const _PopupWindow({required this.action, required this.settings});
+/// Fenêtre ouverte par un site (connexion Google, ou un lien), reliée à la
+/// page d'origine.
+class _PopupWindow extends StatefulWidget {
+  const _PopupWindow({required this.action, required this.settings, required this.login});
   final CreateWindowAction action;
   final InAppWebViewSettings settings;
+  final bool login;
+
+  @override
+  State<_PopupWindow> createState() => _PopupWindowState();
+}
+
+class _PopupWindowState extends State<_PopupWindow> {
+  late String _title = widget.login ? 'Connexion' : (widget.action.request.url?.host ?? 'Lien');
+  InAppWebViewController? _c;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
+      appBar: AppBar(
+        title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          if (!widget.login)
+            IconButton(
+              tooltip: 'Ouvrir dans le navigateur',
+              icon: const Icon(Icons.open_in_new_rounded),
+              onPressed: () async {
+                final u = await _c?.getUrl() ?? widget.action.request.url;
+                if (u != null) await Browser.open(u.toString());
+              },
+            ),
+        ],
+      ),
       body: InAppWebView(
-        windowId: action.windowId,
-        initialSettings: settings,
+        windowId: widget.action.windowId,
+        initialSettings: widget.settings,
+        onWebViewCreated: (c) => _c = c,
+        onTitleChanged: widget.login
+            ? null
+            : (_, t) {
+                if (mounted && t != null && t.trim().isNotEmpty) setState(() => _title = t.trim());
+              },
         onCloseWindow: (_) {
           if (context.mounted) Navigator.maybePop(context);
         },
