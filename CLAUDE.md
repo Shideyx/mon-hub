@@ -269,3 +269,9 @@
   → `doForMe` (Clicky partout passe par l'outil `clicky_a_ma_place` de Mon Hub), `confirmBrowser`. Sécurité :
   `nav_cliquer/ecrire/touche/fermer` = actions à autoriser (`isWriteAction`), sauf pendant une tâche (`trusted`),
   `nav_lire/onglets` = données extérieures (`PromptShield`). Voir `SECURITY.md`.
+- **Devoirs (v1.55)** : Clicky **fait** les devoirs quand on le lui demande (demande de la personne) — plus de « tu
+  guides sans faire à sa place » : `clickyPersona(helpOnly:)`, `ClickyController.homeworkRules` (énoncé trouvé à l'écran,
+  `ecole_devoirs`, `ecole_fichier_lire mode=enonce` = `FileViewer.summarize(full: true)`, travail complet + « Comment j'ai
+  fait », long → Google Doc). « Fais mes devoirs (de maths pour lundi) » = `homeworkRequest` → `homeworkTask` → tâche
+  de fond `doForMe`. Réglage `helpOnly` (« Aider sans faire à ma place », désactivé par défaut, partagé) remet l'ancien
+  comportement.

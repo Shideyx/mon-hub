@@ -420,11 +420,12 @@ class EcoleDirecteModule extends HubModule {
     HubTool(
       name: 'ecole_fichier_lire',
       description:
-          'Lit un fichier joint à un devoir École Directe (PDF, photo, Word) et en donne l\'essentiel : consignes, '
-          'à rendre, contenu.',
+          'Lit un fichier joint à un devoir École Directe (PDF, photo, Word) : l\'essentiel (consignes, à rendre, '
+          'contenu), ou avec mode=enonce le texte complet de l\'énoncé (pour faire le devoir).',
       params: {
         'matiere': ('string', 'Matière du devoir'),
         'fichier': ('string', 'Nom (ou début du nom) du fichier, facultatif'),
+        'mode': ('string', '« essentiel » (défaut) ou « enonce » (tout le texte)'),
       },
       required: ['matiere'],
       run: (a) async {
@@ -434,15 +435,19 @@ class EcoleDirecteModule extends HubModule {
         final wanted = low(a['fichier']);
         final candidates = [
           for (final h in homework)
-            if (h.files.isNotEmpty && (subject.isEmpty || h.subject.toLowerCase().contains(subject)))
+            if (h.files.isNotEmpty &&
+                (subject.isEmpty ||
+                    h.subject.toLowerCase().contains(subject) ||
+                    GradeMath.matchSubject(subject, [h.subject]) != null))
               for (final f in h.files) f,
         ];
         if (candidates.isEmpty) throw 'Aucun fichier joint aux devoirs de « ${a['matiere']} »';
         final f = candidates.where((f) => wanted.isNotEmpty && f.name.toLowerCase().contains(wanted)).firstOrNull ??
             candidates.first;
         final bytes = await withSession(() => client.attachment(f));
-        final summary = await FileViewer.summarize(f.name, Uint8List.fromList(bytes));
-        return {'fichier': f.name, 'essentiel': summary, if (candidates.length > 1) 'autres_fichiers': [
+        final full = '${a['mode'] ?? ''}'.toLowerCase().startsWith('enonc');
+        final summary = await FileViewer.summarize(f.name, Uint8List.fromList(bytes), full: full);
+        return {'fichier': f.name, full ? 'enonce' : 'essentiel': summary, if (candidates.length > 1) 'autres_fichiers': [
           for (final x in candidates) if (x != f) x.name,
         ]};
       },
