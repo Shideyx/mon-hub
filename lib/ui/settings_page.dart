@@ -19,11 +19,7 @@ import '../core/shortcuts.dart';
 import '../core/updater.dart';
 import '../core/vault.dart';
 import '../core/version.dart';
-import '../modules/claude/claude_module.dart';
-import 'clicky/assistant_view.dart';
-import 'clicky/clicky.dart';
-import 'clicky/mind_page.dart';
-import 'clicky/mic_test.dart';
+import 'clicky/clicky_settings_page.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -167,19 +163,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               onTap: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
             ),
-            section('Assistant personnel'),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
-              title: const Text('Clicky prend les devants'),
-              subtitle: const Text('Rappels de devoirs, conflits, nouvelles réunions, plan de ta journée, objectifs, briefing du matin'),
-              onTap: () => AssistantPage.open(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xFF2B6CFF)),
-              title: const Text('Conscience de Clicky'),
-              subtitle: const Text('Sa personnalité, son humeur, ses souvenirs, et sa façon de vivre sur ton écran'),
-              onTap: () => MindPage.open(context),
-            ),
             section('Rangement'),
             ListTile(
               leading: const Icon(Icons.auto_fix_high_rounded),
@@ -310,47 +293,17 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             section('Clicky'),
-            ListenableBuilder(
-              listenable: ClickyController.instance,
-              builder: (context, _) {
-                final c = ClickyController.instance;
-                return Column(
-                  children: [
-                    SwitchListTile(
-                      secondary: Icon(c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded),
-                      title: const Text('Voix de Clicky'),
-                      subtitle: const Text(
-                        'Désactivée : Clicky répond seulement par écrit, sans parler',
-                      ),
-                      value: c.voice,
-                      onChanged: (v) async {
-                        if (!v) await c.stopSpeaking();
-                        await c.setOption('voice', v);
-                      },
-                    ),
-                    SwitchListTile(
-                      secondary: Icon(c.mic ? Icons.mic_rounded : Icons.mic_off_rounded),
-                      title: const Text('Parler à Clicky au micro'),
-                      subtitle: const Text('Désactivé : Ctrl + Alt ouvre la zone pour écrire'),
-                      value: c.mic,
-                      onChanged: (v) => c.setOption('mic', v),
-                    ),
-                    if (c.mic)
-                      ListTile(
-                        leading: const Icon(Icons.graphic_eq_rounded),
-                        title: const Text('Tester le micro'),
-                        subtitle: const Text('Vérifie que Clicky t\'entend, et règle le souci sinon'),
-                        onTap: () => MicTestDialog.show(context),
-                      ),
-                    ListTile(
-                      leading: const Icon(Icons.auto_awesome_rounded),
-                      title: const Text('Autres réglages de Clicky'),
-                      subtitle: const Text('Cerveau (Claude ou Ollama), Clicky partout…'),
-                      onTap: () => ClaudeModule.showSettings(context),
-                    ),
-                  ],
-                );
-              },
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0x227C5CFF),
+                child: Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
+              ),
+              title: const Text('Réglages de Clicky'),
+              subtitle: const Text(
+                'Tout au même endroit : voix, micro, cerveau, apparence, prend les devants, écouter un cours…',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => ClickySettingsPage.open(context),
             ),
             if (AppShortcuts.supported) ...[
               section('Raccourcis'),

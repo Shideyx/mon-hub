@@ -698,6 +698,7 @@ class EdClient {
       for (final m in (d['data']?['matieres'] as List? ?? [])) {
         final todo = m['aFaire'];
         if (todo == null) continue;
+        final seance = m['contenuDeSeance'] is Map ? m['contenuDeSeance'] as Map : todo['contenuDeSeance'];
         out.add(
           EdHomework(
             '${todo['idDevoir'] ?? '$day${m['matiere']}'}',
@@ -706,10 +707,43 @@ class EdClient {
             decodeContent(todo['contenu'] as String?),
             todo['effectue'] == true,
             m['interrogation'] == true,
+            files: homeworkFiles(todo, seance),
+            lesson: seance is Map ? decodeContent(seance['contenu'] as String?) : '',
           ),
         );
       }
     }
+    return out;
+  }
+
+  /// Les fichiers joints à un devoir (et au contenu de la séance) : sujets,
+  /// fiches, PDF du prof. Téléchargés avec le type `FICHIER_CDT`.
+  static List<EdAttachment> homeworkFiles(Object? todo, Object? seance) {
+    final out = <EdAttachment>[];
+    final seen = <String>{};
+    void add(Object? list) {
+      if (list is! List) return;
+      for (final f in list) {
+        if (f is! Map) continue;
+        final id = f['id'] is int ? f['id'] as int : int.tryParse('${f['id']}');
+        if (id == null || id == 0) continue;
+        final type = '${f['type'] ?? ''}'.trim();
+        if (!seen.add('$id')) continue;
+        out.add(
+          EdAttachment(
+            id,
+            decodeEntities('${f['libelle'] ?? f['name'] ?? 'fichier'}'),
+            type.isEmpty ? 'FICHIER_CDT' : type,
+          ),
+        );
+      }
+    }
+
+    if (todo is Map) {
+      add(todo['documents']);
+      add(todo['ressourceDocuments']);
+    }
+    if (seance is Map) add(seance['documents']);
     return out;
   }
 
@@ -999,13 +1033,28 @@ class EdMessageContent {
 }
 
 class EdHomework {
-  EdHomework(this.id, this.due, this.subject, this.content, this.done, this.isTest);
+  EdHomework(
+    this.id,
+    this.due,
+    this.subject,
+    this.content,
+    this.done,
+    this.isTest, {
+    this.files = const [],
+    this.lesson = '',
+  });
   final String id;
   final DateTime due;
   final String subject;
   final String content;
   final bool done;
   final bool isTest;
+
+  /// Fichiers joints par le prof (PDF, sujets, fiches…).
+  final List<EdAttachment> files;
+
+  /// Ce qui a été fait en classe (contenu de séance), s'il est donné.
+  final String lesson;
 }
 
 class EdGrade {

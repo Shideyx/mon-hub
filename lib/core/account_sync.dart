@@ -16,6 +16,7 @@ import 'hub_files.dart';
 import 'module_store.dart';
 import 'session.dart';
 import 'vault.dart';
+import 'freeze_watch.dart';
 
 /// Ton compte Mon Hub sur tous tes appareils, **sans export**.
 ///
@@ -159,6 +160,7 @@ class AccountSync extends ChangeNotifier {
   /// Fusionne cet appareil avec la copie du Drive (sans jamais lever
   /// d'erreur : elle est gardée dans [error]).
   Future<void> syncNow() async {
+    FreezeWatch.note('synchronise le compte');
     final acc = AppSession.instance.current;
     final mail = email;
     if (acc == null || mail == null || busy) return;

@@ -24,6 +24,7 @@ import 'core/hub_home.dart';
 import 'ui/clicky/assistant_view.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
+import 'ui/clicky/course_page.dart';
 import 'ui/clicky/tutorial.dart';
 import 'ui/google_welcome.dart';
 import 'ui/login_page.dart';
@@ -248,7 +249,11 @@ class _HubAppState extends State<HubApp> {
             child: YouTubeMiniLayer(
               child: DiscordPhoneLayer(
                 // Les propositions de l'assistant personnel (en bas à gauche).
-                child: AssistantLayer(enabled: hub != null, child: child ?? const SizedBox.shrink()),
+                child: AssistantLayer(
+                  enabled: hub != null,
+                  // La pastille « Clicky écoute le cours » (en haut, au milieu).
+                  child: CourseRecLayer(child: child ?? const SizedBox.shrink()),
+                ),
               ),
             ),
           ),

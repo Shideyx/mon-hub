@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Directory, File, Platform;
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';
@@ -8,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import '../../ui/file_viewer.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import 'ed_client.dart';
@@ -342,8 +344,40 @@ class EcoleDirecteModule extends HubModule {
               'contenu': h.content,
               'fait': h.done,
               if (h.isTest) 'controle': true,
+              if (h.files.isNotEmpty) 'fichiers_joints': [for (final f in h.files) f.name],
+              if (h.lesson.trim().isNotEmpty) 'fait_en_classe': h.lesson,
             },
         ];
+      },
+    ),
+    HubTool(
+      name: 'ecole_fichier_lire',
+      description:
+          'Lit un fichier joint à un devoir École Directe (PDF, photo, Word) et en donne l\'essentiel : consignes, '
+          'à rendre, contenu.',
+      params: {
+        'matiere': ('string', 'Matière du devoir'),
+        'fichier': ('string', 'Nom (ou début du nom) du fichier, facultatif'),
+      },
+      required: ['matiere'],
+      run: (a) async {
+        await load();
+        String low(Object? v) => '${v ?? ''}'.toLowerCase().trim();
+        final subject = low(a['matiere']);
+        final wanted = low(a['fichier']);
+        final candidates = [
+          for (final h in homework)
+            if (h.files.isNotEmpty && (subject.isEmpty || h.subject.toLowerCase().contains(subject)))
+              for (final f in h.files) f,
+        ];
+        if (candidates.isEmpty) throw 'Aucun fichier joint aux devoirs de « ${a['matiere']} »';
+        final f = candidates.where((f) => wanted.isNotEmpty && f.name.toLowerCase().contains(wanted)).firstOrNull ??
+            candidates.first;
+        final bytes = await withSession(() => client.attachment(f));
+        final summary = await FileViewer.summarize(f.name, Uint8List.fromList(bytes));
+        return {'fichier': f.name, 'essentiel': summary, if (candidates.length > 1) 'autres_fichiers': [
+          for (final x in candidates) if (x != f) x.name,
+        ]};
       },
     ),
     HubTool(
@@ -753,13 +787,37 @@ class EcoleDirecteModule extends HubModule {
             ),
             title: Text(h.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(
-              h.content.split('\n').first,
+              [
+                h.content.split('\n').first,
+                if (h.files.isNotEmpty) '📎 ${h.files.length} fichier${h.files.length > 1 ? 's' : ''}',
+              ].where((x) => x.trim().isNotEmpty).join('  ·  '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            // Avec des fichiers joints, le devoir s'ouvre déjà déplié.
+            initiallyExpanded: h.files.isNotEmpty && !h.done,
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
-            children: [SelectableText(h.content)],
+            children: [
+              SelectableText(h.content),
+              if (h.files.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final f in h.files)
+                      AttachmentChip(name: f.name, load: () => withSession(() => client.attachment(f))),
+                  ],
+                ),
+              ],
+              if (h.lesson.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('En classe', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                SelectableText(h.lesson, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ],
           ),
         ),
       );
@@ -1000,10 +1058,19 @@ class _MessagePageState extends State<_MessagePage> {
                           for (final f in d.files)
                             ListTile(
                               contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.attach_file_rounded),
+                              leading: Icon(FileViewer.iconFor(f.name)),
                               title: Text(f.name),
-                              trailing: const Icon(Icons.download_rounded),
-                              onTap: () => _download(f),
+                              subtitle: const Text('Cliquer pour voir'),
+                              trailing: IconButton(
+                                tooltip: 'Enregistrer sous…',
+                                icon: const Icon(Icons.download_rounded),
+                                onPressed: () => _download(f),
+                              ),
+                              onTap: () => FileViewer.open(
+                                context,
+                                f.name,
+                                () => m.withSession(() => m.client.attachment(f)),
+                              ),
                             ),
                         ],
                       ],
@@ -1140,7 +1207,7 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
           onPressed: () => _save(f.id, f.name, () => m.client.cloudFile(f), open: false),
         ),
       ),
-      onTap: () => _save(f.id, f.name, () => m.client.cloudFile(f), open: true),
+      onTap: () => FileViewer.open(context, f.name, () => m.withSession(() => m.client.cloudFile(f))),
     );
   }
 
@@ -1324,7 +1391,11 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
                                     ),
                                   ),
                                 ),
-                                onTap: () => _save('doc${d.id}', '${d.title}.pdf', () => m.client.documentFile(d), open: true),
+                                onTap: () => FileViewer.open(
+                                  context,
+                                  '${d.title}.pdf',
+                                  () => m.withSession(() => m.client.documentFile(d)),
+                                ),
                               ),
                           ],
                         ),
@@ -1489,7 +1560,7 @@ class _WorkspacePageState extends State<_WorkspacePage> {
                   tooltip: 'Enregistrer sous…',
                   onPressed: () => _open(c, saveAs: true),
                 ),
-          onTap: () => _open(c, saveAs: false),
+          onTap: () => FileViewer.open(context, c.name, () => m.withSession(() => m.client.cloudFile(c))),
         ),
   ];
 

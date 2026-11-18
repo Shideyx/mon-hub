@@ -8,14 +8,13 @@ import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import '../../ui/chat_history.dart';
 import '../../ui/clicky/clicky.dart';
-import '../../ui/clicky/mic_test.dart';
 import '../../ui/clicky/claude_code.dart';
 import '../../ui/clicky/journal.dart';
 import '../../ui/clicky/buddies.dart';
 import '../../ui/clicky/routines.dart';
 import '../../ui/clicky/clicky_desktop.dart';
 import '../../ui/clicky/ollama.dart';
-import '../../ui/clicky/settings.dart';
+import '../../ui/clicky/clicky_settings_page.dart';
 import '../../ui/widgets.dart';
 import 'claude_ai_sync.dart';
 
@@ -73,7 +72,7 @@ class ClaudeModule extends HubModule {
                       FilledButton.icon(
                         icon: const Icon(Icons.key_rounded),
                         label: const Text('Configurer Clicky'),
-                        onPressed: () => showSettings(context),
+                        onPressed: () => showBrain(context),
                       )
                     else
                       FilledButton.icon(
@@ -181,7 +180,11 @@ class ClaudeModule extends HubModule {
     ),
   );
 
-  static Future<void> showSettings(BuildContext context) => Navigator.push(
+  /// Tous les réglages de Clicky (rangés par rubrique).
+  static Future<void> showSettings(BuildContext context) => ClickySettingsPage.open(context);
+
+  /// Le cerveau de Clicky : Claude Pro, clé API ou Ollama.
+  static Future<void> showBrain(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute<void>(builder: (_) => const _SettingsDialog()),
   );
@@ -263,7 +266,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Claude et Clicky'),
+          title: const Text('Cerveau de Clicky'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -281,7 +284,15 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
               children: [
                 _body(context, text),
-                const ClickyMoreSettings(),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('Les autres réglages de Clicky (voix, micro, apparence…)'),
+                    onPressed: () => ClickySettingsPage.open(context),
+                  ),
+                ),
               ],
             ),
           ),
@@ -437,69 +448,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 ],
                 const SizedBox(height: 12),
                 const Divider(),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Activer Clicky'),
-                  subtitle: const Text('Maintiens Ctrl + Alt pour parler, appui court pour écrire'),
-                  value: c.enabled,
-                  onChanged: (v) async {
-                    await c.setOption('enabled', v);
-                    v ? await ClickyDesktop.launch() : await ClickyDesktop.stop();
-                  },
-                ),
-                if (ClickyController.everywhereSupported)
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Clicky partout'),
-                    subtitle: const Text(
-                      'Clicky vit au-dessus de tout l\'écran : il voit toutes tes applis et '
-                      'tous tes écrans, même quand Mon Hub est réduit.',
-                    ),
-                    value: c.everywhere,
-                    onChanged: (v) async {
-                      await c.setOption('everywhere', v);
-                      v ? await ClickyDesktop.launch() : await ClickyDesktop.stop();
-                    },
-                  ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Toujours afficher le curseur bleu'),
-                  subtitle: const Text('Sinon, Clicky n\'apparaît que quand tu lui parles'),
-                  value: c.alwaysShow,
-                  onChanged: (v) => c.setOption('show', v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Voix de Clicky (réponses lues à voix haute)'),
-                  subtitle: const Text('Désactivée : il répond seulement par écrit'),
-                  value: c.voice,
-                  onChanged: (v) async {
-                    if (!v) await c.stopSpeaking();
-                    await c.setOption('voice', v);
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Parler à Clicky au micro'),
-                  subtitle: const Text('Désactivé : Ctrl + Alt ouvre la zone pour écrire'),
-                  value: c.mic,
-                  onChanged: (v) => c.setOption('mic', v),
-                ),
-                if (c.mic)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.graphic_eq_rounded, size: 18),
-                      label: const Text('Tester le micro'),
-                      onPressed: () => MicTestDialog.show(context),
-                    ),
-                  ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Le curseur de Clicky suit la souris'),
-                  value: c.follow,
-                  onChanged: (v) => c.setOption('follow', v),
-                ),
                 const SizedBox(height: 4),
                 Text(
                   'Astuce : commence par « Agent, … » (ex. « Agent, fais-moi le résumé de mes '
@@ -702,7 +650,7 @@ class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
   Future<void> _send(String text) async {
     final pro = await _usePro();
     if (!pro && !await ClaudeApi.hasKey()) {
-      if (mounted) await ClaudeModule.showSettings(context);
+      if (mounted) await ClaudeModule.showBrain(context);
       if (!await _usePro() && !await ClaudeApi.hasKey()) return;
     }
     final id = threadId ?? ChatThread.newId();

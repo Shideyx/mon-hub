@@ -3,8 +3,24 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
+import '../../ui/file_viewer.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
+
+/// Un mail ouvert : son texte et ses pièces jointes.
+class MailContent {
+  const MailContent(this.text, this.files);
+  final String text;
+  final List<MailFile> files;
+}
+
+/// Une pièce jointe d'un mail (déjà téléchargée avec le mail).
+class MailFile {
+  MailFile(this.name, this.size, this.bytes);
+  final String name;
+  final int? size;
+  final Future<List<int>> Function() bytes;
+}
 
 class MailSummary {
   MailSummary(this.account, this.uid, this.from, this.fromEmail, this.subject, this.date,
@@ -119,16 +135,53 @@ class MailModule extends HubModule {
         ];
       });
 
-  /// Contenu complet d'un mail (et le marque comme lu).
-  Future<String> readBody(MailSummary s) => _withImap(s.account, (client) async {
+  /// Contenu complet d'un mail (texte seulement).
+  Future<String> readBody(MailSummary s) async => (await readMail(s)).text;
+
+  /// Contenu complet d'un mail, avec ses pièces jointes (et le marque comme
+  /// lu).
+  Future<MailContent> readMail(MailSummary s) => _withImap(s.account, (client) async {
         final uid = s.uid;
-        if (uid == null) return '';
+        if (uid == null) return const MailContent('', []);
         final r = await client.uidFetchMessage(uid, 'BODY.PEEK[]');
         await client.uidMarkSeen(MessageSequence.fromId(uid, isUid: true));
         s.seen = true;
         badge.value = _cache.where((m) => !m.seen).length;
         final m = r.messages.firstOrNull;
-        if (m == null) return '';
+        if (m == null) return const MailContent('', []);
+        return MailContent(_textOf(m), attachmentsOf(m));
+      });
+
+  /// Les pièces jointes d'un mail (fichiers joints, et images ou documents
+  /// « en ligne » qui ont un nom de fichier).
+  static List<MailFile> attachmentsOf(MimeMessage m) {
+    final out = <MailFile>[];
+    final seen = <String>{};
+    final infos = [
+      ...m.findContentInfo(disposition: ContentDisposition.attachment),
+      ...m.findContentInfo(disposition: ContentDisposition.inline),
+    ];
+    for (final info in infos) {
+      final name = info.fileName?.trim() ?? '';
+      if (info.fetchId.isEmpty || !seen.add(info.fetchId)) continue;
+      // Le texte du mail lui-même n'est pas une pièce jointe.
+      if (name.isEmpty && (info.isText || !info.isImage)) continue;
+      out.add(
+        MailFile(
+          name.isEmpty ? 'image-${out.length + 1}.${info.mediaType?.sub.name ?? 'png'}' : name,
+          info.size,
+          () async {
+            final data = m.getPart(info.fetchId)?.decodeContentBinary();
+            if (data == null || data.isEmpty) throw 'Pièce jointe vide ou illisible';
+            return data;
+          },
+        ),
+      );
+    }
+    return out;
+  }
+
+  static String _textOf(MimeMessage m) {
         final text = m.decodeTextPlainPart();
         if (text != null && text.trim().isNotEmpty) return text.trim();
         final html = m.decodeTextHtmlPart() ?? '';
@@ -144,7 +197,7 @@ class MailModule extends HubModule {
             .replaceAll('&quot;', '"')
             .replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n')
             .trim();
-      });
+  }
 
   /// Envoie un mail (nouveau ou réponse).
   Future<void> send({
@@ -236,7 +289,12 @@ class MailModule extends HubModule {
             final m = (await load()).where((x) =>
                 x.account == a['boite'] && x.uid == (a['uid'] as num).toInt()).firstOrNull;
             if (m == null) throw 'Mail introuvable';
-            return readBody(m);
+            final c = await readMail(m);
+            if (c.files.isEmpty) return c.text;
+            return {
+              'texte': c.text,
+              'pieces_jointes': [for (final f in c.files) f.name],
+            };
           },
         ),
         HubTool(
@@ -489,10 +547,22 @@ class MailModule extends HubModule {
       );
 }
 
-class _MailReadPage extends StatelessWidget {
+class _MailReadPage extends StatefulWidget {
   const _MailReadPage({required this.module, required this.mail});
   final MailModule module;
   final MailSummary mail;
+
+  @override
+  State<_MailReadPage> createState() => _MailReadPageState();
+}
+
+class _MailReadPageState extends State<_MailReadPage> {
+  MailModule get module => widget.module;
+  MailSummary get mail => widget.mail;
+
+  /// Téléchargé une seule fois (avant : à chaque redessin de la page, une
+  /// nouvelle connexion à la boîte mail).
+  late Future<MailContent> _content = module.readMail(mail);
 
   @override
   Widget build(BuildContext context) {
@@ -541,12 +611,42 @@ class _MailReadPage extends StatelessWidget {
               ]),
               const Divider(height: 32),
               FutureBuilder(
-                future: module.readBody(mail),
+                future: _content,
                 builder: (context, snap) {
-                  if (snap.hasError) return ErrorBanner('${snap.error}');
+                  if (snap.hasError) {
+                    return Column(
+                      children: [
+                        ErrorBanner('${snap.error}'),
+                        TextButton.icon(
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Réessayer'),
+                          onPressed: () => setState(() => _content = module.readMail(mail)),
+                        ),
+                      ],
+                    );
+                  }
                   if (!snap.hasData) return const LoadingHint();
-                  return SelectableText(snap.data!,
-                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.5));
+                  final d = snap.data!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (d.files.isNotEmpty) ...[
+                        Text(
+                          '📎 ${d.files.length} pièce${d.files.length > 1 ? 's' : ''} jointe${d.files.length > 1 ? 's' : ''}',
+                          style: theme.textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [for (final f in d.files) AttachmentChip(name: f.name, load: f.bytes)],
+                        ),
+                        const Divider(height: 28),
+                      ],
+                      SelectableText(d.text.isEmpty ? '(mail vide)' : d.text,
+                          style: theme.textTheme.bodyLarge?.copyWith(height: 1.5)),
+                    ],
+                  );
                 },
               ),
             ],

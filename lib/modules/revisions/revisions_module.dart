@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/ai_text.dart';
@@ -18,6 +17,9 @@ import '../schedule/schedule_module.dart';
 import 'fiche_view.dart';
 import 'fsrs.dart';
 import 'revisions_store.dart';
+import '../../core/photo.dart';
+import '../../ui/clicky/course_listener.dart';
+import '../../ui/clicky/course_page.dart';
 
 /// Révisions : comme Anki, Quizlet et les applis de révision des lycéens
 /// (SchoolMouv, Eliott…), en un seul endroit, sur l'appareil :
@@ -659,7 +661,18 @@ class RevisionsHomePage extends StatelessWidget {
     final theme = Theme.of(context);
     final c = module.color;
     return Scaffold(
-      appBar: AppBar(title: const Text('Révisions')),
+      appBar: AppBar(
+        title: const Text('Révisions'),
+        actions: [
+          if (CourseListener.supported)
+            TextButton.icon(
+              icon: const Icon(Icons.mic_external_on_rounded),
+              label: const Text('Écouter un cours'),
+              onPressed: () => CoursePage.open(context),
+            ),
+          const SizedBox(width: 6),
+        ],
+      ),
       body: ListenableBuilder(
         listenable: module.revisions,
         builder: (context, _) => FutureBuilder(
@@ -1338,10 +1351,8 @@ class _GenerateDialogState extends State<_GenerateDialog> {
     for (final f in files.take(6)) {
       var bytes = await f.readAsBytes();
       try {
-        final d = img.decodeImage(bytes);
-        if (d != null) {
-          bytes = Uint8List.fromList(img.encodeJpg(d.width > 1800 ? img.copyResize(d, width: 1800) : d, quality: 85));
-        }
+        // À côté (Isolate) : réduire 6 grosses photos figeait l'appli.
+        bytes = (await Photo.toJpeg(bytes, maxSide: 1800, quality: 85)).$1;
       } catch (_) {}
       out.add(base64Encode(bytes));
     }
