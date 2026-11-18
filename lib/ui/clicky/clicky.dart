@@ -71,6 +71,8 @@ import 'course_page.dart';
 import 'jarvis.dart';
 import 'shot_encode.dart';
 import 'text_fix.dart';
+import '../../core/browser_link.dart';
+import 'background_tasks.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -2240,6 +2242,19 @@ class ClickyController extends ChangeNotifier {
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
     if (_voicePlatform) ...repairTools,
+    // Le navigateur (extension) et les tâches de fond vivent dans Mon Hub.
+    if (hub != null && toolsOverride == null && !desktopMode) ...[
+      ...BrowserLink.instance.tools,
+      HubTool(
+        name: 'clicky_a_ma_place',
+        description:
+            'Fais une tâche à la place de la personne, en arrière-plan (modules, Google Docs, PC sans la souris, et '
+            'navigateur avec l\'extension). Elle peut continuer à utiliser son PC ; elle est prévenue à la fin.',
+        params: {'but': ('string', 'Ce qu\'il faut faire, en détail')},
+        required: ['but'],
+        run: (a) async => BackgroundTasks.instance.start('${a['but'] ?? ''}'),
+      ),
+    ],
     if (toolsOverride == null) ...jarvisTools,
     if (hub != null && toolsOverride == null && CourseListener.supported) ...courseTools,
     if (pcControl != 'off') ...PcControl.tools(),
@@ -2353,7 +2368,7 @@ Ranger : « range mes téléchargements / mon bureau / mon Drive » → pc_range
     if (agent) {
       return '''$base
 
-Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 5 phrases simples, lisible à voix haute, sans markdown.''';
+${BrowserLink.instance.connected ? '${BrowserLink.guide}\n' : ''}Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 5 phrases simples, lisible à voix haute, sans markdown.''';
     }
     final code = codeMode && isCodeEditorTitle(foreground);
     final shotsNote = shots.length > 1 ? ':screenN' : '';
@@ -2398,6 +2413,13 @@ Blocs possibles (2 à 5 par tableau, textes très courts, adaptés à un·e él�
 - {"type":"quiz","question":"…","choix":["…","…","…"],"reponse":0,"explication":"…"} : pour vérifier que c'est compris (reponse = numéro du bon choix, à partir de 0) ; plusieurs blocs quiz pour un quiz de plusieurs questions
 Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une phrase (« regarde le schéma »). Pas de tableau pour une simple question pratique.''';
 
+  /// « Fais-le à ma place », « fais ça pour moi », « en arrière-plan ».
+  static final forMeRe = RegExp(
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?(?:fais|fait)(?:[\s-]+(?:le|la|les|ça|ca|tout))?\s+(?:(?:à|a)\s+ma\s+place|pour\s+moi)\b[\s,:]*'
+    r'|^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?en\s+arri[eè]re[\s-]plan\b[\s,:]*',
+    caseSensitive: false,
+  );
+
   static final _agentRe = RegExp(
     r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?agent\b[\s,:]*',
     caseSensitive: false,
@@ -2431,9 +2453,10 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       unawaited(act(take.group(1)!.trim()));
       return;
     }
-    final agent = _agentRe.firstMatch(q);
+    // « Agent, … », « Fais-le à ma place : … » : une tâche en arrière-plan.
+    final agent = _agentRe.firstMatch(q) ?? forMeRe.firstMatch(q);
     if (agent != null) {
-      unawaited(_runAgent(q.substring(agent.end).trim()));
+      unawaited(doForMe(q.substring(agent.end).trim()));
       return;
     }
     // « Oui », « vas-y », « non merci » : c'est la réponse à son idée.
@@ -3884,6 +3907,61 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     return r;
   }
 
+  /// **Fais-le à ma place** : la tâche part en arrière-plan dans Mon Hub
+  /// (qui a les modules et l'extension du navigateur) ; Clicky reste
+  /// disponible.
+  Future<void> doForMe(String task) async {
+    // « Fais-le à ma place » tout court : ce dont on vient de parler.
+    if (task.trim().isEmpty && _lastQuestion.trim().isNotEmpty) {
+      task = 'Ce que la personne vient de demander : « $_lastQuestion »'
+          '${reply.trim().isEmpty ? '' : ' (ta dernière réponse : « ${reply.length > 600 ? reply.substring(0, 600) : reply} »)'}';
+    }
+    String say;
+    if (hub != null && toolsOverride == null) {
+      say = BackgroundTasks.instance.start(task);
+    } else {
+      // Clicky partout : c'est Mon Hub qui fait le travail.
+      final t = _tools.where((t) => t.name == 'clicky_a_ma_place').firstOrNull;
+      if (t == null) return _runAgent(task);
+      try {
+        say = '${await t.run({'but': task})}';
+      } catch (e) {
+        say = 'Je n\'ai pas pu lancer la tâche : $e';
+      }
+    }
+    _set(ClickyState.idle, status: '', reply: say);
+    unawaited(speak(say.split(':').first.split('.').first));
+    _fadeSoon();
+  }
+
+  /// Une action dans le navigateur qui envoie, publie, paie ou supprime.
+  Future<bool> confirmBrowser(String what) async {
+    notify?.call('Clicky attend ton accord', 'Il veut $what dans ton navigateur.');
+    onInteractive?.call(true);
+    try {
+      final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+      if (ctx == null || !ctx.mounted) return false;
+      final ok = await showDialog<bool>(
+        context: ctx,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.public_rounded, color: Colors.orange),
+          title: const Text('Clicky veut agir dans ton navigateur'),
+          content: Text(
+            'Il veut $what.\n\nAutorise seulement si c\'est bien ce que tu lui as demandé'
+            '${PromptShield.tainted ? ' (il vient de lire une page écrite par quelqu\'un d\'autre : méfie-toi des pièges)' : ''}.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Refuser')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Autoriser')),
+          ],
+        ),
+      );
+      return ok == true;
+    } finally {
+      if (!panelOpen && board == null) onInteractive?.call(false);
+    }
+  }
+
   /// Tâche de fond : Clicky reste disponible pendant que l'agent travaille.
   Future<void> _runAgent(String task) async {
     if (task.isEmpty) {
@@ -3917,6 +3995,9 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   /// Demande la permission avant une action qui envoie ou modifie quelque
   /// chose (aussi utilisée par le pont quand Claude Code agit).
   Future<bool> confirmAction(HubTool tool, Map<String, dynamic> args) async {
+    // Pendant « fais-le à ma place », le navigateur est permis (les clics qui
+    // envoient, publient, paient ou suppriment demandent quand même).
+    if (tool.name.startsWith('nav_') && BrowserLink.instance.trusted) return true;
     final pc = PcControl.isWrite(tool.name);
     if (pc) {
       if (pcControl == 'off') return false;
@@ -4158,6 +4239,14 @@ class _ClickyLayerState extends State<ClickyLayer> {
         );
       // Clicky autonome : il réfléchit et propose (rien sans ton accord).
       c.startAutonomy();
+      // « Fais-le à ma place » : les tâches de fond, et le navigateur.
+      BackgroundTasks.instance
+        ..runner = c.runTask
+        ..onDone = (title, body) {
+          c.notify?.call(title, body);
+          unawaited(c.think(body.length > 220 ? '${body.substring(0, 220)}…' : body));
+        };
+      BrowserLink.confirm = c.confirmBrowser;
       final r = Routines.instance
         // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
         // autres routines par le cerveau de Clicky.

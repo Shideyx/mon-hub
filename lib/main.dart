@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/browser_link.dart';
 import 'core/work_backup.dart';
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
@@ -105,6 +106,7 @@ class _HubAppState extends State<HubApp> {
 
   void _close() {
     WorkBackup.instance.stop();
+    unawaited(BrowserLink.instance.stop());
     AccountSync.instance
       ..onApplied = null
       ..onNotice = null
@@ -159,6 +161,8 @@ class _HubAppState extends State<HubApp> {
           ..start();
         // Tes travaux (Documents, Bureau) copiés dans ton Drive.
         WorkBackup.instance.start();
+        // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
+        unawaited(BrowserLink.instance.start());
         // Première ouverture du compte : la visite guidée de Clicky.
         unawaited(_tutorial());
         unawaited(n.start());

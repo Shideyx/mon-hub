@@ -34,6 +34,18 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   qui a accès à ton compte Google), et la copie reste illisible sans ton mot
   de passe Mon Hub. Une notification le signale sur le PC qui l'envoie.
 
+## Extension Chrome « Clicky dans le navigateur »
+
+- Elle ne parle qu'à Mon Hub, sur ce PC (`ws://127.0.0.1:47614`), et Mon Hub n'accepte que **cette** extension
+  (origine `chrome-extension://nejfhocplopdmnijfodbmcbelcciblji`, fixée par la clé du `manifest.json`) : une page web
+  ne peut pas s'y brancher.
+- Pages interdites : banques, paiement, mots de passe, sécurité du compte Google / Microsoft / Apple, pages internes
+  du navigateur. Aucune saisie dans un champ mot de passe, code ou coordonnées bancaires.
+- Clicky travaille dans **ses** onglets (groupe « Clicky »). Cliquer, écrire et appuyer sur une touche sont des actions
+  à autoriser, sauf pendant une tâche « fais-le à ma place » demandée par la personne (45 min au plus). Même
+  pendant cette tâche, un clic qui envoie, publie, paie ou supprime demande toujours l'accord.
+- Ce que l'extension lit dans une page est marqué comme « données écrites par quelqu'un d'autre » (`PromptShield`).
+
 ## Réglages GitHub conseillés (à faire une fois)
 
 Dans **Settings** du dépôt :

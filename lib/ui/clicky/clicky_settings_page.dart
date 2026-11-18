@@ -6,6 +6,7 @@ import '../../modules/claude/claude_module.dart';
 import 'assistant_view.dart';
 import 'clicky.dart';
 import 'clicky_desktop.dart';
+import 'browser_setup_page.dart';
 import 'course_page.dart';
 import 'jarvis_view.dart';
 import 'mic_test.dart';
@@ -90,6 +91,13 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
       ),
       page('topo'),
       page('teach'),
+      _Entry(
+        'Clicky dans le navigateur',
+        'L\'extension Chrome : il utilise tes sites dans ses onglets, pendant que tu fais autre chose',
+        Icons.extension_rounded,
+        const Color(0xFF10B981),
+        (ctx) => BrowserSetupPage.open(ctx),
+      ),
       _Entry(
         'Écouter un cours',
         'Il écoute tout le cours et te fait le compte rendu',

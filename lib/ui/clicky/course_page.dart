@@ -611,6 +611,8 @@ class CourseRecLayer extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Une tâche « fais-le à ma place » en cours.
+              const TaskPill(),
               // Séance de concentration en cours (à côté de l'écoute de cours).
               const FocusPill(),
               ListenableBuilder(

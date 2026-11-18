@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/nav.dart';
+import '../../core/browser_link.dart';
+import 'background_tasks.dart';
 import 'jarvis.dart';
 
 /// La pastille « Concentration · 32 min » en haut de Mon Hub pendant une
@@ -106,6 +108,11 @@ class ClickySkillsPage extends StatelessWidget {
       '« Réfléchis bien : … » pour qu\'il prenne le temps sur un problème difficile',
       '« Agent, résume mes devoirs de la semaine » : il travaille en fond et te prévient',
     ]),
+    ('Fais-le à ma place', Icons.engineering_rounded, Color(0xFF2B6CFF), [
+      '« Fais-le à ma place : mets mes devoirs de la semaine dans un Google Doc » : en arrière-plan, tu continues',
+      'Avec l\'extension Chrome : il utilise tes sites (Classroom, Forms, Slides…) dans ses propres onglets',
+      'Il demande toujours avant d\'envoyer, publier, payer ou supprimer ; la pastille bleue montre où il en est',
+    ]),
     ('Ta journée', Icons.today_rounded, Color(0xFF7C5CFF), [
       '« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC',
       '« Qu\'est-ce que j\'ai demain ? », « J\'ai quoi comme devoirs ? »',
@@ -123,13 +130,20 @@ class ClickySkillsPage extends StatelessWidget {
       '« Montre le bureau », « Mets Chrome à gauche », « Reviens sur Discord »',
       '« Range mes téléchargements », « Mets le son à 30 % », « Installe VLC »',
     ]),
+    ('Écrire', Icons.spellcheck_rounded, Color(0xFF0EA5E9), [
+      'Surligne un texte n\'importe où et appuie sur Ctrl + Alt + C : il le corrige à sa place',
+      '« Traduis la sélection en anglais », « Reformule mon texte »',
+    ]),
     ('Rappels', Icons.notifications_active_rounded, Color(0xFFF59E0B), [
       '« Rappelle-moi de répondre à Léo quand j\'ouvre Discord »',
       '« Rappelle-moi dans 20 minutes de sortir le linge »',
       '« Retiens que mon oral d\'anglais est jeudi »',
     ]),
     ('École', Icons.school_rounded, Color(0xFFE5484D), [
-      '« Écoute le cours » puis « arrête le cours » : le compte rendu complet',
+      '« Écoute le cours » : il prend tes notes en direct dans un Google Doc, puis fait le compte rendu',
+      '« Il me faut combien en maths pour avoir 14 ? », « Bilan de mes notes »',
+      '« Qu\'est-ce que je dois prendre demain ? » (et le rappel du sac le soir)',
+      '« Fais-moi un contrôle blanc de SVT » : chronométré, noté sur 20',
       '« Qu\'est-ce qu\'il y a dans le PDF du devoir de maths ? »',
       '« Fais-moi des cartes sur la photosynthèse », « Interroge-moi »',
       '« Écris-moi une fiche sur la Révolution française » : un vrai Google Doc',
@@ -205,4 +219,87 @@ class ClickySkillsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// La pastille « Clicky travaille… » pendant une tâche « fais-le à ma
+/// place » (un clic : où il en est, et l'arrêter).
+class TaskPill extends StatelessWidget {
+  const TaskPill({super.key});
+
+  Future<void> _details(BgTask t) async {
+    final ctx = await hubDialogContext();
+    if (ctx == null || !ctx.mounted) return;
+    await showDialog<void>(
+      context: ctx,
+      builder: (c) => ListenableBuilder(
+        listenable: BackgroundTasks.instance,
+        builder: (c, _) => AlertDialog(
+          icon: const Icon(Icons.engineering_rounded),
+          title: const Text('Clicky travaille pour toi'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.goal, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                if (t.steps.isEmpty) const Text('Il réfléchit à comment s\'y prendre…'),
+                for (final s in t.steps.reversed.take(8)) Text('• $s'),
+                if (!t.running) ...[const Divider(), Text(t.result)],
+              ],
+            ),
+          ),
+          actions: [
+            if (t.running)
+              TextButton(
+                onPressed: () {
+                  BackgroundTasks.instance.cancel(t);
+                  Navigator.pop(c);
+                },
+                child: const Text('Arrêter'),
+              ),
+            FilledButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([BackgroundTasks.instance, BrowserLink.instance.step]),
+    builder: (context, _) {
+      final t = BackgroundTasks.instance.current;
+      if (t == null) return const SizedBox.shrink();
+      final step = BrowserLink.instance.step.value;
+      final goal = t.goal.length > 32 ? '${t.goal.substring(0, 32)}…' : t.goal;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Material(
+          color: const Color(0xFF2B6CFF),
+          borderRadius: BorderRadius.circular(20),
+          elevation: 3,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _details(t),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Clicky travaille : $goal${step.isEmpty ? '' : ' · $step'}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }

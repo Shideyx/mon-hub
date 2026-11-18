@@ -255,3 +255,17 @@
   `on20`, `MockExamPage` chronométrée), bouton dans `DeckPage`, outil `revision_controle_blanc`. **Notes en direct** :
   `CourseListener.start(liveDoc:)` crée un Google Doc ouvert en fenêtre, `_writeLive` y ajoute chaque morceau mis au
   propre (`livePrompt`), compte rendu à la fin ; `CourseNote.docId`.
+- **Extension Chrome + « fais-le à ma place » (v1.54)** : `assets/chrome-extension/` (MV3 : `manifest.json` avec
+  `key` → id fixe `nejfhocplopdmnijfodbmcbelcciblji`, `background.js` : WebSocket `ws://127.0.0.1:47614/navigateur`,
+  réveil `chrome.alarms`, commandes tabs/open/read/describe/click/type/key/focus/close, pages bloquées `BLOCKED`, onglets
+  dans le groupe « Clicky », vrai clavier/souris par `chrome.debugger` (CDP `Input.insertText`) ; **les fonctions
+  injectées dans la page ne voient pas le reste du fichier** — `find` y est celui du navigateur). Testé en vrai avec
+  Playwright (Chromium, `channel: 'chromium'`, `--load-extension`). Côté Mon Hub : `core/browser_link.dart`
+  (`BrowserLink` : serveur local, `allowedOrigin`, `call`, outils `nav_*`, `risky` → `confirm`, `trustedUntil`,
+  `step`, `guide`), démarré dans `HubApp._sync`. Installation : `ui/clicky/browser_setup_page.dart` (copie les
+  ressources dans %APPDATA%\MonHub\extension-chrome, ouvre chrome://extensions). Tâches de fond :
+  `ui/clicky/background_tasks.dart` (`BackgroundTasks.start` → `runner` = `ClickyController.runTask`, pastille
+  `TaskPill`, `cancel`), `ClickyController.forMeRe` (« fais-le à ma place », « en arrière-plan », « agent, »)
+  → `doForMe` (Clicky partout passe par l'outil `clicky_a_ma_place` de Mon Hub), `confirmBrowser`. Sécurité :
+  `nav_cliquer/ecrire/touche/fermer` = actions à autoriser (`isWriteAction`), sauf pendant une tâche (`trusted`),
+  `nav_lire/onglets` = données extérieures (`PromptShield`). Voir `SECURITY.md`.
