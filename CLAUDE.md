@@ -239,3 +239,19 @@
   repli), image réduite par Windows (`Win.captureScaled`, StretchBlt HALFTONE), **JPEG** fait dans un Isolate
   (`shot_encode.dart` `encodeShot` : alpha remis à 255 sinon blanc) ; `png64` peut donc être du JPEG → toujours annoncer
   `imageMime(b64)`. Le C++ se vérifie ici avec `x86_64-w64-mingw32-g++ -fsyntax-only -Wall -Wextra -Werror`.
+- **Outils d'élève (v1.53)** : notes = `modules/ecoledirecte/grade_math.dart` (`GradeMath` : `EdGrade.coef/period/counts`
+  lus d'École Directe, `currentPeriod` = période de la note la plus récente, `average` pondérée, `needed`/`sayNeeded`,
+  `matchSubject` « maths » → MATHEMATIQUES, `weekReport`) ; outils `ecole_moyenne`, `ecole_bilan_notes`, notification
+  « bilan » le vendredi ≥ 17 h (`poll`, id `bilan-notes:<lundi>`). **Prépare ton sac** : `ui/clicky/school_bag.dart`
+  (`SchoolBag.plan/say`, une famille d'affaires par cours, réglages `parseCustom`), automatisme `sac` de l'`Assistant`
+  (`bagMinutes` 19 h 30, `bagItems`, `_BagDialog`), outil `assistant_sac`. **Ctrl + Alt + C** (Clicky partout) =
+  `ClickyController.fixSelection` (copie la sélection, `TextFix.prompt/clean/changes`, recolle, remet le presse-papier ;
+  modes corriger / reformuler / traduire:langue ; outil `clicky_corriger_selection`). **Notifications regroupées** :
+  `NotificationCenter.digest` (30 min par défaut, réglage), `urgent` (sans module, appels, cours annulés) passe,
+  `digestOf`. **Sauvegarde des travaux** : `core/work_backup.dart` (`WorkBackup` : Documents/Bureau → Drive « Mon Hub -
+  Sauvegardes », fichiers `wanted` modifiés seulement (`changed`), jamais de suppression, `sauvegarde.json` jamais
+  synchronisé), `ui/backup_page.dart`. **Contrôle blanc** : `modules/revisions/mock_exam.dart` (`MockExam.prompt/parse`
+  — JSON objet lu par `_object`, pas `AiText.json` qui préfère les tableaux —, `mark` QCM auto + rédigé corrigé par l'IA,
+  `on20`, `MockExamPage` chronométrée), bouton dans `DeckPage`, outil `revision_controle_blanc`. **Notes en direct** :
+  `CourseListener.start(liveDoc:)` crée un Google Doc ouvert en fenêtre, `_writeLive` y ajoute chaque morceau mis au
+  propre (`livePrompt`), compte rendu à la fin ; `CourseNote.docId`.

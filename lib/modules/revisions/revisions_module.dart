@@ -20,6 +20,8 @@ import 'revisions_store.dart';
 import '../../core/photo.dart';
 import '../../ui/clicky/course_listener.dart';
 import '../../ui/clicky/course_page.dart';
+import '../ecoledirecte/grade_math.dart';
+import 'mock_exam.dart';
 
 /// Révisions : comme Anki, Quizlet et les applis de révision des lycéens
 /// (SchoolMouv, Eliott…), en un seul endroit, sur l'appareil :
@@ -372,6 +374,33 @@ class RevisionsModule extends HubModule {
         final n = await revisions.addCards(d.id, cards);
         await refreshBadge();
         return {'ok': true, 'ajoutees': n, 'paquet': d.name, 'exemples': [for (final c in cards.take(3)) '${c.$1} → ${c.$2}']};
+      },
+    ),
+    HubTool(
+      name: 'revision_controle_blanc',
+      description:
+          'Ouvre un contrôle blanc chronométré (sujet fait par l\'IA à partir des fiches, cartes et comptes rendus de '
+          'cours de la matière), corrigé et noté sur 20.',
+      params: {'matiere': ('string', 'Matière ou chapitre')},
+      required: ['matiere'],
+      run: (a) async {
+        final q = '${a['matiere'] ?? ''}'.trim();
+        await revisions.load();
+        final deck = revisions.decks
+                .where((d) => GradeMath.matchSubject(q, [d.name.replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ' ')]) != null)
+                .firstOrNull ??
+            revisions.decks.where((d) => d.name.toLowerCase().contains(q.toLowerCase())).firstOrNull;
+        // Les comptes rendus des cours écoutés par Clicky dans cette matière.
+        final notes = [
+          for (final n in await CourseListener.instance.list())
+            if (n.done && GradeMath.matchSubject(q, [n.subject]) != null) n.summary,
+        ].take(3).join('\n\n');
+        final material = [if (deck != null) MockExam.material(deck), notes].where((m) => m.trim().isNotEmpty).join('\n\n');
+        await push(
+          null,
+          () => MockExamPage(subject: deck?.name ?? q, material: material, color: deck == null ? color : Color(deck.color)),
+        );
+        return {'ok': true, 'paquet': deck?.name, 'avec_comptes_rendus': notes.isNotEmpty};
       },
     ),
     HubTool(
@@ -1205,6 +1234,18 @@ class DeckPage extends StatelessWidget {
                     title: 'Écrire',
                     text: 'Tape la réponse',
                     onTap: d.cards.isEmpty ? null : () => module.push(context, () => WritePage(module: module, deck: d)),
+                  ),
+                  _Mode(
+                    icon: Icons.assignment_rounded,
+                    color: const Color(0xFFE5484D),
+                    title: 'Contrôle blanc',
+                    text: enough || (d.sheet ?? '').isNotEmpty ? 'Sujet chronométré, noté /20' : '4 cartes minimum',
+                    onTap: enough || (d.sheet ?? '').isNotEmpty
+                        ? () => module.push(
+                            context,
+                            () => MockExamPage(subject: d.name, material: MockExam.material(d), color: Color(d.color)),
+                          )
+                        : null,
                   ),
                   _Mode(
                     icon: Icons.extension_rounded,

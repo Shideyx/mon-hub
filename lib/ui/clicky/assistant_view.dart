@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../modules/carnet/carnet_store.dart';
 import 'assistant.dart';
+import 'school_bag.dart';
 
 /// Les propositions de Clicky, en bas à gauche de Mon Hub (au-dessus de
 /// toutes les pages). Mon Hub en dessous n'est jamais reconstruit.
@@ -298,6 +299,17 @@ class _AssistantPageState extends State<AssistantPage> {
                 value: a.store.getJson<bool>('initiativesAi') != false,
                 onChanged: a.consent && a.on('initiatives') ? (v) => a.store.setJson('initiativesAi', v) : null,
               ),
+              ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.backpack_rounded)),
+                title: const Text('Mon sac'),
+                subtitle: Text(
+                  'Rappel à ${a.bagMinutes ~/ 60} h ${(a.bagMinutes % 60).toString().padLeft(2, '0')} · '
+                  'les affaires de chaque matière se règlent ici',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                enabled: a.consent && a.on('sac'),
+                onTap: () => _BagDialog.show(context, a),
+              ),
               const Divider(height: 32),
               Text('Briefing du matin', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
@@ -390,4 +402,74 @@ class _AssistantPageState extends State<AssistantPage> {
       ),
     );
   }
+}
+
+/// Les réglages du sac : l'heure du rappel et les affaires par matière.
+class _BagDialog extends StatefulWidget {
+  const _BagDialog({required this.a});
+  final Assistant a;
+
+  static Future<void> show(BuildContext context, Assistant a) =>
+      showDialog<void>(context: context, builder: (_) => _BagDialog(a: a));
+
+  @override
+  State<_BagDialog> createState() => _BagDialogState();
+}
+
+class _BagDialogState extends State<_BagDialog> {
+  late final text = TextEditingController(text: SchoolBag.customText(widget.a.bagItems));
+  late int minutes = widget.a.bagMinutes;
+
+  @override
+  void dispose() {
+    text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: const Icon(Icons.backpack_rounded),
+    title: const Text('Mon sac'),
+    content: SizedBox(
+      width: 460,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.schedule_rounded),
+            label: Text('Rappel à ${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')}'),
+            onPressed: () async {
+              final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60));
+              if (t != null) setState(() => minutes = t.hour * 60 + t.minute);
+            },
+          ),
+          const SizedBox(height: 12),
+          const Text('Tes affaires par matière (une matière par ligne). Sans rien, Clicky utilise les habituelles : '
+              'tenue de sport pour l\'EPS, calculatrice pour les maths…'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: text,
+            minLines: 4,
+            maxLines: 10,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'EPS : tenue, baskets, gourde\nMaths : calculatrice, compas\nAnglais : workbook',
+            ),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+      FilledButton(
+        onPressed: () async {
+          await widget.a.setBagMinutes(minutes);
+          await widget.a.setBagItems(SchoolBag.parseCustom(text.text));
+          if (context.mounted) Navigator.pop(context);
+        },
+        child: const Text('Enregistrer'),
+      ),
+    ],
+  );
 }

@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/browser.dart';
 import '../core/error_log.dart';
 import 'account_sync_view.dart';
+import 'backup_page.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -163,6 +164,14 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               onTap: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
             ),
+            section('Sauvegarde'),
+            ListTile(
+              leading: const Icon(Icons.cloud_done_rounded),
+              title: const Text('Sauvegarde de mes travaux'),
+              subtitle: const Text('Documents et Bureau copiés tout seuls dans ton Google Drive'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => WorkBackupPage.open(context),
+            ),
             section('Rangement'),
             ListTile(
               leading: const Icon(Icons.auto_fix_high_rounded),
@@ -230,6 +239,22 @@ class _SettingsPageState extends State<SettingsPage> {
                   30,
                 ].map((v) => DropdownMenuItem(value: v, child: Text('$v min'))).toList(),
                 onChanged: (v) => n.interval = v ?? 2,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.layers_rounded),
+              title: const Text('Regrouper les notifications'),
+              subtitle: const Text('Un seul résumé au lieu de 15 notifications d\'affilée (les appels passent toujours)'),
+              trailing: DropdownButton<int>(
+                value: n.digest,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('Non')),
+                  DropdownMenuItem(value: 15, child: Text('15 min')),
+                  DropdownMenuItem(value: 30, child: Text('30 min')),
+                  DropdownMenuItem(value: 60, child: Text('1 h')),
+                ],
+                onChanged: (v) => n.digest = v ?? 30,
               ),
             ),
             ListTile(
