@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'account_sync.dart';
 import 'module_store.dart';
 
 /// Un compte Mon Hub (sur cet appareil).
@@ -70,6 +71,20 @@ class AppSession extends ChangeNotifier {
     return List.generate(n, (_) => r.nextInt(36).toRadixString(36)).join();
   }
 
+  /// Empreinte salée d'un mot de passe (jamais le mot de passe lui-même).
+  static String passwordHash(String salt, String password) => _hash(salt, password);
+
+  static String newSalt() => _random(16);
+
+  /// Préfixe tout neuf pour les données d'un compte.
+  static String newNamespace() => 'p.${_random(10)}.';
+
+  /// Le mot de passe est-il celui du compte connecté ?
+  bool checkPassword(String password) {
+    final acc = current;
+    return acc != null && _hash(acc.salt, password) == acc.hash;
+  }
+
   static String normalize(String login) => login.trim().toLowerCase();
 
   /// Reprend la session gardée (« rester connecté »).
@@ -98,8 +113,8 @@ class AppSession extends ChangeNotifier {
     final hasOldData = ModuleStore.global.getKeys().any(
       (k) => k.startsWith('mod.') || k.startsWith('hub.'),
     );
-    final ns = all.isEmpty && hasOldData ? '' : 'p.${_random(10)}.';
-    final salt = _random(16);
+    final ns = all.isEmpty && hasOldData ? '' : newNamespace();
+    final salt = newSalt();
     final acc = HubAccount(
       id,
       name.trim().isEmpty ? login.trim() : name.trim(),
@@ -155,17 +170,34 @@ class AppSession extends ChangeNotifier {
     _open(acc);
   }
 
+  /// Compte retrouvé depuis un autre appareil (même identifiant, même mot
+  /// de passe ; ses données sont déjà dans [HubAccount.ns]) : ajouté ici et
+  /// ouvert.
+  Future<void> adopt(HubAccount acc) async {
+    final all = accounts;
+    if (all.containsKey(acc.login)) throw 'Cet identifiant est déjà pris sur cet appareil';
+    all[acc.login] = acc;
+    await _saveAccounts(all);
+    await ModuleStore.global.setString(_currentKey, acc.login);
+    _open(acc);
+  }
+
   Future<void> signOut() async {
+    AccountSync.instance.stop();
     await ModuleStore.global.remove(_currentKey);
     current = null;
     ModuleStore.profile = '';
     notifyListeners();
   }
 
-  /// Supprime le compte connecté et toutes ses données sur cet appareil.
+  /// Supprime le compte connecté et toutes ses données sur cet appareil
+  /// (la copie gardée dans le Drive, s'il y en a une, n'est pas touchée).
   Future<void> deleteAccount() async {
     final acc = current;
     if (acc == null) return;
+    // Surtout pas de synchro pendant l'effacement : elle enverrait la
+    // suppression aux autres appareils.
+    AccountSync.instance.stop();
     final p = ModuleStore.prefs;
     for (final k in p.getKeys()) {
       await p.remove(k);

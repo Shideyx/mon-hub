@@ -9,6 +9,16 @@ class HubController extends ChangeNotifier {
     for (final m in available) {
       m.attach();
     }
+    _read();
+  }
+
+  /// Ordre et modules cachés changés ailleurs (autre appareil synchronisé).
+  void reload() {
+    _read();
+    notifyListeners();
+  }
+
+  void _read() {
     final prefs = ModuleStore.prefs;
     final savedOrder = prefs.getStringList('hub.order');
     final savedDisabled = prefs.getStringList('hub.disabled') ?? const [];

@@ -71,12 +71,13 @@ Au démarrage, Mon Hub fait confiance aux certificats de Windows (dont ceux d'un
 * **Aucun serveur** : Mon Hub ne parle qu'aux services que tu utilises (École Directe, Spotify, Google…), directement depuis ton appareil. Le créateur de l'appli n'a accès à aucune donnée de personne.
 * **Mots de passe et jetons** : dans le coffre du système (Gestionnaire d'identification Windows, Trousseau, Keystore Android).
 * **Données locales chiffrées** : historiques de Clicky, journal, carnet, routines sont chiffrés en AES-256-GCM, avec une clé par compte rangée dans le coffre du système (`lib/core/vault.dart`).
+* **Compte sur plusieurs appareils** (si tu l'actives) : une copie de ton compte est gardée dans **ton** Google Drive, dans le dossier caché réservé à Mon Hub, chiffrée avec ton mot de passe Mon Hub (PBKDF2 + AES-256-GCM) : ni Google ni le créateur de l'appli ne peuvent la lire (`lib/core/account_sync.dart`).
 * **Export protégé** par un mot de passe (PBKDF2 + AES-256-GCM) : le fichier est illisible sans lui.
 * **Connexion Mon Hub** : après 5 mots de passe faux, attente de plus en plus longue (jusqu'à 15 min).
 
 ## Comptes, thème et Claude
 
-* **Comptes Mon Hub** : page de connexion (identifiant + mot de passe) au démarrage. Chaque compte a ses modules, réglages et connexions, rangés à part (mot de passe stocké sous forme d'empreinte salée). Les comptes sont propres à l'appareil : *Exporter / Importer* pour passer d'un appareil à l'autre.
+* **Comptes Mon Hub** : page de connexion (identifiant + mot de passe) au démarrage. Chaque compte a ses modules, réglages et connexions, rangés à part (mot de passe stocké sous forme d'empreinte salée). **Le même compte sur tous tes appareils, sans export** : *Réglages → Mes appareils → Activer la synchronisation*, puis sur l'autre PC, page de connexion → *Retrouver mon compte d'un autre appareil* (même compte Google, même mot de passe). Ensuite les changements passent d'un appareil à l'autre tout seuls, toutes les 3 minutes.
 * **Mode clair / sombre / auto** : bouton 🌙 sur l'accueil et *Réglages → Apparence*.
 * **Clicky** : un compagnon IA, ton assistant personnel façon JARVIS d'Iron Man, qui vit à côté de ton curseur (comme heyclicky.com et [clicky-windows](https://github.com/Bitshank-2338/clicky-windows)), avec ton **abonnement Claude Pro** comme cerveau (Mon Hub lance ton Claude Code officiel : `claude -p` en stream-json, aucun outil de programmation, les actions de Mon Hub via le serveur MCP local `/mcp`, permission avant toute modification — voir `lib/ui/clicky/claude_code.dart` ; une clé API ou Ollama restent possibles). Maintiens **Ctrl + Alt** et parle (appui court = écrire), ou dis **« Clicky »**. Tout se règle dans module Claude → Réglages.
   * **Look « réacteur »** (par défaut, ou le curseur classique) : un réacteur cyan animé à côté du curseur (anneaux qui tournent quand il réfléchit, onde autour quand il écoute, viseur quand il montre), fenêtres « tête haute », voix posée qui t'appelle par ton prénom, salutation le matin, **briefing** (cours, devoirs, notes, messages), petit bip d'activation (`lib/ui/clicky/hud.dart`).
@@ -126,7 +127,9 @@ Mon Hub vérifie tes comptes toutes les 2 minutes (réglable) et affiche une ale
 
 ## Configurer une seule fois pour tous tes appareils
 
-Réglages → *Exporter ma configuration* sur le PC, puis *Importer une configuration* sur le téléphone. Le fichier contient tes identifiants : ne le partage pas.
+Sur le premier appareil : *Réglages → Mes appareils → Activer la synchronisation* (choisis ton compte Google et tape ton mot de passe Mon Hub). Sur les autres : page de connexion → *Retrouver mon compte d'un autre appareil* → le même compte Google → ton mot de passe Mon Hub. Modules, réglages, connexions, historiques, carnet et révisions arrivent tout seuls, puis restent synchronisés (le plus récent gagne, réglage par réglage). Ce qui est propre à un PC (widgets posés sur le bureau, raccourcis) reste sur ce PC.
+
+Sans internet : *Réglages → Mes appareils → Sans internet : passer par un fichier* (exporter / importer). Le fichier contient tes identifiants : ne le partage pas.
 
 L'appli publiée sur GitHub ne contient **aucun identifiant** : chacun y connecte ses propres comptes.
 
