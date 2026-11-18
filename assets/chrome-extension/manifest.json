@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Mon Hub — Clicky dans le navigateur",
+  "short_name": "Mon Hub",
+  "version": "1.0.0",
+  "description": "Laisse Clicky (Mon Hub, sur ton PC) lire et utiliser tes pages web quand tu le lui demandes. Rien ne part ailleurs que sur ton PC.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjrbilttFAD2VyRKdaBbqqJBwOyUYLJ2kb2ozUZFw+HrE0vbBkFSNvAqWjRBJRy99Jl6e589/g9SpM1TfdT1UDE/t2Kj7eziSZnWpw5uAwOI2pwGGMCFIRb8StVZURQF3UiXxhPNjFeDF06rUQ3yQqXxOsN/sQkiaaZILHyXu6znh7Ss/SN+xOb6YCQb/dXggS0XFoKCxQOB8NVuzTwRnD+GuxzGY9FFlAUPNuturrN4acfUJYRXorf9tLA/SP/lD/y/h3ZEchTN5fJdifYA99h2FJPTxPOhVdpHs5m1qxli4DJC381nhGV13FRr3oR1EAGSpbNWLQSfMiQ1Yk5M6dwIDAQAB",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "scripting", "debugger", "tabGroups", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Mon Hub : Clicky dans le navigateur", "default_icon": "icon.png" },
+  "icons": { "128": "icon.png" }
+}
