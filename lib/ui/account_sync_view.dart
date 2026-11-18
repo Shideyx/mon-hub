@@ -8,6 +8,7 @@ import '../core/module_store.dart';
 import '../core/session.dart';
 import 'google_setup.dart';
 import 'widgets.dart';
+import 'phone_setup_page.dart';
 
 /// « à l'instant », « il y a 3 min », « il y a 2 h », « le 12/11 ».
 String syncAgo(DateTime t, {DateTime? now}) {
@@ -494,6 +495,10 @@ class _JoinAccountViewState extends State<JoinAccountView> {
           style: muted,
         ),
         const SizedBox(height: 20),
+        if (!GoogleAuth.available) ...[
+          PasteGoogleCode(onDone: () => setState(() {})),
+          const SizedBox(height: 12),
+        ],
         FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           icon: _busy ? _spinner : const Icon(Icons.account_circle_rounded),

@@ -110,6 +110,30 @@ class Updater extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(minutes: 30), (_) => check());
   }
 
+  /// iPhone : Apple interdit qu'une appli se mette à jour toute seule hors
+  /// App Store. On regarde seulement s'il y a une nouvelle version iPhone
+  /// (pour prévenir) : renvoie son numéro (« v1.60 »), ou null.
+  static Future<String?> phoneUpdate() async {
+    if (kIsWeb || !Platform.isIOS || current == null) return null;
+    try {
+      final r = await http
+          .get(
+            Uri.parse('https://api.github.com/repos/$repo/releases/latest'),
+            headers: {'accept': 'application/vnd.github+json', 'user-agent': 'MonHub-Updater'},
+          )
+          .timeout(const Duration(seconds: 20));
+      if (r.statusCode != 200) return null;
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      if (j is! Map) return null;
+      final tag = '${j['tag_name'] ?? ''}';
+      final n = versionNumber(tag);
+      final hasIpa = (j['assets'] as List? ?? const []).any((a) => a is Map && a['name'] == 'MonHub-iOS.ipa');
+      return n != null && n > current! && hasIpa ? tag : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Regarde sur GitHub. Renvoie la nouvelle version, ou null.
   Future<UpdateInfo?> check({bool manual = false}) async {
     if (!supported) return null;

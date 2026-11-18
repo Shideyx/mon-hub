@@ -6,6 +6,15 @@
 	<string>Clicky t'écoute quand tu lui parles.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Clicky transforme ta voix en texte pour comprendre ta question.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pour envoyer une photo (devoir, fiche de révision) à Clicky.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Pour prendre en photo un exercice ou une fiche et l'envoyer à Clicky.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

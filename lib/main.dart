@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -72,6 +73,24 @@ Future<void> main(List<String> args) async {
   // Fichiers de l'ancienne version mis de côté pendant la mise à jour.
   unawaited(Updater.cleanup());
   runApp(const HubApp());
+}
+
+/// iPhone : « une nouvelle version est prête » (une fois par version).
+Future<void> _phoneUpdateNotice(NotificationCenter n) async {
+  await Future<void>.delayed(const Duration(seconds: 20));
+  final tag = await Updater.phoneUpdate();
+  if (tag == null) return;
+  final key = 'iphone.maj.$tag';
+  if (ModuleStore.global.getBool(key) == true) return;
+  await ModuleStore.global.setBool(key, true);
+  await n.post(
+    HubNotification(
+      id: 'maj-iphone:$tag',
+      title: '📲 Mon Hub $tag est prête pour ton iPhone',
+      body: 'Sur ton PC : Réglages → Mes appareils → Ajouter mon iPhone → Télécharger, puis Sideloadly. '
+          'Tes données restent sur l\'iPhone.',
+    ),
+  );
 }
 
 /// Racine de l'appli : page de connexion, puis le hub du compte connecté.
@@ -187,6 +206,9 @@ class _HubAppState extends State<HubApp> {
             }
             ..start();
         }
+        // iPhone : pas de mise à jour automatique (Apple l'interdit hors App
+        // Store) : on prévient quand une nouvelle version est prête.
+        if (Platform.isIOS) unawaited(_phoneUpdateNotice(n));
         // Ctrl + Espace (ici) ou Ctrl + Alt + Espace (partout) : la recherche.
         HubHome.instance.onSearchText = (text) => unawaited(SearchPage.show(text));
         // Première ouverture du compte : la visite guidée de Clicky.

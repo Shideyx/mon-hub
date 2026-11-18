@@ -9,6 +9,7 @@ import '../core/google_auth.dart';
 import '../core/module_store.dart';
 import '../core/updater.dart';
 import 'widgets.dart';
+import 'phone_setup_page.dart';
 
 /// Activer la connexion Google, **une seule fois, par le créateur** de Mon
 /// Hub : 5 liens directs sur Google Cloud (gratuit), puis on choisit le
@@ -147,6 +148,18 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
             ),
           ),
           const SizedBox(height: 16),
+          // Nouvel appareil (iPhone) : la clé vient du PC, pas besoin des 5 étapes.
+          if (!builtIn && !GoogleAuth.available) ...[
+            PasteGoogleCode(
+              onDone: () {
+                id.text = GoogleAuth.clientId;
+                secret.text = GoogleAuth.clientSecret;
+                setState(() {});
+                _connect();
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
           if (connected != null && GoogleAuth.available && GoogleAuth.canWriteDrive(connected))
             Container(
               padding: const EdgeInsets.all(16),

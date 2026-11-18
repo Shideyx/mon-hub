@@ -12,6 +12,7 @@ import 'backup_page.dart';
 import 'security_page.dart';
 import 'screen_time_page.dart';
 import 'birthdays_page.dart';
+import 'phone_setup_page.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -427,6 +428,14 @@ class _SettingsPageState extends State<SettingsPage> {
             section('Mes appareils'),
             // Le compte sur tous tes appareils, sans export (Google Drive).
             const AccountSyncSection(),
+            if (Platform.isWindows)
+              ListTile(
+                leading: const Icon(Icons.phone_iphone_rounded),
+                title: const Text('Ajouter mon iPhone'),
+                subtitle: const Text('Mon Hub sur l\'iPhone, synchronisé avec ce PC'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => PhoneSetupPage.open(context),
+              ),
             ExpansionTile(
               leading: const Icon(Icons.folder_zip_rounded),
               title: const Text('Sans internet : passer par un fichier'),
