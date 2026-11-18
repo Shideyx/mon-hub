@@ -203,6 +203,122 @@ class QuickAnswers {
       }
     }
 
+    // ---- Façon JARVIS : état du PC, fenêtres, concentration, rappels ----
+
+    // Le point de la situation (« rapport », « fais le point »).
+    if (RegExp(r'^(?:fais(?: moi)? (?:le |un )?)?(?:rapport|point)(?: de (?:la )?situation)?$|^(?:statut|situation) (?:general|generale|actuelle)$|^fais le point$').hasMatch(n) &&
+        (has('clicky_situation') || has('pc_etat'))) {
+      final sit = has('clicky_situation') ? await call('clicky_situation', {}) : null;
+      final pc = has('pc_etat') ? await call('pc_etat', {}) : null;
+      final lines = '${sit ?? ''}'
+          .split('\n')
+          .map((l) => l.replaceFirst(RegExp(r'^- '), '').trim())
+          .where((l) => l.isNotEmpty)
+          .take(4)
+          .toList();
+      final parts = [
+        'Voici le point. Il est ${_hour(t)}.',
+        if (lines.isNotEmpty) '${lines.join('. ')}.',
+        if (pc is Map && pc['resume'] != null) '${pc['resume']}',
+      ];
+      return QuickReply(parts.join(' ').replaceAll('..', '.'));
+    }
+
+    // L'état du PC.
+    if (has('pc_etat')) {
+      final why = RegExp(r'^pourquoi (?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:si )?lent|bug|bugue|ralentit)$|^(?:mon |le )?(?:pc|ordi|ordinateur) (?:rame|lag|lague|est (?:trop )?lent)$').hasMatch(n);
+      final status = why ||
+          RegExp(
+            r'^(?:etat|statut|diagnostic|bilan|sante) (?:du |de mon |de l )?(?:pc|ordi|ordinateur|systeme|systemes)$|'
+            r'^comment (?:va|se porte) (?:mon |le )?(?:pc|ordi|ordinateur)$|^(?:diagnostic|diagnostic systeme|statut systeme|etat des systemes)$|'
+            r'^(?:il me reste combien de batterie|combien de batterie(?: il me reste| j ai| reste t il)?|(?:ma |la )?batterie|niveau de (?:la )?batterie|j ai combien de batterie)$',
+          ).hasMatch(n);
+      if (status) {
+        final r = await call('pc_etat', {'applis': why});
+        if (r is Map && r['resume'] != null) {
+          var text = '${r['resume']}';
+          if (why && r['applis_gourmandes'] is List && !text.contains('mémoire :')) {
+            text += ' Ce qui prend le plus de mémoire : ${(r['applis_gourmandes'] as List).take(3).join(', ')}.';
+          }
+          return QuickReply(text);
+        }
+      }
+    }
+
+    // Les fenêtres.
+    if (has('pc_fenetres')) {
+      Future<QuickReply> win(String action, [String app = '']) async {
+        final r = await call('pc_fenetres', {'action': action, 'appli': app});
+        if (r is Map && r['ok'] == false) return QuickReply('${r['message'] ?? 'Je ne trouve pas cette fenêtre.'}');
+        return const QuickReply('C\'est fait.');
+      }
+
+      if (RegExp(r'^(?:montre|affiche)(?: moi)? le bureau$|^(?:reduis|cache|baisse) tout(?:es les fenetres)?$|^(?:reduis|cache) toutes les fenetres$').hasMatch(n)) {
+        return win('bureau');
+      }
+      if (RegExp(r'^(?:mets|met|passe)(?: cette fenetre| la fenetre| ca)? en (?:plein ecran|grand)$|^agrandis(?: la| cette)? fenetre$').hasMatch(n)) {
+        return win('agrandir');
+      }
+      if (RegExp(r'^(?:reduis|cache)(?: la| cette)? fenetre$').hasMatch(n)) return win('reduire');
+      final side = RegExp(r'^(?:mets|met|place|range|colle) (.+?) (?:a|sur la|sur le cote|du cote) (gauche|droite)$').firstMatch(n);
+      if (side != null) {
+        final app = side.group(1)!;
+        final here = RegExp(r'^(?:ca|cette fenetre|la fenetre|cette appli|l appli)$').hasMatch(app);
+        return win(side.group(2)!, here ? '' : app);
+      }
+      final go = RegExp(r'^(?:bascule|reviens|retourne) (?:sur|dans|vers) (?:mon |ma |le |la |l )?(.+)$').firstMatch(n);
+      if (go != null && !RegExp(r'\b(?:mode|cours|menu|accueil|question|sujet|debut|etape)\b').hasMatch(go.group(1)!)) {
+        // Fenêtre introuvable : ce n'était peut-être pas une appli, l'IA répond.
+        final r = await call('pc_fenetres', {'action': 'activer', 'appli': go.group(1)!});
+        if (r is Map && r['ok'] != false) return const QuickReply('C\'est fait.');
+      }
+    }
+
+    // Mode concentration.
+    if (has('clicky_concentration')) {
+      if (RegExp(
+        r'^(?:arrete|stop|stoppe|fin du|termine|desactive|quitte|coupe|sors du) (?:le )?mode (?:concentration|focus|travail|ne pas deranger)$|'
+        r'^(?:fin de (?:la )?(?:seance|concentration)|j ai fini de (?:travailler|bosser|reviser))$',
+      ).hasMatch(n)) {
+        final r = await call('clicky_concentration', {'arreter': true});
+        return QuickReply(r is Map ? '${r['bilan'] ?? 'C\'est fini.'}' : 'C\'est fini.');
+      }
+      final focus = RegExp(
+        r'^(?:(?:active|lance|demarre|mets|met|passe en|on passe en|je passe en) (?:le )?)?mode (?:concentration|focus|travail|ne pas deranger)(?: (.+))?$|'
+        r'^(?:je (?:dois|veux|vais) (?:me concentrer|travailler|bosser|reviser))(?: (.+))?$|'
+        r'^ne me derange (?:pas|plus)(?: (.+))?$|^concentration (.+)$',
+      ).firstMatch(n);
+      if (focus != null) {
+        final rest = focus.group(1) ?? focus.group(2) ?? focus.group(3) ?? focus.group(4);
+        final d = rest == null ? const Duration(minutes: 45) : FocusDuration.parse(rest);
+        if (d != null) {
+          final r = await call('clicky_concentration', {'minutes': d.inMinutes});
+          final end = r is Map ? '${r['fin'] ?? ''}' : '';
+          return QuickReply(
+            'Mode concentration activé pour ${FocusDuration.say(d)}${end.isEmpty ? '' : ', jusqu\'à $end'}. '
+            'Je ne te dérange plus et je garde les notifications pour la fin. Courage !',
+          );
+        }
+      }
+    }
+
+    // « Rappelle-moi de … quand j'ouvre … ».
+    if (has('clicky_rappel_appli')) {
+      final m = RegExp(r'^(?:rappelle|redis|redit)(?: moi)? (?:de |d |que |qu )?(.+?) (?:quand|des que|la prochaine fois que) (?:j ouvre|j ouvrirai|je lance|je vais sur|j allume|j arrive sur) (.+)$')
+          .firstMatch(n);
+      if (m != null) {
+        // Le texte d'origine (avec ses accents) quand on le retrouve.
+        final o = RegExp(
+          r"(?:rappelle|redis|redit)[-\s]*(?:moi)?\s+(?:de\s+|d['’]\s*|que\s+|qu['’]\s*)?(.+?)\s+(?:quand|dès que|des que|la prochaine fois que)\s+(?:j['’]\s*ouvre|j['’]\s*ouvrirai|je lance|je vais sur|j['’]\s*allume|j['’]\s*arrive sur)\s+(.+?)[\s.!?]*$",
+          caseSensitive: false,
+        ).firstMatch(raw);
+        final what = (o?.group(1) ?? m.group(1)!).trim();
+        final app = (o?.group(2) ?? m.group(2)!).trim();
+        await call('clicky_rappel_appli', {'appli': app, 'texte': what});
+        return QuickReply('D\'accord : la prochaine fois que tu ouvres $app, je te rappelle de $what.');
+      }
+    }
+
     // Minuteur.
     final timer = RegExp(
       r'^(?:mets |met |lance |demarre |fais )?(?:moi )?(?:un |le )?(?:minuteur|chrono|timer|compte a rebours)(?: de| pour)? '
@@ -616,5 +732,37 @@ class _Parser {
     }
     if (start == i) throw const FormatException('nombre');
     return double.parse(s.substring(start, i));
+  }
+}
+
+/// Durées dites à l'oral pour le mode concentration (« 45 min », « 1 h 30 »,
+/// « une demi-heure »).
+class FocusDuration {
+  FocusDuration._();
+
+  static Duration? parse(String n) {
+    var t = n.trim().replaceFirst(RegExp(r'^(?:pendant|pour|durant) '), '');
+    t = t.replaceAll(RegExp(r'\b(?:une )?demi heure\b'), '30 min').replaceAll(RegExp(r'\b(?:un )?quart d heure\b'), '15 min');
+    const words = {'une': 1, 'un': 1, 'deux': 2, 'trois': 3, 'quatre': 4, 'cinq': 5, 'dix': 10, 'quinze': 15, 'vingt': 20, 'trente': 30};
+    final m = RegExp(r'^(\d{1,3}|une|un|deux|trois|quatre|cinq|dix|quinze|vingt|trente) ?(h|heures?|min|minutes?|mn)(?: ?(?:et )?(\d{1,2}|demie|quart)(?: ?(?:min|minutes?|mn))?)?$')
+        .firstMatch(t);
+    if (m == null) return null;
+    final v = int.tryParse(m[1]!) ?? words[m[1]!]!;
+    final hours = m[2]!.startsWith('h');
+    var minutes = hours ? v * 60 : v;
+    final extra = m[3];
+    if (extra != null) {
+      if (!hours) return null;
+      minutes += extra == 'demie' ? 30 : (extra == 'quart' ? 15 : int.parse(extra));
+    }
+    if (minutes < 5 || minutes > 8 * 60) return null;
+    return Duration(minutes: minutes);
+  }
+
+  static String say(Duration d) {
+    final m = d.inMinutes;
+    if (m < 60) return '$m minutes';
+    final h = m ~/ 60, r = m % 60;
+    return '$h heure${h > 1 ? 's' : ''}${r == 0 ? '' : ' $r'}';
   }
 }

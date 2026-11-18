@@ -67,6 +67,7 @@ import 'win.dart';
 import '../../core/freeze_watch.dart';
 import 'course_listener.dart';
 import 'course_page.dart';
+import 'jarvis.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -244,6 +245,7 @@ class ClickyController extends ChangeNotifier {
   // gardent leurs préférences en mémoire sans relire le disque : on passe
   // donc par un petit fichier commun, relu toutes les 2 secondes.
   static const _sharedKeys = [
+    'followUp',
     'enabled',
     'voice',
     'mic',
@@ -439,6 +441,10 @@ class ClickyController extends ChangeNotifier {
 
   /// Clicky bouge tout seul autour du curseur (vivant).
   bool get alive => _opt('alive', true);
+
+  /// Conversation continue : après avoir répondu à voix haute, il réécoute
+  /// quelques secondes pour la suite (sans raccourci, comme JARVIS).
+  bool get followUp => _opt('followUp', true);
 
   static bool get everywhereSupported => !kIsWeb && Platform.isWindows;
 
@@ -643,9 +649,19 @@ class ClickyController extends ChangeNotifier {
   bool _dictating = false;
   Object? _dictationTarget;
 
-  Future<void> startListening({bool dictate = false}) async {
+  /// Il écoute la suite de la conversation (sans raccourci).
+  bool following = false;
+  Timer? _followTimer;
+  bool _followSpoke = false;
+  int _followChain = 0;
+
+  /// L'échange en cours a commencé à la voix (la suite s'écoute aussi).
+  bool _voiceTurn = false;
+
+  Future<void> startListening({bool dictate = false, bool followUp = false}) async {
     await stopSpeaking();
     if (state == ClickyState.thinking || state == ClickyState.listening) return;
+    if (!followUp) _followChain = 0;
     if (!mic) {
       // Micro désactivé : on écrit à la place.
       openPanel();
@@ -664,11 +680,16 @@ class ClickyController extends ChangeNotifier {
     micProblem = null;
     clearMarks();
     levels.fillRange(0, levels.length, 0);
+    _followSpoke = false;
     _set(
       ClickyState.listening,
-      status: _dictating ? 'Dictée : parle, je tape le texte.' : '',
+      status: _dictating
+          ? 'Dictée : parle, je tape le texte.'
+          : (followUp ? 'Je t\'écoute encore… (sinon, ne dis rien)' : ''),
       reply: '',
     );
+    following = followUp && !_dictating;
+    if (following) _armFollowTimer();
     // Réponse instantanée (Gemini Live, comme JARVIS) : le micro part en
     // direct, la réponse revient en voix tout de suite.
     if (!_dictating && liveReady) {
@@ -679,12 +700,14 @@ class ClickyController extends ChangeNotifier {
     final starting = ears.start(
       onText: (t) {
         if (state != ClickyState.listening) return;
+        if (t.trim().isNotEmpty) _followSpoke = true;
         transcript = t;
         _autoSend?.cancel();
         notifyListeners();
       },
       onLevel: (l) {
         if (state != ClickyState.listening) return;
+        if (l > 0.4) _followSpoke = true;
         levels.setRange(0, levels.length - 1, levels.skip(1));
         levels[levels.length - 1] = l;
         notifyListeners();
@@ -712,6 +735,48 @@ class ClickyController extends ChangeNotifier {
       return;
     }
     _micFailed(problem);
+  }
+
+  /// Conversation continue : sans un mot dans les 6 s, il arrête d'écouter
+  /// (rien n'est envoyé, rien ne coûte) ; on ne l'écoute pas plus de 20 s.
+  void _armFollowTimer() {
+    _followTimer?.cancel();
+    bool spoke() => _followSpoke || _liveSpoke || transcript.trim().isNotEmpty;
+    _followTimer = Timer(const Duration(seconds: 6), () {
+      if (!following || state != ClickyState.listening) return;
+      // Ctrl + Alt maintenus : c'est une écoute normale maintenant.
+      if (_holding) {
+        following = false;
+        return;
+      }
+      if (!spoke()) return _endFollow();
+      _followTimer = Timer(const Duration(seconds: 14), () {
+        if (!following || state != ClickyState.listening || _holding) return;
+        spoke() ? unawaited(stopListening()) : _endFollow();
+      });
+    });
+  }
+
+  void _endFollow() {
+    _followChain = 0;
+    unawaited(stopListening(send: false).then((_) => _fadeSoon()));
+  }
+
+  /// Après une réponse à voix haute : il attend la fin de sa phrase et
+  /// réécoute (5 fois de suite au plus, puis il faut le rappeler).
+  Future<void> _followUpSoon() async {
+    if (_followChain >= 5 || !mic || !_voicePlatform || !active) {
+      _followChain = 0;
+      return;
+    }
+    for (var i = 0; i < 600 && (voiceOut.speaking || _livePlayer.playing); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    // Un petit temps : il ne s'entend pas lui-même.
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (state != ClickyState.idle || _holding || voiceOut.speaking || acting) return;
+    _followChain++;
+    await startListening(followUp: true);
   }
 
   /// Clicky a déjà tenté de se réparer tout seul depuis le démarrage.
@@ -769,6 +834,8 @@ class ClickyController extends ChangeNotifier {
 
   void _micFailed(EarsProblem p) {
     micProblem = p;
+    _voiceTurn = false;
+    _followChain = 0;
     panelOpen = true;
     onInteractive?.call(true);
     _set(ClickyState.idle, status: '', reply: '');
@@ -838,6 +905,14 @@ class ClickyController extends ChangeNotifier {
       _wake.resume();
       return;
     }
+    if (t.isEmpty && following) {
+      // La suite de la conversation : rien dit, il arrête sans rien afficher.
+      _followChain = 0;
+      _set(ClickyState.idle, status: '');
+      _fadeSoon();
+      _wake.resume();
+      return;
+    }
     if (t.isEmpty) {
       _set(
         ClickyState.idle,
@@ -849,8 +924,12 @@ class ClickyController extends ChangeNotifier {
       _wake.resume();
       return;
     }
+    _spokenAsk = true;
     await ask(t);
   }
+
+  /// La prochaine question vient du micro.
+  bool _spokenAsk = false;
 
   /// Secours Windows : la dictée de Windows (Win + H) écrit dans la zone
   /// de texte de Clicky.
@@ -887,6 +966,8 @@ class ClickyController extends ChangeNotifier {
   /// Arrête tout : la réponse en cours, la voix, l'écoute (Échap, « stop »).
   Future<void> cancel() async {
     _askId++;
+    _voiceTurn = false;
+    _followChain = 0;
     ClaudeCode.cancelAll();
     await stopSpeaking();
     // Gemini Live : on coupe la voix et on ignore la fin de la réponse.
@@ -1136,9 +1217,24 @@ class ClickyController extends ChangeNotifier {
       marks.isEmpty &&
       target == null &&
       !_keepReply &&
-      idea == null;
+      idea == null &&
+      // Mode concentration : il ne dit rien de lui-même.
+      !FocusMode.instance.active;
+
+  int _presenceN = 0;
 
   Future<void> _presenceTick() async {
+    _presenceN++;
+    // Toutes les 10 s : le mode concentration (lancé ailleurs ?) et les
+    // rappels liés à une appli (« quand j'ouvre Discord »).
+    if (_presenceN % 5 == 0) {
+      await FocusMode.instance.sync();
+      if (DriveRunner.supported) await _checkAppReminder();
+    }
+    // Le point de la situation se prépare en avance (réponse plus rapide).
+    if (_presenceN % 30 == 0 && state == ClickyState.idle && active) unawaited(_refreshSituation());
+    // Batterie faible : il prévient de lui-même (à 20 % puis à 10 %).
+    if (_presenceN % 30 == 15) _checkBattery();
     final mind = ClickyMind.instance;
     if (!active || !mind.on || !_calm || (fullscreenNow?.call() ?? false)) return;
     if (desktopMode && DriveRunner.supported && privacy && isSensitiveTitle(Win.foregroundTitle())) return;
@@ -1234,6 +1330,52 @@ class ClickyController extends ChangeNotifier {
         _fadeSoon();
       }
     });
+  }
+
+  /// « Rappelle-moi de … quand j'ouvre … » : l'appli vient d'arriver au
+  /// premier plan, il le dit (une seule fois).
+  String _lastFront = '';
+  int? _batteryAlerted;
+
+  void _checkBattery() {
+    final b = SystemStatus.batteryNow();
+    if (b == null) return;
+    final (pct, charging) = b;
+    if (charging) {
+      _batteryAlerted = null;
+      return;
+    }
+    final level = SystemStatus.batteryAlert(pct, charging, _batteryAlerted);
+    if (level == null) return;
+    _batteryAlerted = level;
+    final text = pct <= 10
+        ? 'Batterie à $pct %, branche le chargeur tout de suite.'
+        : 'Batterie à $pct %, pense à brancher le chargeur.';
+    notify?.call('Batterie faible', text);
+    final at = cursor;
+    if (at != null && state == ClickyState.idle) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 6));
+    if (voice && state == ClickyState.idle) unawaited(speak(text));
+  }
+
+  Future<void> _checkAppReminder() async {
+    if (!active || state != ClickyState.idle) return;
+    String title = '';
+    try {
+      title = Win.foregroundTitle();
+    } catch (_) {}
+    if (title.trim().isEmpty || title == 'Clicky') return;
+    // Seulement quand l'appli **arrive** au premier plan (pas si elle y était
+    // déjà quand on a demandé le rappel).
+    final changed = title != _lastFront;
+    _lastFront = title;
+    if (!changed) return;
+    final r = await AppReminders.instance.due(title);
+    if (r == null) return;
+    final text = 'Rappel : ${r.text}';
+    notify?.call('Rappel de Clicky', r.text);
+    final at = cursor;
+    if (at != null) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 8));
+    if (voice) unawaited(speak(withoutEmoji(text)));
   }
 
   /// Une pensée à partager (rappel de l'assistant…) : bulle à côté de lui,
@@ -1468,6 +1610,18 @@ class ClickyController extends ChangeNotifier {
   Future<ClickyIdea?> autonomyTick({DateTime? now, int? idleSeconds, bool propose = true}) async {
     final n = now ?? DateTime.now();
     final mind = ClickyMind.instance;
+    // Mode concentration : rien pendant la séance, le bilan à la fin.
+    final focus = FocusMode.instance;
+    await focus.sync();
+    if (focus.endedUnannounced && propose && toolsOverride == null) {
+      final text = await focus.stop();
+      if (text != null) {
+        notify?.call('Concentration terminée', text);
+        unawaited(think(text));
+      }
+      return null;
+    }
+    if (focus.active) return null;
     if (_deciding || !active || idea != null) return null;
     final windows = DriveRunner.supported;
     final idle = idleSeconds ?? (windows ? Win.idleSeconds() : 0);
@@ -1613,6 +1767,18 @@ class ClickyController extends ChangeNotifier {
 
   void _set(ClickyState s, {String? status, String? reply}) {
     _armStuck(s);
+    final was = state;
+    if (s != ClickyState.listening && following) {
+      following = false;
+      _followTimer?.cancel();
+    }
+    // La réponse à une question posée à la voix est finie : il écoute la suite.
+    if (s == ClickyState.idle &&
+        _voiceTurn &&
+        (was == ClickyState.speaking || was == ClickyState.thinking || was == ClickyState.pointing)) {
+      _voiceTurn = false;
+      if (followUp) unawaited(_followUpSoon());
+    }
     state = s;
     FreezeWatch.note('Clicky : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
     if (status != null) this.status = status;
@@ -1622,6 +1788,129 @@ class ClickyController extends ChangeNotifier {
       _clear?.cancel();
     }
     notifyListeners();
+  }
+
+  /// Les fonctions « JARVIS » (sans IA) : état du PC, fenêtres, mode
+  /// concentration, rappels d'appli, point de situation.
+  List<HubTool> get jarvisTools => [
+    if (SystemStatus.supported) ...[
+      HubTool(
+        name: 'pc_etat',
+        description:
+            'État du PC : batterie, mémoire, processeur, disque, internet, et les applis qui prennent le plus de mémoire '
+            '(« mon PC rame », « il me reste combien de batterie »).',
+        params: {'applis': ('boolean', 'Aussi les applis les plus gourmandes (pour « pourquoi ça rame »)')},
+        run: (a) async => (await SystemStatus.read(apps: a['applis'] == true)).toJson(),
+      ),
+      HubTool(
+        name: 'pc_fenetres',
+        description:
+            'Range les fenêtres : « bureau » (tout réduire), « agrandir », « reduire », « activer », « gauche » ou '
+            '« droite » (moitié de l\'écran). Sans appli : la fenêtre au premier plan.',
+        params: {
+          'action': ('string', 'bureau, agrandir, reduire, activer, gauche ou droite'),
+          'appli': ('string', 'Nom de l\'appli ou mot du titre (facultatif)'),
+        },
+        required: ['action'],
+        run: (a) async => windowCommand('${a['action'] ?? ''}', '${a['appli'] ?? ''}'),
+      ),
+    ],
+    HubTool(
+      name: 'clicky_concentration',
+      description:
+          'Mode concentration : pendant la séance, Clicky ne dérange plus (pas d\'idées ni de remarques), les '
+          'notifications de Mon Hub attendent la fin, et il annonce la fin avec le bilan.',
+      params: {
+        'minutes': ('integer', 'Durée (défaut 45)'),
+        'arreter': ('boolean', 'Arrêter la séance en cours'),
+      },
+      run: (a) async {
+        final f = FocusMode.instance;
+        if (a['arreter'] == true) {
+          final text = await f.stop();
+          return {'ok': true, 'bilan': text ?? 'Pas de séance en cours.'};
+        }
+        final m = ((a['minutes'] as num?)?.toInt() ?? 45).clamp(5, 480);
+        await f.start(Duration(minutes: m));
+        return {'ok': true, 'minutes': m, 'fin': '${f.until!.hour} h ${f.until!.minute.toString().padLeft(2, '0')}'};
+      },
+    ),
+    HubTool(
+      name: 'clicky_rappel_appli',
+      description:
+          'Rappel lié à une appli : Clicky le dit la prochaine fois que l\'appli est ouverte (« rappelle-moi de '
+          'répondre à Léo quand j\'ouvre Discord »). Sans texte : liste les rappels ; supprimer=true : les retire.',
+      params: {
+        'appli': ('string', 'L\'appli ou le site (Discord, Chrome, YouTube, Word…)'),
+        'texte': ('string', 'Ce qu\'il faudra rappeler'),
+        'supprimer': ('boolean', 'Retirer les rappels de cette appli'),
+      },
+      run: (a) async {
+        final r = AppReminders.instance;
+        final app = '${a['appli'] ?? ''}'.trim();
+        final text = '${a['texte'] ?? ''}'.trim();
+        if (a['supprimer'] == true) return {'ok': await r.remove(app)};
+        if (app.isEmpty || text.isEmpty) {
+          return [for (final x in await r.list()) {'appli': x.app, 'rappel': x.text}];
+        }
+        await r.add(app, text);
+        return {'ok': true, 'appli': app};
+      },
+    ),
+    HubTool(
+      name: 'clicky_situation',
+      description: 'Le point de la situation en ce moment (prochain cours, devoirs, contrôles, révisions, musique).',
+      run: (_) async => await _refreshSituation(force: true),
+    ),
+  ];
+
+  /// Range les fenêtres de Windows (sans IA).
+  static Map<String, dynamic> windowCommand(String action, String app) {
+    final what = ToolRouter.normalize(action.trim());
+    if (what == 'bureau') {
+      Win.pressCombo('win+d');
+      return {'ok': true};
+    }
+    final want = ToolRouter.normalize(AppReminders.appKey(app));
+    final all = Win.windowList().where((w) => !w.$2.toLowerCase().contains('mon hub - clicky')).toList();
+    final w = want.isEmpty
+        ? all.firstOrNull
+        : all.where((w) => ToolRouter.normalize('${w.$2} ${w.$3}').contains(want)).firstOrNull;
+    if (w == null) return {'ok': false, 'message': 'Je ne trouve pas de fenêtre « $app » ouverte.'};
+    switch (what) {
+      case 'gauche' || 'droite':
+        Win.windowAction(w.$1, 'restaurer');
+        Win.pressCombo(what == 'gauche' ? 'win+left' : 'win+right');
+      case 'agrandir' || 'reduire':
+        Win.windowAction(w.$1, what);
+      default:
+        Win.windowAction(w.$1, 'activer');
+    }
+    return {'ok': true, 'fenetre': w.$2};
+  }
+
+  /// Le point de la situation (pour les consignes de l'IA), gardé 4 minutes.
+  String _situation = '';
+  DateTime? _situationAt;
+  Future<String>? _situationLoading;
+
+  Future<String> _refreshSituation({bool force = false}) {
+    final at = _situationAt;
+    if (!force && at != null && DateTime.now().difference(at) < const Duration(minutes: 4)) {
+      return Future.value(_situation);
+    }
+    return _situationLoading ??= () async {
+      try {
+        final tools = _tools;
+        final byName = {for (final t in tools) t.name: t};
+        _situation = await ClickySituation.build((n, a) async => byName[n]?.run(a), byName.keys.toSet());
+        _situationAt = DateTime.now();
+      } catch (_) {
+      } finally {
+        _situationLoading = null;
+      }
+      return _situation;
+    }();
   }
 
   /// Écouter un cours en entier et en faire le compte rendu.
@@ -1852,6 +2141,7 @@ class ClickyController extends ChangeNotifier {
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
     if (_voicePlatform) ...repairTools,
+    if (toolsOverride == null) ...jarvisTools,
     if (hub != null && toolsOverride == null && CourseListener.supported) ...courseTools,
     if (pcControl != 'off') ...PcControl.tools(),
     // L'assistant personnel vit dans Mon Hub (qui a les modules).
@@ -1955,6 +2245,8 @@ ${clickyPersona(callName)}
 ${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
+${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
+$thinkingRules
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
 Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir. Pendant un devoir noté, aide à comprendre sans faire le travail à sa place.
@@ -2020,6 +2312,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
 
   Future<void> ask(String question) async {
     final q = question.trim();
+    // Posée à la voix : la suite de la conversation s'écoute aussi.
+    _voiceTurn = _spokenAsk;
+    _spokenAsk = false;
     if (q.isEmpty) return;
     _keepReply = false;
     await stopSpeaking();
@@ -2335,6 +2630,14 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     final lang = multilang ? detectLanguage(q) : 'fr-FR';
     _applyVoice(lang: lang);
+    // Le point de la situation (préparé en avance ; la toute première fois,
+    // on l'attend un peu, pas plus de 2,5 s).
+    if (_situationAt == null) {
+      await _refreshSituation().timeout(const Duration(milliseconds: 2500), onTimeout: () => '');
+    } else {
+      unawaited(_refreshSituation());
+    }
+    if (id != _askId) return;
     // Pas de capture pour une question générale : beaucoup plus rapide.
     final look = withScreen && needsScreen(q);
     final (shots0, fg, hidden) = look ? await _look() : (const <ClickyShot>[], '', false);
@@ -2366,7 +2669,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final sent = groups == null
         ? allTools
         : ToolRouter.forGroups(groups, [...allTools, ...ToolRouter.metaTools(allTools)]);
-    final effort = thrift ? ClaudeThrift.effort(q) : 'low';
+    final deep = ClaudeThrift.deep(q);
+    final effort = thrift ? ClaudeThrift.effort(q) : (deep ? 'high' : 'low');
+    if (deep) _set(ClickyState.thinking, status: 'Je réfléchis à fond…');
     final system = _system(shots, foreground: fg, hiddenScreen: hidden, groups: groups);
     final docBlocks = [for (final d in docs) ...d.blocks()];
     if (!useOllama) unawaited(ClaudeUsage.claude());
@@ -2405,7 +2710,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           extraBlocks: docBlocks,
           web: webSearch,
           groups: groups,
-          effort: thrift ? effort : null,
+          effort: thrift || deep ? effort : null,
           onText: streamed,
           onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
         );
@@ -2753,8 +3058,18 @@ ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
 ${PromptShield.rule}
 Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
-${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}''';
+${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}
+${_situation.isEmpty ? '' : 'En ce moment (données de Mon Hub) :\n$_situation'}
+$thinkingRules''';
   }
+
+  /// Comment Clicky réfléchit (comme un vrai assistant personnel).
+  static const thinkingRules = '''Ta façon de penser :
+- Comprends le vrai besoin derrière la question et réponds à celui-là ; si c'est ambigu, prends l'interprétation la plus probable d'après la situation et la mémoire, et ne pose une question que si c'est vraiment indispensable.
+- Pour un calcul, un raisonnement ou un problème en plusieurs étapes : réfléchis étape par étape en silence, vérifie le résultat, puis donne la réponse claire.
+- Ne devine jamais un fait que tu ignores (une note, un horaire, un message) : va le lire avec l'action qui convient. Si tu n'es pas sûr, dis-le en une phrase.
+- Anticipe comme un vrai JARVIS : si la situation rend une info utile (un contrôle demain, un cours dans 20 minutes, une batterie faible), glisse-la en une phrase à la fin, sans en faire trop.
+- Enchaîne les actions toi-même quand la demande en demande plusieurs (lire puis organiser puis proposer), au lieu de t'arrêter au milieu.''';
 
   static const _liveExtras = [
     {
@@ -2990,6 +3305,7 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
       _wake.resume();
       return;
     }
+    _voiceTurn = true;
     _set(ClickyState.thinking, status: '', reply: '');
     // Tu as lâché avant la fin de la connexion : on attend, puis on envoie.
     var l = _liveTarget;

@@ -213,3 +213,19 @@
 - Réglages de Clicky **rangés** : `ui/clicky/clicky_settings_page.dart` (`ClickySettingsPage` : recherche, « L'essentiel »,
   rubriques `ClickySection.all` → `ClickyMoreSettings(section:)` ou `(query:)`), `ClaudeModule.showSettings` = cette page,
   `ClaudeModule.showBrain` = le cerveau seul. Réglages de Mon Hub : une seule entrée « Réglages de Clicky ».
+- **Clicky façon JARVIS (v1.51)** : `ui/clicky/jarvis.dart` — `SystemStatus` (FFI win32 : batterie `GetSystemPowerStatus`,
+  mémoire, disque C:, processeur `GetSystemTimes` sur 0,4 s, internet ; `topMemory` = `tasklist /fo csv` regroupé ;
+  `say()` « Tous les systèmes sont opérationnels » ou les soucis ; `batteryNow`/`batteryAlert` à 20 % puis 10 %),
+  `FocusMode` (fichier partagé `concentration.json` : Clicky ne dit rien de lui-même — `_calm` et `autonomyTick` —,
+  `NotificationCenter.post` garde les notifications (sauf appels Discord), bilan à la fin par `autonomyTick`, pastille
+  `FocusPill` dans `CourseRecLayer`), `AppReminders` (`rappels-applis.json`, dit quand l'appli **arrive** au premier plan,
+  `_checkAppReminder` dans `_presenceTick`), `ClickySituation` (bloc « En ce moment » dans `_system` et `_liveSystem`,
+  préparé en avance, `_refreshSituation` 4 min). `thinkingRules` = façon de réfléchir. « Réfléchis bien » →
+  `ClaudeThrift.deep` → effort `high`. Outils `pc_etat`, `pc_fenetres` (`windowCommand` : bureau, gauche/droite,
+  agrandir, activer), `clicky_concentration`, `clicky_rappel_appli`, `clicky_situation` (`jarvisTools`), phrases sans IA
+  dans `QuickAnswers` (« fais le point », « comment va mon PC », « pourquoi mon PC rame », « mode concentration 45 min »,
+  « mets Chrome à gauche », « rappelle-moi de … quand j'ouvre … » ; durées `FocusDuration`).
+  **Conversation continue** (réglage `followUp`, partagé) : après une réponse à une question posée à la voix
+  (`_spokenAsk` → `_voiceTurn`, Live : `_liveStop`), `_followUpSoon` attend la fin de la voix et réécoute
+  (`following`, `_armFollowTimer` : rien dit en 6 s → arrêt silencieux, 20 s max, 5 tours de suite). Page
+  « Ce que Clicky sait faire » = `ClickySkillsPage` (`jarvis_view.dart`), en tête des réglages de Clicky.
