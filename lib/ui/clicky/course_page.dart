@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/browser.dart';
 import '../../core/nav.dart';
+import '../../modules/docs/docs_module.dart';
 import '../../modules/revisions/fiche_view.dart';
 import '../widgets.dart';
 import 'clicky.dart';
@@ -65,6 +67,9 @@ class _CoursePageState extends State<CoursePage> {
   final subject = TextEditingController();
   DateTime? _lessonEnd;
   bool _autoStop = true;
+
+  /// Les notes s'écrivent en direct dans un Google Doc.
+  bool _liveDoc = GoogleDocs.connected;
   bool _starting = false;
   late Future<List<CourseNote>> _list = l.list();
   String? _engine;
@@ -110,7 +115,7 @@ class _CoursePageState extends State<CoursePage> {
 
   Future<void> _start() async {
     setState(() => _starting = true);
-    final err = await l.start(subject: subject.text, stopAt: _autoStop ? _lessonEnd : null);
+    final err = await l.start(subject: subject.text, stopAt: _autoStop ? _lessonEnd : null, liveDoc: _liveDoc);
     if (!mounted) return;
     setState(() => _starting = false);
     if (err != null) showError(context, err);
@@ -227,6 +232,17 @@ class _CoursePageState extends State<CoursePage> {
                 onChanged: (v) => setState(() => _autoStop = v ?? true),
                 title: Text('M\'arrêter tout seul à la fin du cours (${hhmm(_lessonEnd!)})'),
               ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _liveDoc && GoogleDocs.connected,
+              onChanged: GoogleDocs.connected ? (v) => setState(() => _liveDoc = v ?? true) : null,
+              title: const Text('Écrire mes notes en direct dans un Google Doc'),
+              subtitle: Text(
+                GoogleDocs.connected
+                    ? 'Le document s\'ouvre et se remplit pendant le cours : tu peux le lire (ou l\'annoter) en direct.'
+                    : 'Connecte ton compte Google (Réglages → Connexion Google) pour ça.',
+              ),
+            ),
             const SizedBox(height: 10),
             if (noEngine)
               ErrorBanner(CourseListener.noEngine)
@@ -301,6 +317,15 @@ class _CoursePageState extends State<CoursePage> {
               ].join(' · '),
               style: theme.textTheme.bodySmall,
             ),
+            if (n.docId != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.description_rounded),
+                  label: const Text('Voir mes notes en direct (Google Doc)'),
+                  onPressed: () => Browser.openAppWindow(GoogleDocs.edit(n.docId!)),
+                ),
+              ),
             if (last.isNotEmpty) ...[
               const SizedBox(height: 10),
               Container(

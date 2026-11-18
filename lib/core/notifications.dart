@@ -73,6 +73,56 @@ class NotificationCenter extends ChangeNotifier {
     notifyListeners();
   }
 
+  static const _digestKey = 'notif.digest';
+
+  /// Regrouper les notifications des modules : toutes les [digest] minutes
+  /// un seul résumé (0 = chacune tout de suite). Les appels passent toujours.
+  int get digest => ModuleStore.prefs.getInt(_digestKey) ?? 30;
+  set digest(int v) {
+    ModuleStore.prefs.setInt(_digestKey, v);
+    if (v == 0) unawaited(flushDigest());
+    notifyListeners();
+  }
+
+  final _held = <HubNotification>[];
+  Timer? _digestTimer;
+
+  /// Ce qui passe toujours tout de suite (un appel qui sonne…).
+  static bool urgent(HubNotification n) =>
+      n.moduleId.isEmpty || n.id.startsWith('discord-appel') || n.id.startsWith('annule:');
+
+  /// Le résumé : « 3 messages Discord, 1 mail… » puis quelques lignes.
+  static HubNotification digestOf(List<HubNotification> items, Map<String, String> names, {DateTime? at}) {
+    final counts = <String, int>{};
+    for (final n in items) {
+      final k = names[n.moduleId] ?? (n.moduleId.isEmpty ? 'Mon Hub' : n.moduleId);
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    final head = [for (final e in counts.entries) '${e.value} ${e.key}'].join(' · ');
+    final lines = [
+      for (final n in items.reversed.take(5)) '• ${n.title}${n.body.isEmpty ? '' : ' — ${n.body.split('\n').first}'}',
+      if (items.length > 5) '… et ${items.length - 5} autre${items.length - 5 > 1 ? 's' : ''}',
+    ];
+    return HubNotification(
+      id: 'resume-${(at ?? DateTime.now()).millisecondsSinceEpoch}',
+      title: '🔔 ${items.length} notification${items.length > 1 ? 's' : ''} : $head',
+      body: lines.join('\n'),
+    );
+  }
+
+  /// Envoie le résumé maintenant (s'il y a quelque chose).
+  Future<void> flushDigest() async {
+    _digestTimer?.cancel();
+    _digestTimer = null;
+    if (_held.isEmpty) return;
+    final items = [..._held];
+    _held.clear();
+    final names = {for (final m in hub.enabled) m.id: m.name};
+    final d = items.length == 1 ? items.first : digestOf(items, names);
+    if (!banners.isClosed) banners.add(d);
+    await show(d);
+  }
+
   Set<String> get muted => (ModuleStore.prefs.getStringList(_mutedKey) ?? const []).toSet();
 
   bool isMuted(String moduleId) => muted.contains(moduleId);
@@ -106,6 +156,12 @@ class NotificationCenter extends ChangeNotifier {
     await focus.sync();
     if (focus.active && !n.id.startsWith('discord-appel')) {
       await focus.holdOne();
+      return;
+    }
+    // Regroupées : un seul résumé toutes les 30 min (ou 1 h).
+    if (digest > 0 && system && !urgent(n)) {
+      _held.add(n);
+      _digestTimer ??= Timer(Duration(minutes: digest), () => unawaited(flushDigest()));
       return;
     }
     if (!banners.isClosed) banners.add(n);

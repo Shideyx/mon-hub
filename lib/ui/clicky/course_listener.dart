@@ -6,8 +6,10 @@ import 'package:record/record.dart';
 
 import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
+import '../../core/browser.dart';
 import '../../core/error_log.dart';
 import '../../core/hub_files.dart';
+import '../../modules/docs/docs_module.dart';
 import 'whisper.dart';
 
 /// Un cours écouté par Clicky : la transcription, puis le compte rendu.
@@ -20,6 +22,7 @@ class CourseNote {
     this.parts = const [],
     this.summary = '',
     this.gaps = 0,
+    this.docId,
   });
 
   final String id;
@@ -36,6 +39,9 @@ class CourseNote {
   /// Morceaux qui n'ont pas pu être transcrits.
   int gaps;
 
+  /// Le Google Doc où les notes s'écrivent en direct (s'il y en a un).
+  String? docId;
+
   String get transcript => parts.where((p) => p.trim().isNotEmpty).join('\n\n');
   bool get done => summary.trim().isNotEmpty;
   /// Durée (un cours interrompu — Mon Hub fermé — compte ses morceaux).
@@ -51,6 +57,7 @@ class CourseNote {
     'morceaux': parts,
     'compte_rendu': summary,
     'trous': gaps,
+    'doc': ?docId,
   };
 
   factory CourseNote.fromJson(Map j) => CourseNote(
@@ -61,6 +68,7 @@ class CourseNote {
     parts: [for (final p in (j['morceaux'] is List ? j['morceaux'] as List : const [])) '$p'],
     summary: '${j['compte_rendu'] ?? ''}',
     gaps: (j['trous'] as num?)?.toInt() ?? 0,
+    docId: j['doc'] as String?,
   );
 }
 
@@ -146,7 +154,9 @@ class CourseListener extends ChangeNotifier {
       'Écoute → Installer Whisper) ou ta clé Gemini gratuite (Réglages de Clicky → Voix).';
 
   /// Commence l'écoute. Renvoie un message d'erreur, ou null si c'est parti.
-  Future<String?> start({String subject = '', DateTime? stopAt}) async {
+  /// [liveDoc] : les notes s'écrivent en direct dans un nouveau Google Doc
+  /// (ouvert à l'écran), pendant que le cours continue.
+  Future<String?> start({String subject = '', DateTime? stopAt, bool liveDoc = false}) async {
     if (!supported) return 'L\'écoute d\'un cours marche sur le PC (Windows).';
     if (recording) return null;
     if (await engine() == null) return noEngine;
@@ -168,6 +178,7 @@ class CourseListener extends ChangeNotifier {
     final now = DateTime.now();
     current = CourseNote(id: '${now.millisecondsSinceEpoch}', subject: subject, start: now, parts: []);
     await _put(current!);
+    if (liveDoc && GoogleDocs.connected) unawaited(_openLiveDoc(current!));
     final err = await _startSegment();
     if (err != null) {
       await _cleanup();
@@ -242,6 +253,8 @@ class CourseListener extends ChangeNotifier {
       if (!silent && await File(path).exists()) {
         final text = await _toText(path);
         note.parts = [...note.parts]..[slot] = text;
+        // Notes en direct : ce morceau, mis au propre, dans le Google Doc.
+        if (note.docId != null && text.trim().length > 40) await _writeLive(note, text);
       }
     } catch (e) {
       note.gaps++;
@@ -309,7 +322,57 @@ class CourseListener extends ChangeNotifier {
     await _put(note);
     notifyListeners();
     await summarize(note);
+    // Le compte rendu complet à la fin du Google Doc.
+    final doc = note.docId;
+    if (doc != null && note.done) {
+      try {
+        await GoogleDocs.append(doc, '\n━━━━━━━━━━  COMPTE RENDU  ━━━━━━━━━━\n\n${note.summary}');
+      } catch (e) {
+        ErrorLog.record(e, null, where: 'Notes en direct');
+      }
+    }
     return note;
+  }
+
+  /// Crée le Google Doc des notes et l'ouvre à l'écran (dans sa fenêtre).
+  Future<void> _openLiveDoc(CourseNote note) async {
+    try {
+      final d = note.start;
+      final title = 'Notes — ${note.title} — ${d.day}/${d.month}/${d.year}';
+      final id = await GoogleDocs.create(
+        title,
+        '# ${note.title} — ${d.day}/${d.month}/${d.year}\n\n*Notes prises en direct par Clicky pendant le cours.*\n',
+      );
+      note.docId = id;
+      await _put(note);
+      notifyListeners();
+      if (!await Browser.openAppWindow(GoogleDocs.edit(id))) await Browser.open(GoogleDocs.edit(id));
+    } catch (e) {
+      problem = 'Le Google Doc des notes n\'a pas pu être créé ($e). J\'écoute quand même le cours.';
+      notifyListeners();
+    }
+  }
+
+  static String livePrompt(String subject, String part) =>
+      'Voici la transcription automatique de quelques minutes d\'un cours${subject.isEmpty ? '' : ' de $subject'} '
+      '(lycée). Transforme-la en notes de cours propres, comme un très bon élève, en texte simple (pas de Markdown) :\n'
+      '- une ligne en MAJUSCULES quand un nouveau thème commence ;\n'
+      '- des lignes qui commencent par « • » pour les idées, courtes ;\n'
+      '- « Définition : » pour les définitions, « À retenir : » pour ce que le prof souligne ;\n'
+      '- les dates, chiffres, formules et exemples importants.\n'
+      'Ignore les bavardages, la discipline et les erreurs de transcription. N\'invente rien. S\'il n\'y a rien '
+      'du cours dans cet extrait, réponds juste « - ».\n\n---\n$part';
+
+  Future<void> _writeLive(CourseNote note, String part) async {
+    final doc = note.docId;
+    if (doc == null) return;
+    try {
+      final notes = (await AiText.ask(livePrompt(note.subject, part))).trim();
+      if (notes.isEmpty || notes == '-' || notes == '« - »') return;
+      await GoogleDocs.append(doc, '\n$notes');
+    } catch (e) {
+      ErrorLog.record(e, null, where: 'Notes en direct');
+    }
   }
 
   /// Abandonne l'écoute (rien n'est gardé).

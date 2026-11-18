@@ -587,6 +587,8 @@ class AccountSync extends ChangeNotifier {
   static bool syncedFile(String name) =>
       RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]*\.json$').hasMatch(name) &&
       !name.startsWith('rangement-') &&
+      // La sauvegarde des travaux est propre à ce PC (ses fichiers à lui).
+      name != 'sauvegarde.json' &&
       !name.startsWith('sync-');
 
   /// Fichiers déjà lus : (date de modification, contenu, empreinte). Un

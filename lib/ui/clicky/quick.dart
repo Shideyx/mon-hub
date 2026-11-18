@@ -245,6 +245,18 @@ class QuickAnswers {
       }
     }
 
+    // Le texte surligné : corriger, reformuler, traduire.
+    if (has('clicky_corriger_selection')) {
+      final sel = r'(?:ce que j ai (?:surligne|selectionne|ecrit)|le texte (?:surligne|selectionne)|la selection|mon texte|ce texte)';
+      final fix = RegExp('^(?:corrige|relis|verifie l orthographe de) $sel\$').hasMatch(n);
+      final re = RegExp('^(?:reformule|ameliore) $sel\$').hasMatch(n);
+      final tr = RegExp('^traduis $sel en (\\w+)\$|^traduis en (\\w+) $sel\$').firstMatch(n);
+      if (fix || re || tr != null) {
+        final mode = fix ? 'corriger' : (re ? 'reformuler' : 'traduire:${tr!.group(1) ?? tr.group(2)}');
+        return QuickReply('${await call('clicky_corriger_selection', {'mode': mode})}');
+      }
+    }
+
     // Les fenêtres.
     if (has('pc_fenetres')) {
       Future<QuickReply> win(String action, [String app = '']) async {
@@ -473,6 +485,53 @@ class QuickAnswers {
       }
     }
 
+    // Prépare ton sac.
+    if (has('assistant_sac') &&
+        RegExp(
+          r'^(?:qu est ce que je dois prendre|je dois prendre quoi|qu est ce que je prends|je prends quoi|qu est ce que je mets dans mon sac)(?: demain| pour demain)?$|'
+          r'^(?:prepare|fais|on prepare|aide moi a preparer) (?:mon |le )?sac(?: pour demain)?$|^(?:mon |le )?sac(?: pour demain| de demain)$',
+        ).hasMatch(n)) {
+      return QuickReply('${await call('assistant_sac', {})}');
+    }
+
+    // Moyennes : la note qu'il faut, la moyenne d'une matière, le bilan.
+    if (has('ecole_moyenne')) {
+      final need = RegExp(
+        r'^(?:il me faut|il faut que j aie|je dois avoir|j ai besoin de|faut que j ai|faut que j aie) combien|'
+        r'^quelle note (?:il me faut|je dois avoir|dois je avoir|faut il)',
+      ).hasMatch(n)
+          ? RegExp(r'\b(?:en|de) (.+?) pour (?:avoir|atteindre|monter a|remonter a|etre a|passer a) (\d{1,2})(?: (\d))?(?: de moyenne)?$').firstMatch(n)
+          : null;
+      if (need != null) {
+        final target = double.parse('${need.group(2)}${need.group(3) == null ? '' : '.${need.group(3)}'}');
+        final subject = need.group(1)!.replaceFirst(RegExp(r'^(?:au prochain (?:devoir|controle|test|ds) )'), '');
+        final coef = RegExp(r'coef(?:ficient)? (\d)').firstMatch(n);
+        final r = await call('ecole_moyenne', {
+          'matiere': subject,
+          'objectif': target,
+          if (coef != null) 'coef': int.parse(coef.group(1)!),
+        });
+        if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+        if (r is Map && r['message'] != null) return QuickReply('${r['message']}');
+      }
+      final avg = RegExp(r'^(?:c est quoi |quelle est |combien j ai de |j ai combien de )?(?:ma |de )?moyenne(?: generale)?(?: (?:en|de) (.+?))?$').firstMatch(n);
+      if (avg != null) {
+        final subject = avg.group(1);
+        final r = await call('ecole_moyenne', {'matiere': subject ?? ''});
+        if (r is Map && subject == null && r['generale'] != null) {
+          return QuickReply('Ta moyenne générale est de ${r['generale']} pour l\'instant.');
+        }
+        if (r is Map && r['moyenne'] != null) {
+          return QuickReply('Ta moyenne en ${subject ?? r['matiere']} est de ${r['moyenne']} (${r['nombre_de_notes']} notes ce trimestre).');
+        }
+        if (r is Map && r['message'] != null) return QuickReply('${r['message']}');
+      }
+    }
+    if (has('ecole_bilan_notes') &&
+        RegExp(r'^(?:fais(?: moi)? (?:le |un )?)?bilan (?:de |des )?(?:mes )?notes(?: de la semaine)?$|^comment (?:vont|sont) mes notes(?: cette semaine)?$').hasMatch(n)) {
+      return QuickReply('${await call('ecole_bilan_notes', {})}');
+    }
+
     // Notes.
     if (has('ecole_notes') &&
         RegExp(r'^(?:mes |quelles sont mes |c est quoi mes |j ai eu quoi comme |j ai quoi comme |montre moi mes )?(?:dernieres |nouvelles )?notes$').hasMatch(n)) {
@@ -501,6 +560,11 @@ class QuickAnswers {
     }
 
     // Révisions.
+    final mock = RegExp(r'^(?:(?:fais|fait|prepare|lance|donne)(?: moi)? |je veux )?(?:un |une )?(?:controle|interro|interrogation|devoir|examen|ds) blanc(?:he)? (?:de |d |en |sur (?:le |la |les )?)(.+)$').firstMatch(n);
+    if (mock != null && has('revision_controle_blanc')) {
+      await call('revision_controle_blanc', {'matiere': mock.group(1)!});
+      return QuickReply('Je te prépare un contrôle blanc de ${mock.group(1)} : il s\'ouvre dans Mon Hub. Bon courage !');
+    }
     if (has('revision_lancer')) {
       if (RegExp(r'^(?:lance |mets |demarre )?(?:le |un )?(?:pomodoro|minuteur de (?:travail|concentration|revision|revisions))$').hasMatch(n)) {
         await call('revision_lancer', {'mode': 'minuteur'});

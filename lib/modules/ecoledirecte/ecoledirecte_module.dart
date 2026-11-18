@@ -13,6 +13,7 @@ import '../../ui/file_viewer.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import 'ed_client.dart';
+import 'grade_math.dart';
 
 /// Emploi du temps École Directe (API non officielle, expérimental).
 class EcoleDirecteModule extends HubModule {
@@ -283,7 +284,18 @@ class EcoleDirecteModule extends HubModule {
     await load(force: true);
     store.changed();
     final now = DateTime.now();
+    // Le bilan des notes de la semaine, le vendredi à partir de 17 h (et le
+    // week-end), une fois par semaine.
+    final weekend = now.weekday >= DateTime.saturday || (now.weekday == DateTime.friday && now.hour >= 17);
+    final report = weekend ? GradeMath.weekReport(grades, now) : null;
+    final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
     return _lastItems = [
+      if (report != null)
+        HubNotification(
+          id: 'bilan-notes:${monday.toIso8601String().substring(0, 10)}',
+          title: '📊 Bilan de tes notes de la semaine',
+          body: report,
+        ),
       for (final g in grades.take(30))
         HubNotification(
           id: 'note:${g.id}',
@@ -325,10 +337,65 @@ class EcoleDirecteModule extends HubModule {
             {
               'matiere': g.subject,
               'note': '${g.value}/${g.outOf}',
+              if (g.coef != 1) 'coef': g.coef,
               'devoir': g.title,
               'date': g.date,
             },
         ];
+      },
+    ),
+    HubTool(
+      name: 'ecole_moyenne',
+      description:
+          'Moyennes du trimestre (avec les coefficients) et la note qu\'il faut au prochain devoir pour atteindre un '
+          'objectif (« il me faut combien en maths pour avoir 14 ? »).',
+      params: {
+        'matiere': ('string', 'Matière (vide : toutes les moyennes et la générale)'),
+        'objectif': ('number', 'Moyenne visée (facultatif)'),
+        'coef': ('number', 'Coefficient du prochain devoir (défaut 1)'),
+        'sur': ('number', 'Le prochain devoir est noté sur… (défaut 20)'),
+      },
+      run: (a) async {
+        await load();
+        final period = GradeMath.currentPeriod(grades);
+        final q = '${a['matiere'] ?? ''}'.trim();
+        if (q.isEmpty) {
+          final by = GradeMath.bySubject(period);
+          final g = GradeMath.general(period);
+          return {
+            'moyennes': {for (final e in by.entries) e.key: GradeMath.fmt(e.value)},
+            if (g != null) 'generale': GradeMath.fmt(g),
+          };
+        }
+        final subject = GradeMath.matchSubject(q, {for (final g in period) g.subject});
+        if (subject == null) return {'ok': false, 'message': 'Pas de note en « $q » ce trimestre.'};
+        final mine = [for (final g in period) if (g.subject == subject) g];
+        final avg = GradeMath.average(mine);
+        final target = (a['objectif'] as num?)?.toDouble();
+        final coef = (a['coef'] as num?)?.toDouble() ?? 1;
+        final outOf = (a['sur'] as num?)?.toDouble() ?? 20;
+        return {
+          'matiere': subject,
+          if (avg != null) 'moyenne': GradeMath.fmt(avg),
+          'nombre_de_notes': mine.length,
+          if (target != null) ...{
+            'note_necessaire': switch (GradeMath.needed(mine, target, coef: coef, outOf: outOf)) {
+              final n? => GradeMath.fmt(n),
+              null => null,
+            },
+            'resume': GradeMath.sayNeeded(_pretty(subject), mine, target, coef: coef, outOf: outOf),
+          },
+        };
+      },
+    ),
+    HubTool(
+      name: 'ecole_bilan_notes',
+      description: 'Bilan des notes de la semaine : nouvelles notes et comment les moyennes ont bougé.',
+      params: {'jours': ('integer', 'Nombre de jours (défaut 7)')},
+      run: (a) async {
+        await load();
+        final r = GradeMath.weekReport(grades, DateTime.now(), days: (a['jours'] as num?)?.toInt() ?? 7);
+        return r ?? 'Pas de nouvelle note sur cette période.';
       },
     ),
     HubTool(
@@ -1640,4 +1707,11 @@ class _WorkspacePageState extends State<_WorkspacePage> {
       ),
     );
   }
+}
+
+/// « MATHEMATIQUES » → « Mathematiques » (plus joli à l'oral).
+String _pretty(String s) {
+  if (s.isEmpty || s != s.toUpperCase()) return s;
+  final l = s.toLowerCase();
+  return l[0].toUpperCase() + l.substring(1);
 }

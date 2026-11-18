@@ -1058,13 +1058,35 @@ class EdHomework {
 }
 
 class EdGrade {
-  EdGrade(this.id, this.subject, this.value, this.outOf, this.title, this.date);
+  EdGrade(
+    this.id,
+    this.subject,
+    this.value,
+    this.outOf,
+    this.title,
+    this.date, {
+    this.coef = 1,
+    this.period = '',
+    this.counts = true,
+  });
   final String id;
   final String subject;
   final String value;
   final String outOf;
   final String title;
   final DateTime? date;
+
+  /// Coefficient de la note (1 si École Directe ne le donne pas).
+  final double coef;
+
+  /// Période (trimestre / semestre) : « A001 »…
+  final String period;
+
+  /// Compte dans la moyenne (pas « non significative », pas en lettres).
+  final bool counts;
+
+  static double _num(Object? v, double fallback) =>
+      double.tryParse('${v ?? ''}'.trim().replaceAll(',', '.')) ?? fallback;
 
   factory EdGrade.fromJson(Map<String, dynamic> j) => EdGrade(
     '${j['id']}',
@@ -1073,6 +1095,9 @@ class EdGrade {
     '${j['noteSur'] ?? '20'}'.trim(),
     j['devoir'] as String? ?? '',
     DateTime.tryParse(j['date'] as String? ?? ''),
+    coef: _num(j['coef'], 1),
+    period: '${j['codePeriode'] ?? ''}',
+    counts: j['nonSignificatif'] != true && j['enLettre'] != true,
   );
 }
 

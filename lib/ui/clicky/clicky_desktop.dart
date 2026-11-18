@@ -405,6 +405,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   Timer? _tick, _slow;
   bool _wasBoth = false;
   bool _wasEsc = false;
+  bool _wasFix = false;
   bool _interactive = false;
   bool _hidden = true;
   int _deadChecks = 0;
@@ -578,6 +579,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final both = Win.down(0x11) && Win.down(0x12) && !Win.down(0xA5);
     // Ctrl + Alt + Maj : dictée (le texte est tapé dans l'appli ouverte).
     final shift = Win.down(0x10);
+    // Ctrl + Alt + C : corrige le texte surligné dans l'appli ouverte.
+    final fix = both && Win.down(0x43);
+    if (fix && !_wasFix) unawaited(c.fixSelection());
+    _wasFix = fix;
     if (both && Win.otherKeyDown()) {
       c.hotkey(down: true, other: true);
     } else if (both && !_wasBoth) {

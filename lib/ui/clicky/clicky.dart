@@ -70,6 +70,7 @@ import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
 import 'shot_encode.dart';
+import 'text_fix.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -1820,6 +1821,14 @@ class ClickyController extends ChangeNotifier {
         run: (a) async => windowCommand('${a['action'] ?? ''}', '${a['appli'] ?? ''}'),
       ),
     ],
+    if (DriveRunner.supported)
+      HubTool(
+        name: 'clicky_corriger_selection',
+        description:
+            'Corrige (ou reformule, ou traduit) le texte surligné dans l\'appli ouverte et le remplace, comme Ctrl + Alt + C.',
+        params: {'mode': ('string', 'corriger (défaut), reformuler, ou traduire:anglais (ou une autre langue)')},
+        run: (a) async => fixSelection(mode: '${a['mode'] ?? 'corriger'}'),
+      ),
     HubTool(
       name: 'clicky_concentration',
       description:
@@ -1868,6 +1877,85 @@ class ClickyController extends ChangeNotifier {
       run: (_) async => await _refreshSituation(force: true),
     ),
   ];
+
+  /// Une correction de texte est en cours.
+  bool _fixing = false;
+
+  /// Une petite bulle à côté de Clicky (sans bouger la boîte).
+  void _bubble(String text, {int seconds = 5}) {
+    final at = cursor;
+    if (at != null) glance(at + const Offset(40, -30), note: text, hold: Duration(seconds: seconds));
+  }
+
+  /// **Ctrl + Alt + C** : corrige le texte surligné dans l'appli ouverte
+  /// (Word, Discord, un mail, un site…) et le remplace. [mode] : corriger,
+  /// reformuler, traduire:anglais. Renvoie ce qui s'est passé (en une phrase).
+  Future<String> fixSelection({String mode = 'corriger'}) async {
+    if (!DriveRunner.supported) return 'Ça marche sur le PC (Windows).';
+    if (_fixing) return 'Je suis déjà en train de corriger.';
+    _fixing = true;
+    String done(String msg) {
+      _set(ClickyState.idle, status: '');
+      _bubble(msg);
+      _fadeSoon();
+      return msg;
+    }
+
+    ClipboardData? before;
+    try {
+      // On attend que tu lâches le raccourci (sinon l'appli reçoit Ctrl+Alt+C).
+      for (var i = 0; i < 40 && (Win.down(0x11) || Win.down(0x12) || Win.down(0x43)); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      final target = Win.foreground().address;
+      if (privacy && isSensitiveTitle(Win.foregroundTitle())) {
+        return done('Fenêtre sensible : je ne touche pas à ce texte.');
+      }
+      before = await Clipboard.getData(Clipboard.kTextPlain);
+      await Clipboard.setData(const ClipboardData(text: ''));
+      Win.releaseModifiers();
+      Win.pressCombo('ctrl+c');
+      String? selected;
+      for (var i = 0; i < 14; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        final d = (await Clipboard.getData(Clipboard.kTextPlain))?.text ?? '';
+        if (d.isNotEmpty) {
+          selected = d;
+          break;
+        }
+      }
+      if (selected == null || selected.trim().isEmpty) {
+        return done('Surligne d\'abord le texte, puis Ctrl + Alt + C.');
+      }
+      if (selected.length > 8000) return done('C\'est trop long d\'un coup : surligne un morceau plus court.');
+      _set(ClickyState.thinking, status: mode == 'corriger' ? 'Je corrige…' : 'J\'écris…');
+      final answer = await AiText.ask(TextFix.prompt(selected, mode: mode), system: TextFix.system);
+      final fixed = TextFix.clean(answer, selected);
+      final n = TextFix.changes(selected, fixed);
+      if (fixed == selected) return done('Aucune faute, c\'est parfait ✓');
+      await Clipboard.setData(ClipboardData(text: fixed));
+      if (Win.foreground().address != target) {
+        before = null; // on laisse le texte corrigé dans le presse-papier
+        return done('La fenêtre a changé : le texte corrigé est copié, colle-le avec Ctrl + V.');
+      }
+      Win.releaseModifiers();
+      Win.pressCombo('ctrl+v');
+      // Le temps que l'appli colle, puis on remet ton presse-papier.
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      return done(mode == 'corriger' ? 'Corrigé ✓ ($n mot${n > 1 ? 's' : ''} changé${n > 1 ? 's' : ''})' : 'C\'est fait ✓');
+    } catch (e) {
+      ErrorLog.record(e, null, where: 'Correction du texte surligné');
+      return done('Je n\'ai pas pu corriger ce texte ($e).');
+    } finally {
+      _fixing = false;
+      final b = before;
+      if (b != null && b.text != null) {
+        try {
+          await Clipboard.setData(b);
+        } catch (_) {}
+      }
+    }
+  }
 
   /// Range les fenêtres de Windows (sans IA).
   static Map<String, dynamic> windowCommand(String action, String app) {
@@ -1925,13 +2013,16 @@ class ClickyController extends ChangeNotifier {
       description:
           'Clicky écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
           'rendu à la fin. Matière et heure de fin trouvées dans l\'emploi du temps si possible.',
-      params: {'matiere': ('string', 'Matière ou thème (facultatif)')},
+      params: {
+        'matiere': ('string', 'Matière ou thème (facultatif)'),
+        'google_doc': ('boolean', 'Écrire les notes en direct dans un Google Doc (oui par défaut si Google est connecté)'),
+      },
       run: (a) async {
         final l = CourseListener.instance;
         if (l.recording) return {'ok': true, 'deja': true, 'matiere': l.current?.subject};
         final lesson = await currentLesson();
         final subject = '${a['matiere'] ?? ''}'.trim().isNotEmpty ? '${a['matiere']}'.trim() : (lesson?.$1 ?? '');
-        final err = await l.start(subject: subject, stopAt: lesson?.$2);
+        final err = await l.start(subject: subject, stopAt: lesson?.$2, liveDoc: a['google_doc'] != false);
         if (err != null) return {'ok': false, 'message': err};
         unawaited(CoursePage.show());
         return {

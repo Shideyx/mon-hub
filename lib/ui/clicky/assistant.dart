@@ -12,6 +12,7 @@ import '../widgets.dart';
 import 'initiatives.dart';
 import 'quick.dart' show QuickTool;
 import 'tutor.dart' show normalize;
+import 'school_bag.dart';
 
 /// Le texte sans emojis (pour la voix).
 String withoutEmoji(String text) => text
@@ -43,6 +44,9 @@ class AssistantFeature {
         'Proposer d\'ajouter tes nouveaux devoirs à ta liste, et le faire après ton accord.'),
     AssistantFeature('conseils', Icons.lightbulb_rounded, Color(0xFFF1C40F), 'Conseils',
         'Repérer que tu accumules trop de tâches et te proposer des priorités.'),
+    AssistantFeature('sac', Icons.backpack_rounded, Color(0xFF2B6CFF), 'Prépare ton sac',
+        'Le soir, d\'après tes cours de demain : les affaires à prendre (tenue de sport, calculatrice…), les devoirs à '
+        'rendre et les contrôles.'),
     AssistantFeature('initiatives', Icons.rocket_launch_rounded, Color(0xFFD35400), 'Initiatives',
         'Prendre les devants sur tout le reste : un rendez-vous ou une date limite dans un message, une mauvaise '
         'note à rattraper, ta série de révisions à sauver, un message qui attend ta réponse, la pluie demain, '
@@ -271,9 +275,54 @@ class Assistant extends ChangeNotifier {
         await _offerPlan(hw, n, why: clash.isNotEmpty ? 'conflit' : (overloaded ? 'chargée' : 'annulé'));
       }
       if (on('initiatives')) await _initiatives(hw, n);
+      if (on('sac')) await _bag(events, hw, n);
     } finally {
       _busy = false;
     }
+  }
+
+  // Prépare ton sac -----------------------------------------------------------
+
+  /// L'heure du rappel du soir (minutes après minuit, 19 h 30 par défaut).
+  int get bagMinutes => store.getJson<int>('sac.heure') ?? 19 * 60 + 30;
+  Future<void> setBagMinutes(int m) async {
+    await store.setJson('sac.heure', m);
+    notifyListeners();
+  }
+
+  /// Les affaires réglées par matière.
+  Map<String, List<String>> get bagItems => {
+    for (final e in (store.getJson<Map<String, dynamic>>('sac.items') ?? const {}).entries)
+      e.key: [for (final i in (e.value is List ? e.value as List : const [])) '$i'],
+  };
+  Future<void> setBagItems(Map<String, List<String>> m) async {
+    await store.setJson('sac.items', m);
+    notifyListeners();
+  }
+
+  /// Le sac pour [day] (texte à dire), ou null s'il n'y a pas cours.
+  Future<String?> bagFor(DateTime day, {List<Map>? events, List<Map>? homework, String? word}) async {
+    final ev = events ??
+        _list(await _get('agenda_lire', {'debut': DateTime(day.year, day.month, day.day).toIso8601String().substring(0, 10), 'jours': 1}));
+    final hw = homework ?? _list(await _get('ecole_devoirs'));
+    final p = SchoolBag.plan(events: ev, homework: hw, day: day, custom: bagItems);
+    if (p == null) return null;
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final isTomorrow = day.year == tomorrow.year && day.month == tomorrow.month && day.day == tomorrow.day;
+    const days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+    return SchoolBag.say(p, word ?? (isTomorrow ? 'demain' : days[day.weekday - 1]));
+  }
+
+  Future<void> _bag(List<Map> events, List<Map> hw, DateTime n) async {
+    if (n.hour * 60 + n.minute < bagMinutes) return;
+    final key = 'sac|${n.toIso8601String().substring(0, 10)}';
+    if (seen(key)) return;
+    final day = DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
+    final text = await bagFor(day, events: events, homework: hw, word: 'demain');
+    await mark(key, n);
+    if (text == null) return;
+    notify?.call('🎒 Prépare ton sac', text);
   }
 
   // Anticipation ------------------------------------------------------------
@@ -957,6 +1006,17 @@ class Assistant extends ChangeNotifier {
   // Outils (pour Clicky et Claude) ------------------------------------------
 
   List<HubTool> get tools => [
+    HubTool(
+      name: 'assistant_sac',
+      description: 'Prépare ton sac : les affaires à prendre pour les cours de demain (ou d\'un autre jour), les devoirs '
+          'à rendre et les contrôles.',
+      params: {'jour': ('string', 'AAAA-MM-JJ (défaut : demain)')},
+      run: (a) async {
+        final n = DateTime.now();
+        final day = DateTime.tryParse('${a['jour'] ?? ''}') ?? DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
+        return await bagFor(day) ?? 'Pas cours ce jour-là : rien à préparer.';
+      },
+    ),
     HubTool(
       name: 'assistant_priorites',
       description: 'Assistant personnel : tout ce que j\'ai à faire (devoirs, contrôles, ma liste), classé du plus '
