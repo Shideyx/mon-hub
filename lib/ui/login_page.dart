@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
+import '../core/account_sync.dart';
 import '../core/session.dart';
 import '../core/version.dart';
+import 'account_sync_view.dart';
 
 /// Page d'accueil : se connecter à son compte Mon Hub ou en créer un.
 class LoginPage extends StatefulWidget {
@@ -17,6 +21,9 @@ class _LoginPageState extends State<LoginPage> {
   final _pass = TextEditingController();
   final _pass2 = TextEditingController();
   late bool _create = AppSession.instance.accounts.isEmpty;
+
+  /// « Retrouver mon compte » (compte d'un autre appareil, synchronisé).
+  bool _join = false;
   bool _remember = true;
   bool _hide = true;
   bool _busy = false;
@@ -41,6 +48,7 @@ class _LoginPageState extends State<LoginPage> {
         await AppSession.instance.register(_login.text, _name.text, _pass.text);
       } else {
         await AppSession.instance.signIn(_login.text, _pass.text, remember: _remember);
+        unawaited(AccountSync.instance.afterSignIn(_pass.text));
       }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -106,110 +114,126 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _create
+                            _join
+                                ? 'Retrouve le compte de ton autre appareil'
+                                : _create
                                 ? 'Crée ton compte pour retrouver tes applis au même endroit'
                                 : 'Connecte-toi à ton compte',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: cs.onSurfaceVariant),
                           ),
                           const SizedBox(height: 24),
-                          TextField(
-                            controller: _login,
-                            autofillHints: const [AutofillHints.username],
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Identifiant',
-                              prefixIcon: Icon(Icons.alternate_email_rounded),
-                            ),
-                          ),
-                          if (_create) ...[
-                            const SizedBox(height: 12),
+                          if (_join)
+                            JoinAccountView(onBack: () => setState(() => _join = false))
+                          else ...[
                             TextField(
-                              controller: _name,
-                              textCapitalization: TextCapitalization.words,
+                              controller: _login,
+                              autofillHints: const [AutofillHints.username],
                               textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(
-                                labelText: 'Prénom (facultatif)',
-                                prefixIcon: Icon(Icons.person_rounded),
+                                labelText: 'Identifiant',
+                                prefixIcon: Icon(Icons.alternate_email_rounded),
                               ),
                             ),
-                          ],
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _pass,
-                            obscureText: _hide,
-                            autofillHints: [
-                              _create ? AutofillHints.newPassword : AutofillHints.password,
-                            ],
-                            textInputAction: _create ? TextInputAction.next : TextInputAction.done,
-                            onSubmitted: (_) => _create ? null : _submit(),
-                            decoration: InputDecoration(
-                              labelText: 'Mot de passe',
-                              prefixIcon: const Icon(Icons.lock_rounded),
-                              suffixIcon: IconButton(
-                                tooltip: _hide ? 'Afficher' : 'Masquer',
-                                icon: Icon(
-                                  _hide ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                            if (_create) ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _name,
+                                textCapitalization: TextCapitalization.words,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Prénom (facultatif)',
+                                  prefixIcon: Icon(Icons.person_rounded),
                                 ),
-                                onPressed: () => setState(() => _hide = !_hide),
                               ),
-                            ),
-                          ),
-                          if (_create) ...[
+                            ],
                             const SizedBox(height: 12),
                             TextField(
-                              controller: _pass2,
+                              controller: _pass,
                               obscureText: _hide,
-                              onSubmitted: (_) => _submit(),
-                              decoration: const InputDecoration(
-                                labelText: 'Confirme le mot de passe',
-                                prefixIcon: Icon(Icons.lock_outline_rounded),
+                              autofillHints: [
+                                _create ? AutofillHints.newPassword : AutofillHints.password,
+                              ],
+                              textInputAction: _create ? TextInputAction.next : TextInputAction.done,
+                              onSubmitted: (_) => _create ? null : _submit(),
+                              decoration: InputDecoration(
+                                labelText: 'Mot de passe',
+                                prefixIcon: const Icon(Icons.lock_rounded),
+                                suffixIcon: IconButton(
+                                  tooltip: _hide ? 'Afficher' : 'Masquer',
+                                  icon: Icon(
+                                    _hide ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                                  ),
+                                  onPressed: () => setState(() => _hide = !_hide),
+                                ),
                               ),
                             ),
-                          ] else
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              controlAffinity: ListTileControlAffinity.leading,
-                              title: const Text('Rester connecté'),
-                              value: _remember,
-                              onChanged: (v) => setState(() => _remember = v ?? true),
+                            if (_create) ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _pass2,
+                                obscureText: _hide,
+                                onSubmitted: (_) => _submit(),
+                                decoration: const InputDecoration(
+                                  labelText: 'Confirme le mot de passe',
+                                  prefixIcon: Icon(Icons.lock_outline_rounded),
+                                ),
+                              ),
+                            ] else
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                title: const Text('Rester connecté'),
+                                value: _remember,
+                                onChanged: (v) => setState(() => _remember = v ?? true),
+                              ),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(_error!, style: TextStyle(color: cs.error)),
+                              ),
+                            const SizedBox(height: 20),
+                            FilledButton(
+                              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                              onPressed: _busy ? null : _submit,
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                                    )
+                                  : Text(_create ? 'Créer mon compte' : 'Se connecter'),
                             ),
-                          if (_error != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Text(_error!, style: TextStyle(color: cs.error)),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _create = !_create;
+                                _error = null;
+                              }),
+                              child: Text(
+                                _create
+                                    ? 'J\'ai déjà un compte : me connecter'
+                                    : 'Nouveau ? Créer un compte',
+                              ),
                             ),
-                          const SizedBox(height: 20),
-                          FilledButton(
-                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                            onPressed: _busy ? null : _submit,
-                            child: _busy
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                                  )
-                                : Text(_create ? 'Créer mon compte' : 'Se connecter'),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () => setState(() {
-                              _create = !_create;
-                              _error = null;
-                            }),
-                            child: Text(
-                              _create
-                                  ? 'J\'ai déjà un compte : me connecter'
-                                  : 'Nouveau ? Créer un compte',
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.devices_rounded),
+                              label: const Text('Retrouver mon compte d\'un autre appareil'),
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() {
+                                      _join = true;
+                                      _error = null;
+                                    }),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Ton compte et tes données restent sur cet appareil. '
-                            'Pour les retrouver sur un autre : Réglages → Exporter.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tes données restent sur tes appareils. Pour retrouver ton compte sur '
+                              'un autre : Réglages → Mes appareils → Activer la synchronisation.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                            ),
+                          ],
                         ],
                       ),
                     ),

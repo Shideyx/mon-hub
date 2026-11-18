@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'core/account_sync.dart';
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
 import 'core/desktop_widgets.dart';
@@ -101,6 +102,9 @@ class _HubAppState extends State<HubApp> {
   }
 
   void _close() {
+    AccountSync.instance
+      ..onApplied = null
+      ..stop();
     DiscordPhone.instance.stop();
     _notifications?.dispose();
     unawaited(_bridge?.stop());
@@ -126,6 +130,17 @@ class _HubAppState extends State<HubApp> {
         _openFor = login;
         // Laisse l'appli Claude (PC) lire et agir dans Mon Hub.
         unawaited(b.start().then((_) => _startClicky()));
+        // Le compte sur tous tes appareils (copie chiffrée dans ton Google
+        // Drive) : ce qui change ailleurs arrive ici tout seul.
+        AccountSync.instance
+          ..onApplied = (keys) {
+            if (keys.any((k) => k.startsWith('p:hub.'))) hub.reload();
+            if (keys.any((k) => k.startsWith('f:') || k.startsWith('p:mod.claude.'))) {
+              unawaited(ClickyController.instance.loadMemory());
+              unawaited(ClickyController.instance.shareOptions());
+            }
+          }
+          ..start();
         // Première ouverture du compte : la visite guidée de Clicky.
         unawaited(_tutorial());
         unawaited(n.start());

@@ -78,12 +78,15 @@ Le micro de Windows doit comprendre le français : *Paramètres → Heure et lan
 2. Télécharge **MonHub-Claude.mcpb** et double-clique dessus : Claude s'ouvre → **Installer**.
 3. Laisse Mon Hub ouvert, puis demande à Claude : « Qu'est-ce que j'ai demain ? », « Ajoute foot mercredi 14h », « Réponds à Léo sur Discord que j'arrive »… Claude demande ta permission avant chaque action.
 
-## 4. Copier la configuration sur le téléphone
+## 4. Ton compte sur un autre appareil (sans export)
 
-1. Sur le PC : **Réglages → Exporter ma configuration** → enregistre `mon-hub-config.json`.
-2. Envoie ce fichier sur ton téléphone (Google Drive, câble USB…).
-3. Sur le téléphone : **Réglages → Importer une configuration** → choisis le fichier → redémarre l'appli.
-4. **Supprime le fichier** de Drive et du téléphone ensuite : il contient tes mots de passe.
+1. Sur ton PC habituel : **Réglages → Mes appareils → Activer la synchronisation** → choisis ton compte Google → tape ton mot de passe Mon Hub.
+2. Sur l'autre appareil, installe Mon Hub puis, sur la page de connexion : **Retrouver mon compte d'un autre appareil** → **Se connecter avec Google** (le même compte) → ton mot de passe Mon Hub.
+3. C'est tout : ton compte est là, et ce que tu changes d'un côté arrive de l'autre tout seul (toutes les 3 minutes quand Mon Hub est ouvert).
+
+La copie est rangée dans un dossier caché de **ton** Google Drive, réservé à Mon Hub, et chiffrée avec ton mot de passe Mon Hub : personne d'autre ne peut la lire.
+
+Sans internet, l'ancienne méthode existe toujours : **Réglages → Mes appareils → Sans internet : passer par un fichier** → *Exporter*, puis *Importer* sur l'autre appareil (supprime ensuite le fichier : il contient tes mots de passe).
 
 ## 5. Mettre à jour
 

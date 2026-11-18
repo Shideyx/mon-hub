@@ -162,5 +162,16 @@
 - **Lecture** : `modules/books/free_classics.dart` (`FreeClassics` : 1984 / La Ferme des animaux via Gutenberg
   Australie, libres en France ; `Wikisource` FR via l'API + ws-export). **Anime-sama refusé** (site pirate) : seulement
   sources légales (MANGA Plus, WEBTOON, MangaDex…).
+- **Compte sur plusieurs appareils, sans export (v1.48)** : `core/account_sync.dart` (`AccountSync`). Copie du compte
+  dans le Drive **de la personne**, dossier caché `appDataFolder` (portée `GoogleAuth.appDataScope`, `GoogleAuth.canSync` ;
+  comptes Google d'avant : reconnexion), fichier `compte-<identifiant>.monhub` = `SyncBox` (gzip + AES-256-GCM, clé
+  `SyncKey` = PBKDF2 du mot de passe Mon Hub, gardée dans le coffre `sync.key` ; AAD = identifiant). Contenu : préférences
+  `p:`, secrets `s:`, fichiers `f:` (JSON de `HubFiles`), chacun `[valeur, date, empreinte]` ; fusion `SyncMerge` clé par
+  clé, **le plus récent gagne**, suppressions gardées 90 j, garde-fou `checkNotWiped`. `sync-base.json` = empreintes de la
+  dernière synchro. Jamais synchronisé : `sync.*`, `app.*`, `shortcut.*`, `hub.detached*`, `vault.key`, `rangement-*`.
+  Toutes les 3 min (`start` dans `HubApp._sync`, `onApplied` → `HubController.reload`, Clicky). Nouvel appareil : page de
+  connexion → « Retrouver mon compte » (`ui/account_sync_view.dart` `JoinAccountView` : `beginJoin` prépare l'espace où se
+  range la connexion Google, `join` → `AppSession.adopt`, `cancelJoin` efface). Réglages → Mes appareils =
+  `AccountSyncSection` ; l'export/import fichier reste dans « Sans internet ». Toujours **aucun serveur à nous**.
 - Animations : `ui/clicky/alive.dart` (`ClickyBounce` : rebond à chaque état, halo en réflexion, saut de joie, coucou
   rare ; rien en boucle au repos), cartes de l'accueil soulevées au survol, 👋 qui salue une fois.

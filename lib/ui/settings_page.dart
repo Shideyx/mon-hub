@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import 'account_sync_view.dart';
 import 'google_setup.dart';
 import 'tidy_page.dart';
 import '../core/google_auth.dart';
@@ -399,7 +400,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 'ne voit tes comptes, messages, notes ou conversations. Mots de passe et jetons sont '
                 'dans le coffre du système (Gestionnaire d\'identification Windows, Trousseau, '
                 'Keystore Android) ; historiques, journal, carnet et routines sont chiffrés '
-                '(AES-256) avec une clé qui ne quitte pas l\'appareil.',
+                '(AES-256) avec une clé qui ne quitte pas l\'appareil. Si tu actives « Mon compte sur '
+                'tous mes appareils », une copie chiffrée avec ton mot de passe va dans ton propre '
+                'Google Drive (illisible pour Google).',
               ),
             ),
             const ListTile(
@@ -419,23 +422,30 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () => _errors(context),
             ),
             section('Mes appareils'),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                'Configure tes comptes une fois (sur ton PC par exemple), exporte, puis '
-                'importe le fichier sur ton téléphone. Le fichier est chiffré avec un mot de passe '
-                'que tu choisis : sans lui, il est illisible.',
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.upload_file_rounded),
-              title: const Text('Exporter ma configuration'),
-              onTap: () => _export(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.download_rounded),
-              title: const Text('Importer une configuration'),
-              onTap: () => _import(context),
+            // Le compte sur tous tes appareils, sans export (Google Drive).
+            const AccountSyncSection(),
+            ExpansionTile(
+              leading: const Icon(Icons.folder_zip_rounded),
+              title: const Text('Sans internet : passer par un fichier'),
+              subtitle: const Text('Exporter / importer (clé USB…)'),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    'Le fichier est chiffré avec un mot de passe que tu choisis : sans lui, il est illisible.',
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.upload_file_rounded),
+                  title: const Text('Exporter ma configuration'),
+                  onTap: () => _export(context),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.download_rounded),
+                  title: const Text('Importer une configuration'),
+                  onTap: () => _import(context),
+                ),
+              ],
             ),
           ],
         ),

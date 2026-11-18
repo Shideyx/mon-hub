@@ -40,9 +40,17 @@ class HubFiles {
   }
 
   /// Nom de dossier sûr pour le compte connecté.
-  static String get profileFolder {
-    final p = ModuleStore.profile.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+  static String get profileFolder => folderFor(ModuleStore.profile);
+
+  static String folderFor(String profile) {
+    final p = profile.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
     return p.isEmpty || p == '_' ? 'default' : p;
+  }
+
+  /// Dossier d'un compte donné (sans le créer).
+  static Future<Directory?> dirOf(String profile) async {
+    final r = await _root();
+    return r == null ? null : Directory('$r${Platform.pathSeparator}${folderFor(profile)}');
   }
 
   /// Dossier du compte connecté (créé au besoin).

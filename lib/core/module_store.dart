@@ -42,6 +42,8 @@ class ModuleStore extends ChangeNotifier {
   static Future<void> writeSecretRaw(String key, String value) =>
       secure.write(key: '$profile$key', value: value);
 
+  static Future<void> deleteSecretRaw(String key) => secure.delete(key: '$profile$key');
+
   static bool _owns(String fullKey) =>
       profile.isEmpty ? !fullKey.startsWith('p.') : fullKey.startsWith(profile);
 
@@ -103,6 +105,7 @@ class ProfilePrefs {
   List<String>? getStringList(String k) => _p.getStringList(_k(k));
   Future<bool> setString(String k, String v) => _p.setString(_k(k), v);
   Future<bool> setInt(String k, int v) => _p.setInt(_k(k), v);
+  Future<bool> setDouble(String k, double v) => _p.setDouble(_k(k), v);
   Future<bool> setBool(String k, bool v) => _p.setBool(_k(k), v);
   Future<bool> setStringList(String k, List<String> v) => _p.setStringList(_k(k), v);
   Future<bool> remove(String k) => _p.remove(_k(k));

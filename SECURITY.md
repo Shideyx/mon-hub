@@ -23,6 +23,12 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   ou clés ; ouvrir un programme, un script ou un partage réseau demande ton
   accord ; les commandes risquées sont toujours montrées avant d'être lancées.
 - **Journal d'erreurs sans secrets** : clés et jetons y sont masqués.
+- **Compte sur plusieurs appareils** (si tu l'actives) : la copie de ton compte
+  vit dans **ton** Google Drive (dossier caché réservé à Mon Hub), compressée
+  puis chiffrée en AES-256-GCM avec une clé tirée de ton mot de passe Mon Hub
+  (PBKDF2-SHA256, 210 000 tours) et liée à ton identifiant. Google ne peut pas
+  la lire, et elle ne passe par aucun serveur à nous. La clé de coffre de
+  chaque PC ne quitte jamais ce PC.
 
 ## Réglages GitHub conseillés (à faire une fois)
 
