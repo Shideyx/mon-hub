@@ -15,7 +15,7 @@ class ClaudeThrift {
   /// plusieurs étapes, ou un long texte.
   static bool heavy(String question) {
     final q = ToolRouter.normalize(question);
-    if (question.length > 400) return true;
+    if (question.length > 400 || deep(question)) return true;
     return RegExp(
       r'\b(redige|rediger|ecris moi|ecrit moi|ecris un|ecris une|dissertation|expose|commentaire|redaction|lettre de motivation'
       r'|analyse|analyser|compare|comparer|argumente|critique|corrige|corriger|ameliore|reformule tout|resume (ce|le|la|mon|ma)'
@@ -28,7 +28,14 @@ class ClaudeThrift {
 
   /// Effort demandé à Claude : moins il réfléchit pour une question simple,
   /// moins ça coûte.
-  static String effort(String question) => heavy(question) ? 'medium' : 'low';
+  static String effort(String question) => deep(question) ? 'high' : (heavy(question) ? 'medium' : 'low');
+
+  /// « Réfléchis bien », « en profondeur », « mode expert » : Claude réfléchit
+  /// à fond (effort « high »), comme un vrai JARVIS sur un problème dur.
+  static bool deep(String question) => RegExp(
+    r'\b(reflechis bien|reflechis a fond|reflechis vraiment|prends ton temps|en profondeur|approfondi|approfondie'
+    r'|mode expert|analyse complete|analyse detaillee|tres precisement|sois tres precis|verifie bien)\b',
+  ).hasMatch(ToolRouter.normalize(question));
 
   /// Une question simple de culture générale, sans données de Mon Hub, sans
   /// écran, sans document : Gemini (gratuit) suffit.

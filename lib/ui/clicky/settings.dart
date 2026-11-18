@@ -188,7 +188,10 @@ class ClickyMoreSettings extends StatelessWidget {
         sw('voice', 'narrate', c.narrate, 'Parler pendant que la réponse s\'écrit', 'Il commence à lire dès la première phrase, sans attendre la fin.');
 
         // ---- Écoute ----
-        if (Whisper.supported) add('listen', 'reconnaissance vocale whisper gemini windows micro installer modele', const _MicEngine());
+        sw('listen', 'followUp', c.followUp, 'Conversation continue',
+        'Après sa réponse à voix haute, il t\'écoute encore quelques secondes : enchaîne sans Ctrl + Alt, comme avec '
+            'JARVIS. Si tu ne dis rien, il arrête tout seul (et rien n\'est envoyé).');
+    if (Whisper.supported) add('listen', 'reconnaissance vocale whisper gemini windows micro installer modele', const _MicEngine());
         if (WakeWord.supported) {
           sw('listen', 'wake', c.wakeOn, 'Mot d\'activation (mains libres)',
               'Dis « Clicky » et pose ta question, sans toucher au clavier. L\'écoute du mot se fait sur ton PC.');

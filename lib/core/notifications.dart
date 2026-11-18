@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'hub_controller.dart';
 import 'module_store.dart';
 import 'freeze_watch.dart';
+import '../ui/clicky/jarvis.dart';
 
 /// Une alerte produite par un module (nouveau mail, nouveau message…).
 class HubNotification {
@@ -100,6 +101,13 @@ class NotificationCenter extends ChangeNotifier {
     );
     unread++;
     notifyListeners();
+    // Mode concentration : gardée pour la fin (sauf un appel qui sonne).
+    final focus = FocusMode.instance;
+    await focus.sync();
+    if (focus.active && !n.id.startsWith('discord-appel')) {
+      await focus.holdOne();
+      return;
+    }
     if (!banners.isClosed) banners.add(n);
     if (system) await show(n);
   }

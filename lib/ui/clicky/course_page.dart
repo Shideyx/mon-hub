@@ -8,6 +8,7 @@ import '../../modules/revisions/fiche_view.dart';
 import '../widgets.dart';
 import 'clicky.dart';
 import 'course_listener.dart';
+import 'jarvis_view.dart';
 
 const _red = Color(0xFFE5484D);
 const _violet = Color(0xFF7C5CFF);
@@ -46,10 +47,8 @@ class CoursePage extends StatefulWidget {
   /// Commencer tout de suite (demandé à Clicky).
   final bool autoStart;
 
-  static Future<void> open(BuildContext context, {bool autoStart = false}) => Navigator.push(
-    context,
-    MaterialPageRoute<void>(builder: (_) => CoursePage(autoStart: autoStart)),
-  );
+  static Future<void> open(BuildContext context, {bool autoStart = false}) =>
+      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => CoursePage(autoStart: autoStart)));
 
   /// Ouvre la page depuis n'importe où (Clicky, raccourci).
   static Future<void> show({bool autoStart = false}) async {
@@ -192,7 +191,10 @@ class _CoursePageState extends State<CoursePage> {
           children: [
             Row(
               children: [
-                const CircleAvatar(backgroundColor: Color(0x22E5484D), child: Icon(Icons.mic_rounded, color: _red)),
+                const CircleAvatar(
+                  backgroundColor: Color(0x22E5484D),
+                  child: Icon(Icons.mic_rounded, color: _red),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -232,7 +234,11 @@ class _CoursePageState extends State<CoursePage> {
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: _red, padding: const EdgeInsets.symmetric(vertical: 14)),
                 icon: _starting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
                     : const Icon(Icons.fiber_manual_record_rounded),
                 label: const Text('Commencer l\'écoute'),
                 onPressed: _starting || _engine == null ? null : _start,
@@ -255,7 +261,11 @@ class _CoursePageState extends State<CoursePage> {
           children: [
             Row(
               children: [
-                Container(width: 14, height: 14, decoration: const BoxDecoration(color: _red, shape: BoxShape.circle)),
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: const BoxDecoration(color: _red, shape: BoxShape.circle),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -265,14 +275,22 @@ class _CoursePageState extends State<CoursePage> {
                 ),
                 Text(
                   _clock(l.elapsed),
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()]),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(value: l.level, minHeight: 8, color: _red, backgroundColor: _red.withValues(alpha: 0.12)),
+              child: LinearProgressIndicator(
+                value: l.level,
+                minHeight: 8,
+                color: _red,
+                backgroundColor: _red.withValues(alpha: 0.12),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -287,10 +305,7 @@ class _CoursePageState extends State<CoursePage> {
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12)),
                 child: Text(
                   '« …${last.length > 280 ? last.substring(last.length - 280) : last} »',
                   style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
@@ -462,7 +477,12 @@ class _CourseNotePageState extends State<CourseNotePage> {
               ],
             ),
           ],
-          bottom: const TabBar(tabs: [Tab(text: 'Compte rendu'), Tab(text: 'Transcription')]),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Compte rendu'),
+              Tab(text: 'Transcription'),
+            ],
+          ),
         ),
         body: TabBarView(
           children: [
@@ -479,19 +499,21 @@ class _CourseNotePageState extends State<CourseNotePage> {
                         label: const Text('En faire un Google Doc'),
                         onPressed: _busy != null
                             ? null
-                            : () => _tool('doc', 'doc_creer', {'titre': _docTitle, 'contenu': n.summary}, 'Google Doc créé ✓'),
+                            : () => _tool('doc', 'doc_creer', {
+                                'titre': _docTitle,
+                                'contenu': n.summary,
+                              }, 'Google Doc créé ✓'),
                       ),
                       FilledButton.tonalIcon(
                         icon: _busyIcon('cards', Icons.style_rounded),
                         label: const Text('Faire des cartes de révision'),
                         onPressed: _busy != null
                             ? null
-                            : () => _tool(
-                                'cards',
-                                'revision_generer',
-                                {'paquet': '🎧 ${n.title}', 'texte': n.summary, 'nombre': 15},
-                                'Cartes ajoutées dans Révisions ✓',
-                              ),
+                            : () => _tool('cards', 'revision_generer', {
+                                'paquet': '🎧 ${n.title}',
+                                'texte': n.summary,
+                                'nombre': 15,
+                              }, 'Cartes ajoutées dans Révisions ✓'),
                       ),
                     ],
                   ],
@@ -500,7 +522,9 @@ class _CourseNotePageState extends State<CourseNotePage> {
                 if (l.summarizing)
                   const Padding(padding: EdgeInsets.all(24), child: LoadingHint())
                 else if (n.done)
-                  SelectionArea(child: FicheView(markdown: n.summary, color: _violet))
+                  SelectionArea(
+                    child: FicheView(markdown: n.summary, color: _violet),
+                  )
                 else
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -532,10 +556,7 @@ class _CourseNotePageState extends State<CourseNotePage> {
                   style: theme.textTheme.labelMedium,
                 ),
                 const SizedBox(height: 12),
-                SelectableText(
-                  n.transcript.isEmpty ? '(vide)' : n.transcript,
-                  style: const TextStyle(height: 1.6),
-                ),
+                SelectableText(n.transcript.isEmpty ? '(vide)' : n.transcript, style: const TextStyle(height: 1.6)),
               ],
             ),
           ],
@@ -562,35 +583,49 @@ class CourseRecLayer extends StatelessWidget {
         left: 0,
         right: 0,
         child: Center(
-          child: ListenableBuilder(
-            listenable: CourseListener.instance,
-            builder: (context, _) {
-              final l = CourseListener.instance;
-              if (!l.recording && !l.summarizing) return const SizedBox.shrink();
-              return Material(
-                color: l.recording ? _red : _violet,
-                borderRadius: BorderRadius.circular(20),
-                elevation: 3,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => CoursePage.show(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(l.recording ? Icons.mic_rounded : Icons.auto_awesome_rounded, color: Colors.white, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          l.recording ? 'Clicky écoute le cours' : 'Compte rendu en cours…',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Séance de concentration en cours (à côté de l'écoute de cours).
+              const FocusPill(),
+              ListenableBuilder(
+                listenable: CourseListener.instance,
+                builder: (context, _) {
+                  final l = CourseListener.instance;
+                  if (!l.recording && !l.summarizing) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: Material(
+                      color: l.recording ? _red : _violet,
+                      borderRadius: BorderRadius.circular(20),
+                      elevation: 3,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => CoursePage.show(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                l.recording ? Icons.mic_rounded : Icons.auto_awesome_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                l.recording ? 'Clicky écoute le cours' : 'Compte rendu en cours…',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),

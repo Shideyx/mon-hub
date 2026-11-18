@@ -7,6 +7,7 @@ import 'assistant_view.dart';
 import 'clicky.dart';
 import 'clicky_desktop.dart';
 import 'course_page.dart';
+import 'jarvis_view.dart';
 import 'mic_test.dart';
 import 'mind_page.dart';
 import 'settings.dart';
@@ -52,6 +53,13 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
     }
 
     return [
+      _Entry(
+        'Ce que Clicky sait faire',
+        'Des exemples de phrases : concentration, état du PC, rappels, cours, écran…',
+        Icons.tips_and_updates_rounded,
+        const Color(0xFF0EA5E9),
+        (ctx) => ClickySkillsPage.open(ctx),
+      ),
       _Entry(
         'Cerveau',
         switch (c.provider) {
