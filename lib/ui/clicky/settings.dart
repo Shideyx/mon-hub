@@ -16,6 +16,7 @@ import 'wake.dart';
 import 'win.dart';
 import 'whisper.dart';
 import 'mic_test.dart' show WhisperInstallDialog;
+import 'thrift.dart';
 
 /// Réglages de Clicky (apparence, voix, écoute, prof, vie privée,
 /// outils), affichés sous le choix du cerveau.
@@ -105,6 +106,13 @@ class ClickyMoreSettings extends StatelessWidget {
             'Réponses instantanées sans IA',
             'L\'heure, un calcul, un minuteur, la musique, tes devoirs, ton emploi du temps, tes notes, la météo, '
                 'ouvrir une appli, ranger… : Clicky répond tout de suite lui-même. L\'IA (Claude) ne sert que pour le reste.',
+          ),
+          sw(
+            'thrift',
+            c.thrift,
+            'Clicky économe (Claude pour les demandes difficiles)',
+            'Les questions simples vont à Gemini (gratuit) ; Claude ne reçoit que les actions utiles à ta question '
+                'et réfléchit juste ce qu\'il faut. Modèle conseillé : Claude Opus 5.5. ${ClaudeUsage.summary}',
           ),
 
           head('Voix', Icons.record_voice_over_rounded),

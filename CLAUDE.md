@@ -139,3 +139,28 @@
   page). Lecteurs : `modules/books/reader_page.dart` (`openReading`, `ScanReaderPage` page par page / webtoon / sens
   japonais, `TextReaderPage` liseuse avec texte gardé dans `lectures/`, `WebBookPage`). Outil Clicky `livre_ou_lire`.
   Jamais de site pirate ni de scraping : seulement ces API publiques.
+- **Sécurité (v1.47)** : `SECURITY.md`. Pont local (`claude_bridge.dart`) : clé 64 hex comparée en temps constant
+  (`sameKey`), refus des pages web (`fromThisPc` : Origin / Host), corps limité (`maxBody`), `/call` demande l'accord
+  pour les actions d'écriture (sauf Clicky partout qui l'a déjà demandé : en-tête `x-monhub-client: clicky` +
+  `confirme`). **Jamais `cmd /c start`** : `core/safe_open.dart` (`SafeOpen.launch` = ShellExecute, `risky` → accord
+  via `PcControl.confirmRisky`). `PcControl.secretPath` (mots de passe, cookies, clés : jamais lus/écrits),
+  `riskyWrite` (démarrage, scripts : toujours demandés), `dangerous` élargi. Bouclier anti-piège
+  `core/prompt_shield.dart` (`wrap` = résultats d'outils extérieurs étiquetés « données », `tainted` 15 min → le mode
+  auto redemande, `rule` dans les consignes Claude et Gemini Live). `ErrorLog.redact` (clés masquées). Mise à jour :
+  empreinte SHA-256 obligatoire + `Updater.trustedUrl`. Workflow : `permissions: contents: read`, Dependabot.
+- **Clicky économe** : `core/tool_router.dart` (`ToolRouter` : groupes d'outils par mots-clés, `pick`, méta-outils
+  `mon_hub_outils` / `mon_hub_action` résolus par `resolve` pour garder les permissions, `cap` des résultats ;
+  `/mcp?groupes=`), `ui/clicky/thrift.dart` (`ClaudeThrift.light` → Gemini, `heavy` → effort medium sinon low,
+  `ClaudeUsage` compteur local), `cache_control` dans `ClaudeApi`, réglage `thrift`. Modèle conseillé : Claude Opus 5.5
+  (`claude-opus-5-5`).
+- **Ton fil** (modules reliés) : `core/hub_feed.dart` (`HubFeed.build` sans IA à partir des outils de lecture
+  agenda/devoirs/révisions/livres + pastilles ; `say` pour Clicky), `ui/hub_feed_view.dart` (`HubFeedStrip` à
+  l'accueil). Clicky proactif : `ClickyController.feedNudge` (1 info importante, ≤ 6/jour, 45 min d'écart) + retour.
+- **Modules perso** : `core/custom_modules.dart` (`CustomModules` : catalogue, site https dans `HubWebView`, liste de
+  liens ; `hub.custom` ; ids `perso_…`), `ui/add_module.dart` (carte « + » à l'accueil, `AddModuleSheet`),
+  `HubController.add/remove`.
+- **Lecture** : `modules/books/free_classics.dart` (`FreeClassics` : 1984 / La Ferme des animaux via Gutenberg
+  Australie, libres en France ; `Wikisource` FR via l'API + ws-export). **Anime-sama refusé** (site pirate) : seulement
+  sources légales (MANGA Plus, WEBTOON, MangaDex…).
+- Animations : `ui/clicky/alive.dart` (`ClickyBounce` : rebond à chaque état, halo en réflexion, saut de joie, coucou
+  rare ; rien en boucle au repos), cartes de l'accueil soulevées au survol, 👋 qui salue une fois.

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/safe_open.dart';
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
@@ -281,7 +282,7 @@ class VoiceSkill {
         if (!kIsWeb && Platform.isWindows) {
           // « start » de Windows : pas de commande arbitraire, juste le nom
           // du programme choisi par toi.
-          await Process.start('cmd', ['/c', 'start', '', value], mode: ProcessStartMode.detached);
+          await SafeOpen.launch(value);
           return ('Je lance ${value.replaceAll('.exe', '')}.', null);
         }
         return ('Je ne peux lancer de programme que sur Windows.', null);

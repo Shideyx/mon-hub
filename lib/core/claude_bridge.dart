@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 
 import 'hub_controller.dart';
 import 'hub_module.dart';
+import 'prompt_shield.dart';
+import 'tool_router.dart';
 
 /// Pont local entre l'appli Claude (sur PC) et Mon Hub.
 ///
@@ -39,11 +42,14 @@ class ClaudeBridge {
     await s?.close(force: true);
   }
 
-  List<HubTool> get tools => [
-    for (final m in hub.enabled) ...m.tools,
-    ...extras.value,
-    ...?appTools?.call(),
-  ];
+  List<HubTool> get tools {
+    final all = [
+      for (final m in hub.enabled) ...m.tools,
+      ...extras.value,
+      ...?appTools?.call(),
+    ];
+    return [...all, ...ToolRouter.metaTools(all)];
+  }
 
   /// Outils de l'appli elle-même (Clicky : contrôle du PC, réparation du
   /// micro), pour que Claude Code puisse aussi s'en servir.
@@ -57,16 +63,28 @@ class ClaudeBridge {
   /// chose, quand c'est Claude Code (Clicky) qui l'appelle via /mcp.
   static Future<bool> Function(HubTool tool, Map<String, dynamic> args)? confirm;
 
+  /// Dossier imposé (tests).
+  @visibleForTesting
+  static String? folderOverride;
+
+  /// Port du pont (tests).
+  int? get port => _server?.port;
+
+  /// Clé du pont (tests).
+  @visibleForTesting
+  String? key;
+
   Future<void> start() async {
     if (!supported || _server != null) return;
-    final dir = folder;
+    final dir = folderOverride ?? folder;
     if (dir == null) return;
     try {
-      final key = List.generate(32, (_) => Random.secure().nextInt(16).toRadixString(16)).join();
+      final key = this.key = List.generate(64, (_) => Random.secure().nextInt(16).toRadixString(16)).join();
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       _server = server;
       await Directory(dir).create(recursive: true);
-      Future<void> writeInfo() => File('$dir${Platform.pathSeparator}bridge.json').writeAsString(
+      final info = File('$dir${Platform.pathSeparator}bridge.json');
+      Future<void> writeInfo() => info.writeAsString(
         jsonEncode({
           'port': server.port,
           'key': key,
@@ -75,6 +93,13 @@ class ClaudeBridge {
         }),
       );
       await writeInfo();
+      // Mac / Linux : la clé n'est lisible que par toi (Windows : le dossier
+      // %APPDATA% est déjà personnel).
+      if (!Platform.isWindows) {
+        try {
+          await Process.run('chmod', ['600', info.path]);
+        } catch (_) {}
+      }
       void refresh() {
         if (_server == server) writeInfo(); // modules activés / désactivés
       }
@@ -87,6 +112,41 @@ class ClaudeBridge {
     }
   }
 
+  /// Comparaison en temps constant (on ne devine pas la clé caractère par
+  /// caractère en mesurant le temps de réponse).
+  static bool sameKey(String? a, String b) {
+    if (a == null) return false;
+    final x = utf8.encode(a), y = utf8.encode(b);
+    var diff = x.length ^ y.length;
+    for (var i = 0; i < y.length; i++) {
+      diff |= (i < x.length ? x[i] : 0) ^ y[i];
+    }
+    return diff == 0;
+  }
+
+  /// La demande vient d'un programme de ce PC (Claude Code, l'extension de
+  /// l'appli Claude), pas d'une page web.
+  static bool fromThisPc(String? origin, String? host) {
+    final h = (host ?? '').toLowerCase();
+    if (h.isNotEmpty && h != '127.0.0.1' && h != 'localhost') return false;
+    final o = (origin ?? '').trim().toLowerCase();
+    if (o.isEmpty || o == 'null') return true;
+    return RegExp(r'^https?://(127\.0\.0\.1|localhost)(:\d+)?$').hasMatch(o);
+  }
+
+  /// Taille maximale d'une demande (au-delà : refusée).
+  static const maxBody = 4 * 1024 * 1024;
+
+  /// Lit le corps de la demande (taille limitée).
+  static Future<String> _body(HttpRequest req) async {
+    final out = BytesBuilder(copy: false);
+    await for (final chunk in req) {
+      out.add(chunk);
+      if (out.length > maxBody) throw const HttpException('Demande trop grosse');
+    }
+    return utf8.decode(out.takeBytes());
+  }
+
   Future<void> _handle(HttpRequest req, String key) async {
     final res = req.response..headers.contentType = ContentType.json;
     Future<void> reply(int code, Object body) async {
@@ -95,7 +155,13 @@ class ClaudeBridge {
       await res.close();
     }
 
-    if (req.headers.value('authorization') != 'Bearer $key') {
+    // Une page web ouverte dans ton navigateur ne doit jamais pouvoir parler
+    // au pont (attaques « DNS rebinding » / CSRF) : un site envoie son
+    // « Origin », et un faux nom d'hôte pointant sur 127.0.0.1 est refusé.
+    if (!fromThisPc(req.headers.value('origin'), req.headers.host)) {
+      return reply(403, {'error': 'Refusé'});
+    }
+    if (!sameKey(req.headers.value('authorization'), 'Bearer $key')) {
       return reply(401, {'error': 'Clé invalide'});
     }
     if (req.uri.path == '/mcp') return _mcp(req, res);
@@ -106,13 +172,31 @@ class ClaudeBridge {
     }
     if (req.method == 'POST' && req.uri.path == '/call') {
       try {
-        final body = jsonDecode(await utf8.decodeStream(req)) as Map<String, dynamic>;
+        final body = jsonDecode(await _body(req)) as Map<String, dynamic>;
         final name = body['name'] as String;
-        final tool = tools.where((t) => t.name == name).firstOrNull;
+        final args0 = (body['arguments'] as Map?)?.cast<String, dynamic>() ?? {};
+        final all = tools;
+        final (tool, args) = ToolRouter.resolve(name, args0, all);
         if (tool == null) return await reply(404, {'error': 'Action inconnue : $name'});
-        final args = (body['arguments'] as Map?)?.cast<String, dynamic>() ?? {};
-        final result = await tool.run(args);
-        return await reply(200, {'result': plain(result)});
+        // Comme pour Claude Code : une action qui envoie ou modifie quelque
+        // chose attend ton accord (avant, l'extension de l'appli Claude
+        // pouvait lancer une commande sur le PC sans rien demander).
+        // Clicky partout (autre programme de Mon Hub) a déjà demandé l'accord
+        // dans sa bulle ; l'extension de l'appli Claude, elle, passe ici.
+        final asked = req.headers.value('x-monhub-client') == 'clicky' && body['confirme'] == true;
+        if (isWriteAction(tool) && !asked) {
+          final ask = confirm;
+          if (ask == null || !await ask(tool, args)) {
+            return await reply(200, {'error': 'La personne a refusé cette action.'});
+          }
+        }
+        final result = plain(await tool.run(args));
+        PromptShield.touched(tool.name);
+        return await reply(200, {
+          'result': PromptShield.readsOutside(tool.name)
+              ? PromptShield.wrap(tool.name, result is String ? result : jsonEncode(result))
+              : result,
+        });
       } catch (e) {
         return reply(200, {'error': '$e'});
       }
@@ -135,7 +219,7 @@ class ClaudeBridge {
     }
     Object? body;
     try {
-      body = jsonDecode(await utf8.decodeStream(req));
+      body = jsonDecode(await _body(req));
     } catch (_) {
       res.statusCode = 400;
       res.write(jsonEncode(_rpcError(null, -32700, 'JSON invalide')));
@@ -144,9 +228,12 @@ class ClaudeBridge {
     final batch = body is List;
     final messages = batch ? body : [body];
     final replies = <Map<String, dynamic>>[];
+    // Clicky économe : « ?groupes=agenda,ecole » = seulement ces outils
+    // (moins de texte envoyé à Claude à chaque question).
+    final groups = req.uri.queryParameters['groupes'];
     for (final m in messages) {
       if (m is! Map) continue;
-      final reply = await _rpc(m.cast<String, dynamic>());
+      final reply = await _rpc(m.cast<String, dynamic>(), groups: groups);
       if (reply != null) replies.add(reply);
     }
     if (replies.isEmpty) {
@@ -164,7 +251,7 @@ class ClaudeBridge {
     'error': {'code': code, 'message': message},
   };
 
-  Future<Map<String, dynamic>?> _rpc(Map<String, dynamic> m) async {
+  Future<Map<String, dynamic>?> _rpc(Map<String, dynamic> m, {String? groups}) async {
     final id = m['id'];
     final method = m['method'];
     if (id == null) return null; // notification (ex. « initialized »)
@@ -185,9 +272,11 @@ class ClaudeBridge {
       case 'ping':
         return ok({});
       case 'tools/list':
+        final all = tools;
+        final shown = groups == null ? all : ToolRouter.forGroups(groups.split(','), all);
         return ok({
           'tools': [
-            for (final t in tools)
+            for (final t in shown)
               {
                 'name': t.name,
                 'description': t.description,
@@ -197,9 +286,13 @@ class ClaudeBridge {
         });
       case 'tools/call':
         final name = '${params['name']}';
-        final tool = tools.where((t) => t.name == name).firstOrNull;
+        final all = tools;
+        final (tool, args) = ToolRouter.resolve(
+          name,
+          (params['arguments'] as Map?)?.cast<String, dynamic>() ?? {},
+          all,
+        );
         if (tool == null) return _rpcError(id, -32602, 'Action inconnue : $name');
-        final args = (params['arguments'] as Map?)?.cast<String, dynamic>() ?? {};
         Map<String, dynamic> result(String text, {bool error = false}) => ok({
           'content': [
             {'type': 'text', 'text': text},
@@ -212,7 +305,8 @@ class ClaudeBridge {
             return result('La personne a refusé cette action.', error: true);
           }
           final out = plain(await tool.run(args));
-          return result(out is String ? out : jsonEncode(out));
+          PromptShield.touched(tool.name);
+          return result(PromptShield.wrap(tool.name, ToolRouter.cap(out is String ? out : jsonEncode(out))));
         } catch (e) {
           return result('$e', error: true);
         }

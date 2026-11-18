@@ -12,6 +12,7 @@ import '../modules/revisions/revisions_module.dart';
 import '../modules/roblox/roblox_module.dart';
 import '../modules/schedule/schedule_module.dart';
 import '../modules/youtube/youtube_module.dart';
+import 'custom_modules.dart';
 import 'hub_module.dart';
 
 /// LA liste des modules du hub.
@@ -37,5 +38,7 @@ List<HubModule> buildModules() {
     RobloxModule(),
     BooksModule(),
     DriveModule(),
+    // Les modules ajoutés par la personne (Accueil → « Ajouter un module »).
+    ...CustomModules.build(),
   ];
 }

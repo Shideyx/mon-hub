@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 
 import 'book_finder.dart';
+import 'free_classics.dart';
 
 /// Ce qui est cherché, débarrassé des « Tome 3 », « chap. 12 », sous-titres…
 class ReadQuery {
@@ -91,9 +92,17 @@ class ReadMatch {
 
   bool get isManga => source == 'mangadex';
 
+  /// Livre en texte, lu dans la liseuse de Mon Hub.
+  bool get isText => textSources.contains(source);
+
+  /// Sources dont le livre arrive en texte brut.
+  static const textSources = {'gutenberg', 'gutenberg-au', 'wikisource'};
+
   String get sourceLabel => switch (source) {
     'mangadex' => 'Scans manga (MangaDex)',
     'gutenberg' => 'Livre libre (Projet Gutenberg)',
+    'gutenberg-au' => 'Classique libre en France (Gutenberg Australie, en anglais)',
+    'wikisource' => 'Livre libre en français (Wikisource)',
     'archive' => 'Livre scanné (Internet Archive)',
     _ => source,
   };
@@ -187,7 +196,10 @@ class ReadFinder {
     final results = await Future.wait([
       if (manga) _mangadex(q.title).catchError((_) => <ReadMatch>[]),
       if (books) _gutenberg(q.title, author).catchError((_) => <ReadMatch>[]),
+      if (books) _wikisource(q.title, author).catchError((_) => <ReadMatch>[]),
       if (books) _archive(q.title, author).catchError((_) => <ReadMatch>[]),
+      // 1984, La Ferme des animaux… : libres en France, pas aux États-Unis.
+      if (books) Future.value(FreeClassics.match(title, author: author)),
     ]);
     final scored = [
       for (final r in results)
@@ -443,10 +455,23 @@ class ReadFinder {
 
   /// Le texte du livre, sans les mentions de licence du début et de la fin.
   Future<String> bookText(String url) async {
-    final r = await _http.get(Uri.parse(url), headers: {'user-agent': 'MonHub/1.0'}).timeout(const Duration(seconds: 40));
+    final r = await _http
+        .get(Uri.parse(url), headers: {'user-agent': 'MonHub/1.0'})
+        .timeout(Duration(seconds: url.contains('ws-export') ? 90 : 40));
     if (r.statusCode != 200) throw 'HTTP ${r.statusCode}';
-    return cleanGutenberg(utf8.decode(r.bodyBytes, allowMalformed: true));
+    final raw = utf8.decode(r.bodyBytes, allowMalformed: true);
+    if (url.contains('gutenberg.net.au')) return FreeClassics.clean(raw);
+    if (url.contains('ws-export')) {
+      if (raw.trim().length < 200) throw 'texte introuvable sur Wikisource';
+      return raw.replaceAll('\r\n', '\n').trim();
+    }
+    return cleanGutenberg(raw);
   }
+
+  // ---- Wikisource (classiques en français) ----
+
+  Future<List<ReadMatch>> _wikisource(String title, String author) async =>
+      Wikisource.fromSearch(await _json(Wikisource.search(title, author: author)) as Map);
 
   static String cleanGutenberg(String raw) {
     var t = raw.replaceAll('\r\n', '\n');

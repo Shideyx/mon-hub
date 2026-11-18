@@ -169,6 +169,16 @@ class Updater extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Le fichier vient bien des versions publiées de ce dépôt GitHub.
+  static bool trustedUrl(String url) {
+    final u = Uri.tryParse(url);
+    return u != null &&
+        u.scheme == 'https' &&
+        u.host == 'github.com' &&
+        u.path.startsWith('/$repo/releases/download/') &&
+        !u.path.contains('..');
+  }
+
   /// Page des versions (téléchargement à la main).
   static String get releasesUrl => 'https://github.com/$repo/releases/latest';
 
@@ -191,6 +201,10 @@ class Updater extends ChangeNotifier {
   Future<void> install() async {
     final info = available;
     if (info == null || busy) return;
+    if (!trustedUrl(info.url)) {
+      _set(status: '', progress: null, error: 'Adresse de mise à jour inattendue : installation annulée par sécurité.');
+      return;
+    }
     busy = true;
     error = null;
     received = 0;
@@ -222,13 +236,14 @@ class Updater extends ChangeNotifier {
         _client = null;
       }
 
-      // 2. Vérification : le fichier est bien celui publié.
+      // 2. Vérification : le fichier est exactement celui publié (sans
+      // empreinte annoncée par GitHub, on n'installe rien).
       _set(status: 'Vérification du fichier…', progress: null);
-      if (info.sha256 != null) {
-        final digest = sha256.convert(await zip.readAsBytes()).toString();
-        if (digest != info.sha256) {
-          throw 'Le fichier téléchargé est abîmé (empreinte différente) : réessaie';
-        }
+      final expected = info.sha256;
+      if (expected == null) throw 'GitHub n\'a pas donné l\'empreinte du fichier : installation annulée par sécurité';
+      final digest = sha256.convert(await zip.readAsBytes()).toString();
+      if (digest != expected) {
+        throw 'Le fichier téléchargé est abîmé (empreinte différente) : réessaie';
       }
 
       // 3. Décompression.

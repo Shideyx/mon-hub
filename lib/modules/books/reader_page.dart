@@ -28,7 +28,7 @@ Future<void> openReading(BuildContext context, BooksModule m, Book b, {bool choo
   if (link == null) return;
   final Widget page = switch (link.source) {
     'mangadex' => ScanReaderPage(module: m, book: b),
-    'gutenberg' => TextReaderPage(module: m, book: b),
+    'gutenberg' || 'gutenberg-au' || 'wikisource' => TextReaderPage(module: m, book: b),
     _ => WebBookPage(module: m, book: b),
   };
   final r = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => page));
@@ -46,7 +46,7 @@ Future<void> _setOpt(BooksModule m, String k, Object v) =>
 
 IconData _sourceIcon(String source) => switch (source) {
   'mangadex' => Icons.auto_awesome_mosaic_rounded,
-  'gutenberg' => Icons.menu_book_rounded,
+  'gutenberg' || 'gutenberg-au' || 'wikisource' => Icons.menu_book_rounded,
   _ => Icons.account_balance_rounded,
 };
 
@@ -178,8 +178,9 @@ class _FindReadingSheetState extends State<_FindReadingSheet> {
                         Padding(
                           padding: const EdgeInsets.all(12),
                           child: Text(
-                            'Sources gratuites et légales : MangaDex (scans), Projet Gutenberg et '
-                            'Internet Archive (livres libres). Seul le titre part sur internet.',
+                            'Sources gratuites et légales : MangaDex (scans), Projet Gutenberg, Wikisource, '
+                            'Gutenberg Australie (classiques libres en France, comme 1984) et Internet Archive. '
+                            'Jamais de site pirate. Seul le titre part sur internet.',
                             style: theme.textTheme.labelSmall,
                             textAlign: TextAlign.center,
                           ),
@@ -256,14 +257,27 @@ class _FindReadingSheetState extends State<_FindReadingSheet> {
         Text(
           'Je n\'ai rien trouvé à lire gratuitement pour « ${q.text} ».\n'
           'Essaie le titre anglais ou japonais. Les gros mangas sous licence (One Piece, '
-          'Jujutsu Kaisen…) se lisent gratuitement sur le site officiel MANGA Plus.',
+          'Jujutsu Kaisen…) se lisent gratuitement et légalement sur les sites officiels ; '
+          'un livre récent s\'emprunte à la médiathèque (souvent aussi en numérique).',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.open_in_new_rounded),
-          label: const Text('Ouvrir MANGA Plus'),
-          onPressed: () => Browser.open('https://mangaplus.shueisha.co.jp/'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('MANGA Plus'),
+              onPressed: () => Browser.open('https://mangaplus.shueisha.co.jp/'),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('WEBTOON'),
+              onPressed: () => Browser.open('https://www.webtoons.com/fr/'),
+            ),
+          ],
         ),
       ],
     ),
@@ -1007,12 +1021,27 @@ class _TextReaderPageState extends State<TextReaderPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ErrorBanner(error!),
-            FilledButton(
-              onPressed: () {
-                setState(() => error = null);
-                _load();
-              },
-              child: const Text('Réessayer'),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: () {
+                    setState(() => error = null);
+                    _load();
+                  },
+                  child: const Text('Réessayer'),
+                ),
+                // Le texte ne se télécharge pas : on le lit sur le site même.
+                if (link.webUrl != null)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.public_rounded),
+                    label: const Text('Lire sur le site'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => WebBookPage(module: widget.module, book: widget.book)),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

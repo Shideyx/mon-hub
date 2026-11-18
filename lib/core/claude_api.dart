@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'claude_bridge.dart';
 import 'hub_module.dart';
 import 'module_store.dart';
+import 'prompt_shield.dart';
+import 'tool_router.dart';
 
 /// Accès direct à Claude (API Anthropic) avec ta propre clé API.
 ///
@@ -19,7 +21,7 @@ class ClaudeApi {
   static final ModuleStore store = ModuleStore()..bind('claude');
 
   static const models = {
-    'claude-opus-5-5': 'Claude Opus 5.5 (le plus malin)',
+    'claude-opus-5-5': 'Claude Opus 5.5 (conseillé : le plus malin)',
     'claude-sonnet-5-5': 'Claude Sonnet 5.5 (plus rapide)',
     'claude-haiku-5-5': 'Claude Haiku 5.5 (le plus rapide, le moins cher)',
   };
@@ -89,6 +91,10 @@ class ClaudeApi {
         'output_config': {'effort': effort},
         'fallbacks': 'default',
         'stream': true,
+        // Économie : ce qui ne change pas d'un tour à l'autre (consignes,
+        // actions, début de la conversation) est relu depuis le cache
+        // d'Anthropic, environ 20 fois moins cher.
+        'cache_control': {'type': 'ephemeral'},
         if (tools.isNotEmpty) 'tools': tools,
       });
     final client = http.Client();
@@ -194,13 +200,23 @@ class ClaudeApi {
     void Function(String text)? onText,
     String effort = 'low',
     bool webSearch = false,
+    List<HubTool>? allTools,
   }) async {
     final defs = [
       for (final t in tools)
         {'name': t.name, 'description': t.description, 'input_schema': t.toJson()['inputSchema']},
-      // Recherche sur internet, faite par Anthropic.
-      if (webSearch) {'type': 'web_search_20250305', 'name': 'web_search', 'max_uses': 3},
+      // Recherche sur internet, faite par Anthropic (version qui trie les
+      // résultats elle-même : moins de texte relu).
+      if (webSearch)
+        {
+          'type': model.contains('haiku') ? 'web_search_20250305' : 'web_search_20260209',
+          'name': 'web_search',
+          'max_uses': 3,
+        },
     ];
+    // Toutes les actions connues (les actions « meta » peuvent en lancer
+    // une qui n'a pas été envoyée).
+    final every = [...tools, ...?allTools];
     for (var round = 0; round < 8; round++) {
       final (content, stop) = await _call(
         system: system,
@@ -232,8 +248,11 @@ class ClaudeApi {
       }
       final results = <Map<String, dynamic>>[];
       for (final u in uses) {
-        final tool = tools.where((t) => t.name == u['name']).firstOrNull;
-        final args = (u['input'] as Map?)?.cast<String, dynamic>() ?? {};
+        final (tool, args) = ToolRouter.resolve(
+          '${u['name']}',
+          (u['input'] as Map?)?.cast<String, dynamic>() ?? {},
+          every,
+        );
         Object? out;
         var error = false;
         if (tool == null) {
@@ -246,15 +265,17 @@ class ClaudeApi {
           onStatus?.call('J\'utilise ${tool.name.replaceAll('_', ' ')}…');
           try {
             out = ClaudeBridge.plain(await tool.run(args));
+            PromptShield.touched(tool.name);
           } catch (e) {
             out = '$e';
             error = true;
           }
         }
+        final text = ToolRouter.cap(out is String ? out : jsonEncode(out));
         results.add({
           'type': 'tool_result',
           'tool_use_id': u['id'],
-          'content': out is String ? out : jsonEncode(out),
+          'content': tool == null || error ? text : PromptShield.wrap(tool.name, text),
           if (error) 'is_error': true,
         });
       }

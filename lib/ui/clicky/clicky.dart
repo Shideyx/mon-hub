@@ -19,14 +19,18 @@ import '../../modules/carnet/carnet_store.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/error_log.dart';
 import '../../core/hub_controller.dart';
+import '../../core/hub_feed.dart';
 import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import '../../core/prompt_shield.dart';
 import '../../core/session.dart';
+import '../../core/tool_router.dart';
 import '../../core/version.dart';
 import '../chat_history.dart';
 import '../widgets.dart';
 import 'act.dart';
+import 'alive.dart';
 import 'board.dart';
 import 'buddies.dart';
 import 'capture.dart';
@@ -53,6 +57,7 @@ import 'quick.dart';
 import 'ollama.dart';
 import 'pointer.dart';
 import 'routines.dart';
+import 'thrift.dart';
 import 'tutor.dart';
 import 'voice.dart';
 import 'wake.dart';
@@ -100,7 +105,10 @@ class ClickyShot {
 }
 
 class ClickyController extends ChangeNotifier {
-  ClickyController._();
+  ClickyController._() {
+    // Ouvrir un programme, un script ou un partage réseau : on demande.
+    PcControl.confirmRisky = _confirmOpen;
+  }
   static final instance = ClickyController._();
 
   /// Modules de Mon Hub (dans l'appli).
@@ -268,6 +276,7 @@ class ClickyController extends ChangeNotifier {
     'micEngine',
     'instant',
     'quick',
+    'thrift',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -1409,6 +1418,50 @@ class ClickyController extends ChangeNotifier {
   }
 
   /// Un tour de réflexion. [now]/[idleSeconds] : pour les tests.
+  // ---------- Proactif : le fil de Mon Hub ----------
+
+  final _nudged = <String>{};
+  DateTime? _lastNudge;
+  var _nudgeDay = '';
+  var _nudgesToday = 0;
+
+  /// Relit le fil de Mon Hub (au plus toutes les 3 minutes).
+  void _refreshFeed() {
+    final h = hub;
+    if (h == null) return;
+    final tools = {for (final m in h.enabled) for (final t in m.tools) t.name: t};
+    unawaited(
+      HubFeed.instance
+          .refresh(
+            call: (name, args) async => tools[name]?.run(args),
+            tools: tools.keys.toSet(),
+            badges: {for (final m in h.enabled) m.id: m.badge.value},
+            names: {for (final m in h.enabled) m.id: m.name},
+          )
+          .catchError((Object _) {}),
+    );
+  }
+
+  /// Dit l'info la plus importante du fil, une seule fois par info, au plus
+  /// 6 fois par jour et pas plus d'une fois toutes les 45 minutes.
+  bool feedNudge(DateTime n) {
+    final i = HubFeed.instance.top;
+    final line = HubFeed.say(i);
+    if (i == null || line == null || i.priority < 75 || _nudged.contains(i.id)) return false;
+    final day = '${n.year}-${n.month}-${n.day}';
+    if (day != _nudgeDay) {
+      _nudgeDay = day;
+      _nudgesToday = 0;
+    }
+    final last = _lastNudge;
+    if (_nudgesToday >= 6 || (last != null && n.difference(last) < const Duration(minutes: 45))) return false;
+    _nudged.add(i.id);
+    _lastNudge = n;
+    _nudgesToday++;
+    unawaited(think(line));
+    return true;
+  }
+
   Future<ClickyIdea?> autonomyTick({DateTime? now, int? idleSeconds, bool propose = true}) async {
     final n = now ?? DateTime.now();
     final mind = ClickyMind.instance;
@@ -1421,14 +1474,25 @@ class ClickyController extends ChangeNotifier {
       await mind.load();
     } catch (_) {}
     if (!mind.on || !mind.autonomy) return null;
-    // Tu reviens après une absence : il te le dit (et prend des nouvelles).
+    // Le fil de Mon Hub (cours, contrôles, devoirs…) reste à jour, même
+    // quand l'accueil n'est pas affiché.
+    _refreshFeed();
+    // Tu reviens après une absence : il te le dit (et prend des nouvelles),
+    // avec ce qui compte maintenant.
     if (back) {
       final hello = mind.welcomeBack(now: n, name: callName);
       final loop = mind.dueLoops(n).firstOrNull;
       if (loop != null && hello.contains(loop.text)) unawaited(mind.markAsked(loop));
-      if (propose) unawaited(think(hello));
+      final top = HubFeed.instance.top;
+      final extra = HubFeed.say(top);
+      if (top != null && extra != null) _nudged.add(top.id);
+      if (propose) unawaited(think(extra == null ? hello : '$hello $extra'));
       return null;
     }
+    // Quelque chose d'important arrive (cours dans 30 min, contrôle demain) :
+    // il prévient de lui-même, sans IA (jamais en plein écran).
+    final busy = windows && (Win.foregroundFullscreen() || isSensitiveTitle(Win.foregroundTitle()));
+    if (propose && idle < 120 && !busy && feedNudge(n)) return null;
     if (idle > 120 || n.difference(_startedAt).inMinutes < 8 || !mind.ideaAllowed(n)) return null;
     if (windows && (Win.foregroundFullscreen() || isSensitiveTitle(Win.foregroundTitle()))) return null;
     _deciding = true;
@@ -1776,7 +1840,10 @@ class ClickyController extends ChangeNotifier {
     bool agent = false,
     String foreground = '',
     bool hiddenScreen = false,
+    Set<String>? groups,
   }) {
+    // Consignes d'un groupe d'actions : seulement s'il est envoyé.
+    bool has(String g) => groups == null || groups.contains(g);
     final modules = hub?.enabled ?? const <HubModule>[];
     final now = DateTime.now();
     final where = hiddenScreen
@@ -1797,9 +1864,10 @@ ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 ${clickyPersona(callName)}
+${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
-${_voicePlatform ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
+${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
 Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir. Pendant un devoir noté, aide à comprendre sans faire le travail à sa place.
 Ranger : « range mes téléchargements / mon bureau / mon Drive » → pc_ranger_apercu ou drive_ranger_apercu, dis en une phrase ce qui va bouger, puis pc_ranger ou drive_ranger ; « annule le rangement » → pc_ranger_annuler ou drive_ranger_annuler.''';
@@ -1908,8 +1976,16 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       if (await _handleSelf(q)) return;
       if (await _handleSkill(q)) return;
       // Tout ce qu'un algorithme sait faire : réponse immédiate, sans l'IA.
-      if (await _handleQuick(q)) return;
-      if (liveReady && !needsClassic(q) && await _liveAsk(q)) return;
+      if (await _handleQuick(q)) {
+        unawaited(ClaudeUsage.saved());
+        return;
+      }
+      if (liveReady && !needsClassic(q) && await _liveAsk(q)) {
+        unawaited(ClaudeUsage.saved());
+        return;
+      }
+      // Question simple : Gemini (gratuit) avant Claude.
+      if (await _thriftAnswer(q)) return;
       await _askAi(q);
     } finally {
       // Le mot d'activation se remet à écouter après chaque échange.
@@ -2195,8 +2271,17 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     if (id != _askId) return;
     final memory = _memory();
-    final system = _system(shots, foreground: fg, hiddenScreen: hidden);
+    // Clicky économe : seulement les actions utiles à cette question (les
+    // autres restent accessibles par mon_hub_outils), et un effort adapté.
+    final groups = thrift ? ToolRouter.groupsOrDefault(q) : null;
+    final allTools = _tools;
+    final sent = groups == null
+        ? allTools
+        : ToolRouter.forGroups(groups, [...allTools, ...ToolRouter.metaTools(allTools)]);
+    final effort = thrift ? ClaudeThrift.effort(q) : 'low';
+    final system = _system(shots, foreground: fg, hiddenScreen: hidden, groups: groups);
     final docBlocks = [for (final d in docs) ...d.blocks()];
+    if (!useOllama) unawaited(ClaudeUsage.claude());
     try {
       voiceOut.resetLive();
       final live = narrate && voice && _voicePlatform;
@@ -2231,6 +2316,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           ],
           extraBlocks: docBlocks,
           web: webSearch,
+          groups: groups,
+          effort: thrift ? effort : null,
           onText: streamed,
           onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
         );
@@ -2270,7 +2357,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         raw = await ClaudeApi.chat(
           system: system,
           history: msgs,
-          tools: _tools,
+          tools: sent,
+          allTools: allTools,
+          effort: effort,
           confirm: confirmAction,
           webSearch: webSearch,
           onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
@@ -2492,6 +2581,48 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Réponses instantanées sans l'IA (heure, calculs, devoirs, musique…).
   bool get quick => _opt('quick', true);
 
+  /// Clicky économe : Claude seulement pour les demandes lourdes (les
+  /// questions simples de culture générale vont à Gemini, gratuit).
+  bool get thrift => _opt('thrift', true);
+
+  /// Une question simple sans Claude : Gemini répond (gratuit).
+  Future<bool> _thriftAnswer(String q) async {
+    if (!thrift || docs.isNotEmpty) return false;
+    if (!ClaudeThrift.light(q, screen: needsScreen(q))) return false;
+    if (!await AiText.hasGemini()) return false;
+    final id = ++_askId;
+    _lastQuestion = q;
+    _set(ClickyState.thinking, status: 'Je réfléchis…', reply: '');
+    String r;
+    try {
+      final memory = _memory();
+      final context = [
+        for (final (u, a) in memory.length > 3 ? memory.sublist(memory.length - 3) : memory) 'Personne : $u\nToi : $a',
+      ].join('\n');
+      r = (await AiText.ask(
+        '${context.isEmpty ? '' : 'Début de la conversation :\n$context\n\n'}Question : $q',
+        system:
+            '${clickyPersona(callName)}\n${PromptShield.rule}\nRéponds en français, à l\'oral : 1 à 4 phrases courtes, '
+            'sans markdown ni liste. Si la question demande des données de Mon Hub (agenda, notes, messages) ou d\'agir, '
+            'réponds seulement : CLAUDE',
+        geminiOnly: true,
+      )).trim();
+    } catch (_) {
+      if (id == _askId) _set(ClickyState.thinking, status: '');
+      return false;
+    }
+    if (id != _askId) return true;
+    if (r.isEmpty || r.toUpperCase().startsWith('CLAUDE')) return false;
+    unawaited(ClaudeUsage.saved());
+    unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
+    unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));
+    _set(ClickyState.speaking, status: '', reply: r);
+    await speak(r);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
+    return true;
+  }
+
   /// Gemini Live peut servir maintenant.
   bool get liveReady =>
       instant &&
@@ -2532,6 +2663,7 @@ Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
+${PromptShield.rule}
 Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}''';
   }
@@ -2860,6 +2992,16 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
       case 'agir_sur_ordinateur':
         final goal = '${args['but'] ?? ''}'.trim();
         if (goal.isEmpty) return 'Quel est le but ?';
+        // Juste après avoir lu un message d'un inconnu : on vérifie que
+        // c'est bien la personne qui veut que Clicky prenne la souris.
+        if (PromptShield.tainted &&
+            !await _confirmOpen(
+              goal,
+              title: 'Clicky veut prendre la souris',
+              note: 'Clicky va cliquer et écrire à ta place pour ce but :',
+            )) {
+          return 'La personne a refusé.';
+        }
         // Après la phrase de Gemini (« je m'en occupe »).
         unawaited(Future<void>.delayed(const Duration(seconds: 2), () => act(goal)));
         return 'D\'accord : je prends la souris dans un instant. Dis-le en quelques mots.';
@@ -2878,7 +3020,11 @@ ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '-
     if (ClaudeBridge.isWriteAction(tool) && !await confirmAction(tool, args)) {
       return 'La personne a refusé cette action.';
     }
-    return tool.run(args);
+    final out = await tool.run(args);
+    PromptShield.touched(name);
+    if (!PromptShield.readsOutside(name)) return out;
+    final plain = ClaudeBridge.plain(out);
+    return PromptShield.wrap(name, plain is String ? plain : jsonEncode(plain));
   }
 
   // ---------- Clicky agit : il prend la souris et le clavier ----------
@@ -3272,7 +3418,14 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     if (pc) {
       if (pcControl == 'off') return false;
       final cmd = '${args['commande'] ?? ''}';
-      if (pcControl == 'auto' && !PcControl.dangerous(cmd) && args['admin'] != true) return true;
+      // Mode auto : seulement pour les actions sans risque, et jamais juste
+      // après avoir lu des messages ou des pages écrits par d'autres (un
+      // message piégé ne doit pas pouvoir commander le PC).
+      final risky =
+          PcControl.dangerous(cmd) ||
+          args['admin'] == true ||
+          (tool.name == 'pc_ecrire_fichier' && PcControl.riskyWrite('${args['chemin'] ?? ''}'));
+      if (pcControl == 'auto' && !risky && !PromptShield.tainted) return true;
       return _confirmPc(tool, args);
     }
     onInteractive?.call(true);
@@ -3293,6 +3446,57 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Refuser')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Autoriser')),
+          ],
+        ),
+      );
+      return ok == true;
+    } finally {
+      if (!panelOpen && board == null) onInteractive?.call(false);
+    }
+  }
+
+  /// Permission avant d'ouvrir quelque chose qui peut lancer un programme
+  /// (« .exe », script, raccourci, partage réseau…).
+  Future<bool> _confirmOpen(
+    String target, {
+    String title = 'Clicky veut ouvrir un programme',
+    String note = 'Ouvrir ceci peut lancer un programme ou un script. Autorise seulement si c\'est bien ce que '
+        'tu as demandé.',
+  }) async {
+    if (pcControl == 'off') return false;
+    onInteractive?.call(true);
+    try {
+      final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
+      if (ctx == null || !ctx.mounted) return false;
+      final ok = await showDialog<bool>(
+        context: ctx,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.shield_outlined, color: Colors.orange),
+          title: Text(title),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(note),
+                if (PromptShield.tainted)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Clicky vient de lire des messages ou une page écrits par quelqu\'un d\'autre : '
+                      'méfie-toi, c\'est peut-être un piège.',
+                      style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                SelectableText(target, style: const TextStyle(fontFamily: 'Consolas', fontSize: 12.5)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Refuser')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ouvrir')),
           ],
         ),
       );
@@ -3337,6 +3541,15 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (why.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(why)),
+                  if (PromptShield.tainted)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Clicky vient de lire des messages ou une page écrits par quelqu\'un d\'autre. '
+                        'Si ce n\'est pas toi qui as demandé cette action, refuse : c\'est peut-être un piège.',
+                        style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   if (danger)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 8),
@@ -4028,7 +4241,6 @@ class _Pointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thinking = c.state == ClickyState.thinking;
     if (c.hud) {
       final mode = switch (c.state) {
         ClickyState.listening => HudMode.listening,
@@ -4064,6 +4276,13 @@ class _Pointer extends StatelessWidget {
         ],
       );
     }
+    final mood = switch (c.state) {
+      ClickyState.listening => AliveMood.listening,
+      ClickyState.thinking => AliveMood.thinking,
+      ClickyState.speaking => AliveMood.speaking,
+      ClickyState.pointing => AliveMood.pointing,
+      _ => AliveMood.idle,
+    };
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -4074,17 +4293,12 @@ class _Pointer extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              if (thinking)
-                const Positioned(
-                  left: -6,
-                  top: -6,
-                  child: SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: clickyBlue),
-                  ),
-                ),
-              CustomPaint(size: const Size(22, 22), painter: _TrianglePainter()),
+              // Rebond, halo quand il réfléchit, saut de joie quand il répond.
+              ClickyBounce(
+                mood: mood,
+                color: clickyBlue,
+                child: CustomPaint(size: const Size(22, 22), painter: _TrianglePainter()),
+              ),
               if (c.agentsRunning > 0)
                 Positioned(
                   right: -4,
@@ -4188,10 +4402,19 @@ class _Fab extends StatelessWidget {
             child: SizedBox(
               width: 44,
               height: 44,
-              child: Icon(
-                listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                color: c.hud && !listening ? hudCyan : Colors.white,
-                size: 22,
+              // L'icône tourne en se changeant (étincelle ↔ micro).
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                transitionBuilder: (w, a) => RotationTransition(
+                  turns: Tween(begin: 0.6, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)),
+                  child: ScaleTransition(scale: a, child: w),
+                ),
+                child: Icon(
+                  listening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
+                  key: ValueKey(listening),
+                  color: c.hud && !listening ? hudCyan : Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),

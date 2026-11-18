@@ -28,7 +28,10 @@ class ErrorLog {
   /// fois par minute).
   static void record(Object error, StackTrace? stack, {String where = ''}) {
     try {
-      final first = '$error'.split('\n').first;
+      // Jamais de clé ni de jeton dans le journal (les erreurs réseau
+      // contiennent souvent l'adresse complète, « ?key=… » compris).
+      final text = redact('$error');
+      final first = text.split('\n').first;
       final key = '$where|$first';
       final now = DateTime.now();
       final last = _recent[key];
@@ -45,12 +48,34 @@ class ErrorLog {
       }
       final trace = (stack?.toString() ?? '').split('\n').take(14).join('\n');
       f.writeAsStringSync(
-        '[${now.toIso8601String()}] $_who${where.isEmpty ? '' : ' / $where'}\n$error\n$trace\n\n',
+        '[${now.toIso8601String()}] $_who${where.isEmpty ? '' : ' / $where'}\n$text\n$trace\n\n',
         mode: FileMode.append,
         flush: true,
       );
     } catch (_) {}
   }
+
+  /// Masque les secrets d'un texte : clés d'API (Gemini, Claude, GitHub…),
+  /// jetons (`Bearer …`, Discord), paramètres `key=`, `token=`, mots de passe.
+  static String redact(String s) => s
+      .replaceAllMapped(
+        RegExp(
+          r'([?&;\s](?:key|api_?key|token|access_token|refresh_token|id_token|code|password|passwd|mdp|secret|client_secret|sig|signature)=)[^&\s"<>]+',
+          caseSensitive: false,
+        ),
+        (m) => '${m[1]}•••',
+      )
+      .replaceAllMapped(
+        RegExp(r'((?:bearer|bot|basic)\s+)[A-Za-z0-9._~+/=-]{12,}', caseSensitive: false),
+        (m) => '${m[1]}•••',
+      )
+      .replaceAll(RegExp(r'AIza[0-9A-Za-z_-]{30,}'), 'AIza•••')
+      .replaceAll(RegExp(r'sk-ant-[A-Za-z0-9_-]{10,}'), 'sk-ant-•••')
+      .replaceAll(RegExp(r'gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'), 'gh•••')
+      .replaceAll(RegExp(r'GOCSPX-[A-Za-z0-9_-]{10,}'), 'GOCSPX-•••')
+      .replaceAll(RegExp(r'ya29\.[A-Za-z0-9._-]{20,}'), 'ya29.•••')
+      .replaceAll(RegExp(r'\b[MNO][A-Za-z\d_-]{23,27}\.[\w-]{6}\.[\w-]{27,40}\b'), '(jeton Discord masqué)')
+      .replaceAll(RegExp(r'"(password|motdepasse|mdp|token|apiKey|key)"\s*:\s*"[^"]*"', caseSensitive: false), '"•••":"•••"');
 
   /// Installe les garde-fous (au démarrage de chaque programme).
   static void install(String who) {
@@ -74,7 +99,8 @@ class ErrorLog {
     try {
       final p = path;
       if (p == null || !File(p).existsSync()) return '';
-      return File(p).readAsStringSync();
+      // Les anciennes lignes (avant le masquage) sont masquées à la lecture.
+      return redact(File(p).readAsStringSync());
     } catch (_) {
       return '';
     }

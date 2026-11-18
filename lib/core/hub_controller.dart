@@ -40,6 +40,24 @@ class HubController extends ChangeNotifier {
     _save();
   }
 
+  /// Ajoute un module (module perso créé par la personne) à la fin.
+  void add(HubModule m) {
+    if (available.any((x) => x.id == m.id)) return;
+    m.attach();
+    available.add(m);
+    _order.add(m.id);
+    _disabled.remove(m.id);
+    _save();
+  }
+
+  /// Retire un module perso.
+  void remove(String id) {
+    available.removeWhere((m) => m.id == id);
+    _order.remove(id);
+    _disabled.remove(id);
+    _save();
+  }
+
   void reorder(int oldIndex, int newIndex) {
     final id = _order.removeAt(oldIndex);
     _order.insert(newIndex, id);
