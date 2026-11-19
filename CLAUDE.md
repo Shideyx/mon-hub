@@ -300,4 +300,16 @@
   dans `JoinAccountView` et `GoogleSetupPage`), puis « Retrouver mon compte » = `AccountSync` (synchro existante). Pas de
   mise à jour auto sur iPhone : `Updater.phoneUpdate` → notification. Rien de Windows au démarrage sur iOS (`BrowserLink`
   bureau seulement).
-
+- **Mon téléphone** (pont téléphone ↔ PC par le Wi-Fi, sans cloud) : `core/phone_link.dart` (`PhoneLink` : serveur sur
+  0.0.0.0 port fixe **47615** (sinon au hasard), seulement les appareils du réseau local (`localClient`), **lien secret**
+  `/t/<32 hex>/` (`app.phone.token`, prefs `app.*` jamais synchronisées, `newLink` délie, `sameKey`), activé par
+  `app.phone.on`, démarré dans `HubApp._sync` (ordinateur seulement), arrêté au changement de compte. API : `api/etat`
+  (presse-papier du PC, fichiers proposés), `api/envoyer` (fichier en flux, en-tête `x-nom`, `safeName`, jamais
+  d'écrasement `uniqueFile`, ≤ 4 Go → Téléchargements\Depuis mon téléphone, notification groupée), `api/texte` →
+  presse-papier du PC, `api/fichier/<id>` (fichiers proposés par `share`), `api/commande` → `PhoneRemote.run`
+  (`ui/phone_link_page.dart` : touches médias, flèches/F5/F11, `Win.mouseBy/clickHere/scroll`, `Win.lock`, `Win.sleep`
+  (powrprof SetSuspendState), `shutdown /s /t 60` + `/a`). `extraRoutes` = autres pages sur le même serveur (soirée).
+  Page du téléphone : `assets/phone/` (onglets Envoyer / Du PC / Texte / Télécommande, pavé tactile 1 doigt = souris,
+  2 doigts = défiler, toucher = clic ; « Sur l'écran d'accueil » iPhone). Mon Hub : `PhoneLinkPage` (QR `QrView`, paquet
+  `qr`), bouton de l'accueil + Réglages → Mes appareils → Mon téléphone. Outil Clicky `telephone_envoyer` (groupe
+  `telephone`). Le pare-feu de Windows demande l'autorisation la 1ʳᵉ fois.

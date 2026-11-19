@@ -54,6 +54,7 @@ dependencies:
   record: ^7.2.0
   image: ^4.13.1
   xml: ^7.1.0
+  qr: ^4.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -80,6 +81,7 @@ flutter:
     - assets/logo.png
     - assets/chrome-extension/
     - assets/cacert.pem
+    - assets/phone/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

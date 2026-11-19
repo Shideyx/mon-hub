@@ -4,9 +4,11 @@ import 'dart:io' show Directory, Platform;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/phone_link.dart';
 import 'core/browser_link.dart';
 import 'core/work_backup.dart';
 import 'core/screen_time.dart';
+import 'ui/phone_link_page.dart';
 import 'ui/clicky/win.dart';
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
@@ -137,6 +139,7 @@ class _HubAppState extends State<HubApp> {
     DiscordPhone.instance.stop();
     _notifications?.dispose();
     unawaited(_bridge?.stop());
+    unawaited(PhoneLink.instance.stop());
     _hub = null;
     _notifications = null;
     _bridge = null;
@@ -198,6 +201,14 @@ class _HubAppState extends State<HubApp> {
         // Les hologrammes ont été retirés (v1.60) : on efface la « vision des
         // mains » qu'ils avaient téléchargée (~ 30 Mo), une fois.
         unawaited(_removeHologramFiles());
+        // Le téléphone relié au PC : fichiers, presse-papier, télécommande.
+        if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+          PhoneLinkPage.wire((title, body) {
+            final id = 'tel:${DateTime.now().millisecondsSinceEpoch}';
+            unawaited(n.post(HubNotification(id: id, title: title, body: body)));
+          });
+          unawaited(PhoneLink.instance.start());
+        }
         // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier
         // plan toutes les 15 s (sur ce PC seulement).
         if (Win.supportedHere) {

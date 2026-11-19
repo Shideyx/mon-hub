@@ -80,6 +80,7 @@ import 'catch_up.dart';
 import '../../core/screen_time.dart';
 import '../../core/everywhere_search.dart';
 import '../../core/hub_home.dart';
+import '../../core/phone_link.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -2114,6 +2115,25 @@ class ClickyController extends ChangeNotifier {
         if (Win.supportedHere) Win.raiseMain(pid);
         HubHome.instance.onSearchText?.call('${a['texte'] ?? ''}');
         return 'Recherche ouverte.';
+      },
+    ),
+    HubTool(
+      name: 'telephone_envoyer',
+      description:
+          'Envoie un fichier du PC sur le téléphone de la personne (page « Mon téléphone », par le Wi-Fi) : il apparaît '
+          'dans l\'onglet « Du PC » du téléphone. Les fichiers reçus du téléphone sont dans Téléchargements\\Depuis mon '
+          'téléphone.',
+      params: {'chemin': ('string', 'Chemin complet du fichier sur le PC')},
+      required: ['chemin'],
+      run: (a) async {
+        final link = PhoneLink.instance;
+        if (!link.running) {
+          return 'Le téléphone n\'est pas relié : Réglages → Mes appareils → Mon téléphone (un QR code à scanner).';
+        }
+        final f = await link.share('${a['chemin'] ?? ''}'.trim());
+        return f == null
+            ? 'Fichier introuvable.'
+            : '« ${f.name} » est prêt sur ton téléphone : onglet « Du PC » de la page Mon PC.';
       },
     ),
   ];

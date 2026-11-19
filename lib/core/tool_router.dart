@@ -82,6 +82,7 @@ class ToolRouter {
       ['temps d ecran', 'temps passe', 'combien de temps', 'limite', 'trop joue', 'accro', 'pause'],
     ),
     'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
+    'telephone': (['telephone_'], ['telephone', 'iphone', 'portable', 'mon tel']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),
     'perso': (['perso_'], ['ouvre', 'module', 'site']),
