@@ -173,14 +173,6 @@ class ClickySkillsPage extends StatelessWidget {
       '« Fais-moi des cartes sur la photosynthèse », « Interroge-moi »',
       '« Écris-moi une fiche sur la Révolution française » : un vrai Google Doc',
     ]),
-    ('Hologrammes 3D', Icons.view_in_ar_rounded, Color(0xFF06B6D4), [
-      '« Affiche un T-rex en 3D » : un hologramme dans l\'image de ta caméra (bouton 🧊 de l\'accueil)',
-      'Glisse ton index dessus pour le faire tourner, pince-le pour l\'attraper, pince avec tes deux mains pour l\'agrandir',
-      '« Fais un hologramme de voiture sur ma main » : il fabrique l\'objet que tu veux',
-      '« … sur la table » : il sort de ton téléphone posé à plat (avec le marqueur affiché dessus)',
-      'Pour le voir en vrai, hors de l\'écran : mode 🔺 Pyramide + une petite pyramide en plastique sur ton téléphone '
-          '(bouton « Sur mon téléphone ») : il flotte dans l\'air, et tu le tournes avec tes doigts devant la webcam',
-    ]),
     ('À l\'écran', Icons.ads_click_rounded, Color(0xFF0EA5E9), [
       '« Où est le bouton pour… ? » : il te montre',
       '« Prends la main et ouvre mes mails » : il clique pour toi',

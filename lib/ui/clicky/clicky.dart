@@ -13,7 +13,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../ar_page.dart';
 import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -80,7 +79,6 @@ import '../../core/security_check.dart';
 import 'catch_up.dart';
 import '../../core/screen_time.dart';
 import '../../core/everywhere_search.dart';
-import '../../core/hologram.dart';
 import '../../core/hub_home.dart';
 
 /// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
@@ -2118,53 +2116,7 @@ class ClickyController extends ChangeNotifier {
         return 'Recherche ouverte.';
       },
     ),
-    if (ArPage.supported)
-      HubTool(
-        name: 'ar_afficher',
-        description:
-            'Affiche un hologramme 3D en réalité augmentée, dans l\'image de la caméra : la personne le touche, '
-            'l\'attrape, le tourne et l\'agrandit avec ses doigts. Objets prêts : T-rex, Clicky, planète, cœur, '
-            'fusée, diamant, système solaire, cube magique ; tout autre objet est fabriqué avec des formes simples.',
-        params: {
-          'objet': ('string', 'Ce qu\'il faut afficher (ex. « dinosaure », « voiture de course »)'),
-          'mode': (
-            'string',
-            'air (devant la caméra, par défaut), main (posé sur la main), table (sur le marqueur) ou pyramide '
-                '(pyramide holographique : visible en vrai, dans l\'air, avec une pyramide en plastique sur l\'écran)',
-          ),
-        },
-        run: (a) async => showHologram('${a['objet'] ?? ''}', '${a['mode'] ?? ''}'),
-      ),
   ];
-
-  /// Réalité augmentée : ouvre les hologrammes avec [what] (objet prêt, ou
-  /// fabriqué par l'IA avec des formes simples).
-  Future<String> showHologram(String what, String mode) async {
-    if (Win.supportedHere) Win.raiseMain(pid);
-    final m = Hologram.modes.contains(mode) ? mode : null;
-    final w = what.trim();
-    final id = w.isEmpty ? 'dino' : Hologram.match(w);
-    final place = switch (m) {
-      'main' => 'sur ta main',
-      'table' => 'sur le marqueur',
-      'pyramide' => 'pour la pyramide holographique',
-      _ => 'devant la caméra',
-    };
-    if (id != null) {
-      await ArPage.show(objet: id, mode: m);
-      return 'Voilà ${Hologram.labelOf(id)} en hologramme, $place. Glisse ton doigt dessus pour le faire tourner, '
-          'pince-le pour l\'attraper.';
-    }
-    if (!ArPage.isOpen) await ArPage.show(mode: m);
-    Map<String, dynamic>? recipe;
-    try {
-      recipe = await Hologram.invent(w);
-    } catch (_) {}
-    if (recipe == null) return 'Je n\'ai pas réussi à fabriquer « $w » en 3D. Je t\'ai mis le T-rex en attendant.';
-    await ArPage.show(recipe: recipe, mode: m);
-    final nom = '${recipe['nom']}'.isEmpty ? w : recipe['nom'];
-    return 'Voilà « $nom » en hologramme, $place.';
-  }
 
   /// La recherche partout, avec les outils de lecture de Mon Hub.
   Future<List<SearchHit>> search(String query, {void Function(List<SearchHit>)? onPart}) {
