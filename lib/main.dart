@@ -8,6 +8,7 @@ import 'core/phone_link.dart';
 import 'core/browser_link.dart';
 import 'core/work_backup.dart';
 import 'core/screen_time.dart';
+import 'ui/clicky/live_captions.dart';
 import 'ui/phone_link_page.dart';
 import 'ui/clicky/win.dart';
 import 'core/certificates.dart';
@@ -45,6 +46,8 @@ Future<void> main(List<String> args) async {
   if (args.contains('--clicky')) return runClickyDesktop();
   // « hub.exe --widget=musique » : un widget détaché sur le bureau.
   final widget = args.where((a) => a.startsWith('--widget=')).firstOrNull;
+  // « hub.exe --widget=soustitres » : les sous-titres en direct du son du PC.
+  if (widget == '--widget=${LiveCaptions.id}') return runCaptionsWindow();
   if (widget != null) return runWidgetWindow(widget.substring(9));
   WidgetsFlutterBinding.ensureInitialized();
   // Journal des erreurs (sur le PC) et garde-fous : une erreur ne casse

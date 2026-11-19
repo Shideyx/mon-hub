@@ -21,7 +21,16 @@ class GeminiLive {
     required this.tools,
     this.voice = 'Charon',
     this.extraDeclarations = const [],
+    this.language = 'fr-FR',
+    this.autoVad = false,
   });
+
+  /// Langue de la voix (null : Gemini choisit, ex. pour l'interprète).
+  final String? language;
+
+  /// true : Gemini repère tout seul quand on commence et finit de parler
+  /// (conversation continue, interprète) ; false : Clicky le lui dit.
+  final bool autoVad;
 
   final String key;
   final String system;
@@ -128,7 +137,7 @@ class GeminiLive {
           'voiceConfig': {
             'prebuiltVoiceConfig': {'voiceName': voice},
           },
-          'languageCode': 'fr-FR',
+          'languageCode': ?language,
         },
       },
       'systemInstruction': {
@@ -136,19 +145,21 @@ class GeminiLive {
           {'text': system},
         ],
       },
-      'tools': [
-        {
-          'functionDeclarations': [
-            for (final t in tools) declaration(t),
-            ...extraDeclarations,
-          ],
-        },
-      ],
+      if (tools.isNotEmpty || extraDeclarations.isNotEmpty)
+        'tools': [
+          {
+            'functionDeclarations': [
+              for (final t in tools) declaration(t),
+              ...extraDeclarations,
+            ],
+          },
+        ],
       // Clicky dit lui-même quand tu commences et finis de parler
       // (Ctrl + Alt, ou silence) : la réponse part dès que tu lâches.
-      'realtimeInputConfig': {
-        'automaticActivityDetection': {'disabled': true},
-      },
+      if (!autoVad)
+        'realtimeInputConfig': {
+          'automaticActivityDetection': {'disabled': true},
+        },
       'inputAudioTranscription': <String, dynamic>{},
       'outputAudioTranscription': <String, dynamic>{},
       'contextWindowCompression': {'slidingWindow': <String, dynamic>{}},

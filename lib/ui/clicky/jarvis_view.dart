@@ -171,6 +171,10 @@ class ClickySkillsPage extends StatelessWidget {
       'Surligne un texte n\'importe où et appuie sur Ctrl + Alt + C : il le corrige à sa place',
       '« Traduis la sélection en anglais », « Reformule mon texte »',
     ]),
+    ('Langues', Icons.translate_rounded, Color(0xFF0EA5E9), [
+      '« Interprète anglais » : tu parles avec quelqu\'un, Clicky traduit à voix haute dans les deux sens',
+      '« Mets les sous-titres » : tout ce qui passe sur ton PC (vidéo, série, jeu) traduit en français en bas de l\'écran',
+    ]),
     ('Rappels', Icons.notifications_active_rounded, Color(0xFFF59E0B), [
       '« Rappelle-moi de répondre à Léo quand j\'ouvre Discord »',
       '« Rappelle-moi dans 20 minutes de sortir le linge »',

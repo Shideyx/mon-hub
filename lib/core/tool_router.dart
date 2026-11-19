@@ -93,6 +93,10 @@ class ToolRouter {
       ['copie', 'redaction', 'dissertation', 'corrige', 'oral', 'expose', 'repeter', 'jury', 'video', 'fiche',
         'carte mentale', 'schema', 'mind map'],
     ),
+    'langues': (
+      ['interprete_', 'soustitres_'],
+      ['traduis', 'traduction', 'interprete', 'sous titre', 'sous-titre', 'langue', 'anglais', 'espagnol', 'allemand'],
+    ),
     'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),
