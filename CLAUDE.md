@@ -300,4 +300,20 @@
   dans `JoinAccountView` et `GoogleSetupPage`), puis « Retrouver mon compte » = `AccountSync` (synchro existante). Pas de
   mise à jour auto sur iPhone : `Updater.phoneUpdate` → notification. Rien de Windows au démarrage sur iOS (`BrowserLink`
   bureau seulement).
-
+- **Hologrammes / réalité augmentée** (demande de la personne : « un vrai élément 3D que je bouge avec mes doigts »,
+  façon hologramme de T-rex) : page web 3D `assets/ar/` (three.js r187 minifié dans `vendor/three.min.js`, js-aruco2 dans
+  `vendor/aruco.js` ; `ar.js` boucle caméra/suivi/gestes, `objects.js` objets dessinés par le code — T-rex, Clicky, planète,
+  cœur, fusée, diamant, système solaire, cube — + `buildCustom` (recette de formes), `holo.js` style hologramme (shader
+  bords + balayage, fils `WireframeGeometry`, socle projecteur, rayons, particules, points au bout des doigts), `track.js`
+  (`palmPose` main MediaPipe → pose, ouverture/pincement mesurés en 3D, `markerPose` POSIT + choix de la bonne solution,
+  `OneEuro`)). Modes : `air` (devant la caméra, toujours visible), `main` (sur la paume ; poing = caché ; deux mains =
+  entre les deux), `table` (marqueur ARUCO_MIP_36h12 n° 0, à afficher sur le téléphone ou imprimer). Gestes : index qui
+  glisse = rotation avec élan, pincer = attraper (collé aux doigts à l'écran, profondeur proportionnelle), deux mains qui
+  pincent = taille + pivot. Servie par `core/ar_server.dart` (`ArServer` : 127.0.0.1 port au hasard, Host vérifié, `safeAsset`,
+  vision des mains MediaPipe 1.2.3 téléchargée à la demande depuis npm + storage.googleapis.com, **SHA-256 épinglés**,
+  `extractPackage` dans un Isolate, rangée dans %APPDATA%\MonHub\realite-augmentee) ; écran `ui/ar_page.dart` (`ArPage.show`,
+  caméra autorisée seulement pour 127.0.0.1, gestionnaires JS `photo` → Images\Mon Hub, `invent` → `Hologram.invent`).
+  `core/hologram.dart` (`Hologram.match/prompt/parse` : recette JSON de l'IA vérifiée). Outil `ar_afficher` (groupe
+  `hologrammes` du `ToolRouter`), phrases sans IA dans `QuickAnswers` (« affiche un T-rex en 3D », « fais un hologramme de
+  voiture sur ma main »), bouton 🧊 de l'accueil. Tests navigateur : Playwright + `--use-file-for-fake-video-capture` (y4m),
+  `window.__fakeHands` = mains simulées, `window.__ar` = état. Ça s'affiche **sur l'écran** (image de la caméra), pas dans l'air.

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Réalité augmentée</title>
+<link rel="stylesheet" href="ar.css">
+<script src="vendor/aruco.js"></script>
+<script type="module" src="ar.js"></script>
+</head>
+<body>
+<div id="stage">
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="gl"></canvas>
+</div>
+<div id="flash"></div>
+
+<div id="top">
+  <div class="pill" id="modes">
+    <button data-mode="air" class="on">✨ Dans l'air</button>
+    <button data-mode="main">🖐️ Sur ma main</button>
+    <button data-mode="table">🔳 Sur la table</button>
+  </div>
+  <div class="tools">
+    <button class="round" id="btn-style" title="Hologramme ou vraies couleurs">🎨</button>
+    <button class="round" id="btn-marker" title="Le marqueur à imprimer">🔳</button>
+    <button class="round" id="btn-cam" title="Changer de caméra" hidden>🔄</button>
+    <button class="round" id="btn-photo" title="Prendre une photo">📸</button>
+  </div>
+</div>
+
+<div id="hint" hidden></div>
+<div id="progress" hidden><div id="progress-bar"></div></div>
+
+<div id="bottom">
+  <div id="objects"></div>
+  <form id="invent" autocomplete="off">
+    <input id="invent-text" maxlength="80" placeholder="Fais apparaître… (un bonhomme de neige, une voiture…)">
+    <button type="submit" title="Créer">✨</button>
+  </form>
+</div>
+
+<div id="sheet" hidden>
+  <div class="card">
+    <div id="marker-svg"></div>
+    <h2>Le marqueur</h2>
+    <p>Affiche-le en grand sur ton téléphone (ou imprime-le), pose-le à plat devant la caméra : l'hologramme
+      sort de l'écran du téléphone. Tourne-le, l'hologramme tourne avec.</p>
+    <div class="row">
+      <button id="btn-print">🖨️ Imprimer</button>
+      <button id="btn-close" class="ghost">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div id="error" hidden>
+  <div class="card">
+    <div class="big">📷</div>
+    <h2 id="error-title">Pas de caméra</h2>
+    <p id="error-text"></p>
+    <button id="btn-retry">Réessayer</button>
+  </div>
+</div>
+</body>
+</html>
