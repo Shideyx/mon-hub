@@ -19,7 +19,11 @@ import 'fsrs.dart';
 import 'revisions_store.dart';
 import '../../core/photo.dart';
 import '../../ui/clicky/course_listener.dart';
+import '../../ui/clicky/copy_check.dart';
 import '../../ui/clicky/course_page.dart';
+import '../../ui/clicky/mind_map.dart';
+import '../../ui/clicky/oral_coach.dart';
+import '../../ui/clicky/video_notes.dart' show VideoNotesPage;
 import '../ecoledirecte/grade_math.dart';
 import 'mock_exam.dart';
 
@@ -699,6 +703,22 @@ class RevisionsHomePage extends StatelessWidget {
               label: const Text('Écouter un cours'),
               onPressed: () => CoursePage.open(context),
             ),
+          PopupMenuButton<String>(
+            tooltip: 'Outils',
+            icon: const Icon(Icons.auto_awesome_rounded),
+            onSelected: (v) => switch (v) {
+              'copie' => CopyCheckPage.open(),
+              'oral' => OralCoachPage.open(),
+              'video' => VideoNotesPage.open(),
+              _ => MindMapPage.open(),
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'copie', child: ListTile(leading: Icon(Icons.fact_check_rounded), title: Text('Corriger ma copie (photo)'))),
+              PopupMenuItem(value: 'oral', child: ListTile(leading: Icon(Icons.record_voice_over_rounded), title: Text('Coach d\'oral'))),
+              PopupMenuItem(value: 'video', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('Vidéo YouTube → fiche'))),
+              PopupMenuItem(value: 'carte', child: ListTile(leading: Icon(Icons.hub_rounded), title: Text('Carte mentale'))),
+            ],
+          ),
           const SizedBox(width: 6),
         ],
       ),

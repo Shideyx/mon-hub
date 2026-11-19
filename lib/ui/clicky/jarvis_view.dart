@@ -186,6 +186,10 @@ class ClickySkillsPage extends StatelessWidget {
       '« Qu\'est-ce qu\'il y a dans le PDF du devoir de maths ? »',
       '« Fais-moi des cartes sur la photosynthèse », « Interroge-moi »',
       '« Écris-moi une fiche sur la Révolution française » : un vrai Google Doc',
+      '« Corrige ma copie » : prends-la en photo, chaque faute est entourée à sa place, avec la règle',
+      '« Coach d\'oral » : répète ton exposé, il compte tes « euh », mesure ton débit, puis le jury te pose ses questions',
+      'Vidéo YouTube → fiche : résumé, chapitres cliquables et quiz (Révisions → ✨)',
+      '« Fais une carte mentale sur la photosynthèse » : les branches se déplient, Clicky explique',
     ]),
     ('À l\'écran', Icons.ads_click_rounded, Color(0xFF0EA5E9), [
       '« Où est le bouton pour… ? » : il te montre',

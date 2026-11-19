@@ -14,6 +14,10 @@ import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../party_page.dart';
+import 'copy_check.dart';
+import 'mind_map.dart';
+import 'oral_coach.dart';
+import 'video_notes.dart';
 import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -2116,6 +2120,54 @@ class ClickyController extends ChangeNotifier {
         if (Win.supportedHere) Win.raiseMain(pid);
         HubHome.instance.onSearchText?.call('${a['texte'] ?? ''}');
         return 'Recherche ouverte.';
+      },
+    ),
+    HubTool(
+      name: 'copie_corriger',
+      description:
+          'Ouvre la correction de copie : la personne prend sa copie (rédaction, exercice) en photo et Clicky entoure '
+          'chaque faute à sa place sur la feuille, avec la correction et la règle, et une note estimée.',
+      params: {'chemin': ('string', 'Chemin d\'une photo déjà sur le PC (facultatif)')},
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        final p = '${a['chemin'] ?? ''}'.trim();
+        unawaited(CopyCheckPage.open(path: p.isEmpty ? null : p));
+        return p.isEmpty
+            ? 'Correction ouverte : choisis la photo de ta copie (ou envoie-la depuis ton téléphone).'
+            : 'Je corrige ta copie…';
+      },
+    ),
+    HubTool(
+      name: 'oral_coach',
+      description:
+          'Ouvre le coach d\'oral (exposé, Grand oral) : la personne répète à voix haute, chrono, tics de langage, débit, '
+          'blancs, plan respecté, note sur 20, puis questions du jury lues à voix haute.',
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        unawaited(OralCoachPage.open());
+        return 'Coach d\'oral ouvert : écris ton sujet, puis « Commencer la répétition ».';
+      },
+    ),
+    HubTool(
+      name: 'video_fiche',
+      description: 'Transforme une vidéo YouTube de cours en fiche : résumé, chapitres cliquables, à retenir et quiz.',
+      params: {'lien': ('string', 'Lien de la vidéo YouTube')},
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        final l = '${a['lien'] ?? ''}'.trim();
+        unawaited(VideoNotesPage.open(url: l.isEmpty ? null : l));
+        return l.isEmpty ? 'Colle le lien de la vidéo dans la page qui s\'ouvre.' : 'Je regarde la vidéo et je fais la fiche…';
+      },
+    ),
+    HubTool(
+      name: 'carte_mentale',
+      description: 'Fait une carte mentale animée (branches qui se déplient) sur un sujet ou à partir du texte d\'un cours.',
+      params: {'sujet': ('string', 'Le sujet, ou le texte du cours')},
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        final t = '${a['sujet'] ?? ''}'.trim();
+        unawaited(MindMapPage.open(input: t.isEmpty ? null : t));
+        return t.isEmpty ? 'Carte mentale ouverte.' : 'Je dessine la carte mentale…';
       },
     ),
     HubTool(

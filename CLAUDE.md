@@ -339,3 +339,19 @@
   « jeux gratuits »). **Mots de passe fuités** : `core/pwned.dart` (`PwnedPasswords` : k-anonymat, SHA-1 sur l'appareil,
   seuls 5 caractères envoyés, `Add-Padding`), carte `PwnedCheckCard` dans le bilan de sécurité (mot de passe effacé
   après la vérification, jamais gardé).
+- **Outils d'études (vague 3)**, menu ✨ de Révisions + outils Clicky (groupe `etudes`) :
+  **Correction de copie** `ui/clicky/copy_check.dart` (`CopyCheck` : photo → `Photo.toJpeg` 1800 px → `AiText.ask` (Gemini
+  d'abord) avec `box_2d` [ymin, xmin, ymax, xmax] en millièmes, `parse` remet dans l'ordre et borne ; `CopyCheckPage` :
+  cadres colorés numérotés par type sur la photo (`InteractiveViewer`), liste faux → correction + règle, note /20 ; une
+  photo reçue par « Mon téléphone » s'ouvre toute seule), outil `copie_corriger`, « corrige ma copie ».
+  **Coach d'oral** `ui/clicky/oral_coach.dart` (`OralCoach` : enregistrement `record` WAV 16 kHz, blancs > 3 s comptés
+  sur l'amplitude, Gemini **écoute l'audio** (`listen`, < 19 Mo) sinon `CourseListener.toText` + `AiText` ; `fillers`
+  (euh, du coup, en fait, genre, « quoi » en fin de phrase…), `wpm` + `paceAdvice` (120–160), note, plan oublié,
+  questions du jury lues par `ClickyController.speak(force: true)`, réponse à l'oral jugée `judgeAnswer`), outil
+  `oral_coach`, « entraîne-moi pour mon grand oral ». **Vidéo → fiche** `ui/clicky/video_notes.dart` (`VideoNotes` :
+  Gemini regarde la vidéo publique (`file_data.file_uri` YouTube), sinon sous-titres `captionTracks` + `fmt=json3` avec
+  les minutes + `AiText` ; chapitres cliquables → `YouTubeModule.open` à la seconde, quiz, Google Doc / cartes), outil
+  `video_fiche`. **Carte mentale** `ui/clicky/mind_map.dart` (`MindMaps.parse` 3 niveaux, `layout` radial (240 px puis
+  +200 par niveau, chaque branche dans sa part du cercle), `MindMapPage` : une seule `AnimationController` interpole
+  positions des idées et des liens (`_Links`), déplier/replier, « Clicky explique » à voix haute, Google Doc / cartes),
+  outil `carte_mentale`, « fais une carte mentale sur … ».
