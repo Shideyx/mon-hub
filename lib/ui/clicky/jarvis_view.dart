@@ -154,6 +154,13 @@ class ClickySkillsPage extends StatelessWidget {
       '« Envoie le PDF de mon exposé sur mon téléphone »',
       '« Lance une soirée » : tes amis scannent un QR code, ajoutent leurs sons et votent ; le PC enchaîne',
     ]),
+    ('Ton argent', Icons.savings_rounded, Color(0xFF16A34A), [
+      'Carte « Mon argent » : tes abonnements et essais gratuits trouvés dans tes mails, rappel la veille du prélèvement',
+      '« Mes abonnements », « Combien je dépense en abonnements ? »',
+      '« Où est mon colis ? » : il suit tes colis d\'après les mails et te prévient quand ils sont à retirer',
+      '« Jeux gratuits » (Epic) et les promos de ta liste de souhaits Steam',
+      'Bilan de sécurité : « mes mots de passe ont-ils fuité ? » (sans jamais les envoyer)',
+    ]),
     ('Ton PC', Icons.computer_rounded, Color(0xFFEA580C), [
       '« Comment va mon PC ? », « Il me reste combien de batterie ? »',
       '« Pourquoi mon PC rame ? » : il te dit quelles applis prennent la mémoire',

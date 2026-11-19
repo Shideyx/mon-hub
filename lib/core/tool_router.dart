@@ -83,6 +83,11 @@ class ToolRouter {
     ),
     'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
     'telephone': (['telephone_'], ['telephone', 'iphone', 'portable', 'mon tel']),
+    'argent': (
+      ['argent_'],
+      ['abonnement', 'essai gratuit', 'preleve', 'colis', 'livraison', 'commande', 'jeux gratuits', 'jeu gratuit', 'promo',
+        'steam', 'epic', 'netflix', 'depense', 'resilier'],
+    ),
     'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),

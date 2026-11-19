@@ -53,6 +53,13 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   Téléchargements › Depuis mon téléphone, sans jamais en écraser ni en ouvrir
   aucun. « Changer le lien » coupe les téléphones reliés avant. Rien ne passe
   par internet.
+- **Mots de passe fuités** (bilan de sécurité) : le mot de passe tapé n'est
+  jamais envoyé ni gardé. Mon Hub calcule son empreinte sur ton PC et n'envoie
+  que ses 5 premiers caractères à haveibeenpwned.com (k-anonymat) : le site ne
+  peut pas savoir quel mot de passe tu vérifies.
+- **Mon argent** : tes mails sont lus sur ton PC, sans IA ; seuls les sites
+  publics d'Epic et de Steam sont consultés (et ton profil Steam public, si tu
+  le donnes).
 
 ## Extension Chrome « Clicky dans le navigateur »
 
