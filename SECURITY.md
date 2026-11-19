@@ -47,21 +47,6 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   passe : Google la dit non confidentielle pour une appli installée) passe du
   PC à l'iPhone par ton presse-papier ou ta propre boîte mail, jamais par un
   serveur.
-- **Hologrammes (réalité augmentée)** : la caméra ne s'allume que sur la page
-  « Hologrammes », et seulement pour la page locale de Mon Hub (`127.0.0.1`,
-  port au hasard, autres noms d'hôte refusés). Les images de la caméra sont
-  analysées **sur l'appareil** (vision des mains MediaPipe en WebAssembly,
-  marqueur js-aruco2) : rien n'est envoyé. La vision des mains est téléchargée
-  une fois (npm et Google) et **refusée si son empreinte SHA-256 n'est pas la
-  bonne**. Un objet « inventé » par l'IA n'est qu'une liste de formes et de
-  couleurs vérifiée (jamais du code), et seul le texte demandé part vers l'IA.
-- **Hologramme sur le téléphone** (bouton « Sur mon téléphone ») : pour la
-  pyramide holographique, la page 3D est aussi servie au même Wi-Fi, mais
-  seulement derrière un **lien secret** (128 bits au hasard, dans le QR code),
-  seulement les fichiers de la page et ce qui est affiché (objet, rotation) :
-  jamais la caméra ni les fichiers de Mon Hub. Le lien se coupe quand la page
-  Hologrammes se ferme (3 h au plus). Windows demande d'autoriser Mon Hub sur
-  le réseau la première fois.
 
 ## Extension Chrome « Clicky dans le navigateur »
 

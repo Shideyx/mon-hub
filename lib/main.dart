@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, Platform;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -143,6 +143,15 @@ class _HubAppState extends State<HubApp> {
     _openFor = null;
   }
 
+  static Future<void> _removeHologramFiles() async {
+    final base = ClaudeBridge.folder;
+    if (base == null) return;
+    try {
+      final d = Directory('$base${Platform.pathSeparator}realite-augmentee');
+      if (await d.exists()) await d.delete(recursive: true);
+    } catch (_) {}
+  }
+
   /// Ouvre (ou ferme) le hub quand on se connecte / se déconnecte.
   void _sync() {
     if (widget.controller != null) return;
@@ -186,6 +195,9 @@ class _HubAppState extends State<HubApp> {
         WorkBackup.instance.start();
         // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
         unawaited(BrowserLink.instance.start());
+        // Les hologrammes ont été retirés (v1.60) : on efface la « vision des
+        // mains » qu'ils avaient téléchargée (~ 30 Mo), une fois.
+        unawaited(_removeHologramFiles());
         // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier
         // plan toutes les 15 s (sur ce PC seulement).
         if (Win.supportedHere) {

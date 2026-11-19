@@ -403,33 +403,6 @@ class QuickAnswers {
       }
     }
 
-    // Hologrammes (réalité augmentée) : « affiche un T-rex en 3D », « fais un
-    // hologramme de voiture sur ma main », « ouvre la réalité augmentée ».
-    if (has('ar_afficher')) {
-      const where = r'(?: (sur ma main|dans ma main|sur la table|sur mon telephone|dans l air|dans la pyramide|en pyramide))?';
-      final m = RegExp(
-        r'^(?:ouvre |lance |active |demarre )?(?:la |les )?(?:realite augmentee|hologrammes?)$|'
-        r'^(?:affiche|montre|fais apparaitre|fais|mets|pose|cree)(?: moi)? (?:un |une |le |la |l |des |les )?'
-        r'(.{2,40}?) (?:en 3d|en hologramme|en realite augmentee|en vrai)'
-        '$where\$|'
-        r'^(?:affiche|montre|fais apparaitre|fais|cree)(?: moi)? (?:un |une |l )?hologramme (?:d un |d une |de |du |des |d )?'
-        r'(.{2,40}?)'
-        '$where\$',
-      ).firstMatch(n);
-      if (m != null) {
-        final what = (m[1] ?? m[3] ?? '').trim();
-        final place = m[2] ?? m[4] ?? '';
-        final mode = place.contains('main')
-            ? 'main'
-            : place.contains('pyramide')
-            ? 'pyramide'
-            : (place.contains('table') || place.contains('telephone'))
-            ? 'table'
-            : 'air';
-        return QuickReply('${await call('ar_afficher', {'objet': what, 'mode': mode})}');
-      }
-    }
-
     // Anniversaires.
     if (has('anniversaire_ajouter')) {
       final m = RegExp(
