@@ -460,6 +460,25 @@ class QuickAnswers {
       }
     }
 
+    // Langues : interprète et sous-titres en direct.
+    if (has('interprete_ouvrir')) {
+      const langs = r'(anglais|espagnol|allemand|italien|portugais|arabe|chinois|japonais|coreen|russe|turc|ukrainien|polonais|neerlandais|roumain)';
+      final m = RegExp(
+        '^(?:mode |lance |ouvre |active )?(?:l |un |mon )?interprete(?: (?:en |d |de |pour l |pour |francais )?$langs)?\$|'
+        '^traduis (?:ma |notre |la |cette )?conversation(?: (?:en |avec l )?$langs)?\$',
+      ).firstMatch(n);
+      if (m != null) {
+        return QuickReply('${await call('interprete_ouvrir', {'langue': m[1] ?? m[2] ?? 'anglais'})}');
+      }
+    }
+    if (has('soustitres_lancer') &&
+        RegExp(r'^(?:mets |lance |active |affiche )?(?:moi )?(?:les |des )?sous titres?(?: en direct| en francais)?$|'
+                r'^sous titre(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie)$|'
+                r'^traduis(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie|ce qu ils disent)$')
+            .hasMatch(n)) {
+      return QuickReply('${await call('soustitres_lancer', const {})}');
+    }
+
     // Playlist de soirée.
     if (has('soiree_ouvrir') &&
         RegExp(r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$').hasMatch(n)) {

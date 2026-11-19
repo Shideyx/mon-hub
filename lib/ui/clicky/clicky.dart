@@ -15,6 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../party_page.dart';
 import 'copy_check.dart';
+import 'interpreter.dart';
+import 'live_captions.dart';
 import 'mind_map.dart';
 import 'oral_coach.dart';
 import 'video_notes.dart';
@@ -2168,6 +2170,31 @@ class ClickyController extends ChangeNotifier {
         final t = '${a['sujet'] ?? ''}'.trim();
         unawaited(MindMapPage.open(input: t.isEmpty ? null : t));
         return t.isEmpty ? 'Carte mentale ouverte.' : 'Je dessine la carte mentale…';
+      },
+    ),
+    HubTool(
+      name: 'interprete_ouvrir',
+      description:
+          'Ouvre l\'interprète en direct : la personne parle avec quelqu\'un dans une autre langue, Clicky traduit à voix '
+          'haute dans les deux sens (français ⇄ la langue choisie).',
+      params: {'langue': ('string', 'Anglais, Espagnol, Allemand, Italien, Portugais, Arabe, Chinois, Japonais…')},
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        final want = ToolRouter.normalize('${a['langue'] ?? 'anglais'}').trim();
+        final lang = Interpreter.languages.keys.where((k) => ToolRouter.normalize(k) == want).firstOrNull ?? 'Anglais';
+        unawaited(InterpreterPage.open(language: lang));
+        return 'Interprète français ⇄ ${lang.toLowerCase()} ouvert : appuie sur « Commencer » et parlez chacun votre tour.';
+      },
+    ),
+    HubTool(
+      name: 'soustitres_lancer',
+      description:
+          'Affiche les sous-titres en direct (traduits en français) de tout ce qui passe sur le PC : vidéo, série, jeu, appel. '
+          'Une petite fenêtre toujours au premier plan, en bas de l\'écran.',
+      run: (a) async {
+        if (!LiveCaptions.supported) return 'Les sous-titres en direct marchent sur le PC (Windows).';
+        await LiveCaptions.launch();
+        return 'Sous-titres lancés : lance ta vidéo, la traduction s\'écrit en bas de l\'écran (quelques secondes de décalage).';
       },
     ),
     HubTool(

@@ -21,6 +21,8 @@ import '../../core/photo.dart';
 import '../../ui/clicky/course_listener.dart';
 import '../../ui/clicky/copy_check.dart';
 import '../../ui/clicky/course_page.dart';
+import '../../ui/clicky/interpreter.dart';
+import '../../ui/clicky/live_captions.dart';
 import '../../ui/clicky/mind_map.dart';
 import '../../ui/clicky/oral_coach.dart';
 import '../../ui/clicky/video_notes.dart' show VideoNotesPage;
@@ -710,6 +712,8 @@ class RevisionsHomePage extends StatelessWidget {
               'copie' => CopyCheckPage.open(),
               'oral' => OralCoachPage.open(),
               'video' => VideoNotesPage.open(),
+              'interprete' => InterpreterPage.open(),
+              'soustitres' => LiveCaptions.launch(),
               _ => MindMapPage.open(),
             },
             itemBuilder: (_) => const [
@@ -717,6 +721,8 @@ class RevisionsHomePage extends StatelessWidget {
               PopupMenuItem(value: 'oral', child: ListTile(leading: Icon(Icons.record_voice_over_rounded), title: Text('Coach d\'oral'))),
               PopupMenuItem(value: 'video', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('Vidéo YouTube → fiche'))),
               PopupMenuItem(value: 'carte', child: ListTile(leading: Icon(Icons.hub_rounded), title: Text('Carte mentale'))),
+              PopupMenuItem(value: 'interprete', child: ListTile(leading: Icon(Icons.translate_rounded), title: Text('Interprète en direct'))),
+              PopupMenuItem(value: 'soustitres', child: ListTile(leading: Icon(Icons.subtitles_rounded), title: Text('Sous-titres en direct'))),
             ],
           ),
           const SizedBox(width: 6),

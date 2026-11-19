@@ -355,3 +355,15 @@
   +200 par niveau, chaque branche dans sa part du cercle), `MindMapPage` : une seule `AnimationController` interpole
   positions des idées et des liens (`_Links`), déplier/replier, « Clicky explique » à voix haute, Google Doc / cartes),
   outil `carte_mentale`, « fais une carte mentale sur … ».
+- **Langues** (groupe `langues`) : **Interprète** `ui/clicky/interpreter.dart` (`GeminiLive(autoVad: true, language: null,
+  tools: [])` : Gemini repère seul les tours de parole, consignes `Interpreter.system` = traduire seulement ; micro coupé
+  pendant que la traduction est lue (`PcmPlayer.playing`) pour ne pas se traduire lui-même ; transcriptions entrée /
+  sortie affichées), outil `interprete_ouvrir`, « interprète anglais ». `GeminiLive` : `tools` et `realtimeInputConfig`
+  omis quand vides / `autoVad`, `languageCode` omis si `language` null (Clicky inchangé). **Sous-titres en direct**
+  `ui/clicky/loopback.dart` (`LoopbackCapture` : WASAPI en boucle (`AUDCLNT_STREAMFLAGS_LOOPBACK`) dans un Isolate, format
+  de mixage float32 ou int16 → mono → `Resampler` (interpolation linéaire, sans couture) → PCM 16 kHz) +
+  `ui/clicky/live_captions.dart` (`hub.exe --widget=soustitres` → `runCaptionsWindow` : fenêtre à part, toujours au
+  premier plan en bas de l'écran ; morceaux de 8 s (14 s après un 429), silence ignoré, `OralCoach.listen` envoie le WAV
+  à Gemini qui écrit la traduction (`LiveCaptions.prompt/clean`, « (rien) » = pas de paroles), sinon Whisper `lang: auto`
+  (langue d'origine) ; quitter = `DesktopWidgets.send(id, 'quit')`), outil `soustitres_lancer`, « mets les sous-titres ».
+  Les deux sont aussi dans le menu ✨ de Révisions.

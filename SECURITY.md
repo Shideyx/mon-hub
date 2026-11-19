@@ -60,6 +60,11 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
 - **Mon argent** : tes mails sont lus sur ton PC, sans IA ; seuls les sites
   publics d'Epic et de Steam sont consultés (et ton profil Steam public, si tu
   le donnes).
+- **Sous-titres en direct et interprète** : ils n'écoutent que quand tu les
+  lances (et s'arrêtent quand tu fermes leur fenêtre). Pour traduire, le son
+  part chez Google (Gemini, avec ta clé) par petits morceaux, rien n'est
+  gardé sur le disque. Sans clé Gemini, les sous-titres sont faits sur ton PC
+  (Whisper), sans traduction.
 
 ## Extension Chrome « Clicky dans le navigateur »
 
