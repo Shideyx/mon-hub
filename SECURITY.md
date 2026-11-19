@@ -47,6 +47,12 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   passe : Google la dit non confidentielle pour une appli installée) passe du
   PC à l'iPhone par ton presse-papier ou ta propre boîte mail, jamais par un
   serveur.
+- **Mon téléphone** (si tu l'actives) : Mon Hub répond au Wi-Fi de la maison
+  seulement (pas aux adresses d'internet), et seulement derrière un **lien
+  secret** de 128 bits (le QR code). Les fichiers reçus vont dans
+  Téléchargements › Depuis mon téléphone, sans jamais en écraser ni en ouvrir
+  aucun. « Changer le lien » coupe les téléphones reliés avant. Rien ne passe
+  par internet.
 
 ## Extension Chrome « Clicky dans le navigateur »
 

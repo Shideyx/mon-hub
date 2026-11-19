@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
@@ -14,6 +15,7 @@ import '../core/notifications.dart';
 import 'add_module.dart';
 import 'hub_feed_view.dart';
 import 'notifications_page.dart';
+import 'phone_link_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
 import 'clicky/win.dart';
@@ -210,6 +212,13 @@ class _Header extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (Platform.isWindows)
+                  IconButton(
+                    tooltip: 'Mon téléphone (fichiers, télécommande)',
+                    color: Colors.white,
+                    icon: const Icon(Icons.devices_rounded),
+                    onPressed: () => PhoneLinkPage.open(context),
+                  ),
                 IconButton(
                   tooltip: 'Chercher partout (Ctrl + Espace)',
                   color: Colors.white,

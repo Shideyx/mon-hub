@@ -525,6 +525,38 @@ class Win {
     SendInput(1, input, sizeOf<INPUT>());
   });
 
+  /// Déplace la souris de ([dx], [dy]) depuis là où elle est (pavé tactile
+  /// du téléphone).
+  static void mouseBy(int dx, int dy) => using((a) {
+    final input = a<INPUT>();
+    input.ref.type = INPUT_MOUSE;
+    input.ref.Anonymous.mi
+      ..dwFlags = MOUSEEVENTF_MOVE
+      ..dx = dx
+      ..dy = dy;
+    SendInput(1, input, sizeOf<INPUT>());
+  });
+
+  /// Un clic là où est la souris.
+  static void clickHere({bool right = false}) {
+    _mouse(right ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN);
+    _mouse(right ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP);
+  }
+
+  /// Verrouille la session (comme Windows + L).
+  static bool lock() => LockWorkStation().value;
+
+  /// Met le PC en veille (pas en veille prolongée).
+  static bool sleep() {
+    try {
+      final f = DynamicLibrary.open('powrprof.dll')
+          .lookupFunction<Uint8 Function(Uint8, Uint8, Uint8), int Function(int, int, int)>('SetSuspendState');
+      return f(0, 0, 0) != 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Glisser-déposer d'un point à un autre.
   static Future<void> drag(int x1, int y1, int x2, int y2) async {
     await glide(x1, y1);

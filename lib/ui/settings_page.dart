@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import 'phone_link_page.dart';
 import 'account_sync_view.dart';
 import 'backup_page.dart';
 import 'security_page.dart';
@@ -428,6 +429,14 @@ class _SettingsPageState extends State<SettingsPage> {
             section('Mes appareils'),
             // Le compte sur tous tes appareils, sans export (Google Drive).
             const AccountSyncSection(),
+            if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+              ListTile(
+                leading: const Icon(Icons.devices_rounded),
+                title: const Text('Mon téléphone'),
+                subtitle: const Text('Fichiers, presse-papier et télécommande du PC, par le Wi-Fi'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => PhoneLinkPage.open(context),
+              ),
             if (Platform.isWindows)
               ListTile(
                 leading: const Icon(Icons.phone_iphone_rounded),

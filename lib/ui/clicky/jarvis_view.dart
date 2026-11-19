@@ -147,6 +147,12 @@ class ClickySkillsPage extends StatelessWidget {
       'Il ne te dérange plus et garde les notifications pour la fin',
       '« Arrête le mode concentration » : il te donne le bilan',
     ]),
+    ('Ton téléphone', Icons.devices_rounded, Color(0xFF0EA5E9), [
+      'Réglages → Mes appareils → Mon téléphone : un QR code à scanner une fois',
+      'Envoie tes photos au PC sans câble, récupère des fichiers du PC, partage le presse-papier',
+      'Télécommande : son, musique, diapos, souris, verrouiller, veille, éteindre… depuis ton lit',
+      '« Envoie le PDF de mon exposé sur mon téléphone »',
+    ]),
     ('Ton PC', Icons.computer_rounded, Color(0xFFEA580C), [
       '« Comment va mon PC ? », « Il me reste combien de batterie ? »',
       '« Pourquoi mon PC rame ? » : il te dit quelles applis prennent la mémoire',

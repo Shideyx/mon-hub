@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mon PC">
+<meta name="theme-color" content="#120f24">
+<link rel="apple-touch-icon" href="icone.png">
+<link rel="icon" href="icone.png">
+<title>Mon PC</title>
+<link rel="stylesheet" href="phone.css">
+<script src="phone.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="who"><span class="dot" id="dot"></span><span id="pc">Mon PC</span></div>
+  <button class="ghost small" id="btn-home" hidden>📲 Ajouter à l'écran d'accueil</button>
+</header>
+
+<main>
+  <!-- Envoyer -->
+  <section data-tab="envoyer" class="on">
+    <label class="drop" for="pick">
+      <span class="big">📤</span>
+      <b>Envoyer au PC</b>
+      <span class="sub">Photos, vidéos, fichiers : ils arrivent dans Téléchargements › Depuis mon téléphone</span>
+      <input id="pick" type="file" multiple>
+    </label>
+    <ul class="list" id="sent"></ul>
+  </section>
+
+  <!-- Recevoir -->
+  <section data-tab="recevoir">
+    <h2>Du PC</h2>
+    <p class="sub">Dans Mon Hub (page « Mon téléphone »), clique sur « Envoyer au téléphone » : le fichier apparaît ici.</p>
+    <ul class="list" id="files"></ul>
+  </section>
+
+  <!-- Presse-papier -->
+  <section data-tab="texte">
+    <h2>Copié sur le PC</h2>
+    <textarea id="pc-clip" readonly placeholder="Rien de copié sur le PC"></textarea>
+    <div class="row"><button id="btn-copy">📋 Copier</button><button class="ghost" id="btn-refresh">↻ Actualiser</button></div>
+    <h2>Envoyer un texte au PC</h2>
+    <textarea id="my-text" placeholder="Colle ou écris ici (un lien, un message…)"></textarea>
+    <div class="row"><button id="btn-send-text">➡️ Envoyer au PC</button></div>
+    <p class="sub">Il arrive dans le presse-papier du PC : Ctrl + V pour le coller.</p>
+  </section>
+
+  <!-- Télécommande -->
+  <section data-tab="telecommande">
+    <div class="pad" id="pad"><span>Pavé tactile<br><small>Glisse pour bouger la souris · touche pour cliquer · 2 doigts pour défiler</small></span></div>
+    <div class="row"><button data-cmd="clic">Clic</button><button data-cmd="clic_droit">Clic droit</button></div>
+    <h3>Son et musique</h3>
+    <div class="grid3">
+      <button data-cmd="voldown">🔉</button><button data-cmd="mute">🔇</button><button data-cmd="volup">🔊</button>
+      <button data-cmd="prev">⏮</button><button data-cmd="playpause">⏯</button><button data-cmd="next">⏭</button>
+    </div>
+    <h3>Diaporama et vidéo</h3>
+    <div class="grid3">
+      <button data-cmd="gauche">◀</button><button data-cmd="espace">␣</button><button data-cmd="droite">▶</button>
+      <button data-cmd="echap">Échap</button><button data-cmd="plein_ecran">⛶ F5</button><button data-cmd="f11">F11</button>
+    </div>
+    <h3>Le PC</h3>
+    <div class="grid3">
+      <button data-cmd="verrouiller">🔒<small>Verrouiller</small></button>
+      <button data-cmd="veille" data-confirm="Mettre le PC en veille ?">🌙<small>Veille</small></button>
+      <button data-cmd="eteindre" data-confirm="Éteindre le PC dans 1 minute ?">⏻<small>Éteindre</small></button>
+    </div>
+    <div class="row"><button class="ghost" data-cmd="annuler_extinction">Annuler l'extinction</button></div>
+  </section>
+</main>
+
+<div id="toast" hidden></div>
+
+<nav>
+  <button data-go="envoyer" class="on"><span>📤</span>Envoyer</button>
+  <button data-go="recevoir"><span>📥</span>Du PC</button>
+  <button data-go="texte"><span>📋</span>Texte</button>
+  <button data-go="telecommande"><span>🎛️</span>Télécommande</button>
+</nav>
+
+<div id="home-help" hidden>
+  <div class="card">
+    <h2>Comme une vraie appli</h2>
+    <p>Dans Safari : touche <b>Partager</b> <span class="share">⬆️</span> puis <b>Sur l'écran d'accueil</b>. L'icône « Mon PC »
+      t'ouvrira directement cette page.</p>
+    <button id="btn-home-ok">Compris</button>
+  </div>
+</div>
+</body>
+</html>
