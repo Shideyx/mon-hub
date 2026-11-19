@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -154,6 +155,7 @@ class ArServer {
   }
 
   Future<void> stop() async {
+    await stopShare();
     final s = _server;
     _server = null;
     await s?.close(force: true);
@@ -222,6 +224,139 @@ class ArServer {
     res.contentLength = body.length;
     res.add(body);
     await res.close();
+  }
+
+  // --------------------------------------- Sur le téléphone (même Wi-Fi)
+  // Pour la pyramide holographique posée sur le téléphone : la page 3D est
+  // aussi servie aux appareils du même Wi-Fi, **seulement** derrière un lien
+  // secret (128 bits au hasard), seulement les fichiers de la page et l'état
+  // affiché (aucune caméra, aucune action), et seulement tant que la page
+  // Hologrammes est ouverte (3 h au plus).
+  HttpServer? _lan;
+  String? _token;
+  Timer? _lanTimer;
+
+  /// Ce que la page du PC affiche (objet, rotation, taille), relu par le téléphone.
+  Map<String, Object?> shared = const {};
+
+  /// La recette de l'objet inventé, à part (plus grosse, envoyée une fois).
+  Object? sharedRecipe;
+
+  bool get sharing => _lan != null;
+
+  /// Ouvre le lien et renvoie l'adresse à scanner (null : pas de Wi-Fi).
+  Future<Uri?> startShare() async {
+    final ip = await lanAddress();
+    if (ip == null) return null;
+    if (_lan == null) {
+      final r = Random.secure();
+      _token = [for (var i = 0; i < 16; i++) r.nextInt(256).toRadixString(16).padLeft(2, '0')].join();
+      final s = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+      _lan = s;
+      s.listen((req) => unawaited(_handleLan(req)));
+      _lanTimer = Timer(const Duration(hours: 3), () => unawaited(stopShare()));
+    }
+    return Uri(
+      scheme: 'http',
+      host: ip,
+      port: _lan!.port,
+      path: '/p/$_token/',
+      queryParameters: {'mode': 'pyramide', 'lien': '1'},
+    );
+  }
+
+  Future<void> stopShare() async {
+    _lanTimer?.cancel();
+    _lanTimer = null;
+    final s = _lan;
+    _lan = null;
+    _token = null;
+    shared = const {};
+    sharedRecipe = null;
+    await s?.close(force: true);
+  }
+
+  /// Adresse imposée (tests).
+  static String? lanOverride;
+
+  /// Adresse privée (192.168.x.x, 10.x.x.x, 172.16-31.x.x) du PC sur le Wi-Fi.
+  static Future<String?> lanAddress() async {
+    if (lanOverride != null) return lanOverride;
+    try {
+      final all = await NetworkInterface.list(type: InternetAddressType.IPv4);
+      String? best;
+      var bestScore = -1;
+      for (final i in all) {
+        final name = i.name.toLowerCase();
+        final virtual = RegExp(r'vethernet|virtual|vmware|vbox|hyper-v|wsl|docker|loopback|tailscale|zerotier|vpn')
+            .hasMatch(name);
+        for (final a in i.addresses) {
+          if (!isPrivate(a.address)) continue;
+          var score = virtual ? 0 : 1;
+          if (RegExp(r'wi-?fi|wlan|wireless|sans fil').hasMatch(name)) score += 2;
+          if (a.address.startsWith('192.168.')) score += 1;
+          if (score > bestScore) {
+            best = a.address;
+            bestScore = score;
+          }
+        }
+      }
+      return best;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool isPrivate(String ip) {
+    final p = ip.split('.').map(int.tryParse).toList();
+    if (p.length != 4 || p.any((x) => x == null)) return false;
+    final a = p[0]!;
+    final b = p[1]!;
+    return a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31);
+  }
+
+  Future<void> _handleLan(HttpRequest req) async {
+    final res = req.response;
+    try {
+      final token = _token;
+      final prefix = '/p/$token/';
+      final path = req.uri.path;
+      if (token == null || req.method != 'GET' || !path.startsWith(prefix)) {
+        return await _send(res, 404, 'text/plain', const []);
+      }
+      res.headers
+        ..set('X-Content-Type-Options', 'nosniff')
+        ..set('Cache-Control', 'no-store')
+        ..set('Referrer-Policy', 'no-referrer');
+      final rel = path.substring(prefix.length);
+      if (rel == 'etat') return await _sendJson(res, shared);
+      if (rel == 'recette') return await _sendJson(res, sharedRecipe ?? const {});
+      final asset = rel.isEmpty ? 'index.html' : rel;
+      if (!safeAsset(asset)) return await _send(res, 404, 'text/plain', const []);
+      final bytes = await loadAsset(asset);
+      if (bytes == null) return await _send(res, 404, 'text/plain', const []);
+      return await _send(res, 200, typeOf(asset), bytes);
+    } catch (_) {
+      try {
+        await _send(res, 500, 'text/plain', const []);
+      } catch (_) {}
+    }
+  }
+
+  /// Ce que la page du PC envoie (vérifié : seulement ces champs, bornés).
+  void publish(Object? msg) {
+    if (msg is! Map) return;
+    num? n(Object? v) => v is num && v.isFinite ? v : null;
+    final objet = '${msg['objet'] ?? ''}';
+    shared = {
+      'objet': RegExp(r'^[a-z]{2,12}$').hasMatch(objet) ? objet : 'dino',
+      'recetteId': n(msg['recetteId'])?.toInt() ?? 0,
+      'tour': n(msg['tour'])?.toDouble() ?? 0,
+      'taille': (n(msg['taille'])?.toDouble() ?? 1).clamp(0.3, 5),
+      'holo': msg['holo'] != false,
+    };
+    final r = msg['recette'];
+    if (r is Map && r['pieces'] is List && (r['pieces'] as List).length <= 80) sharedRecipe = r;
   }
 }
 

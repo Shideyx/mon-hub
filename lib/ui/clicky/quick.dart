@@ -406,7 +406,7 @@ class QuickAnswers {
     // Hologrammes (réalité augmentée) : « affiche un T-rex en 3D », « fais un
     // hologramme de voiture sur ma main », « ouvre la réalité augmentée ».
     if (has('ar_afficher')) {
-      const where = r'(?: (sur ma main|dans ma main|sur la table|sur mon telephone|dans l air))?';
+      const where = r'(?: (sur ma main|dans ma main|sur la table|sur mon telephone|dans l air|dans la pyramide|en pyramide))?';
       final m = RegExp(
         r'^(?:ouvre |lance |active |demarre )?(?:la |les )?(?:realite augmentee|hologrammes?)$|'
         r'^(?:affiche|montre|fais apparaitre|fais|mets|pose|cree)(?: moi)? (?:un |une |le |la |l |des |les )?'
@@ -421,6 +421,8 @@ class QuickAnswers {
         final place = m[2] ?? m[4] ?? '';
         final mode = place.contains('main')
             ? 'main'
+            : place.contains('pyramide')
+            ? 'pyramide'
             : (place.contains('table') || place.contains('telephone'))
             ? 'table'
             : 'air';

@@ -104,6 +104,11 @@ void main() {
         'objet': 'dinosaure',
         'mode': 'air',
       });
+      expect(await ask('affiche un dinosaure en 3D dans la pyramide'), {
+        'name': 'ar_afficher',
+        'objet': 'dinosaure',
+        'mode': 'pyramide',
+      });
     });
 
     test('les vraies questions partent vers l\'IA', () async {
@@ -183,6 +188,46 @@ void main() {
       expect(ArServer.typeOf('wasm/vision_wasm_internal.wasm'), 'application/wasm');
     });
 
+    test('sur le téléphone : lien secret, seulement l\'hologramme', () async {
+      ArServer.lanOverride = '127.0.0.1';
+      addTearDown(() => ArServer.lanOverride = null);
+      final link = (await server.startShare())!;
+      expect(link.queryParameters, {'mode': 'pyramide', 'lien': '1'});
+      final token = link.pathSegments[1];
+      expect(token, matches(RegExp(r'^[0-9a-f]{32}$')));
+      Future<(int, String)> lan(String path) async {
+        final req = await client.getUrl(Uri.parse('http://127.0.0.1:${link.port}$path'));
+        final res = await req.close();
+        return (res.statusCode, await res.transform(utf8.decoder).join());
+      }
+
+      expect(await lan('/p/$token/'), (200, '<h1>AR</h1>'));
+      expect((await lan('/p/0123456789abcdef0123456789abcdef/')).$1, 404);
+      expect((await lan('/')).$1, 404);
+      expect((await lan('/p/$token/mp/vision_bundle.mjs')).$1, 404);
+      // L'état publié par la page du PC est vérifié avant d'être servi.
+      server.publish({'objet': '<script>', 'tour': 1.5, 'taille': 99, 'holo': false, 'secret': 'x'});
+      final etat = jsonDecode((await lan('/p/$token/etat')).$2) as Map;
+      expect(etat, {'objet': 'dino', 'recetteId': 0, 'tour': 1.5, 'taille': 5.0, 'holo': false});
+      server.publish({
+        'objet': 'custom',
+        'recetteId': 2,
+        'recette': {'nom': 'x', 'pieces': []},
+      });
+      expect(jsonDecode((await lan('/p/$token/recette')).$2), {'nom': 'x', 'pieces': []});
+      await server.stopShare();
+      expect(server.sharing, isFalse);
+    });
+
+    test('adresses du Wi-Fi', () {
+      expect(ArServer.isPrivate('192.168.1.12'), isTrue);
+      expect(ArServer.isPrivate('10.0.0.5'), isTrue);
+      expect(ArServer.isPrivate('172.20.3.4'), isTrue);
+      expect(ArServer.isPrivate('172.32.0.1'), isFalse);
+      expect(ArServer.isPrivate('8.8.8.8'), isFalse);
+      expect(ArServer.isPrivate('pas une ip'), isFalse);
+    });
+
     test('un paquet abîmé est refusé', () {
       expect(() => ArServer.extractPackage(Uint8List.fromList([1, 2, 3])), throwsA(anything));
     });
@@ -198,6 +243,7 @@ void main() {
         'objects.js',
         'track.js',
         'holo.js',
+        'pyramid.js',
         'vendor/three.min.js',
         'vendor/aruco.js',
       ]) {

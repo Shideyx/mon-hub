@@ -20,9 +20,11 @@
     <button data-mode="air" class="on">✨ Dans l'air</button>
     <button data-mode="main">🖐️ Sur ma main</button>
     <button data-mode="table">🔳 Sur la table</button>
+    <button data-mode="pyramide">🔺 Pyramide</button>
   </div>
   <div class="tools">
     <button class="round" id="btn-style" title="Hologramme ou vraies couleurs">🎨</button>
+    <button class="round" id="btn-pyr" title="Fabriquer la pyramide holographique">🔺</button>
     <button class="round" id="btn-marker" title="Le marqueur à imprimer">🔳</button>
     <button class="round" id="btn-cam" title="Changer de caméra" hidden>🔄</button>
     <button class="round" id="btn-photo" title="Prendre une photo">📸</button>
@@ -33,6 +35,7 @@
 <div id="progress" hidden><div id="progress-bar"></div></div>
 
 <div id="bottom">
+  <label class="pyr-only" id="pyr-size-box">Taille des 4 images <input type="range" id="pyr-size" min="40" max="100" value="100"></label>
   <div id="objects"></div>
   <form id="invent" autocomplete="off">
     <input id="invent-text" maxlength="80" placeholder="Fais apparaître… (un bonhomme de neige, une voiture…)">
@@ -49,6 +52,32 @@
     <div class="row">
       <button id="btn-print">🖨️ Imprimer</button>
       <button id="btn-close" class="ghost">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div id="pyr-sheet" hidden>
+  <div class="card wide">
+    <h2>🔺 La pyramide holographique</h2>
+    <p>Avec elle, l'hologramme flotte <b>dans l'air, à l'intérieur de la pyramide</b>, et se voit à l'œil nu des 4 côtés
+      (c'est l'illusion de Pepper, celle des concerts « en hologramme »).</p>
+    <ol>
+      <li>Imprime le gabarit, ou recopie les mesures sur du papier.</li>
+      <li>Pose dessus du plastique transparent et rigide (boîtier de CD, couvercle de boîte, pochette épaisse) et découpe
+        <b>4 trapèzes</b> au cutter (demande à un adulte si besoin).</li>
+      <li>Scotche-les côte à côte : ça fait une pyramide sans pointe.</li>
+      <li>Mets Mon Hub en mode <b>🔺 Pyramide</b> (ou ouvre-le sur ton téléphone avec le bouton du PC « Sur mon
+        téléphone »), pose la pyramide <b>à l'envers</b>, petit trou en bas, au centre de l'écran.</li>
+      <li>Éteins la lumière et regarde à hauteur de la pyramide : le T-rex flotte dedans. Règle « Taille des 4 images »
+        pour qu'elles tombent sous les faces.</li>
+    </ol>
+    <div class="templates">
+      <figure><div id="pyr-phone"></div><figcaption>Pour un téléphone</figcaption></figure>
+      <figure><div id="pyr-tablet"></div><figcaption>Pour une tablette ou un écran posé à plat</figcaption></figure>
+    </div>
+    <div class="row">
+      <button id="btn-pyr-print">🖨️ Imprimer le gabarit</button>
+      <button id="btn-pyr-close" class="ghost">Fermer</button>
     </div>
   </div>
 </div>

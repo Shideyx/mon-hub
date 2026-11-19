@@ -24,7 +24,7 @@ class Hologram {
     'cube': ('le cube magique', ['cube', 'rubik']),
   };
 
-  static const modes = ['air', 'main', 'table'];
+  static const modes = ['air', 'main', 'table', 'pyramide'];
 
   /// L'objet prêt qui correspond à [text] (« un dinosaure » → dino).
   static String? match(String text) {

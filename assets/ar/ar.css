@@ -96,12 +96,37 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 #marker-svg { width: min(260px, 70vw); margin: 0 auto; }
 #marker-svg svg { width: 100%; height: auto; display: block; }
 
+#top, #bottom, #hint { transition: opacity .6s; }
+body.pyr #cam { visibility: hidden; }
+body.pyr #stage { background: #000; }
+body.pyr { background: #000; }
+.pyr-only { display: none; }
+body.pyr:not(.follower) .pyr-only { display: flex; }
+#pyr-size-box { align-items: center; gap: 10px; padding: 6px 14px; border-radius: 999px; background: var(--glass); font-size: 13px; }
+#pyr-size { accent-color: var(--accent); }
+body.pyr.calm #top, body.pyr.calm #bottom, body.pyr.calm #hint, body.pyr.calm #progress { opacity: 0; pointer-events: none; }
+body.pyr #bottom { background: none; }
+body.follower #modes, body.follower .tools, body.follower #objects, body.follower #invent { display: none !important; }
+#pyr-sheet { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(7,6,13,.7); backdrop-filter: blur(6px); overflow: auto; }
+.card.wide { width: min(640px, 100%); text-align: left; max-height: calc(100vh - 32px); overflow: auto; }
+.card.wide h2 { text-align: center; }
+.card ol { margin: 0 0 14px; padding-left: 20px; color: #4b4566; }
+.card li { margin: 4px 0; }
+.templates { display: flex; gap: 16px; justify-content: center; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+.templates figure { margin: 0; text-align: center; font-size: 12px; color: #4b4566; }
+.templates svg { max-width: 100%; height: auto; }
+
 @media print {
   body { background: #fff; }
-  body > *:not(#sheet) { display: none !important; }
-  #sheet { position: static; background: none; backdrop-filter: none; display: block !important; }
-  #sheet .card { box-shadow: none; width: auto; }
-  #sheet p, #sheet .row { display: none; }
+  body:not(.print-pyr) > *:not(#sheet) { display: none !important; }
+  body.print-pyr > *:not(#pyr-sheet) { display: none !important; }
+  #sheet, #pyr-sheet { position: static; background: none; backdrop-filter: none; display: block !important; }
+  #sheet .card, #pyr-sheet .card { box-shadow: none; width: auto; max-height: none; overflow: visible; }
+  #sheet p, #sheet .row, #pyr-sheet .row { display: none; }
   #marker-svg { width: 10cm; }
   #sheet h2::after { content: " — Mon Hub, réalité augmentée (10 cm)"; font-weight: normal; font-size: 12px; }
+  .templates svg { max-width: none; height: auto; }
+  #pyr-phone svg { width: 70mm; }
+  #pyr-tablet svg { width: 130mm; }
 }

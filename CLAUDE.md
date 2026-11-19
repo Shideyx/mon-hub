@@ -317,3 +317,14 @@
   `hologrammes` du `ToolRouter`), phrases sans IA dans `QuickAnswers` (« affiche un T-rex en 3D », « fais un hologramme de
   voiture sur ma main »), bouton 🧊 de l'accueil. Tests navigateur : Playwright + `--use-file-for-fake-video-capture` (y4m),
   `window.__fakeHands` = mains simulées, `window.__ar` = état. Ça s'affiche **sur l'écran** (image de la caméra), pas dans l'air.
+  **Visible en vrai (hors de l'écran)** : la personne veut voir l'hologramme dans la pièce → seule solution sans matériel
+  payant = **pyramide holographique** (illusion de Pepper). Mode `pyramide` : `assets/ar/pyramid.js` (`PyramidView` : 4 vues
+  rendues dans des render targets puis montées sur fond noir, **tête vers l'extérieur et en miroir** — face à 45° : un point
+  de l'écran à la distance d du centre apparaît à la hauteur d —, caméra k à l'angle k × 90°, `pyramidTemplate` gabarit en mm
+  1/3,5/6 cm téléphone, 2/7/12 cm tablette), boutons cachés après 4 s (`calm`, sinon ils se reflètent), glisser/molette.
+  **Sur le téléphone** : bouton « Sur mon téléphone » de `ArPage` (ordinateur seulement) → `ArServer.startShare` = 2ᵉ serveur
+  sur 0.0.0.0, **lien secret** `/p/<32 hex>/` (QR code `QrPainter`, paquet `qr`), seulement les fichiers de la page + `etat` /
+  `recette` (jamais `/mp/`, jamais la caméra), coupé à la fermeture de la page ou après 3 h ; la page du PC publie l'état
+  (gestionnaire JS `etat` → `ArServer.publish`, champs vérifiés) 10×/s, le téléphone (`?lien=1`, `follower` : pas de caméra)
+  le relit (`follow()`). Le pare-feu de Windows demande l'autorisation la 1ʳᵉ fois. Autres façons (payantes) : lunettes de
+  réalité mixte (Quest 3…), ventilateur holographique.
