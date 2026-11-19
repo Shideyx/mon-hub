@@ -313,3 +313,12 @@
   2 doigts = défiler, toucher = clic ; « Sur l'écran d'accueil » iPhone). Mon Hub : `PhoneLinkPage` (QR `QrView`, paquet
   `qr`), bouton de l'accueil + Réglages → Mes appareils → Mon téléphone. Outil Clicky `telephone_envoyer` (groupe
   `telephone`). Le pare-feu de Windows demande l'autorisation la 1ʳᵉ fois.
+- **Playlist de soirée** : `core/party.dart` (`Party` : route `extraRoutes` du serveur de `PhoneLink` (démarré avec
+  `start(force: true)`, arrêté à la fin si « Mon téléphone » n'est pas activé), lien des invités `/soiree/<24 hex>/` qui
+  ne donne **que** la soirée (jamais fichiers/télécommande), `api/chercher` (recherche YouTube faite par le PC, 1 / 0,8 s
+  par invité), `api/ajouter` (id vidéo vérifié, textes nettoyés `clean`, 5 sons en attente par invité, doublon = vote),
+  `api/voter` (bascule), file `upcoming` triée par votes puis arrivée). Page invités `assets/party/` (prénom gardé dans le
+  téléphone). PC : `ui/party_page.dart` (`PartyPage.open` : lecteur = vraie page YouTube dans `HubWebView` + CSS
+  `YouTubeMiniPlayer.script`, sondage 1 s de `movie_player.getPlayerState()` : 0 = fini → `next()`, pub ignorée, bloqué
+  20 s → suivant ; QR des invités, ajout par l'hôte, retirer, pause, suivant ; quitter = terminer). Outil `soiree_ouvrir`
+  (groupe `soiree`), « lance une soirée » / « mode soirée » sans IA, bouton dans la page Mon téléphone.

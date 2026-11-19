@@ -83,6 +83,7 @@ class ToolRouter {
     ),
     'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
     'telephone': (['telephone_'], ['telephone', 'iphone', 'portable', 'mon tel']),
+    'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),
     'perso': (['perso_'], ['ouvre', 'module', 'site']),

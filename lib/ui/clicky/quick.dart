@@ -403,6 +403,12 @@ class QuickAnswers {
       }
     }
 
+    // Playlist de soirée.
+    if (has('soiree_ouvrir') &&
+        RegExp(r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$').hasMatch(n)) {
+      return QuickReply('${await call('soiree_ouvrir', const {})}');
+    }
+
     // Anniversaires.
     if (has('anniversaire_ajouter')) {
       final m = RegExp(
