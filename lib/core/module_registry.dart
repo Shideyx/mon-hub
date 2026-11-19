@@ -7,6 +7,7 @@ import '../modules/ecoledirecte/ecoledirecte_module.dart';
 import '../modules/instagram/instagram_module.dart';
 import '../modules/drive/drive_module.dart';
 import '../modules/mail/mail_module.dart';
+import '../modules/money/money_module.dart';
 import '../modules/music/music_module.dart';
 import '../modules/revisions/revisions_module.dart';
 import '../modules/roblox/roblox_module.dart';
@@ -23,6 +24,8 @@ List<HubModule> buildModules() {
   // L'Agenda reprend les cours d'École Directe : on partage le même module.
   final ecole = EcoleDirecteModule();
   final schedule = ScheduleModule(ecole: ecole);
+  // « Mon argent » lit les mails (abonnements, colis).
+  final mail = MailModule();
   return [
     schedule,
     ClaudeModule(),
@@ -30,7 +33,7 @@ List<HubModule> buildModules() {
     DocsModule(),
     RevisionsModule(ecole: ecole, schedule: schedule),
     ecole,
-    MailModule(),
+    mail,
     DiscordModule(),
     InstagramModule(),
     MusicModule(),
@@ -38,6 +41,7 @@ List<HubModule> buildModules() {
     RobloxModule(),
     BooksModule(),
     DriveModule(),
+    MoneyModule(mail: mail),
     // Les modules ajoutés par la personne (Accueil → « Ajouter un module »).
     ...CustomModules.build(),
   ];

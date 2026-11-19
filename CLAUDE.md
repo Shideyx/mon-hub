@@ -322,3 +322,20 @@
   `YouTubeMiniPlayer.script`, sondage 1 s de `movie_player.getPlayerState()` : 0 = fini → `next()`, pub ignorée, bloqué
   20 s → suivant ; QR des invités, ajout par l'hôte, retirer, pause, suivant ; quitter = terminer). Outil `soiree_ouvrir`
   (groupe `soiree`), « lance une soirée » / « mode soirée » sans IA, bouton dans la page Mon téléphone.
+- **Mon argent** (module `argent`, `modules/money/`, carte de l'accueil) : **sans IA**. `money_rules.dart` (`MoneyRules` :
+  `knownServices` (Spotify, Netflix, Deezer, Disney+, Prime, YouTube Premium, Apple/Google avec un mot-clé obligatoire,
+  Game Pass, PS Plus, Nitro, Roblox Premium, Crunchyroll, ChatGPT…), `subscription` = essai / renouvellement / paiement /
+  résiliation + prix `amount` + date `date`/`dateAfter` (FR et EN, sans année = prochaine fois), paiement sans date =
+  +1 mois / +1 an ; `parcel` = transporteur + numéro (Colissimo, Chronopost, UPS, DHL, Mondial Relay, Relais Colis, GLS,
+  DPD, Amazon ; numéros courts seulement si le mail vient du transporteur) + état `status` (commande → expédié → livré
+  aujourd'hui → à retirer → livré, `later` : jamais de recul) + lien de suivi `trackingUrl`). `money_store.dart`
+  (`MoneyStore`, `argent.json` chiffré : abonnements, colis, jeux, mails déjà lus `vus`). `MoneyModule(mail:)` (le
+  `MailModule` est partagé dans `module_registry`) : `scanMails` (toutes les 30 min, 80 derniers mails, ≤ 15 lus en entier),
+  `refreshGames` (Epic 6 h, Steam 12 h), `reminders` (veille / jour du prélèvement ou de la fin d'essai dès 9 h, colis
+  à retirer / livré, jeu gratuit, promo Steam ; doublons filtrés par le centre de notifications). `games_deals.dart`
+  (`GameDeals.epic` = freeGamesPromotions public, `steamId` (lien, pseudo via `?xml=1`, numéro), `steamDeals` =
+  IWishlistService/GetWishlist + appdetails `price_overview` par 50 (Steam renvoie `data: []` sans prix), remise ≥ 20 %).
+  Outils `argent_abonnements/colis/jeux` (groupe `argent`), phrases sans IA (« mes abonnements », « où est mon colis »,
+  « jeux gratuits »). **Mots de passe fuités** : `core/pwned.dart` (`PwnedPasswords` : k-anonymat, SHA-1 sur l'appareil,
+  seuls 5 caractères envoyés, `Add-Padding`), carte `PwnedCheckCard` dans le bilan de sécurité (mot de passe effacé
+  après la vérification, jamais gardé).

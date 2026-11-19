@@ -403,6 +403,45 @@ class QuickAnswers {
       }
     }
 
+    // Mon argent : abonnements, colis, jeux gratuits.
+    if (has('argent_abonnements') &&
+        RegExp(r'^(?:quels sont |montre |liste |donne )?(?:moi )?mes abonnements$|'
+                r'^combien (?:je depense|je paye|je paie|ca me coute)(?: par mois)? (?:en|pour mes|avec mes) abonnements$|'
+                r'^(?:j ai|ai je) (?:quels|des) abonnements$')
+            .hasMatch(n)) {
+      final r = await call('argent_abonnements', const {});
+      if (r is Map) {
+        final subs = _list(r['abonnements']).where((s) => s['resilie'] != true).toList();
+        if (subs.isEmpty) {
+          return const QuickReply('Je ne connais aucun abonnement pour l\'instant. Ouvre « Mon argent » : je cherche dans tes mails.');
+        }
+        final names = [for (final s in subs) s['prix'] == null ? '${s['service']}' : '${s['service']} (${s['prix']})'];
+        final next = subs.where((s) => s['prochain'] != null).toList()
+          ..sort((a, b) => '${a['prochain']}'.compareTo('${b['prochain']}'));
+        final d = next.isEmpty ? null : DateTime.tryParse('${next.first['prochain']}');
+        return QuickReply(
+          '${subs.length} abonnement${subs.length > 1 ? 's' : ''} : ${names.join(', ')}. Soit ${r['total_par_mois']} par mois.'
+          '${d == null ? '' : ' Le prochain : ${next.first['service']} ${_dayName(d, t)}.'}',
+        );
+      }
+    }
+    if (has('argent_colis') &&
+        RegExp(r'^(?:ou (?:est|en est|en sont) (?:mon|mes) colis|mes colis|(?:il|elle) arrive quand mon colis|'
+                r'(?:j ai|est ce que j ai) (?:un|des) colis(?: a recuperer| a retirer)?)$')
+            .hasMatch(n)) {
+      final list = _list(await call('argent_colis', const {}));
+      if (list.isEmpty) return const QuickReply('Aucun colis en cours dans tes mails.');
+      return QuickReply([for (final p in list.take(4)) '📦 ${p['boutique']} : ${p['etat']}'].join('\n'));
+    }
+    if (has('argent_jeux') &&
+        RegExp(r'^(?:quels sont les |y a t il des |il y a des |c est quoi les )?jeux gratuits(?: cette semaine| en ce moment| sur epic)?$')
+            .hasMatch(n)) {
+      final r = await call('argent_jeux', const {});
+      final free = r is Map ? _list(r['gratuits']).where((g) => g['maintenant'] == true).toList() : const <Map>[];
+      if (free.isEmpty) return const QuickReply('Pas de jeu gratuit sur Epic en ce moment (ou pas d\'internet).');
+      return QuickReply('🎮 Gratuit sur Epic en ce moment : ${free.map((g) => g['titre']).join(', ')}.');
+    }
+
     // Playlist de soirée.
     if (has('soiree_ouvrir') &&
         RegExp(r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$').hasMatch(n)) {
