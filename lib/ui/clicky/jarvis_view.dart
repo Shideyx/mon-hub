@@ -152,6 +152,7 @@ class ClickySkillsPage extends StatelessWidget {
       'Envoie tes photos au PC sans câble, récupère des fichiers du PC, partage le presse-papier',
       'Télécommande : son, musique, diapos, souris, verrouiller, veille, éteindre… depuis ton lit',
       '« Envoie le PDF de mon exposé sur mon téléphone »',
+      '« Lance une soirée » : tes amis scannent un QR code, ajoutent leurs sons et votent ; le PC enchaîne',
     ]),
     ('Ton PC', Icons.computer_rounded, Color(0xFFEA580C), [
       '« Comment va mon PC ? », « Il me reste combien de batterie ? »',

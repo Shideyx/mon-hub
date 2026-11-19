@@ -9,6 +9,7 @@ import 'package:qr/qr.dart';
 import '../core/phone_link.dart';
 import '../core/safe_open.dart';
 import 'clicky/win.dart';
+import 'party_page.dart';
 
 /// La page « Mon téléphone » : relier le téléphone au PC par un QR code, puis
 /// s'envoyer des fichiers, du texte, et piloter le PC depuis le téléphone.
@@ -163,6 +164,11 @@ class PhoneLinkPage extends StatelessWidget {
                           },
                           icon: const Icon(Icons.folder_open_rounded),
                           label: const Text('Fichiers reçus'),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: PartyPage.open,
+                          icon: const Icon(Icons.celebration_rounded),
+                          label: const Text('Playlist de soirée'),
                         ),
                         TextButton.icon(
                           onPressed: () => _newLink(context),

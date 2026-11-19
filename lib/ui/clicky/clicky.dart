@@ -13,6 +13,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../party_page.dart';
 import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -2115,6 +2116,17 @@ class ClickyController extends ChangeNotifier {
         if (Win.supportedHere) Win.raiseMain(pid);
         HubHome.instance.onSearchText?.call('${a['texte'] ?? ''}');
         return 'Recherche ouverte.';
+      },
+    ),
+    HubTool(
+      name: 'soiree_ouvrir',
+      description:
+          'Lance la playlist de soirée : un QR code que les invités scannent pour chercher et ajouter des sons '
+          '(YouTube) et voter ; le PC les joue dans l\'ordre des votes.',
+      run: (a) async {
+        if (Win.supportedHere) Win.raiseMain(pid);
+        unawaited(PartyPage.open());
+        return 'Soirée lancée 🎉 : tes amis scannent le QR code affiché pour ajouter leurs sons.';
       },
     ),
     HubTool(

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#160b2e">
+<link rel="icon" href="icone.png">
+<title>🎉 Soirée</title>
+<link rel="stylesheet" href="party.css">
+<script src="party.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>🎉 La playlist de la soirée</h1>
+  <div class="now" id="now"><span class="eq"><i></i><i></i><i></i></span><div><small>En ce moment</small><b id="now-title">Rien pour l'instant</b></div></div>
+</header>
+
+<main>
+  <form id="search" autocomplete="off">
+    <input id="q" placeholder="Chercher un son, un artiste…" enterkeyhint="search">
+    <button>🔎</button>
+  </form>
+  <ul class="list" id="results"></ul>
+
+  <h2>À suivre <small>(👍 pour faire remonter un son)</small></h2>
+  <ul class="list" id="queue"></ul>
+</main>
+
+<div id="toast" hidden></div>
+
+<div id="who" hidden>
+  <form class="card" id="who-form">
+    <h2>C'est qui ?</h2>
+    <p>Ton prénom s'affiche à côté des sons que tu ajoutes.</p>
+    <input id="name" maxlength="20" placeholder="Ton prénom" autocomplete="given-name">
+    <button>C'est parti 🎶</button>
+  </form>
+</div>
+</body>
+</html>
