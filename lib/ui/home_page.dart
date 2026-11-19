@@ -12,6 +12,7 @@ import '../core/hub_module.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
 import 'add_module.dart';
+import 'ar_page.dart';
 import 'hub_feed_view.dart';
 import 'notifications_page.dart';
 import 'search_page.dart';
@@ -210,6 +211,13 @@ class _Header extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (ArPage.supported)
+                  IconButton(
+                    tooltip: 'Hologrammes (réalité augmentée)',
+                    color: Colors.white,
+                    icon: const Icon(Icons.view_in_ar_rounded),
+                    onPressed: () => ArPage.show(),
+                  ),
                 IconButton(
                   tooltip: 'Chercher partout (Ctrl + Espace)',
                   color: Colors.white,

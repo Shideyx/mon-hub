@@ -47,6 +47,14 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   passe : Google la dit non confidentielle pour une appli installée) passe du
   PC à l'iPhone par ton presse-papier ou ta propre boîte mail, jamais par un
   serveur.
+- **Hologrammes (réalité augmentée)** : la caméra ne s'allume que sur la page
+  « Hologrammes », et seulement pour la page locale de Mon Hub (`127.0.0.1`,
+  port au hasard, autres noms d'hôte refusés). Les images de la caméra sont
+  analysées **sur l'appareil** (vision des mains MediaPipe en WebAssembly,
+  marqueur js-aruco2) : rien n'est envoyé. La vision des mains est téléchargée
+  une fois (npm et Google) et **refusée si son empreinte SHA-256 n'est pas la
+  bonne**. Un objet « inventé » par l'IA n'est qu'une liste de formes et de
+  couleurs vérifiée (jamais du code), et seul le texte demandé part vers l'IA.
 
 ## Extension Chrome « Clicky dans le navigateur »
 

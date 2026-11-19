@@ -82,6 +82,10 @@ class ToolRouter {
       ['temps d ecran', 'temps passe', 'combien de temps', 'limite', 'trop joue', 'accro', 'pause'],
     ),
     'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
+    'hologrammes': (
+      ['ar_'],
+      ['3d', 'hologramme', 'holo', 'realite augmentee', 'camera', 'webcam', ' ar ', 'en vrai', 'dans la vraie vie'],
+    ),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),
     'perso': (['perso_'], ['ouvre', 'module', 'site']),

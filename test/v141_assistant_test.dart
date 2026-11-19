@@ -209,6 +209,9 @@ void main() {
 
     test('réponses instantanées : « par quoi je commence ? »', () async {
       final a = Assistant.instance;
+      // Liste vide : le devoir daté du test précédent finirait « en retard »
+      // avec le temps et passerait devant.
+      await Carnet.instance.clear('todos');
       a.useTools(
         call: (name, args) async => name == 'ecole_devoirs'
             ? [
