@@ -178,6 +178,8 @@ class ClickySkillsPage extends StatelessWidget {
       'Glisse ton index dessus pour le faire tourner, pince-le pour l\'attraper, pince avec tes deux mains pour l\'agrandir',
       '« Fais un hologramme de voiture sur ma main » : il fabrique l\'objet que tu veux',
       '« … sur la table » : il sort de ton téléphone posé à plat (avec le marqueur affiché dessus)',
+      'Pour le voir en vrai, hors de l\'écran : mode 🔺 Pyramide + une petite pyramide en plastique sur ton téléphone '
+          '(bouton « Sur mon téléphone ») : il flotte dans l\'air, et tu le tournes avec tes doigts devant la webcam',
     ]),
     ('À l\'écran', Icons.ads_click_rounded, Color(0xFF0EA5E9), [
       '« Où est le bouton pour… ? » : il te montre',

@@ -55,6 +55,13 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   une fois (npm et Google) et **refusée si son empreinte SHA-256 n'est pas la
   bonne**. Un objet « inventé » par l'IA n'est qu'une liste de formes et de
   couleurs vérifiée (jamais du code), et seul le texte demandé part vers l'IA.
+- **Hologramme sur le téléphone** (bouton « Sur mon téléphone ») : pour la
+  pyramide holographique, la page 3D est aussi servie au même Wi-Fi, mais
+  seulement derrière un **lien secret** (128 bits au hasard, dans le QR code),
+  seulement les fichiers de la page et ce qui est affiché (objet, rotation) :
+  jamais la caméra ni les fichiers de Mon Hub. Le lien se coupe quand la page
+  Hologrammes se ferme (3 h au plus). Windows demande d'autoriser Mon Hub sur
+  le réseau la première fois.
 
 ## Extension Chrome « Clicky dans le navigateur »
 

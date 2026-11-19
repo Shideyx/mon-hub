@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:qr/qr.dart';
 
 import '../core/ar_server.dart';
 import '../core/claude_bridge.dart';
@@ -169,6 +170,76 @@ class _ArPageState extends State<ArPage> {
     }
   }
 
+  /// Le lien vers le téléphone : seulement depuis un ordinateur.
+  bool get _canShare => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+  /// Pyramide sur le téléphone : la page est ouverte au même Wi-Fi derrière
+  /// un lien secret, montré en QR code.
+  Future<void> _share() async {
+    final s = ArPage._server;
+    if (s == null) return;
+    Uri? link;
+    try {
+      link = await s.startShare();
+    } catch (e, st) {
+      ErrorLog.record(e, st, where: 'hologrammes sur le téléphone');
+    }
+    if (!mounted) return;
+    if (link == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Je ne trouve pas de Wi-Fi : le PC et le téléphone doivent être sur le même réseau.'),
+        ),
+      );
+      return;
+    }
+    await _js('window.monHub.setLinked(true)');
+    await _js("window.monHub.setMode('pyramide')");
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('L\'hologramme sur ton téléphone'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox.square(dimension: 220, child: CustomPaint(painter: QrPainter('$link'))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '1. Scanne ce code avec l\'appareil photo de ton téléphone (même Wi-Fi que le PC).\n'
+                  '2. Si Windows demande d\'autoriser Mon Hub sur le réseau, clique sur « Autoriser ».\n'
+                  '3. Pose le téléphone à plat, la pyramide à l\'envers au centre, et éteins la lumière.\n'
+                  '4. Devant la webcam du PC, glisse ton index pour faire tourner l\'hologramme, pince avec '
+                  'tes deux mains pour l\'agrandir. Change d\'objet ici : le téléphone suit.\n'
+                  '5. Pour que l\'écran du téléphone ne s\'éteigne pas : Réglages → Luminosité → Verrouillage auto → Jamais.',
+                ),
+                const SizedBox(height: 8),
+                SelectableText('$link', style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 4),
+                const Text(
+                  'Le lien est secret et ne montre que l\'hologramme (jamais la caméra). Il se coupe quand tu fermes '
+                  'cette page.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('C\'est bon'))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final url = _url;
@@ -178,6 +249,18 @@ class _ArPageState extends State<ArPage> {
         title: const Text('Hologrammes'),
         backgroundColor: const Color(0xFF07060D),
         foregroundColor: Colors.white,
+        actions: [
+          if (_canShare)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: _url == null ? null : _share,
+                icon: const Icon(Icons.phone_iphone_rounded),
+                label: const Text('Sur mon téléphone'),
+              ),
+            ),
+        ],
       ),
       body: _error != null
           ? Center(
@@ -200,6 +283,13 @@ class _ArPageState extends State<ArPage> {
                 c.addJavaScriptHandler(
                   handlerName: 'photo',
                   callback: (args) => args.isEmpty ? 'Photo vide.' : _savePhoto('${args.first}'),
+                );
+                c.addJavaScriptHandler(
+                  handlerName: 'etat',
+                  callback: (args) {
+                    if (args.isNotEmpty) ArPage._server?.publish(args.first);
+                    return null;
+                  },
                 );
                 c.addJavaScriptHandler(
                   handlerName: 'invent',
@@ -231,4 +321,28 @@ class _ArPageState extends State<ArPage> {
             ),
     );
   }
+}
+
+/// Un QR code dessiné (paquet qr, sans Internet).
+class QrPainter extends CustomPainter {
+  QrPainter(this.data)
+    : _image = QrImage(QrCode(payload: QrPayload.fromString(data), errorCorrectLevel: QrErrorCorrectLevel.medium));
+
+  final String data;
+  final QrImage _image;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final n = _image.moduleCount;
+    final cell = size.shortestSide / n;
+    final paint = Paint()..color = Colors.black;
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        if (_image.isDark(y, x)) canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell + 0.5, cell + 0.5), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(QrPainter old) => old.data != data;
 }

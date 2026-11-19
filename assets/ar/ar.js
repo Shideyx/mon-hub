@@ -7,6 +7,7 @@ import * as THREE from './vendor/three.min.js';
 import { OBJECTS, buildObject, buildCustom } from './objects.js';
 import { focalFor, PoseSmoother, palmPose, betweenHands, markerPose, basisFromUp } from './track.js';
 import { setHolo, tickHolo, makeProjector, makeFingertip, holoSkin, holoWire } from './holo.js';
+import { PyramidView, pyramidTemplate } from './pyramid.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('cam');
@@ -15,12 +16,17 @@ const glCanvas = $('gl');
 const params = new URLSearchParams(location.search);
 const bridge = () => window.flutter_inappwebview;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const MODES = ['air', 'main', 'table'];
+const MODES = ['air', 'main', 'table', 'pyramide'];
+// Page ouverte sur le téléphone (lien du PC) : pas de caméra, elle suit le PC.
+const follower = params.has('lien');
 
 const state = {
   mode: MODES.includes(params.get('mode')) ? params.get('mode') : 'air',
   object: params.get('objet') || 'dino',
   holo: params.get('style') !== 'reel',
+  recipe: null,
+  recipeId: 0,
+  linked: false,
   stream: null,
   devices: [],
   deviceIndex: -1,
@@ -105,8 +111,9 @@ function dispose(obj) {
 
 function applyStyle() {
   if (current) setHolo(current.group, state.holo);
-  projector.group.visible = state.holo;
-  shadow.visible = !state.holo;
+  const pyr = state.mode === 'pyramide';
+  projector.group.visible = state.holo && !pyr;
+  shadow.visible = !state.holo && !pyr;
   $('btn-style').textContent = state.holo ? '🎨' : '✨';
   $('btn-style').title = state.holo ? 'Vraies couleurs' : 'Hologramme';
 }
@@ -118,6 +125,8 @@ function setObject(id, recipe) {
   }
   current = recipe ? buildCustom(recipe) : buildObject(id);
   state.object = recipe ? 'custom' : OBJECTS.some((o) => o.id === id) ? id : 'dino';
+  state.recipe = recipe || null;
+  if (recipe) state.recipeId++;
   spinner.add(current.group);
   pop.x = Math.min(pop.x, 0.2);
   applyStyle();
@@ -172,7 +181,12 @@ function setMode(mode) {
   gest.grab = null;
   gest.duo = null;
   if (state.mode === 'air') resetAir();
-  ensureHands().catch(() => {});
+  document.body.classList.toggle('pyr', state.mode === 'pyramide');
+  applyStyle();
+  layout();
+  wakeUi();
+  if (state.mode === 'pyramide') setHint('Pose la pyramide au centre, pointe en bas, et baisse la lumière 🔺', 5000);
+  if (!follower) ensureHands().catch(() => {});
 }
 
 for (const b of document.querySelectorAll('#modes button')) b.onclick = () => setMode(b.dataset.mode);
@@ -191,6 +205,52 @@ $('btn-cam').onclick = () => {
   startCamera();
 };
 $('marker-svg').innerHTML = new AR.Dictionary('ARUCO_MIP_36h12').generateSVG(0);
+$('btn-pyr').onclick = () => ($('pyr-sheet').hidden = false);
+$('btn-pyr-close').onclick = () => ($('pyr-sheet').hidden = true);
+$('btn-pyr-print').onclick = () => {
+  document.body.classList.add('print-pyr');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-pyr'), 500);
+};
+$('pyr-phone').innerHTML = pyramidTemplate(10, 35, 60);
+$('pyr-tablet').innerHTML = pyramidTemplate(20, 70, 120);
+$('pyr-size').oninput = (e) => {
+  pyrScale = Number(e.target.value) / 100;
+  layout();
+};
+
+// Les boutons se cachent en mode pyramide (sinon ils se reflètent aussi).
+let calmTimer = null;
+function wakeUi() {
+  document.body.classList.remove('calm');
+  clearTimeout(calmTimer);
+  calmTimer = setTimeout(() => {
+    if (state.mode === 'pyramide' && $('pyr-sheet').hidden) document.body.classList.add('calm');
+  }, 4000);
+}
+window.addEventListener('pointermove', wakeUi);
+window.addEventListener('pointerdown', wakeUi);
+
+// Tourner (glisser) et agrandir (molette) à la souris ou au doigt sur l'écran.
+let drag = null;
+let localYaw = 0;
+window.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('button, input, form, .card, #top, #bottom')) return;
+  drag = { x: e.clientX };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const d = (e.clientX - drag.x) * 0.012;
+  drag.x = e.clientX;
+  if (follower) localYaw += d;
+  else gest.yaw += d;
+  gest.spin = 0;
+});
+window.addEventListener('pointerup', () => (drag = null));
+window.addEventListener('pointercancel', () => (drag = null));
+window.addEventListener('wheel', (e) => {
+  gest.scale = Math.min(5, Math.max(0.3, gest.scale * Math.exp(-e.deltaY * 0.001)));
+}, { passive: true });
 
 // Les objets connus, reconnus dans une phrase (« un dinosaure », « le soleil »…).
 const KNOWN = [
@@ -248,6 +308,7 @@ window.monHub = {
   setObject: (id) => setObject(id),
   setCustom: (recipe) => setObject('custom', recipe),
   setMode: (m) => setMode(m),
+  setLinked: (on) => (state.linked = !!on),
   setHolo: (on) => {
     state.holo = !!on;
     applyStyle();
@@ -315,8 +376,18 @@ function layout() {
   state.W = W;
   state.H = H;
   state.focal = focalFor(W, H);
+  state.posit = new POS.Posit(1.0, state.focal);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  if (state.mode === 'pyramide') {
+    // Plein écran noir : la caméra (cachée) ne sert qu'à suivre les doigts.
+    Object.assign(stage.style, { width: `${vw}px`, height: `${vh}px`, left: '0px', top: '0px' });
+    stage.classList.remove('mirror');
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(vw, vh, false);
+    pyramid.layout(vw, vh, pyrScale);
+    return;
+  }
   const k = Math.max(vw / W, vh / H);
   const cw = Math.round(W * k);
   const ch = Math.round(H * k);
@@ -441,7 +512,8 @@ function interact(hands, t, dt, carrier) {
   for (const h of hands) pinchState.set(h.id, h.pinching);
   for (const id of [...pinchState.keys()]) if (!hands.some((h) => h.id === id)) pinchState.delete(id);
   const obj = objectOnScreen();
-  const near = (p, f) => Math.hypot(p.x - obj.x, p.y - obj.y) < obj.r * f;
+  const anywhere = state.mode === 'pyramide';
+  const near = (p, f) => anywhere || Math.hypot(p.x - obj.x, p.y - obj.y) < obj.r * f;
 
   // Deux mains qui pincent : écarter = agrandir, tourner = faire pivoter.
   const pinching = hands.filter((h) => h.pinching);
@@ -504,7 +576,9 @@ function interact(hands, t, dt, carrier) {
     if (!near(h.indexPx, 1.15)) continue;
     const vx = (h.indexPx.x - prev.x) / Math.max(dt, 1 / 120);
     if (Math.abs(vx) < 40) continue;
-    const want = Math.max(-14, Math.min(14, vx / Math.max(30, obj.r)));
+    // En pyramide l'écran n'est pas en miroir : on suit le sens vu par toi.
+    const dir = anywhere && state.mirror ? -1 : 1;
+    const want = Math.max(-14, Math.min(14, (dir * vx) / (anywhere ? 160 : Math.max(30, obj.r))));
     gest.spin = Math.abs(want) > Math.abs(gest.spin) || Math.sign(want) !== Math.sign(gest.spin) ? want : gest.spin;
     gest.used = true;
   }
@@ -513,6 +587,7 @@ function interact(hands, t, dt, carrier) {
 
 function showFingertips(hands) {
   let i = 0;
+  if (state.mode === 'pyramide') hands = [];
   for (const h of hands.slice(0, 2)) {
     const pts = h.pinching ? [h.pinch3d] : [h.index, h.thumb];
     for (const p of pts) {
@@ -623,6 +698,8 @@ function track(now, t, dt) {
   let carrier = null;
   if (state.mode === 'air') {
     airHint(hands);
+  } else if (state.mode === 'pyramide') {
+    if (!waitingForHands() && !gest.used) setHint(hands.length ? 'Glisse ton index devant la caméra pour le faire tourner 👆' : '');
   } else if (state.mode === 'main') {
     if (!waitingForHands()) {
       const r = palmAnchor(hands);
@@ -722,7 +799,12 @@ function frame(now) {
   lastT = t;
   track(now, t, dt);
   let visible;
-  if (state.mode === 'air') {
+  if (state.mode === 'pyramide') {
+    visible = true;
+    anchor.position.set(0, 0, 0);
+    anchor.quaternion.identity();
+    anchor.scale.setScalar(1);
+  } else if (state.mode === 'air') {
     visible = true;
     anchor.position.copy(air.position);
     anchor.quaternion.copy(basisFromUp(new THREE.Vector3(0, 1, 0), air.position));
@@ -738,7 +820,9 @@ function frame(now) {
   stepPop(visible ? 1 : 0, dt);
   anchor.visible = pop.x > 0.01;
   holder.scale.setScalar(Math.max(0.0001, pop.x * gest.scale));
-  // La rotation donnée du doigt, qui ralentit doucement.
+  // Le téléphone suit le PC (rotation adoucie) ; sinon la rotation donnée
+  // du doigt ralentit doucement.
+  if (follower && remote.yaw !== null) gest.yaw += (remote.yaw + localYaw - gest.yaw) * Math.min(1, dt * 10);
   gest.yaw += gest.spin * dt;
   gest.spin *= Math.exp(-dt * 1.1);
   if (Math.abs(gest.spin) < 0.02) gest.spin = 0;
@@ -747,16 +831,83 @@ function frame(now) {
   if (state.holo) projector.update(t, dt);
   tickHolo(t);
   updateLight(t);
-  renderer.render(scene, camera);
+  if (state.mode === 'pyramide') {
+    const h = holder.scale.x;
+    pyramid.render(new THREE.Vector3(0, 0.5 * Math.max(0.3, Math.min(h, 1.6)), 0), 1);
+  } else {
+    renderer.render(scene, camera);
+  }
   if (wantPhoto) takePhoto();
+  if (state.linked && !follower && t - lastShare > 0.1) share(t);
   window.__ar = { visible: anchor.visible, mode: state.mode, objet: state.object, hands: !!state.hands, error: state.handsError, screen: objectOnScreen(),
     geste: { tour: +gest.yaw.toFixed(2), elan: +gest.spin.toFixed(2), taille: +gest.scale.toFixed(2), attrape: !!gest.grab },
     mains: lastHands.map((h) => ({ id: h.id, reach: +h.reach.toFixed(2), pince: +h.pinchRatio.toFixed(2), taille: Math.round(h.sizePx), ouverte: h.open })) };
 }
 
+// ------------------------------------------ Le téléphone et la pyramide
+// Sur le PC : la page envoie à Mon Hub ce qui est affiché (10 fois par
+// seconde) ; le téléphone, sur le même Wi-Fi, le relit et suit.
+let lastShare = 0;
+let sharedRecipeId = -1;
+function share(t) {
+  lastShare = t;
+  const b = bridge();
+  if (!b?.callHandler) return;
+  const msg = { objet: state.object, recetteId: state.recipeId, tour: gest.yaw, taille: gest.scale, holo: state.holo };
+  if (state.recipe && sharedRecipeId !== state.recipeId) {
+    msg.recette = state.recipe;
+    sharedRecipeId = state.recipeId;
+  }
+  b.callHandler('etat', msg).catch(() => {});
+}
+
+const remote = { yaw: null };
+async function follow() {
+  let lastObjet = null;
+  let recipeId = -1;
+  let fails = 0;
+  for (;;) {
+    try {
+      const st = await (await fetch('etat', { cache: 'no-store' })).json();
+      fails = 0;
+      if (st && typeof st.objet === 'string') {
+        if (st.objet === 'custom') {
+          if (st.recetteId !== recipeId) {
+            const r = await (await fetch('recette', { cache: 'no-store' })).json();
+            if (r && Array.isArray(r.pieces)) setObject('custom', r);
+            recipeId = st.recetteId;
+            lastObjet = 'custom';
+          }
+        } else if (st.objet !== lastObjet) {
+          setObject(st.objet);
+          lastObjet = st.objet;
+        }
+        if (Number.isFinite(st.tour)) remote.yaw = st.tour;
+        if (Number.isFinite(st.taille)) gest.scale = Math.min(5, Math.max(0.3, st.taille));
+        if (typeof st.holo === 'boolean' && st.holo !== state.holo) {
+          state.holo = st.holo;
+          applyStyle();
+        }
+      }
+    } catch {
+      if (++fails === 20) setHint('Je ne capte plus le PC : Mon Hub est-il encore ouvert, sur le même Wi-Fi ?', 5000);
+    }
+    await sleep(100);
+  }
+}
+
+const pyramid = new PyramidView(renderer, scene);
+let pyrScale = 1;
+
 resetAir();
 renderChips();
 setObject(state.object);
-setMode(state.mode);
-startCamera();
+if (follower) {
+  document.body.classList.add('follower');
+  setMode('pyramide');
+  follow();
+} else {
+  setMode(state.mode);
+  startCamera();
+}
 requestAnimationFrame(frame);
