@@ -88,6 +88,11 @@ class ToolRouter {
       ['abonnement', 'essai gratuit', 'preleve', 'colis', 'livraison', 'commande', 'jeux gratuits', 'jeu gratuit', 'promo',
         'steam', 'epic', 'netflix', 'depense', 'resilier'],
     ),
+    'etudes': (
+      ['copie_', 'oral_', 'video_', 'carte_'],
+      ['copie', 'redaction', 'dissertation', 'corrige', 'oral', 'expose', 'repeter', 'jury', 'video', 'fiche',
+        'carte mentale', 'schema', 'mind map'],
+    ),
     'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
     'extensions': (['mcp_'], []),

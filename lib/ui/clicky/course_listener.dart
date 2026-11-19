@@ -251,7 +251,7 @@ class CourseListener extends ChangeNotifier {
   Future<void> _transcribe(CourseNote note, int slot, String path, {required bool silent}) async {
     try {
       if (!silent && await File(path).exists()) {
-        final text = await _toText(path);
+        final text = await toText(path);
         note.parts = [...note.parts]..[slot] = text;
         // Notes en direct : ce morceau, mis au propre, dans le Google Doc.
         if (note.docId != null && text.trim().length > 40) await _writeLive(note, text);
@@ -271,7 +271,7 @@ class CourseListener extends ChangeNotifier {
     }
   }
 
-  static Future<String> _toText(String wav) async {
+  static Future<String> toText(String wav) async {
     final how = await engine();
     if (how == 'whisper') {
       try {

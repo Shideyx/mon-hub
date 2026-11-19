@@ -442,6 +442,24 @@ class QuickAnswers {
       return QuickReply('🎮 Gratuit sur Epic en ce moment : ${free.map((g) => g['titre']).join(', ')}.');
     }
 
+    // Outils d'études : correction sur la photo, coach d'oral, carte mentale.
+    if (has('copie_corriger') &&
+        RegExp(r'^corrige(?: moi)? (?:ma|mon|cette|la) (?:copie|redaction|dissertation|commentaire|photo|devoir|essai)$').hasMatch(n)) {
+      return QuickReply('${await call('copie_corriger', const {})}');
+    }
+    if (has('oral_coach') &&
+        RegExp(r'^(?:coach d oral|entraine moi (?:a|pour) (?:mon |l |le |mon grand )?(?:oral|expose|grand oral)|'
+                r'(?:je veux |aide moi a )?repeter mon (?:oral|expose|grand oral))$')
+            .hasMatch(n)) {
+      return QuickReply('${await call('oral_coach', const {})}');
+    }
+    if (has('carte_mentale')) {
+      final m = RegExp(r'^(?:fais|dessine|cree)(?: moi)? une carte mentale (?:sur |de |du |des |d )(.{2,80})$').firstMatch(n);
+      if (m != null) {
+        return QuickReply('${await call('carte_mentale', {'sujet': QuickAnswers.original(raw, m[1]!.trim())})}');
+      }
+    }
+
     // Playlist de soirée.
     if (has('soiree_ouvrir') &&
         RegExp(r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$').hasMatch(n)) {
