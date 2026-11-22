@@ -32,6 +32,7 @@ import 'ocr.dart';
 import 'quick.dart' show Calc;
 import 'senses.dart';
 import 'tutor.dart' show isSensitiveTitle;
+import 'watchers.dart' show Watchers;
 import 'win.dart';
 
 /// Ce que Clicky propose pour ce que tu viens de copier.
@@ -386,6 +387,8 @@ class PcWatch {
       );
       return;
     }
+    // « Préviens-moi quand mon téléchargement est fini ».
+    unawaited(Watchers.instance.onDownload(name).catchError((Object _) {}));
     final subject = PcRules.downloadSubject(name);
     if (subject == null) return;
     await ClickySenses.instance.offer(

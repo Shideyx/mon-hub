@@ -6,6 +6,8 @@ import '../../core/screen_memory.dart';
 import 'mic_test.dart' show WhisperInstallDialog;
 import 'pc_watch.dart';
 import 'senses.dart';
+import 'interests.dart';
+import 'watchers.dart' show Replies;
 import 'whisper.dart' show Whisper;
 
 /// Réglages de Clicky → **Ses yeux et ses oreilles** : voir l'écran et
@@ -261,6 +263,34 @@ class _SensesPageState extends State<SensesPage> {
                       value: PcWatch.instance.pcOn,
                       onChanged: (v) async {
                         await PcWatch.instance.setPc(v);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Text('💬', style: TextStyle(fontSize: 22)),
+                      title: const Text('Réponses toutes prêtes'),
+                      subtitle: const Text(
+                        'Quand on te pose une question en message privé sur Discord : « je te prépare une réponse ? ». Elle est '
+                        'copiée, prête à coller : Clicky n\'envoie jamais rien tout seul.',
+                      ),
+                      value: Replies.on,
+                      onChanged: (v) async {
+                        await Replies.setOn(v);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Text('🎵', style: TextStyle(fontSize: 22)),
+                      title: const Text('Veille sur tes artistes'),
+                      subtitle: const Text(
+                        'Deux fois par jour, il regarde les artistes de tes titres likés et te prévient quand l\'un d\'eux sort un '
+                        'nouveau son (recherche publique Deezer : seuls les noms d\'artistes sont cherchés).',
+                      ),
+                      value: ArtistWatch.on,
+                      onChanged: (v) async {
+                        await ArtistWatch.setOn(v);
                         if (mounted) setState(() {});
                       },
                     ),

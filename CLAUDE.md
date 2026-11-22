@@ -428,3 +428,21 @@
   `app.clip.malin` / `app.pc.reagit` (oui par défaut) dans la page Ses yeux et ses oreilles. Tests `test/v171_pc_watch_test.dart`.
 - **Ville** (météo, accessoires de Clicky) : Carnet → Réglages, ou Réglages de Clicky → Conscience → Sa vie à lui, ou
   « j'habite à Lyon » (`ClickyLife.cityFrom` dans `_handleSelf` → `Carnet.setSetting('city')`).
+- **« Préviens-moi quand… » (v1.58)** : `ui/clicky/watchers.dart`. `WatchParse` (sans IA : `lead` = « préviens-moi / dis-moi /
+  tu me dis quand… », `parse` → `Watch` note (matière), devoir, message (Discord / ED, `mail` = mails seulement), page (lien
+  dans la phrase ou copié, https, jamais Instagram / Discord / ED / banque), prix (jeu Steam : `appdetails`), internet,
+  téléchargement ; sinon une explication — « Je ne sais pas encore… » = la phrase part vers l'IA), `matches` (via
+  `NotificationCenter.onAny`, aucune requête en plus), `visibleText` (sans scripts ni compteurs). `Watchers` (`guetteurs.json`,
+  **jamais synchronisé**) : `add/remove/say`, `onNotification`, `onDownload` (appelé par `PcWatch`), `tick` 1 min (internet
+  `online`) / 30 min (pages, prix) ; un guetteur se déclenche **une fois** → notification + `think`. Outils `guetteur_creer`,
+  `guetteur_liste` (groupe `guetteurs`). **Réponses toutes prêtes** (`Replies`, réglage `app.reponses`) : message privé
+  Discord avec une question (sans lien) → idée → `clicky_brouillon_reponse` (une réponse courte, **copiée**, jamais envoyée).
+- **Habitudes (v1.58)** : `ScreenTime.hours` (jour → heure → appli → secondes, 35 j). `ui/clicky/habits.dart` (`Habits.find`
+  : ≥ 10 min, 3 semaines sur les 4 dernières ; `upcoming` ; `nudge` = « d'habitude à 14 h c'est Roblox… contrôle de SVT
+  demain : 20 min avant ? » (`ClickySenses._habitNudge`, une fois par jour) ; `insights` : habitudes, heure la plus active,
+  heure où tu quittes le PC, appli n° 1). Outil `clicky_habitudes`, « mes habitudes », section « Ce que Clicky a remarqué »
+  dans la page Temps d'écran.
+- **Veille sur tes artistes (v1.58)** : `ui/clicky/interests.dart` (`ArtistWatch` : 2 fois par jour, `topArtists` des titres
+  likés (`musique_titres_likes`), API publique Deezer (recherche d'artiste + albums), `fresh` < 10 jours, 3 annonces max,
+  `veille.json` jamais synchronisé, réglage `app.veille`). Interrupteurs dans la page Ses yeux et ses oreilles. Tests :
+  `test/v172_watchers_test.dart`.

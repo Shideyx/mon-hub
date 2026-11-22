@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import '../widgets.dart';
 import 'tutor.dart' show normalize;
+import 'watchers.dart' show WatchParse;
 import '../../core/birthdays.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
@@ -386,6 +387,32 @@ class QuickAnswers {
       if (off != null) {
         return QuickReply('${await call('temps_ecran_limite', {'appli': off[1]!.trim(), 'minutes': 0})}');
       }
+    }
+
+    // Ses habitudes.
+    if (has('clicky_habitudes') &&
+        RegExp(r'^(?:quelles sont |c est quoi )?mes habitudes(?: sur le pc)?$|^qu est ce que tu (?:sais|as remarque) (?:sur|de) mes habitudes$|^tu as remarque quoi sur (?:moi|mes habitudes)$|^tu me connais$')
+            .hasMatch(n)) {
+      final r = await call('clicky_habitudes', {});
+      if (r is Map) return QuickReply('${r['resume']}');
+    }
+
+    // « Préviens-moi quand j'ai ma note de maths », « …quand Lucas m'écrit ».
+    if (has('guetteur_creer')) {
+      final m = WatchParse.lead.firstMatch(n);
+      if (m != null) {
+        final rest = (m[1] ?? m[2] ?? m[3])!.trim();
+        final r = '${await call('guetteur_creer', {'phrase': rest, 'texte': raw})}';
+        // Pas un guetteur (« préviens-moi quand il est 18 h ») : l'IA s'en charge.
+        if (!r.startsWith('Je ne sais pas encore')) return QuickReply(r);
+      }
+    }
+    if (has('guetteur_liste')) {
+      if (RegExp(r'^(?:qu est ce que tu surveilles|tu surveilles quoi|mes alertes|quelles sont mes alertes|tu guettes quoi)$').hasMatch(n)) {
+        return QuickReply('${await call('guetteur_liste', {})}');
+      }
+      final stop = RegExp(r'^(?:arrete de surveiller|ne surveille plus|annule (?:l alerte|les alertes|mes alertes))(?: (?:pour |de |du |la |le )?(.+))?$').firstMatch(n);
+      if (stop != null) return QuickReply('${await call('guetteur_liste', {'supprimer': (stop[1] ?? 'tout').trim()})}');
     }
 
     // Ses yeux et ses oreilles : la mémoire de l'écran (« tu te souviens ? »).

@@ -70,6 +70,9 @@ class ScreenTime extends ChangeNotifier {
       '${e.key}': (e.value as num).toInt(),
   };
 
+  /// Par heure : jour (« 2026-11-22 ») → heure → appli → secondes.
+  Map<String, dynamic> get hours => ((_data['heures'] as Map?) ?? const {}).cast<String, dynamic>();
+
   /// Secondes par appli sur les 7 derniers jours.
   Map<String, int> week(DateTime now) {
     final out = <String, int>{};
@@ -171,6 +174,15 @@ class ScreenTime extends ChangeNotifier {
     final keep = dayKey(n.subtract(const Duration(days: 35)));
     days.removeWhere((k, _) => k.compareTo(keep) < 0);
     _file.value['jours'] = days;
+    // Par heure (pour les habitudes : « le mercredi vers 14 h, c'est Roblox »).
+    final hours = Map<String, dynamic>.from((_data['heures'] as Map?) ?? const {});
+    final h = Map<String, dynamic>.from((hours[key] as Map?) ?? const {});
+    final apps = Map<String, dynamic>.from((h['${n.hour}'] as Map?) ?? const {});
+    apps[app] = ((apps[app] as num?)?.toInt() ?? 0) + step.inSeconds;
+    h['${n.hour}'] = apps;
+    hours[key] = h;
+    hours.removeWhere((k, _) => k.compareTo(keep) < 0);
+    _file.value['heures'] = hours;
     // Limite douce atteinte : prévenu une fois par jour et par appli.
     final limit = limits[app];
     if (limit != null && secs >= limit * 60) {

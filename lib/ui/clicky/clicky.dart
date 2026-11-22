@@ -79,6 +79,7 @@ import 'jarvis.dart';
 import 'life.dart';
 import 'senses.dart';
 import 'pc_watch.dart';
+import 'watchers.dart';
 import 'life_view.dart';
 import 'loopback.dart';
 import 'shot_encode.dart';
@@ -2566,6 +2567,14 @@ class ClickyController extends ChangeNotifier {
     ...ClickySenses.instance.tools(explain: _explainScreen),
     // Le presse-papier malin et les réactions du PC.
     if (DriveRunner.supported) ...PcWatch.instance.tools(),
+    // « Préviens-moi quand… » et les réponses toutes prêtes.
+    ...Watchers.instance.tools(
+      clipUrl: () async {
+        final t = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
+        return t.isNotEmpty && !t.contains(RegExp(r'\s')) && ScamShield.links(t).length == 1 ? t : null;
+      },
+    ),
+    ...Replies.tools(),
     HubTool(
       name: 'temps_ecran',
       description:

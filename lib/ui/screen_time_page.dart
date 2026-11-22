@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/screen_time.dart';
 import 'clicky/assistant.dart';
+import 'clicky/habits.dart';
 
 /// Réglages → **Temps d'écran et sommeil** : le temps passé par appli
 /// (aujourd'hui et la semaine), les limites douces, l'heure du coucher et le
@@ -280,6 +281,28 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                               title: Text(snap.data!),
                             ),
                           ),
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final seen = Habits.insights(st.hours, st.week(now), now);
+                      if (seen.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Ce que Clicky a remarqué', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                            for (final s in seen)
+                              ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Text('🔎', style: TextStyle(fontSize: 18)),
+                                title: Text(s),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
                   Text('Mode jeu', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
