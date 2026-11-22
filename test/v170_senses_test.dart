@@ -204,7 +204,7 @@ void main() {
         {'pour_le': DateTime(2026, 11, 25), 'matiere': 'ANGLAIS', 'fait': false},
       ];
       final line = SenseRules.procrastinationLine(minutes: mins, app: 'YouTube', homework: hw, now: now)!;
-      expect(line, contains('un contrôle de Svt'));
+      expect(line, contains('un contrôle de SVT'));
       expect(line, contains('25 minutes'));
       // Fait, trop tôt, ou pas assez de distraction : rien.
       expect(SenseRules.procrastinationLine(minutes: 20, app: 'YouTube', homework: hw, now: now), isNull);

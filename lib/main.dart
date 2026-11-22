@@ -11,6 +11,8 @@ import 'core/screen_time.dart';
 import 'ui/clicky/live_captions.dart';
 import 'ui/clicky/senses.dart';
 import 'ui/clicky/pc_watch.dart';
+import 'ui/clicky/watchers.dart';
+import 'ui/clicky/interests.dart';
 import 'ui/clicky/jarvis.dart' show FocusMode;
 import 'ui/phone_link_page.dart';
 import 'ui/clicky/win.dart';
@@ -156,6 +158,8 @@ class _HubAppState extends State<HubApp> {
     NotificationCenter.onAny = null;
     unawaited(ClickySenses.instance.stop());
     PcWatch.instance.stop();
+    Watchers.instance.stop();
+    ArtistWatch.instance.stop();
     WorkBackup.instance.stop();
     ScreenTime.instance.stop();
     unawaited(BrowserLink.instance.stop());
@@ -313,7 +317,32 @@ class _HubAppState extends State<HubApp> {
         // pour Claude Code.
         ClaudeBridge.appTools = () => ClickyController.instance.localTools;
         // Clicky réagit aux nouvelles (une bonne note, un cours annulé…).
-        NotificationCenter.onAny = ClickyController.instance.reactTo;
+        NotificationCenter.onAny = (note) {
+          ClickyController.instance.reactTo(note);
+          // « Préviens-moi quand… » (note, devoir, message de quelqu'un).
+          unawaited(Watchers.instance.onNotification(note).catchError((Object _) {}));
+          // Une question sur Discord : « je te prépare une réponse ? ».
+          final idea = Replies.on && Win.supportedHere && Win.idleSeconds() < 120 ? Replies.ideaFor(note) : null;
+          if (idea != null) {
+            unawaited(ClickySenses.instance.offer(idea, 'reponse|${note.id}', gap: const Duration(minutes: 20)));
+          }
+        };
+        // La veille : un artiste que tu écoutes sort un nouveau son.
+        ArtistWatch.instance
+          ..call = ((name, args) async =>
+              ClickyController.instance.hubTools.where((t) => t.name == name).firstOrNull?.run(args))
+          ..alert = (title, body) {
+            unawaited(n.post(HubNotification(id: 'veille:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body, moduleId: 'music')));
+            unawaited(ClickyController.instance.think(body, aloud: false));
+          }
+          ..start();
+        // Les guetteurs : notification + Clicky le dit.
+        Watchers.instance
+          ..alert = (title, body) {
+            unawaited(n.post(HubNotification(id: 'guetteur:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
+            unawaited(ClickyController.instance.think(body));
+          }
+          ..start();
         // Alertes de Clicky (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(

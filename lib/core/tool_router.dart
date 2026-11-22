@@ -66,7 +66,8 @@ class ToolRouter {
     'clicky': (
       ['clicky_'],
       ['micro', 'entends', 'marche pas', 'voix', 'repare', 'bug', 'panne', 'concentration', 'focus', 'deranger',
-        'quand j ouvre', 'rappel', 'situation', 'le point', 'rate', 'loupe', 'quoi de neuf', 'absence', 'nouvelles'],
+        'quand j ouvre', 'rappel', 'situation', 'le point', 'rate', 'loupe', 'quoi de neuf', 'absence', 'nouvelles',
+        'habitude', 'presse papier', 'copie', 'explique l ecran', 'erreur'],
     ),
     'securite': (
       ['securite_'],
@@ -99,6 +100,10 @@ class ToolRouter {
     ),
     'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
+    'guetteurs': (
+      ['guetteur_', 'clicky_brouillon'],
+      ['previens moi', 'dis moi quand', 'surveille', 'alerte', 'fais moi signe', 'des que', 'reponse', 'repondre'],
+    ),
     'memoire': (
       ['memoire_', 'sens_'],
       ['souviens', 'rappelles', 'j ai vu', 'vu hier', 'que je regardais', 'que je faisais', 'que je lisais', 'oublie',

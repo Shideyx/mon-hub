@@ -30,6 +30,7 @@ import '../../core/prompt_shield.dart';
 import '../../core/screen_memory.dart';
 import '../../core/screen_time.dart';
 import 'autonomy.dart';
+import 'habits.dart';
 import 'initiatives.dart' show DateSpotter, SpottedDate;
 import 'life.dart' show BeatDetector;
 import 'live_captions.dart' show LiveCaptions;
@@ -237,7 +238,7 @@ class SenseRules {
   static String pretty(String subject) {
     final s = subject.trim();
     if (s.isEmpty) return s;
-    if (s == s.toUpperCase()) return s[0] + s.substring(1).toLowerCase();
+    if (s.length > 4 && s == s.toUpperCase()) return s[0] + s.substring(1).toLowerCase();
     return s;
   }
 
@@ -681,8 +682,32 @@ class ClickySenses extends ChangeNotifier {
     }
   }
 
+  String _habitDay = '';
+
+  /// Juste avant une habitude de jeu ou de vidéos, s'il y a un contrôle ou
+  /// un devoir demain.
+  Future<void> _habitNudge(DateTime n) async {
+    final day = n.toIso8601String().substring(0, 10);
+    if (_habitDay == day || n.minute < 45 || n.hour < 12 || n.hour >= 21) return;
+    final st = ScreenTime.instance;
+    await st.load();
+    final h = Habits.upcoming(Habits.find(st.hours, n), n, SenseRules.distractions);
+    if (h == null) return;
+    final hw = await call!('ecole_devoirs', const {});
+    final line = Habits.nudge(h, [for (final x in (hw is List ? hw : const [])) if (x is Map) x], n);
+    if (line == null) return;
+    if (await _propose(
+      ClickyIdea(say: line, tool: 'clicky_concentration', args: const {'minutes': 20}, why: 'habitude + devoir demain'),
+      'habitude|$day',
+      n,
+    )) {
+      _habitDay = day;
+    }
+  }
+
   Future<void> _procrastination(DateTime n) async {
     if (!nudgeOn || call == null) return;
+    unawaited(_habitNudge(n).catchError((Object _) {}));
     final day = n.toIso8601String().substring(0, 10);
     if (_procDay == day || n.hour < 16 || n.hour >= 22) return;
     final (mins, app) = SenseRules.distraction(_apps, n);
@@ -846,6 +871,24 @@ class ClickySenses extends ChangeNotifier {
           'yeux': screenOn,
           'oreilles': soundOn,
           if (paused) 'pause_jusqu_a': '${pausedUntil!.hour} h ${pausedUntil!.minute.toString().padLeft(2, '0')}',
+        };
+      },
+    ),
+    HubTool(
+      name: 'clicky_habitudes',
+      description:
+          'Ce que Clicky a remarqué sur tes habitudes (temps d\'écran par heure, sur ce PC) : « le mercredi vers 14 h, c\'est '
+          'Roblox », ton heure la plus active, l\'heure où tu quittes le PC le soir, ton appli n° 1.',
+      run: (_) async {
+        final st = ScreenTime.instance;
+        await st.load();
+        final now = DateTime.now();
+        final list = Habits.insights(st.hours, st.week(now), now);
+        return {
+          'resume': list.isEmpty
+              ? 'Je ne te connais pas encore assez : il me faut quelques semaines de temps d\'écran.'
+              : 'Ce que j\'ai remarqué : ${list.join(' ')}',
+          'habitudes': [for (final h in Habits.find(st.hours, now).take(8)) h.toJson()],
         };
       },
     ),

@@ -597,6 +597,9 @@ class AccountSync extends ChangeNotifier {
       // Ce que Clicky a vu et entendu reste sur ce PC (jamais envoyé).
       name != 'memoire-ecran.json' &&
       name != 'sens-recent.json' &&
+      // Les guetteurs tournent sur ce PC (sinon : deux alertes).
+      name != 'guetteurs.json' &&
+      name != 'veille.json' &&
       !name.startsWith('sync-');
 
   /// Fichiers déjà lus : (date de modification, contenu, empreinte). Un
