@@ -132,6 +132,7 @@ class _HubAppState extends State<HubApp> {
   }
 
   void _close() {
+    NotificationCenter.onAny = null;
     WorkBackup.instance.stop();
     ScreenTime.instance.stop();
     unawaited(BrowserLink.instance.stop());
@@ -257,6 +258,8 @@ class _HubAppState extends State<HubApp> {
         // Les outils de Clicky (contrôle du PC, réparation du micro) aussi
         // pour Claude Code.
         ClaudeBridge.appTools = () => ClickyController.instance.localTools;
+        // Clicky réagit aux nouvelles (une bonne note, un cours annulé…).
+        NotificationCenter.onAny = ClickyController.instance.reactTo;
         // Alertes de Clicky (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(

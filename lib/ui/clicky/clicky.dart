@@ -76,6 +76,9 @@ import '../../core/freeze_watch.dart';
 import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
+import 'life.dart';
+import 'life_view.dart';
+import 'loopback.dart';
 import 'shot_encode.dart';
 import 'text_fix.dart';
 import '../../core/browser_link.dart';
@@ -594,19 +597,25 @@ class ClickyController extends ChangeNotifier {
       holo != null ||
       marks.isNotEmpty ||
       state != ClickyState.idle ||
-      agentsRunning > 0;
+      agentsRunning > 0 ||
+      // Sa vie à lui : une bulle, ou il dort / est assis quelque part.
+      lifeNote.isNotEmpty ||
+      _lifeHold;
 
   void moveCursor(Offset p) {
     if (cursor == p) return;
     final old = cursor;
     cursor = p;
+    // Sa vie à lui : réveil, caresse, souris secouée…
+    if (old != null) _lifeMove(old, p);
     if (old == null || (old - p).distance > 3) {
       final now = DateTime.now();
       // Revenu après une longue absence : nouvelle séance.
       if (now.difference(_lastMove).inMinutes >= 15) _sessionStart = now;
       _lastMove = now;
-      // On bouge la souris : Clicky revient tout de suite à côté.
-      if (gaze != null && !_gazeHold) {
+      // On bouge la souris : Clicky revient tout de suite à côté (sauf s'il
+      // dort dans son coin ou s'il est assis sur ta fenêtre).
+      if (gaze != null && !_gazeHold && !_lifeHold) {
         gaze = null;
         gazeNote = '';
         notifyListeners();
@@ -1264,6 +1273,11 @@ class ClickyController extends ChangeNotifier {
     if (_presenceN % 30 == 0 && state == ClickyState.idle && active) unawaited(_refreshSituation());
     // Batterie faible : il prévient de lui-même (à 20 % puis à 10 %).
     if (_presenceN % 30 == 15) _checkBattery();
+    // Sa vie à lui : sommeil, danse, accessoires, bâillements…
+    try {
+      await _lifeTick(DateTime.now());
+    } catch (_) {}
+    if (_lifeHold) return;
     final mind = ClickyMind.instance;
     if (!active || !mind.on || !_calm || (fullscreenNow?.call() ?? false)) return;
     if (desktopMode && DriveRunner.supported && privacy && isSensitiveTitle(Win.foregroundTitle())) return;
@@ -1278,6 +1292,9 @@ class ClickyController extends ChangeNotifier {
     // Souris immobile : il part regarder autour, comme quelqu'un d'autre.
     if (mind.wander && gaze == null && idle.inSeconds >= 20 && idle.inMinutes < 30 && now.isAfter(_nextGlance)) {
       _nextGlance = now.add(Duration(seconds: 45 + math.Random().nextInt(70)));
+      // Une fois sur quatre : il va s'asseoir sur ta fenêtre (et tombe si tu
+      // la fermes ou la bouges).
+      if (mind.life && mind.lifePerch && perchSpot != null && math.Random().nextInt(4) == 0 && _perch()) return;
       final spots = lookSpots?.call() ?? const <Offset>[];
       final base = cursor;
       if (spots.isEmpty && base == null) return;
@@ -1343,6 +1360,8 @@ class ClickyController extends ChangeNotifier {
 
   /// Clicky va regarder quelque part tout seul (puis revient).
   void glance(Offset at, {String note = '', Duration hold = const Duration(seconds: 3)}) {
+    // Il dormait ou était assis sur ta fenêtre : il se lève d'abord.
+    if (_lifeHold) _endRest(quiet: true);
     gaze = at;
     gazeNote = note;
     _gazeHold = true;
@@ -1485,6 +1504,476 @@ class ClickyController extends ChangeNotifier {
     } finally {
       _noticing = false;
     }
+  }
+
+  // ---------- Sa vie à lui (v1.57) : il dort, rêve, danse, réagit ----------
+
+  /// Clicky partout : son coin pour dormir (en bas de l'écran où est la
+  /// souris), et où s'asseoir sur la fenêtre au premier plan (avec le
+  /// rectangle de la fenêtre : il tombe si elle bouge ou se ferme).
+  Offset? Function()? restSpot;
+  (Offset, Rect)? Function()? perchSpot;
+
+  final _shake = WiggleDetector.shake();
+  final _pet = WiggleDetector.pet();
+  final _rage = RageClickDetector();
+  final _beatDetector = BeatDetector();
+  StreamSubscription<Uint8List>? _beatSub;
+  DateTime _lastAsk = DateTime.now();
+  DateTime? _perchUntil;
+  DateTime? _nearSince;
+  DateTime? _coffeeUntil;
+  DateTime? _dreamAt;
+  double _wakeMoves = 0;
+  int _lifeN = 0;
+  bool _lifeLoaded = false;
+  Map? _weather;
+  DateTime _nextAntic = DateTime.now().add(const Duration(minutes: 40));
+  int _anticsToday = 0;
+  String _anticDay = '';
+  Timer? _restNoteEnd;
+
+  /// Il dort dans son coin, ou il est assis sur ta fenêtre.
+  bool get _lifeHold => ClickyLife.instance.asleep || ClickyLife.instance.perched;
+
+  bool get _lifeOn => active && ClickyMind.instance.on && ClickyMind.instance.life;
+
+  String _lifeBlock() {
+    final m = ClickyMind.instance;
+    if (!m.on || !m.life) return '';
+    return ClickyLife.instance.promptBlock(DateTime.now());
+  }
+
+  /// Une phrase de lui-même, en bulle **muette**, seulement si les garde-fous
+  /// le permettent (rare, jamais en plein écran ni quand il est occupé).
+  bool _lifeSay(String text, {int seconds = 5, bool force = false}) {
+    final life = ClickyLife.instance;
+    final now = DateTime.now();
+    if (!_calm || (fullscreenNow?.call() ?? false)) return false;
+    if (!force && !life.mayTalk(now)) return false;
+    life.talked(now);
+    // Assis ou endormi : la bulle s'affiche là où il est, sans le déplacer.
+    if (_lifeHold) {
+      gazeNote = text;
+      notifyListeners();
+      _restNoteEnd?.cancel();
+      _restNoteEnd = Timer(Duration(seconds: seconds) + Duration(milliseconds: text.length * 45), () {
+        if (gazeNote == text) {
+          gazeNote = '';
+          notifyListeners();
+        }
+      });
+      return true;
+    }
+    // Sinon, une petite bulle qui le suit (elle ne s'en va pas dès qu'on
+    // bouge la souris).
+    lifeNote = text;
+    notifyListeners();
+    _lifeNoteEnd?.cancel();
+    _lifeNoteEnd = Timer(Duration(seconds: seconds) + Duration(milliseconds: text.length * 45), () {
+      if (lifeNote == text) {
+        lifeNote = '';
+        notifyListeners();
+      }
+    });
+    return true;
+  }
+
+  /// Sa petite bulle à lui (suit la souris).
+  String lifeNote = '';
+  Timer? _lifeNoteEnd;
+
+  /// La souris bouge : réveil, caresse, ou tête qui tourne.
+  void _lifeMove(Offset old, Offset p) {
+    final life = ClickyLife.instance;
+    if (!_lifeOn) return;
+    final ms = DateTime.now().millisecondsSinceEpoch;
+    if (life.asleep) {
+      _wakeMoves += (p - old).distance;
+      if (_wakeMoves >= 160) _wakeUp();
+      return;
+    }
+    if (life.perched) {
+      final at = gaze;
+      if (at == null) {
+        _endRest(quiet: true);
+        return;
+      }
+      if ((p - at).distance < 70) {
+        if (_pet.add(ms, p.dx)) {
+          _petted();
+          return;
+        }
+        final since = _nearSince ??= DateTime.now();
+        // La souris vient le chercher : il saute dessus.
+        if (DateTime.now().difference(since) > const Duration(milliseconds: 1600)) {
+          life.show('😊', seconds: 2);
+          _endRest(quiet: true);
+        }
+      } else {
+        _nearSince = null;
+      }
+      return;
+    }
+    if (ClickyMind.instance.lifeReact &&
+        state == ClickyState.idle &&
+        _shake.add(ms, p.dx) &&
+        // Dans un jeu, la souris bouge vite exprès.
+        !(DriveRunner.supported && ClickyLife.gameLike(Win.foregroundExe(), Win.foregroundTitle()))) {
+      _dizzy();
+    }
+  }
+
+  void _petted() {
+    final life = ClickyLife.instance;
+    final now = DateTime.now();
+    life.show('🥰', seconds: 3);
+    _nearSince = now;
+    _perchUntil = now.add(const Duration(seconds: 20));
+    unawaited(ClickyMind.instance.petted(now: now));
+    if (life.mayEmoji('caresse-texte', now, const Duration(minutes: 30))) {
+      _lifeSay(const ['rrr… ♥', 'Hé, ça chatouille !', 'Encore, encore !'][now.second % 3], seconds: 2);
+    }
+  }
+
+  void _dizzy() {
+    final life = ClickyLife.instance;
+    final now = DateTime.now();
+    life.wobble.value++;
+    life.show('😵‍💫', seconds: 3);
+    if (life.mayEmoji('tournis-texte', now, const Duration(minutes: 20))) {
+      _lifeSay(
+        const ['Ouh là… la tête qui tourne !', 'Doucement, j\'ai le mal de mer !', 'Waouh, on est où là ?'][now.second % 3],
+        seconds: 3,
+      );
+    }
+  }
+
+  /// Un clic (Clicky partout) : il se réveille, ou s'inquiète si tu
+  /// cliques comme un fou (sauf dans un jeu).
+  void userClicked() {
+    final life = ClickyLife.instance;
+    if (!_lifeOn) return;
+    if (life.asleep) {
+      _wakeUp();
+      return;
+    }
+    final p = cursor;
+    if (!ClickyMind.instance.lifeReact || state != ClickyState.idle || p == null) return;
+    if (!_rage.add(DateTime.now().millisecondsSinceEpoch, p.dx, p.dy)) return;
+    if (DriveRunner.supported && ClickyLife.gameLike(Win.foregroundExe(), Win.foregroundTitle())) return;
+    final now = DateTime.now();
+    life.show('😬', seconds: 3);
+    if (life.mayEmoji('clics-texte', now, const Duration(minutes: 30))) {
+      _lifeSay('Ça bloque ? Maintiens Ctrl + Alt et dis-moi ce qui se passe, je regarde.', seconds: 6);
+    }
+  }
+
+  /// Toutes les 2 secondes : sommeil, bâillements, danse, accessoire, ennui.
+  Future<void> _lifeTick(DateTime now) async {
+    final life = ClickyLife.instance;
+    final mind = ClickyMind.instance;
+    if (!_lifeLoaded) {
+      _lifeLoaded = true;
+      try {
+        await mind.load();
+      } catch (_) {}
+      life.restore(mind.lifeState);
+    }
+    if (!_lifeOn) {
+      if (_lifeHold) _endRest(quiet: true);
+      life.refreshAccessory(now, off: true);
+      if (_beatSub != null) await _stopDance();
+      return;
+    }
+    _lifeN++;
+    // Réglages changés dans Mon Hub (fichier partagé) : relus toutes les 30 s.
+    if (_lifeN % 15 == 0) unawaited(mind.load().catchError((Object _) {}));
+    life.pace = mind.lifePace;
+    final windows = DriveRunner.supported;
+    final idleSecs = windows ? Win.idleSeconds() : now.difference(_lastMove).inSeconds;
+    final fullscreen = fullscreenNow?.call() ?? false;
+    // La vraie météo (toutes les 30 min) et les fêtes : son accessoire.
+    if (_lifeN % 900 == 1 || (_weather == null && _lifeN % 150 == 10)) unawaited(_refreshWeather());
+    final day = now.toIso8601String().substring(0, 10);
+    // Le matin, au premier signe de vie : son café (et un rêve à raconter).
+    if (now.hour >= 5 && now.hour < 11 && idleSecs < 30 && life.once('cafe:$day')) {
+      _coffeeUntil = now.add(const Duration(minutes: 25));
+      if (life.dreamDue(const Duration(hours: 8), now)) _dreamAt = now.add(const Duration(seconds: 50));
+    }
+    final coffee = _coffeeUntil != null && now.isBefore(_coffeeUntil!);
+    final said = life.refreshAccessory(now, weather: _weather, coffee: coffee);
+    // Sa musique (toutes les 16 s) : il danse. Pas en plein écran, ni en
+    // mode concentration ou mode jeu.
+    final quietMode = fullscreen || FocusMode.instance.active || GameMode.instance.active;
+    if (_lifeN % 8 == 3) unawaited(_checkDance(quietMode).catchError((Object _) {}));
+    if (!_calm || fullscreen) return;
+    if (said != null && !life.asleep) _lifeSay('${life.accessory} $said', seconds: 6);
+    final dreamAt = _dreamAt;
+    if (dreamAt != null && now.isAfter(dreamAt) && !_lifeHold) {
+      _dreamAt = null;
+      unawaited(_tellDream());
+      return;
+    }
+    if (life.perched) {
+      _perchCheck(now);
+      return;
+    }
+    if (life.asleep) {
+      // Tu tapes au clavier (sans toucher la souris) : il se réveille aussi.
+      final slept = now.difference(life.sleptAt ?? now);
+      if (windows && idleSecs <= 2 && slept > const Duration(seconds: 10)) _wakeUp();
+      return;
+    }
+    // 4 minutes sans toi (et pas de musique) : il s'endort dans son coin.
+    if (idleSecs >= 240 && !life.dancing) {
+      _fallAsleep();
+      return;
+    }
+    if (idleSecs >= 60) return;
+    // Il est tard : il bâille (émoji), et le dit une fois par soir.
+    if (ClickyLife.sleepyAt(now) && life.mayEmoji('baille', now, const Duration(minutes: 20))) {
+      life.show('🥱', seconds: 3);
+      final night = now.hour < 6 ? now.subtract(const Duration(days: 1)) : now;
+      if (life.once('nuit:${night.toIso8601String().substring(0, 10)}')) {
+        final when = now.hour == 0 ? 'minuit passé' : '${now.hour} h passées';
+        _lifeSay('Il est $when… moi je commence à fatiguer. Et toi ?', seconds: 5);
+      }
+      return;
+    }
+    // Il s'ennuie (pas un mot depuis 1 h 30) : il s'occupe, sans un mot.
+    if (day != _anticDay) {
+      _anticDay = day;
+      _anticsToday = 0;
+    }
+    if (now.difference(_lastAsk).inMinutes >= 90 && now.isAfter(_nextAntic) && _anticsToday < (life.discreet ? 2 : 4)) {
+      _nextAntic = now.add(Duration(minutes: 40 + math.Random().nextInt(40)));
+      _anticsToday++;
+      life.show(ClickyLife.antics[math.Random().nextInt(ClickyLife.antics.length)], seconds: 4);
+    }
+  }
+
+  Future<Object?> _lifeCall(String name, [Map<String, dynamic> args = const {}]) async {
+    try {
+      return await _tools.where((t) => t.name == name).firstOrNull?.run(args);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _refreshWeather() async {
+    final w = await _lifeCall('carnet_meteo');
+    if (w is Map && w['temperature'] != null) _weather = w;
+  }
+
+  void _fallAsleep() {
+    final life = ClickyLife.instance;
+    life.show('🥱', seconds: 2);
+    Timer(const Duration(milliseconds: 1800), () {
+      if (!_lifeOn || !_calm || _lifeHold) return;
+      if (DriveRunner.supported && Win.idleSeconds() < 200) return;
+      life.fallAsleep();
+      _wakeMoves = 0;
+      final spot = restSpot?.call();
+      if (spot != null) {
+        _gazeEnd?.cancel();
+        gaze = spot;
+        gazeNote = '';
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Réveillé par la souris ou le clavier : sursaut, bâillement, et parfois
+  /// le rêve qu'il a fait.
+  void _wakeUp() {
+    final life = ClickyLife.instance;
+    if (!life.asleep) return;
+    final slept = life.wake();
+    final now = DateTime.now();
+    life.wokeNow(now);
+    _wakeMoves = 0;
+    if (gaze != null) {
+      gaze = null;
+      gazeNote = '';
+      notifyListeners();
+    }
+    unawaited(ClickyMind.instance.saveLife(life.toJson()));
+    if (slept < const Duration(seconds: 30)) return;
+    life.show('😮', seconds: 1.2);
+    Timer(const Duration(milliseconds: 1300), () {
+      if (!life.asleep) life.show('🥱', seconds: 2.5);
+    });
+    if (life.dreamDue(slept, now)) _dreamAt = now.add(const Duration(seconds: 8));
+  }
+
+  /// Il raconte le rêve qu'il a fait (une fois par jour, en bulle muette).
+  Future<void> _tellDream() async {
+    final life = ClickyLife.instance;
+    final now = DateTime.now();
+    if (!_lifeOn || !life.dreamDue(const Duration(hours: 1), now)) return;
+    var app = '', artist = '';
+    final st = await _lifeCall('temps_ecran', {'periode': 'hier'});
+    if (st is Map && st['applis'] is List) {
+      for (final a in st['applis'] as List) {
+        final name = a is Map ? '${a['appli'] ?? ''}' : '';
+        if (name.isNotEmpty && name != 'Mon Hub' && !name.startsWith('Navigateur') && name != 'Explorateur') {
+          app = name;
+          break;
+        }
+      }
+    }
+    final m = await _lifeCall('musique_joue');
+    if (m is Map) artist = '${m['artiste'] ?? ''}'.trim();
+    var memory = ClickyMind.instance.episodes.where((e) => e.kind != 'attente').firstOrNull?.text ?? '';
+    if (memory.length > 70) memory = '';
+    var dream = ClickyLife.dreamFrom(app: app, artist: artist, memory: memory);
+    if (await AiText.hasGemini()) {
+      try {
+        final r = await AiText.ask(
+          ClickyLife.dreamPrompt(name: callName, app: app, artist: artist, memory: memory),
+          system: 'Tu es Clicky, un petit curseur vivant, drôle et tendre. Français, très court.',
+          geminiOnly: true,
+        ).timeout(const Duration(seconds: 12));
+        dream = ClickyLife.cleanDream(r) ?? dream;
+      } catch (_) {}
+    }
+    // Occupé entre-temps (briefing, question…) : ce sera dans 2 minutes.
+    if (!_calm || _lifeHold) {
+      _dreamAt = DateTime.now().add(const Duration(minutes: 2));
+      return;
+    }
+    life.dreamt(dream, now);
+    unawaited(ClickyMind.instance.saveLife(life.toJson()));
+    life.show('🌙', seconds: 4);
+    _lifeSay(dream, seconds: 7, force: true);
+  }
+
+  /// Il va s'asseoir sur la fenêtre que tu regardes.
+  bool _perch() {
+    final p = perchSpot?.call();
+    if (p == null) return false;
+    final (spot, rect) = p;
+    final life = ClickyLife.instance;
+    life.perch(rect);
+    _perchUntil = DateTime.now().add(Duration(seconds: 40 + math.Random().nextInt(50)));
+    _nearSince = null;
+    _gazeEnd?.cancel();
+    gaze = spot;
+    gazeNote = '';
+    _gazeHold = true;
+    _recent = true;
+    Timer(const Duration(milliseconds: 900), () => _gazeHold = false);
+    notifyListeners();
+    life.show('👀', seconds: 2.5);
+    return true;
+  }
+
+  void _perchCheck(DateTime now) {
+    final life = ClickyLife.instance;
+    final cur = perchSpot?.call();
+    // La fenêtre a bougé, s'est fermée, ou tu es passé à une autre : il tombe !
+    if (cur == null || cur.$2 != life.perchedOn) {
+      _fall();
+      return;
+    }
+    final until = _perchUntil;
+    if (until != null && now.isAfter(until)) _endRest(quiet: true);
+  }
+
+  void _fall() {
+    final life = ClickyLife.instance;
+    final at = gaze;
+    life.unperch();
+    life.show('😱', seconds: 1.4);
+    if (at == null) return;
+    glance(at + const Offset(0, 260), hold: const Duration(milliseconds: 700));
+    Timer(const Duration(milliseconds: 1700), () => life.show('😅', seconds: 2.5));
+  }
+
+  /// Il se lève (réveil discret, ou il descend de ta fenêtre).
+  void _endRest({bool quiet = false}) {
+    final life = ClickyLife.instance;
+    if (life.asleep) {
+      if (!quiet) {
+        _wakeUp();
+        return;
+      }
+      life.wake();
+      life.wokeNow(DateTime.now());
+      unawaited(ClickyMind.instance.saveLife(life.toJson()));
+    }
+    if (life.perched) life.unperch();
+    _perchUntil = null;
+    _nearSince = null;
+    _wakeMoves = 0;
+    if (gaze != null) {
+      gaze = null;
+      gazeNote = '';
+      notifyListeners();
+    }
+  }
+
+  /// Ta musique joue (Clicky partout) : il écoute le son du PC et danse en
+  /// rythme (seulement sur une vraie musique, au rythme régulier).
+  Future<void> _checkDance(bool quietMode) async {
+    final life = ClickyLife.instance;
+    var want = !quietMode && desktopMode && LoopbackCapture.supported && ClickyMind.instance.lifeDance && !life.asleep;
+    if (want) {
+      final r = await _lifeCall('musique_joue');
+      want = r is Map && r['en_lecture'] == true;
+    }
+    if (want && _beatSub == null) {
+      _beatDetector.reset();
+      life.setDancing(true);
+      _beatSub = LoopbackCapture.start().listen(
+        (pcm) {
+          if (_beatDetector.push(pcm) > 0 && state == ClickyState.idle && !life.asleep) {
+            life.onBeat(steady: _beatDetector.steady);
+          }
+        },
+        onError: (Object _) => unawaited(_stopDance()),
+      );
+    } else if (!want && _beatSub != null) {
+      await _stopDance();
+    }
+  }
+
+  Future<void> _stopDance() async {
+    final s = _beatSub;
+    _beatSub = null;
+    ClickyLife.instance.setDancing(false);
+    await s?.cancel();
+  }
+
+  /// Une notification de Mon Hub arrive : il réagit (un émoji ; une phrase
+  /// seulement pour une note).
+  void reactTo(HubNotification n) {
+    final mind = ClickyMind.instance;
+    if (!active || !mind.on || !mind.life || !mind.lifeReact) return;
+    final f = ClickyLife.feelingFor(n.id, n.title, n.body);
+    if (f == null) return;
+    unawaited(feel(f.$1, text: f.$2));
+  }
+
+  /// Ce qu'il ressent, à côté de lui (envoyé à Clicky partout s'il est là).
+  Future<void> feel(String emoji, {String? text}) async {
+    if (handledElsewhere) {
+      await ClickyDesktop.send('feel64 ${base64Encode(utf8.encode(jsonEncode({'e': emoji, 't': text})))}');
+      return;
+    }
+    final life = ClickyLife.instance;
+    final now = DateTime.now();
+    if (!_lifeOn || life.asleep || !_calm || (fullscreenNow?.call() ?? false)) return;
+    if (!life.mayEmoji('notif', now, const Duration(seconds: 20))) return;
+    life.show(emoji, seconds: 4);
+    // Une très bonne note : il saute de joie.
+    if (emoji == '🤩') {
+      for (var i = 0; i < 3; i++) {
+        Timer(Duration(milliseconds: 260 * i), () => life.beat.value++);
+      }
+    }
+    if (text != null && text.isNotEmpty) _lifeSay(text, seconds: 6);
   }
 
   // ---------- Autonomie : il décide, propose, et fait après ton accord ----------
@@ -1817,6 +2306,8 @@ class ClickyController extends ChangeNotifier {
       if (followUp) unawaited(_followUpSoon());
     }
     state = s;
+    // On l'appelle pendant qu'il dort ou qu'il est assis : il revient.
+    if (s != ClickyState.idle && _lifeHold) _endRest(quiet: true);
     FreezeWatch.note('Clicky : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
     if (status != null) this.status = status;
     if (reply != null) this.reply = reply;
@@ -2657,7 +3148,7 @@ Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.min
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
-${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
+${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
 $thinkingRules
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
@@ -2765,6 +3256,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     _voiceTurn = _spokenAsk;
     _spokenAsk = false;
     if (q.isEmpty) return;
+    _lastAsk = DateTime.now();
     _keepReply = false;
     await stopSpeaking();
     input.clear();
@@ -2840,7 +3332,15 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     if (!quick) return false;
     final mind = ClickyMind.instance;
     await mind.load();
-    final r = mind.selfAnswer(q, now: DateTime.now(), name: callName);
+    final r = mind.selfAnswer(q, now: DateTime.now(), name: callName) ??
+        (mind.on && mind.life
+            ? ClickyLife.instance.answer(
+                q,
+                now: DateTime.now(),
+                setPace: mind.setLifePace,
+                setDance: (v) => mind.set('life.dance', v),
+              )
+            : null);
     if (r == null) return false;
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
     unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));
@@ -3510,7 +4010,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     return '''
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${ClickyMind.instance.promptBlock(name: callName)}
-Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
+${_lifeBlock()}Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
@@ -4865,7 +5365,7 @@ class _PointerWithLabel extends StatelessWidget {
   Widget _build(BuildContext context) {
     final label = c.state == ClickyState.pointing && c.targetLabel.isNotEmpty
         ? c.targetLabel
-        : (c.gaze != null && c.gazeNote.isNotEmpty ? c.gazeNote : '');
+        : (c.gaze != null && c.gazeNote.isNotEmpty ? c.gazeNote : c.lifeNote);
     final flying = c.flightScale != 1 || c.flightAngle != 0;
     return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -4878,7 +5378,12 @@ class _PointerWithLabel extends StatelessWidget {
         child: Transform.rotate(
           angle: c.flightAngle,
           alignment: Alignment.topLeft,
-          child: Transform.scale(scale: c.flightScale, alignment: Alignment.topLeft, child: _Pointer(c: c)),
+          child: Transform.scale(
+            scale: c.flightScale,
+            alignment: Alignment.topLeft,
+            // Sa vie à lui : émoji de ce qu'il ressent, accessoire, danse.
+            child: ClickyLifeBody(hud: c.hud, child: _Pointer(c: c)),
+          ),
         ),
       ),
       if (label.isNotEmpty && !flying)

@@ -367,3 +367,26 @@
   à Gemini qui écrit la traduction (`LiveCaptions.prompt/clean`, « (rien) » = pas de paroles), sinon Whisper `lang: auto`
   (langue d'origine) ; quitter = `DesktopWidgets.send(id, 'quit')`), outil `soustitres_lancer`, « mets les sous-titres ».
   Les deux sont aussi dans le menu ✨ de Révisions.
+- **Clicky vivant (v1.57)** : il **garde son look de curseur** (pas de visage, demande de la personne) et vit avec des
+  **émojis** à côté de lui. `ui/clicky/life.dart` (`ClickyLife` : `show` émoji passager, `shown` (💤 quand il dort, 🎵
+  quand il danse), accessoire `refreshAccessory` — fêtes `seasonAccessory` (🎅 1–26 déc., 🎃, 🥳, 🐟…) > vraie météo
+  `weatherAccessory` (résultat de `carnet_meteo` : 🧣 ≤ 4 °C, ☂️, ⛄, 😎 ≥ 28 °C) ; ☕ le matin passe avant tout —,
+  `energyAt/sleepyAt`, sommeil `fallAsleep/wake`, rêves `dreamFrom` (sans IA) / `dreamPrompt` (Gemini) / `cleanDream`,
+  1 par jour, `feelingFor` (notifications : note ≥ 15/20 🤩 + phrase, < 10 🫂 + phrase, cours annulé 🥳, arnaque 🚨…),
+  `answer` sans IA (« tu dors ? », « t'as rêvé de quoi ? », « pourquoi t'as une écharpe ? », « sois plus discret »,
+  « arrête de danser »), `promptBlock` dans les consignes Claude et Gemini Live, détecteurs `WiggleDetector.shake/pet`,
+  `RageClickDetector`, `BeatDetector` (PCM 16 kHz, `steady` = vrai rythme, pas une voix), `gameLike`). **Garde-fous
+  anti-saoulant** : `mayTalk` (bulles muettes : 2/h, 8/j, 10 min d'écart ; « discret » 1/h, 4/j, 30 min), `mayEmoji`
+  (même émoji pas en boucle), `once` ; jamais sa voix de lui-même ; rien en plein écran, jeu, concentration.
+  Affichage : `ui/clicky/life_view.dart` (`ClickyLifeBody` autour de `_Pointer` : émoji qui « pop », 💤 qui flotte,
+  accessoire, saut sur chaque battement, tangue au tournis ; `LifeMotion` ; `emojiFonts`). Contrôleur (`ClickyController`,
+  section « Sa vie à lui ») : `_lifeTick` dans `_presenceTick` (endormi après 4 min sans souris ni clavier → vole vers
+  `restSpot` ; réveil = souris ≥ 160 px, clavier ou clic → 😮 🥱 ; bâille le soir ; s'ennuie → émoji après 1 h 30 sans
+  question ; café + rêve le matin), `_perch` (1 regard sur 4 : assis en haut de la fenêtre `perchSpot`, tombe 😱 si elle
+  bouge / change, caresse = petits allers-retours 🥰 `ClickyMind.petted`, souris qui approche = il revient),
+  `_lifeMove` (dans `moveCursor` ; `_lifeHold` empêche le retour auto), `userClicked` (clics, Clicky partout `_loop`),
+  `_checkDance` (Clicky partout : `musique_joue` du module Musique, sans rien recharger, puis `LoopbackCapture` →
+  `BeatDetector`), `reactTo` (branché sur `NotificationCenter.onAny` dans `HubApp._sync`) → `feel` (`feel64` vers
+  Clicky partout), `lifeNote` (sa bulle, qui suit la souris). Réglages dans `ClickyMind` (`life`, `life.dance`,
+  `life.perch`, `life.react`, `lifePace`, `lifeState` = dernier rêve / sieste) et Réglages → Conscience de Clicky
+  (« Sa vie à lui »). Tests : `test/v169_alive_test.dart`.
