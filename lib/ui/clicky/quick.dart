@@ -388,6 +388,75 @@ class QuickAnswers {
       }
     }
 
+    // Ses yeux et ses oreilles : la mémoire de l'écran (« tu te souviens ? »).
+    if (has('memoire_ecran')) {
+      final rem = RegExp(
+        r'^(?:tu te souviens|tu te rappelles?) (?:de |du |des |d )?(.{3,90}?)(?: que j ai (?:vu|regarde|lu|ouvert).*)?$|'
+        r'^(?:c etait quoi|c est quoi|quel etait|quelle etait|retrouve(?: moi)?) (?:le |la |les |l |ce |cette )?'
+        r'(?:site|page|video|article|document|doc|fichier|image|pdf|exercice|lien|recette|chanson)(.{3,90}?)'
+        r'(?: que j ai (?:vu|regarde|lu|ouvert|ecoute)| que je (?:regardais|lisais|faisais))(.*)$|'
+        r'^ou (?:est ce que )?j ai vu (.{3,80})$',
+      ).firstMatch(n);
+      final what = (rem?[1] ?? rem?[2] ?? rem?[4])?.trim() ?? '';
+      if (rem != null && what.isNotEmpty && !RegExp(r'^(?:moi|quoi|ce que je t ai dit|nous)$').hasMatch(what)) {
+        // Le moment (« hier », « mardi vers 16 h ») est cherché dans toute la phrase.
+        final r = await call('memoire_ecran', {'texte': what, 'quand': n});
+        // Rien vu : l'IA cherche aussi dans vos conversations.
+        if (r is Map && (r['resultats'] as List?)?.isNotEmpty == true) return QuickReply('${r['resume']}');
+      }
+      final doing = RegExp(r'^qu est ce que je (?:faisais|regardais|lisais) (.{3,60})$|^je faisais quoi (.{3,60})$').firstMatch(n);
+      if (doing != null) {
+        final r = await call('memoire_ecran', {'quand': (doing[1] ?? doing[2])!});
+        if (r is Map && (r['moments'] as List?)?.isNotEmpty == true) return QuickReply('${r['resume']}');
+      }
+      final forget = RegExp(
+        r'^(?:oublie|efface) (?:ce que tu as vu (?:pendant )?)?(?:les |la )?(?:(\d+) )?(?:dernieres? )?(minutes?|min|heures?|h)(?: dernieres?)?$',
+      ).firstMatch(n);
+      if (forget != null && has('memoire_oublier')) {
+        final k = int.tryParse(forget[1] ?? '') ?? 1;
+        final minutes = forget[2]!.startsWith('h') ? k * 60 : k;
+        return QuickReply('${await call('memoire_oublier', {'minutes': minutes})}');
+      }
+      if (has('memoire_oublier') && RegExp(r'^(?:oublie|efface) tout ce que tu as (?:vu|entendu)$').hasMatch(n)) {
+        return QuickReply('${await call('memoire_oublier', {'minutes': 0})}');
+      }
+    }
+    if (has('sens_etat') &&
+        RegExp(
+          r'^(?:qu est ce qu (?:il|elle|on) (?:a dit|vient de dire)|(?:il|elle) a dit quoi|(?:tu as|t as) entendu quoi)(?: dans la video)?$',
+        ).hasMatch(n)) {
+      final r = await call('sens_etat', {});
+      if (r is Map) {
+        final said = '${r['vient_d_etre_dit'] ?? ''}'.trim();
+        if (said.isEmpty) return const QuickReply('Je n\'ai rien entendu ces 2 dernières minutes (ou mes oreilles sont éteintes).');
+        return QuickReply('Il vient de dire : « ${said.length > 320 ? '…${said.substring(said.length - 320)}' : said} »');
+      }
+    }
+    if (has('sens_regler')) {
+      Future<QuickReply> set(Map<String, dynamic> a, String text) async {
+        await call('sens_regler', a);
+        return QuickReply(text);
+      }
+
+      if (RegExp(r'^(?:regarde|surveille|tu peux regarder|vois) (?:mon |l )?ecran(?: en continu| tout le temps| en permanence)?$').hasMatch(n)) {
+        return set({'ecran': true}, 'D\'accord : je vois ton écran en continu, et tout reste sur ton PC (jamais tes messages, ta banque ni la navigation privée).');
+      }
+      if (RegExp(r'^(?:arrete|stop) de (?:regarder|voir|surveiller) (?:mon |l )?ecran$|^ne regarde plus (?:mon |l )?ecran$').hasMatch(n)) {
+        return set({'ecran': false}, 'C\'est noté : je ne regarde plus ton écran.');
+      }
+      if (RegExp(r'^(?:ecoute|tu peux ecouter|entends) (?:le son|ce qui passe|mes videos)(?: du pc| de mon pc| sur mon pc)?(?: en continu| tout le temps)?$').hasMatch(n)) {
+        return set({'son': true}, 'D\'accord : j\'écoute le son de ton PC (les vidéos, pas la musique), jamais pendant un appel, et tout reste sur ton PC.');
+      }
+      if (RegExp(r'^(?:arrete|stop) d ecouter(?: le son)?(?: du pc| de mon pc)?$|^n ecoute plus(?: le son)?(?: du pc)?$').hasMatch(n)) {
+        return set({'son': false}, 'C\'est noté : je n\'écoute plus le son de ton PC.');
+      }
+      final eyes = RegExp(r'^(?:ferme les yeux|ne regarde pas|fais une pause d ecran)(?: pendant (.+))?$').firstMatch(n);
+      if (eyes != null) {
+        final d = eyes[1] == null ? const Duration(hours: 1) : (FocusDuration.parse(eyes[1]!) ?? const Duration(hours: 1));
+        return set({'pause_minutes': d.inMinutes}, 'Je ferme les yeux et les oreilles pendant ${FocusDuration.say(d)}.');
+      }
+    }
+
     // Recherche partout.
     if (has('recherche_partout')) {
       final m = RegExp(

@@ -9,6 +9,8 @@ import 'core/browser_link.dart';
 import 'core/work_backup.dart';
 import 'core/screen_time.dart';
 import 'ui/clicky/live_captions.dart';
+import 'ui/clicky/senses.dart';
+import 'ui/clicky/jarvis.dart' show FocusMode;
 import 'ui/phone_link_page.dart';
 import 'ui/clicky/win.dart';
 import 'core/certificates.dart';
@@ -80,6 +82,24 @@ Future<void> main(List<String> args) async {
   runApp(const HubApp());
 }
 
+/// Une fois : « Clicky peut maintenant voir ton écran et entendre ton PC ».
+Future<void> _announceSenses(NotificationCenter n) async {
+  const key = 'app.sens.annonce';
+  if (ModuleStore.global.getBool(key) == true) return;
+  await Future<void>.delayed(const Duration(seconds: 40));
+  await ModuleStore.global.setBool(key, true);
+  if (ClickySenses.instance.screenOn) return;
+  await n.post(
+    HubNotification(
+      id: 'sens:annonce',
+      title: '👀 Nouveau : Clicky peut voir ton écran et entendre ton PC',
+      body: 'En continu, mais tout reste sur ton PC (jamais tes messages, ta banque ni pendant un appel). '
+          'À allumer dans Réglages de Clicky → Ses yeux et ses oreilles.',
+      moduleId: 'claude',
+    ),
+  );
+}
+
 /// iPhone : « une nouvelle version est prête » (une fois par version).
 Future<void> _phoneUpdateNotice(NotificationCenter n) async {
   await Future<void>.delayed(const Duration(seconds: 20));
@@ -133,6 +153,7 @@ class _HubAppState extends State<HubApp> {
 
   void _close() {
     NotificationCenter.onAny = null;
+    unawaited(ClickySenses.instance.stop());
     WorkBackup.instance.stop();
     ScreenTime.instance.stop();
     unawaited(BrowserLink.instance.stop());
@@ -220,12 +241,34 @@ class _HubAppState extends State<HubApp> {
           st.alert = (title, body) {
             unawaited(n.post(HubNotification(id: 'temps:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
           };
+          // Ce qu'il remarque à l'écran ou dans le son devient une idée (avec
+          // ton accord) ou une petite pensée.
+          final clicky = ClickyController.instance;
+          ClickySenses.instance
+            ..propose = clicky.proposeIdea
+            ..think = ((t) => unawaited(clicky.think(t, aloud: false)))
+            ..call = ((name, args) async {
+              final tools = clicky.hubTools;
+              return tools.where((t) => t.name == name).firstOrNull?.run(args);
+            })
+            ..busy = (() => FocusMode.instance.active || GameMode.instance.active || clicky.idea != null)
+            ..inCall = (() => const {PhoneState.ringing, PhoneState.calling, PhoneState.inCall}.contains(DiscordPhone.instance.state));
+          unawaited(_announceSenses(n));
           st
             ..onTick = () async {
               try {
                 final exe = Win.foregroundExe(), title = Win.foregroundTitle();
                 await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
-                final end = GameMode.instance.tick(exe: exe, fullscreen: Win.foregroundFullscreen());
+                final full = Win.foregroundFullscreen();
+                final end = GameMode.instance.tick(exe: exe, fullscreen: full);
+                // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
+                await ClickySenses.instance.tick(
+                  exe: exe,
+                  title: title,
+                  idle: Win.idleSeconds(),
+                  fullscreen: full,
+                  game: GameMode.instance.active,
+                );
                 if (end != null) {
                   unawaited(n.post(HubNotification(id: 'jeu:${DateTime.now().millisecondsSinceEpoch}', title: '🎮 Partie terminée', body: end)));
                 }

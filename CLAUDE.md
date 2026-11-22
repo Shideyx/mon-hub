@@ -390,3 +390,27 @@
   Clicky partout), `lifeNote` (sa bulle, qui suit la souris). Réglages dans `ClickyMind` (`life`, `life.dance`,
   `life.perch`, `life.react`, `lifePace`, `lifeState` = dernier rêve / sieste) et Réglages → Conscience de Clicky
   (« Sa vie à lui »). Tests : `test/v169_alive_test.dart`.
+- **Yeux et oreilles de Clicky (v1.58)** : il voit l'écran et entend le son du PC **en continu, sur le PC** (demande de la
+  personne). `core/screen_memory.dart` (`ScreenMemory` : `memoire-ecran.json` chiffré, 7 jours, 1 500 moments, **jamais
+  synchronisé** (`AccountSync.syncedFile`), `ScreenMoment` vu/entendu (`heard`), même fenêtre + même texte = prolongé,
+  `search` (mots, pluriels), `between`, `say/sayBetween`, `forget` ; `TimeWindow.parse` : hier (soir), mardi vers 16 h,
+  il y a 20 min, tout à l'heure…). `ui/clicky/senses.dart` : `SenseRules` (sans Windows, testables : `privateWindow` =
+  messageries, mails, banque, mots de passe, navigation privée, ED/Pronote, Mon Hub → **jamais regardés** ; `callLikely`
+  (sessions audio d'un programme d'appel, ou navigateur qui joue + onglet Meet/Discord/Zoom…) → **jamais écouté pendant un
+  appel** (enregistrer les paroles d'autrui sans accord est interdit) ; `thumb/changed` (aperçu 64 × 36 : relire seulement
+  si la fenêtre change, 1 lecture / min max par fenêtre), `cleanOcr`, `errorShown`, `deadline`, `english`, `importantLine`
+  (« retenez bien », « ça tombera au contrôle »), `distraction` + `procrastinationLine`), `AudioSessions.active` (COM
+  `IAudioSessionManager2` dans un Isolate), `ClickySenses` (dans Mon Hub, `tick` appelé par le tour de 15 s du temps
+  d'écran dans `HubApp._sync` : OCR Windows de la fenêtre (`ClickyOcr.read(name: 'clicky-sens.jpg')`), son = `LoopbackCapture`
+  → morceaux de 20 s → silence/musique ignorés → `Whisper.transcribe(lang: 'auto')` local (Whisper obligatoire, pas de
+  Gemini en continu : quota) ; initiatives via `propose` = `proposeIdea` (6/jour, 15 min d'écart) : erreur à l'écran →
+  `clicky_expliquer_ecran`, date limite → `agenda_ajouter`, vidéo en anglais → `soustitres_lancer`, « à retenir » →
+  `think` muet + `notes`, procrastination le soir (devoir/contrôle demain + 40 min de distraction) → `clicky_concentration`
+  25 min ; `sens-recent.json` (petit, 1/min) → `ClickySenses.promptBlock` (`_sensesBlock` du contrôleur, dans `_system` et
+  `_liveSystem`, étiqueté `PromptShield.wrap`). Réglages propres au PC : `app.sens.ecran` / `app.sens.son` (éteints par
+  défaut, consentement), `app.sens.recadrer` ; annonce une fois (`_announceSenses`). Outils `memoire_ecran`,
+  `memoire_oublier`, `sens_etat`, `sens_regler` (**action à autoriser**, `isWriteAction`), `clicky_expliquer_ecran`
+  (groupe `memoire` du `ToolRouter`), phrases sans IA dans `QuickAnswers` (« tu te souviens du site sur… », « qu'est-ce
+  que je faisais mardi vers 16 h », « qu'est-ce qu'il a dit ? », « oublie les 10 dernières minutes », « ferme les yeux
+  pendant 1 h », « regarde mon écran »). Page `ui/clicky/senses_page.dart` (Réglages de Clicky → Ses yeux et ses
+  oreilles). Tests : `test/v170_senses_test.dart`.

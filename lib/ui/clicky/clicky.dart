@@ -77,6 +77,7 @@ import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
 import 'life.dart';
+import 'senses.dart';
 import 'life_view.dart';
 import 'loopback.dart';
 import 'shot_encode.dart';
@@ -1269,6 +1270,8 @@ class ClickyController extends ChangeNotifier {
       await FocusMode.instance.sync();
       if (DriveRunner.supported) await _checkAppReminder();
     }
+    // Ce qu'il voit et entend (préparé en avance).
+    if (_presenceN % 15 == 7) unawaited(_refreshSenses());
     // Le point de la situation se prépare en avance (réponse plus rapide).
     if (_presenceN % 30 == 0 && state == ClickyState.idle && active) unawaited(_refreshSituation());
     // Batterie faible : il prévient de lui-même (à 20 % puis à 10 %).
@@ -1504,6 +1507,31 @@ class ClickyController extends ChangeNotifier {
     } finally {
       _noticing = false;
     }
+  }
+
+  // ---------- Ses yeux et ses oreilles (v1.58) ----------
+
+  /// Ce qu'il voit et entend en ce moment, pour les consignes de l'IA
+  /// (préparé en avance, toutes les 30 s).
+  String _sensesBlock = '';
+
+  Future<void> _refreshSenses() async {
+    try {
+      _sensesBlock = await ClickySenses.promptBlock();
+    } catch (_) {
+      _sensesBlock = '';
+    }
+  }
+
+  /// Il ouvre sa boîte et répond à une question sur l'écran (Clicky partout
+  /// s'il est là).
+  void _explainScreen(String question) {
+    if (handledElsewhere) {
+      unawaited(ClickyDesktop.send('ask $question'));
+      return;
+    }
+    openPanel();
+    unawaited(ask(question));
   }
 
   // ---------- Sa vie à lui (v1.57) : il dort, rêve, danse, réagit ----------
@@ -2530,6 +2558,9 @@ class ClickyController extends ChangeNotifier {
 
   /// Temps d'écran, recherche partout, anniversaires (dans Mon Hub).
   List<HubTool> get lifeTools => [
+    // Ses yeux et ses oreilles : la mémoire de l'écran, ce qu'il voit et
+    // entend en ce moment.
+    ...ClickySenses.instance.tools(explain: _explainScreen),
     HubTool(
       name: 'temps_ecran',
       description:
@@ -3150,6 +3181,7 @@ ${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
+$_sensesBlock
 $thinkingRules
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
@@ -4018,6 +4050,7 @@ ${PromptShield.rule}
 Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données de Mon Hub) :\n$_situation'}
+$_sensesBlock
 $thinkingRules''';
   }
 

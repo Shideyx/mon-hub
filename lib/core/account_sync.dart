@@ -594,6 +594,9 @@ class AccountSync extends ChangeNotifier {
       name != 'sauvegarde.json' &&
       // Le temps d'écran est propre à ce PC.
       name != 'temps-ecran.json' &&
+      // Ce que Clicky a vu et entendu reste sur ce PC (jamais envoyé).
+      name != 'memoire-ecran.json' &&
+      name != 'sens-recent.json' &&
       !name.startsWith('sync-');
 
   /// Fichiers déjà lus : (date de modification, contenu, empreinte). Un

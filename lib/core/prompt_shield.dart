@@ -27,7 +27,7 @@ class PromptShield {
   static bool readsOutside(String tool) => RegExp(
     r'^(discord_(messages|conversations|salons|mentions)|clicky_rate|recherche_partout|instagram_|mail_lire|mails_lister|ecole_message|ecole_messages'
     r'|ecole_cloud|ecole_espaces|ecole_fichier|cours_comptes_rendus|nav_lire|nav_onglets|doc_lire|drive_chercher|youtube_chercher|youtube_historique|actualites'
-    r'|livre_ou_lire|pc_lire|mcp_|web|WebFetch|WebSearch|mcp__monhub__(discord_messages|mail_lire|ecole_message_lire|pc_lire|doc_lire))',
+    r'|livre_ou_lire|pc_lire|memoire_ecran|sens_etat|mcp_|web|WebFetch|WebSearch|mcp__monhub__(discord_messages|mail_lire|ecole_message_lire|pc_lire|doc_lire))',
   ).hasMatch(tool);
 
   /// À appeler quand un outil vient de tourner.
