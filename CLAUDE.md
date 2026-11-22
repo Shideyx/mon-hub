@@ -414,3 +414,17 @@
   que je faisais mardi vers 16 h », « qu'est-ce qu'il a dit ? », « oublie les 10 dernières minutes », « ferme les yeux
   pendant 1 h », « regarde mon écran »). Page `ui/clicky/senses_page.dart` (Réglages de Clicky → Ses yeux et ses
   oreilles). Tests : `test/v170_senses_test.dart`.
+- **Presse-papier malin + PC qui réagit (v1.58)** : `ui/clicky/pc_watch.dart`. `ClipSmart.classify` (sans IA) : lien
+  d'arnaque (`ScamShield.checkUrl`, même copié dans une messagerie) → bulle + notification ; calcul (`Calc`, pas les dates /
+  numéros) → résultat ; colis (`parcel` : UPS, Colissimo, Chronopost, Amazon) / adresse (`address`) → `pc_ouvrir` (suivi,
+  Google Maps) ; date (`DateSpotter`) → `agenda_ajouter` ; anglais (`SenseRules.english`) → `clicky_presse_papier`
+  traduire (recopié) ; long texte → résumer ; `looksSecret` = jamais les mots de passe / clés, ni depuis `isSensitiveTitle`.
+  `PcWatch` (Mon Hub, Windows) : `GetClipboardSequenceNumber` toutes les 1,5 s, marqueur `clip-ignore` écrit par
+  `fixSelection` (`PcWatch.markClipboardUse`) + `ignoreClipboard` ; dossiers Téléchargements et Images\Screenshots surveillés
+  (`Directory.watch`, fichier stable 3 s, `PcRules.partial`) → cours → `pc_ranger_fichier` (un seul fichier vers
+  Cours/<matière>, journal `rangement-*`, **action à autoriser**) ; capture → `pc_lire_image` (OCR → presse-papier) ; `tick`
+  (15 s) : clé USB (`GetLogicalDrives`, `DRIVE_REMOVABLE`, `PcRules.suspicious` → alerte), appli « (Ne répond pas) » 30 s
+  → `pc_etat`, disque < 5 Go → `pc_ranger_apercu`. Idées dans le budget commun `ClickySenses.offer`. Réglages
+  `app.clip.malin` / `app.pc.reagit` (oui par défaut) dans la page Ses yeux et ses oreilles. Tests `test/v171_pc_watch_test.dart`.
+- **Ville** (météo, accessoires de Clicky) : Carnet → Réglages, ou Réglages de Clicky → Conscience → Sa vie à lui, ou
+  « j'habite à Lyon » (`ClickyLife.cityFrom` dans `_handleSelf` → `Carnet.setSetting('city')`).

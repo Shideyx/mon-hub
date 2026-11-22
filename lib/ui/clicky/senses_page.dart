@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/screen_memory.dart';
 import 'mic_test.dart' show WhisperInstallDialog;
+import 'pc_watch.dart';
 import 'senses.dart';
 import 'whisper.dart' show Whisper;
 
@@ -232,6 +233,38 @@ class _SensesPageState extends State<SensesPage> {
                     value: s.nudgeOn,
                     onChanged: s.setNudge,
                   ),
+                  if (PcWatch.supported) ...[
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Text('📋', style: TextStyle(fontSize: 22)),
+                      title: const Text('Le presse-papier malin'),
+                      subtitle: const Text(
+                        'Tu copies un lien d\'arnaque → il te prévient ; un calcul → le résultat ; une date → « je l\'ajoute à ton '
+                        'agenda ? » ; un colis → le suivi ; une adresse → le plan ; de l\'anglais → « je te le traduis ? » ; un long '
+                        'texte → « je te le résume ? ». Rien n\'est gardé, et jamais depuis un gestionnaire de mots de passe.',
+                      ),
+                      value: PcWatch.instance.clipOn,
+                      onChanged: (v) async {
+                        await PcWatch.instance.setClip(v);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Text('💻', style: TextStyle(fontSize: 22)),
+                      title: const Text('Il réagit à ton PC'),
+                      subtitle: const Text(
+                        'Un cours téléchargé → « je le range dans Cours/Maths ? » ; une capture d\'écran → « je copie son texte ? » ; '
+                        'une clé USB → il l\'ouvre (et prévient s\'il y a un programme suspect dessus) ; une appli qui ne répond '
+                        'plus ; un disque presque plein.',
+                      ),
+                      value: PcWatch.instance.pcOn,
+                      onChanged: (v) async {
+                        await PcWatch.instance.setPc(v);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ],
                   if (s.screenOn || s.soundOn) ...[
                     const SizedBox(height: 6),
                     Wrap(
