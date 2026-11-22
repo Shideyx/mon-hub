@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import 'clicky.dart';
+import 'life_view.dart' show emojiFonts;
 import 'mind.dart';
 
 /// Réglages → Conscience de Clicky : son humeur, ses souvenirs, sa présence.
@@ -112,6 +113,77 @@ class _MindPageState extends State<MindPage> {
                   onPressed: () => ClickyController.instance.noticeSomething(force: true),
                 ),
               ),
+              const Divider(height: 32),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Text('🐾', style: TextStyle(fontSize: 22, fontFamilyFallback: emojiFonts)),
+                title: const Text('Sa vie à lui', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: const Text(
+                  'Il garde son look de curseur, mais il vit à côté de toi avec des émojis : il bâille le soir, '
+                  's\'endort dans son coin quand tu pars (💤) et se réveille en sursaut, te raconte ses rêves, porte un '
+                  'accessoire selon la vraie météo et les fêtes (🧣 ☂️ 😎 🎅, ☕ le matin), réagit à tes notes. Presque '
+                  'tout est muet : quelques petites bulles par jour au plus, jamais sa voix de lui-même, et rien en plein '
+                  'écran, en jeu ou en mode concentration.',
+                ),
+                value: m.life,
+                onChanged: m.on ? (v) => m.set('life', v) : null,
+              ),
+              if (m.on && m.life) ...[
+                const SizedBox(height: 6),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'discret', label: Text('Discret')),
+                    ButtonSegment(value: 'normal', label: Text('Normal')),
+                  ],
+                  selected: {m.lifePace},
+                  onSelectionChanged: (v) => m.setLifePace(v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  m.lifePace == 'discret'
+                      ? 'Une petite bulle par heure (4 par jour) au plus, et deux fois moins d\'émojis.'
+                      : 'Deux petites bulles par heure (8 par jour) au plus, 10 minutes d\'écart au minimum.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Text('🎵', style: TextStyle(fontSize: 20, fontFamilyFallback: emojiFonts)),
+                  title: const Text('Il danse sur ta musique'),
+                  subtitle: const Text(
+                    'Quand ta musique joue, il écoute le son du PC (rien n\'est enregistré ni envoyé) et bouge en rythme. '
+                    'Pas sur une vidéo qui parle : seulement sur un vrai rythme.',
+                  ),
+                  value: m.lifeDance,
+                  onChanged: (v) => m.set('life.dance', v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Text('🪑', style: TextStyle(fontSize: 20, fontFamilyFallback: emojiFonts)),
+                  title: const Text('Il s\'assoit sur tes fenêtres'),
+                  subtitle: const Text(
+                    'De temps en temps, il va s\'asseoir en haut de ta fenêtre… et tombe si tu la fermes ou en changes 😱. '
+                    'Approche la souris pour qu\'il revienne, ou fais de petits allers-retours dessus pour le caresser 🥰.',
+                  ),
+                  value: m.lifePerch,
+                  onChanged: (v) => m.set('life.perch', v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Text('😵‍💫', style: TextStyle(fontSize: 20, fontFamilyFallback: emojiFonts)),
+                  title: const Text('Il réagit'),
+                  subtitle: const Text(
+                    'La tête qui tourne si tu secoues la souris, inquiet si tu cliques comme un fou (pas dans un jeu), '
+                    'content pour une bonne note 🤩, là pour toi après une mauvaise 🫂.',
+                  ),
+                  value: m.lifeReact,
+                  onChanged: (v) => m.set('life.react', v),
+                ),
+                Text(
+                  'Demande-lui : « tu dors ? », « t\'as rêvé de quoi ? », « pourquoi t\'as une écharpe ? », « tu danses ? ». '
+                  'Trop présent ? Dis-lui « sois plus discret ».',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
               const Divider(height: 32),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

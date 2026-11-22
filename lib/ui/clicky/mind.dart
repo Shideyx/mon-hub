@@ -82,6 +82,29 @@ class ClickyMind extends ChangeNotifier {
     await _save();
   }
 
+  /// **Sa vie à lui** (v1.57) : sommeil, rêves, émojis, accessoires (voir
+  /// `life.dart`). Chaque partie se coupe à part.
+  bool get life => _d['life'] != false;
+  bool get lifeDance => _d['life.dance'] != false;
+  bool get lifePerch => _d['life.perch'] != false;
+  bool get lifeReact => _d['life.react'] != false;
+
+  /// « discret » (moitié moins de bulles et d'émojis) ou « normal ».
+  String get lifePace => _d['life.pace'] == 'discret' ? 'discret' : 'normal';
+
+  Future<void> setLifePace(String v) async {
+    _d['life.pace'] = v == 'discret' ? 'discret' : 'normal';
+    await _save();
+  }
+
+  /// Ce qu'il retient de sa vie (dernier rêve, dernière sieste).
+  Map<String, dynamic> get lifeState => ((_d['vie'] as Map?) ?? const {}).cast<String, dynamic>();
+
+  Future<void> saveLife(Map<String, dynamic> m) async {
+    _d['vie'] = m;
+    await _save();
+  }
+
   // ---------------------------------------------------------------- État
 
   DateTime _ms(Object? v, DateTime or) => v is num ? DateTime.fromMillisecondsSinceEpoch(v.toInt()) : or;
@@ -172,6 +195,16 @@ class ClickyMind extends ChangeNotifier {
       list.insert(0, Episode(at: n, kind: 'conversation', text: _short(said)));
     }
     await _setEpisodes(list);
+    await _save();
+  }
+
+  /// Une caresse (la souris qui va et vient tout près de lui) : il est
+  /// content, et le lien grandit un tout petit peu.
+  Future<void> petted({DateTime? now}) async {
+    if (!on) return;
+    final n = now ?? DateTime.now();
+    _d['bond'] = (bond + 0.005).clamp(0, 1);
+    _nudge(0.12, n);
     await _save();
   }
 

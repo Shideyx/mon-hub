@@ -59,6 +59,19 @@ class MusicModule extends HubModule {
       },
     ),
     HubTool(
+      name: 'musique_joue',
+      description: 'De la musique joue-t-elle en ce moment sur le PC ? (réponse rapide, sans rien recharger).',
+      run: (_) async {
+        player.ensureStarted();
+        final np = player.now;
+        return {
+          'en_lecture': np?.playing ?? false,
+          if (np != null) 'titre': np.title,
+          if (np != null) 'artiste': np.artist,
+        };
+      },
+    ),
+    HubTool(
       name: 'musique_titres_likes',
       description: 'Mes titres likés (Spotify, ou favoris Deezer), les plus récents d\'abord.',
       run: (_) async => [

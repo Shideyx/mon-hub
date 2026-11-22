@@ -144,7 +144,14 @@ class NotificationCenter extends ChangeNotifier {
 
   /// Publie une alerte : historique (cloche), bandeau dans la fenêtre et
   /// notification du système.
+  /// Chaque alerte publiée (Clicky y réagit : un émoji, une phrase pour une
+  /// note). Branché par Mon Hub.
+  static void Function(HubNotification n)? onAny;
+
   Future<void> post(HubNotification n, {bool system = true}) async {
+    try {
+      onAny?.call(n);
+    } catch (_) {}
     final prefs = ModuleStore.prefs;
     await prefs.setStringList(
       _historyKey,

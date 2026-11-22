@@ -187,6 +187,14 @@ Future<void> runClickyDesktop() async {
       }
       // « Regarde mon écran maintenant » (réglages de Mon Hub).
       if (cmd == 'notice') unawaited(c.noticeSomething(force: true));
+      // Ce qu'il ressent (une note, un cours annulé…), envoyé par Mon Hub.
+      if (cmd.startsWith('feel64 ')) {
+        try {
+          final j = jsonDecode(utf8.decode(base64Decode(cmd.substring(7)))) as Map;
+          final t = j['t'];
+          unawaited(c.feel('${j['e']}', text: t is String ? t : null));
+        } catch (_) {}
+      }
       // Une pensée de Clicky (rappel de l'assistant…) envoyée par Mon Hub.
       if (cmd.startsWith('think64 ')) {
         try {
@@ -405,7 +413,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   Timer? _tick, _slow;
   bool _wasBoth = false;
   bool _wasEsc = false;
-  bool _wasFix = false, _wasFind = false;
+  bool _wasFix = false, _wasFind = false, _wasClick = false;
   bool _fullscreen = false;
   int _n = 0;
   bool _interactive = false;
@@ -465,6 +473,12 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
       if (mounted) setState(() {});
     };
     c.addListener(_onChange);
+    // Sa vie à lui : son coin pour dormir (en bas à droite de l'écran où est
+    // la souris, au-dessus de la barre des tâches) et le haut de ta fenêtre,
+    // où il vient s'asseoir.
+    c
+      ..restSpot = _restSpot
+      ..perchSpot = _perchSpot;
     // La boîte s'attrape par sa barre du haut : la fenêtre suit la souris
     // (en pixels de l'écran) et reste où on la pose.
     c.onDragBox = (d, start) {
@@ -570,6 +584,29 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     }
   }
 
+  Offset? _restSpot() {
+    final cur = Win.cursor();
+    final mons = Win.monitors();
+    if (mons.isEmpty) return null;
+    final d = _dpr;
+    final m = mons.firstWhere(
+      (m) => cur != null && cur.$1 >= m.$1 && cur.$1 < m.$1 + m.$3 && cur.$2 >= m.$2 && cur.$2 < m.$2 + m.$4,
+      orElse: () => mons.first,
+    );
+    return Offset(m.$1 + m.$3 - 190 * d, m.$2 + m.$4 - 140 * d);
+  }
+
+  (Offset, Rect)? _perchSpot() {
+    final t = Win.foregroundTitle();
+    if (t.trim().isEmpty || t == 'Clicky' || t == 'Program Manager' || _fullscreen) return null;
+    final f = Win.foregroundRect();
+    if (f == null) return null;
+    final (x, y, w, h) = f;
+    final d = _dpr;
+    if (w < 360 * d || h < 240 * d) return null;
+    return (Offset(x + w * 0.62, y - 6 * d), Rect.fromLTWH(x.toDouble(), y.toDouble(), w.toDouble(), h.toDouble()));
+  }
+
   void _show() {
     _hidden = true; // force un nouveau placement visible
     _place(force: true);
@@ -603,6 +640,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final esc = Win.down(0x1B);
     if (esc && !_wasEsc) c.escape();
     _wasEsc = esc;
+    // Les clics (il se réveille, ou s'inquiète des clics énervés).
+    final click = Win.down(0x01);
+    if (click && !_wasClick) c.userClicked();
+    _wasClick = click;
 
     final p = Win.cursor();
     if (p != null) c.moveCursor(Offset(p.$1.toDouble(), p.$2.toDouble()));
@@ -642,7 +683,9 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
       if (_frames.isActive) _frames.stop();
       final size = c.board != null || c.holo != null
           ? _withBoard
-          : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty
+          : c.lifeNote.length > 60 && c.state == ClickyState.idle
+          ? _compact
+          : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty || c.lifeNote.isNotEmpty
           ? _pointing
           : c.boxOpen
           ? _compact
@@ -710,7 +753,9 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
         ? _withBoard
         : _interactive
         ? _withPanel
-        : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty
+        : c.lifeNote.length > 60 && c.state == ClickyState.idle && !c.boxOpen
+        ? _compact
+        : c.state == ClickyState.pointing || c.gazeNote.isNotEmpty || c.lifeNote.isNotEmpty
         ? _pointing
         : c.boxOpen
         ? _compact
