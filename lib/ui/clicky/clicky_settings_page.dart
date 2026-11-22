@@ -1,3 +1,4 @@
+import 'senses_page.dart';
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
@@ -81,6 +82,13 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
         Icons.psychology_alt_rounded,
         const Color(0xFF2B6CFF),
         (ctx) => MindPage.open(ctx),
+      ),
+      _Entry(
+        'Ses yeux et ses oreilles',
+        'Il voit ton écran et entend le son du PC en continu (sur le PC), et s\'en souvient',
+        Icons.visibility_rounded,
+        const Color(0xFF0EA5E9),
+        (ctx) => SensesPage.open(ctx),
       ),
       _Entry(
         'Clicky prend les devants',

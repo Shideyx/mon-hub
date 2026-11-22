@@ -99,6 +99,12 @@ class ToolRouter {
     ),
     'soiree': (['soiree_'], ['soiree', 'fete', 'playlist', 'anniv', 'potes', 'invites']),
     'actualites': (['actualites'], ['actu', 'news', 'nouvelles', 'info', 'journal']),
+    'memoire': (
+      ['memoire_', 'sens_'],
+      ['souviens', 'rappelles', 'j ai vu', 'vu hier', 'que je regardais', 'que je faisais', 'que je lisais', 'oublie',
+        'memoire', 'entendu', 'il a dit', 'elle a dit', 'dans la video', 'mon ecran', 'regarde mon', 'ecoute le son',
+        'a retenir', 'tout a l heure'],
+    ),
     'extensions': (['mcp_'], []),
     'perso': (['perso_'], ['ouvre', 'module', 'site']),
   };

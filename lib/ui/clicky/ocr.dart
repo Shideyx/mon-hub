@@ -14,12 +14,12 @@ class ClickyOcr {
   static bool get supported => !kIsWeb && Platform.isWindows;
 
   /// Texte lu sur une image PNG (vide si rien / indisponible).
-  static Future<String> read(Uint8List png) async {
+  static Future<String> read(Uint8List png, {String name = 'clicky-ocr.png'}) async {
     if (!supported) return '';
     final dir = Directory(ClaudeBridge.folder ?? Directory.systemTemp.path);
     await dir.create(recursive: true);
     final sep = Platform.pathSeparator;
-    final img = File('${dir.path}${sep}clicky-ocr.png');
+    final img = File('${dir.path}$sep$name');
     try {
       await img.writeAsBytes(png, flush: true);
       final r = await PowerShell.run(_script, {'Path': img.path});
