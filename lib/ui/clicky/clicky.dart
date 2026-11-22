@@ -78,6 +78,7 @@ import 'course_page.dart';
 import 'jarvis.dart';
 import 'life.dart';
 import 'senses.dart';
+import 'pc_watch.dart';
 import 'life_view.dart';
 import 'loopback.dart';
 import 'shot_encode.dart';
@@ -2487,6 +2488,8 @@ class ClickyController extends ChangeNotifier {
     if (!DriveRunner.supported) return 'Ça marche sur le PC (Windows).';
     if (_fixing) return 'Je suis déjà en train de corriger.';
     _fixing = true;
+    // Mon Hub ne doit pas prendre cette copie pour la tienne (presse-papier malin).
+    PcWatch.markClipboardUse();
     String done(String msg) {
       _set(ClickyState.idle, status: '');
       _bubble(msg);
@@ -2561,6 +2564,8 @@ class ClickyController extends ChangeNotifier {
     // Ses yeux et ses oreilles : la mémoire de l'écran, ce qu'il voit et
     // entend en ce moment.
     ...ClickySenses.instance.tools(explain: _explainScreen),
+    // Le presse-papier malin et les réactions du PC.
+    if (DriveRunner.supported) ...PcWatch.instance.tools(),
     HubTool(
       name: 'temps_ecran',
       description:
@@ -3364,7 +3369,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     if (!quick) return false;
     final mind = ClickyMind.instance;
     await mind.load();
-    final r = mind.selfAnswer(q, now: DateTime.now(), name: callName) ??
+    var r = mind.selfAnswer(q, now: DateTime.now(), name: callName) ??
         (mind.on && mind.life
             ? ClickyLife.instance.answer(
                 q,
@@ -3373,6 +3378,15 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
                 setDance: (v) => mind.set('life.dance', v),
               )
             : null);
+    // « J'habite à Lyon » : la ville de la météo (et de ses accessoires).
+    final city = r == null ? ClickyLife.cityFrom(q) : null;
+    if (city != null) {
+      final name = QuickAnswers.original(q, city);
+      await Carnet.instance.setSetting('city', name);
+      _weather = null;
+      unawaited(_refreshWeather());
+      r = 'C\'est noté : tu habites à $name. Je regarderai la météo de là-bas, et je m\'habillerai en conséquence.';
+    }
     if (r == null) return false;
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
     unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));

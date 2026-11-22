@@ -319,7 +319,7 @@ class ClaudeBridge {
   /// Actions qui changent quelque chose : on demande la permission avant.
   static bool isWriteAction(HubTool t) =>
       RegExp(r'envoyer|ajouter|supprimer|modifier|repondre|noter|ranger$|ranger_annuler$|^mcp_|^pc_commande$|^pc_ecrire|'
-              r'^nav_(?:cliquer|ecrire|touche|fermer)$|^sens_regler$')
+              r'^nav_(?:cliquer|ecrire|touche|fermer)$|^sens_regler$|^pc_ranger_fichier$')
           .hasMatch(t.name);
 
   /// Convertit le résultat en JSON simple (dates en texte).

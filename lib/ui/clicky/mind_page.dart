@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../modules/carnet/carnet_store.dart';
 import 'clicky.dart';
 import 'life_view.dart' show emojiFonts;
 import 'mind.dart';
@@ -19,11 +20,37 @@ class MindPage extends StatefulWidget {
 
 class _MindPageState extends State<MindPage> {
   final m = ClickyMind.instance;
+  final city = TextEditingController();
+  String cityInfo = '';
 
   @override
   void initState() {
     super.initState();
     unawaited(m.load());
+    unawaited(Carnet.instance.load().then((_) {
+      if (mounted) setState(() => city.text = Carnet.instance.setting<String>('city', ''));
+    }));
+  }
+
+  @override
+  void dispose() {
+    city.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveCity() async {
+    final v = city.text.trim();
+    await Carnet.instance.setSetting('city', v);
+    if (v.isEmpty) {
+      setState(() => cityInfo = '');
+      return;
+    }
+    try {
+      final w = await Weather.forCity(v);
+      if (mounted) setState(() => cityInfo = '${w['icone']} ${w['ville']} : ${w['maintenant']}');
+    } catch (e) {
+      if (mounted) setState(() => cityInfo = '$e');
+    }
   }
 
   static String _day(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
@@ -137,6 +164,17 @@ class _MindPageState extends State<MindPage> {
                   ],
                   selected: {m.lifePace},
                   onSelectionChanged: (v) => m.setLifePace(v.first),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: city,
+                  decoration: InputDecoration(
+                    labelText: 'Ta ville (pour la vraie météo et ses accessoires 🧣 ☂️ 😎)',
+                    helperText: cityInfo.isEmpty ? 'Ou dis-lui : « j\'habite à Lyon ».' : cityInfo,
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(icon: const Icon(Icons.check_rounded), onPressed: _saveCity),
+                  ),
+                  onSubmitted: (_) => _saveCity(),
                 ),
                 const SizedBox(height: 4),
                 Text(

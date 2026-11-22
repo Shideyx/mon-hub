@@ -10,6 +10,7 @@ import 'core/work_backup.dart';
 import 'core/screen_time.dart';
 import 'ui/clicky/live_captions.dart';
 import 'ui/clicky/senses.dart';
+import 'ui/clicky/pc_watch.dart';
 import 'ui/clicky/jarvis.dart' show FocusMode;
 import 'ui/phone_link_page.dart';
 import 'ui/clicky/win.dart';
@@ -154,6 +155,7 @@ class _HubAppState extends State<HubApp> {
   void _close() {
     NotificationCenter.onAny = null;
     unawaited(ClickySenses.instance.stop());
+    PcWatch.instance.stop();
     WorkBackup.instance.stop();
     ScreenTime.instance.stop();
     unawaited(BrowserLink.instance.stop());
@@ -254,6 +256,14 @@ class _HubAppState extends State<HubApp> {
             ..busy = (() => FocusMode.instance.active || GameMode.instance.active || clicky.idea != null)
             ..inCall = (() => const {PhoneState.ringing, PhoneState.calling, PhoneState.inCall}.contains(DiscordPhone.instance.state));
           unawaited(_announceSenses(n));
+          // Le presse-papier malin et les réactions du PC (téléchargements,
+          // captures, clés USB…).
+          PcWatch.instance
+            ..think = ((t) => unawaited(clicky.think(t, aloud: false)))
+            ..warn = ((title, body) {
+              unawaited(n.post(HubNotification(id: 'arnaque:pc:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
+            })
+            ..start();
           st
             ..onTick = () async {
               try {
@@ -261,6 +271,7 @@ class _HubAppState extends State<HubApp> {
                 await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
                 final full = Win.foregroundFullscreen();
                 final end = GameMode.instance.tick(exe: exe, fullscreen: full);
+                await PcWatch.instance.tick(title: title, idle: Win.idleSeconds(), diskFreeGb: PcWatch.instance.diskFree());
                 // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
                 await ClickySenses.instance.tick(
                   exe: exe,

@@ -429,6 +429,19 @@ class ClickyLife extends ChangeNotifier {
     return null;
   }
 
+  /// « J'habite à Lyon », « ma ville c'est Nantes » : la ville (sans
+  /// accents, en minuscules), ou null.
+  static String? cityFrom(String said) {
+    var n = normalize(said).replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?clicky ?'), '').trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|stp|svp|merci)$'), '').trim();
+    final m = RegExp(r'^(?:j habite|je vis|je reside|moi j habite) (?:a|au|aux|en|sur) (.{2,40})$|^ma ville (?:c est |est |s appelle )?(.{2,40})$')
+        .firstMatch(n);
+    final c = (m?[1] ?? m?[2])?.trim();
+    if (c == null || c.split(' ').length > 4) return null;
+    if (RegExp(r'^(?:la maison|cote|chez|l etranger|la campagne|paris ou|quoi|ou)\b').hasMatch(c)) return null;
+    return c;
+  }
+
   DateTime? _wokeHint;
 
   /// Il vient d'être réveillé (pour « tu dormais ? »).

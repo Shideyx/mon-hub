@@ -596,9 +596,14 @@ class ClickySenses extends ChangeNotifier {
   DateTime? _last;
   String _procDay = '';
 
-  /// Une idée (avec ton accord) : 6 par jour au plus, 15 min d'écart, jamais
+  /// Une idée venue d'ailleurs (presse-papier, téléchargement, clé USB…),
+  /// dans le même budget.
+  Future<bool> offer(ClickyIdea i, String key, {DateTime? now, Duration gap = const Duration(minutes: 15)}) =>
+      _propose(i, key, now ?? DateTime.now(), gap: gap);
+
+  /// Une idée (avec ton accord) : 8 par jour au plus, 15 min d'écart, jamais
   /// deux fois la même.
-  Future<bool> _propose(ClickyIdea i, String key, DateTime n) async {
+  Future<bool> _propose(ClickyIdea i, String key, DateTime n, {Duration gap = const Duration(minutes: 15)}) async {
     final p = propose;
     if (p == null || (busy?.call() ?? false)) return false;
     final day = n.toIso8601String().substring(0, 10);
@@ -607,8 +612,8 @@ class ClickySenses extends ChangeNotifier {
       _count = 0;
       _seen.clear();
     }
-    if (_seen.contains(key) || _count >= 6) return false;
-    if (_last != null && n.difference(_last!) < const Duration(minutes: 15)) return false;
+    if (_seen.contains(key) || _count >= 8) return false;
+    if (_last != null && n.difference(_last!) < gap) return false;
     _seen.add(key);
     _count++;
     _last = n;
