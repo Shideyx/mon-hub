@@ -18,6 +18,7 @@ import 'notifications_page.dart';
 import 'phone_link_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
+import 'clicky/skills.dart';
 import 'clicky/win.dart';
 import 'motion.dart';
 import 'widgets.dart';
@@ -219,6 +220,12 @@ class _Header extends StatelessWidget {
                     icon: const Icon(Icons.devices_rounded),
                     onPressed: () => PhoneLinkPage.open(context),
                   ),
+                IconButton(
+                  tooltip: 'Ce que Clicky sait faire',
+                  color: Colors.white,
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  onPressed: () => ClickySkillsPage.open(context),
+                ),
                 IconButton(
                   tooltip: 'Chercher partout (Ctrl + Espace)',
                   color: Colors.white,

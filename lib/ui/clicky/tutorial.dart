@@ -1,25 +1,33 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/module_store.dart';
-import '../../modules/music/cd_case.dart';
-import '../../modules/music/music_models.dart';
 import 'board.dart';
-import 'holo.dart';
+import 'clicky.dart';
 import 'hud.dart';
+import 'life.dart';
+import 'life_view.dart';
 import 'marks.dart';
+import 'senses_page.dart';
+import 'skills.dart';
 
-/// Visite guidée de Clicky, montrée à la création du compte (et après une
-/// grosse mise à jour) : chaque page présente une capacité en animation.
+/// **La visite guidée** de Clicky : montrée à la création du compte et une
+/// fois après une grosse mise à jour (nouvelle clé [_seenKey]). Chaque page
+/// présente un thème en animation, avec des phrases qu'on peut **essayer
+/// tout de suite** (Clicky répond par-dessus la visite).
 class ClickyTutorial extends StatefulWidget {
-  const ClickyTutorial({super.key, this.onBrain});
+  const ClickyTutorial({super.key, this.onBrain, this.onTry});
 
   /// « Choisir son cerveau » (réglages de Claude et Clicky).
   final VoidCallback? onBrain;
 
-  static const _seenKey = 'tutorial.v124';
+  /// Essayer une phrase (par défaut : Clicky la reçoit).
+  final void Function(String phrase)? onTry;
+
+  static const _seenKey = 'tutorial.v159';
 
   /// Déjà vue sur ce compte ?
   static bool get seen => ModuleStore.prefs.getBool(_seenKey) == true;
@@ -39,13 +47,104 @@ class ClickyTutorial extends StatefulWidget {
 
   @override
   State<ClickyTutorial> createState() => _ClickyTutorialState();
+
+  /// Le texte de chaque page (testable).
+  static const tour = <TourPage>[
+    TourPage(
+      'Salut, moi c\'est Clicky',
+      'Ton assistant personnel, façon JARVIS. Je vis à côté de ta souris, sur tout ton PC. Je vois, j\'entends, je parle, '
+          'je montre, j\'explique… et je fais des trucs à ta place. Voilà tout ce que je sais faire.',
+    ),
+    TourPage(
+      'Parle-moi',
+      'Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris. Ou active le mot d\'activation et dis '
+          'simplement « Clicky ». Après ma réponse, enchaîne : je t\'écoute encore un peu.',
+      examples: ['Fais le point', 'Qu\'est-ce que j\'ai demain ?'],
+    ),
+    TourPage(
+      'Je vois ton écran et je te montre',
+      'Pose ta question : je regarde l\'écran, mon curseur vole jusqu\'au bon bouton et je dessine dessus (flèches, cercles). '
+          'Je t\'explique avec des tableaux, des schémas et des quiz.',
+      examples: ['Explique-moi ce qu\'il y a à mon écran', 'Où est le bouton pour mettre en gras ?'],
+    ),
+    TourPage(
+      'Je le fais à ta place',
+      '« Fais mes devoirs de maths » : je lis le cahier de texte et les fichiers du prof, je fais tout et je le range dans un '
+          'Google Doc. « Prends la main » : je clique pour toi. Avec l\'extension Chrome, j\'utilise tes sites en arrière-plan. '
+          'Je demande toujours avant d\'envoyer, publier ou supprimer.',
+      examples: ['Qu\'est-ce que j\'ai comme devoirs ?'],
+    ),
+    TourPage(
+      'Ton école',
+      'Tes notes et ta moyenne, la note qu\'il te faut, le contrôle préparé tout seul (fiche, cartes, quiz), un contrôle blanc '
+          'noté, ta copie corrigée sur la photo, un coach pour ton oral, et j\'écoute le cours pour toi.',
+      examples: ['Il me faut combien en maths pour avoir 14 ?', 'Bilan de mes notes'],
+    ),
+    TourPage(
+      'Mes yeux et mes oreilles',
+      'Si tu veux, je vois ton écran et j\'entends le son du PC en continu — tout reste sur ton PC, jamais tes messages ni ta '
+          'banque, jamais pendant un appel. Je me souviens de ce que tu as vu, et je remarque une erreur, une date limite, '
+          'une vidéo en anglais…',
+      examples: ['Tu te souviens du site sur les volcans que j\'ai vu hier ?'],
+      badge: 'Nouveau',
+    ),
+    TourPage(
+      'Je prends les devants',
+      'Je te propose des choses utiles au bon moment, avec Oui / Non : réviser avant ta partie habituelle, ranger le cours que '
+          'tu viens de télécharger, traduire ce que tu copies, te préparer une réponse sur Discord, te recadrer si tu '
+          'procrastines. Jamais plus de quelques fois par jour.',
+      examples: ['Mes habitudes', 'Briefing'],
+      badge: 'Nouveau',
+    ),
+    TourPage(
+      'Préviens-moi quand…',
+      'Je surveille pour toi et je te préviens dès que ça arrive : ta note qui tombe, un message de quelqu\'un, un nouveau '
+          'devoir, une page qui change, le prix d\'un jeu Steam qui baisse, internet qui revient.',
+      examples: ['Préviens-moi quand j\'ai ma note de maths', 'Qu\'est-ce que tu surveilles ?'],
+      badge: 'Nouveau',
+    ),
+    TourPage(
+      'Toute ta vie, pas que l\'école',
+      'Ta musique, tes abonnements et tes colis, ton téléphone relié au PC, une soirée où tes potes ajoutent leurs sons, les '
+          'anniversaires, ton temps d\'écran, la sécurité de tes comptes, et une recherche qui trouve tout.',
+      examples: ['Mes abonnements', 'Comment va mon PC ?'],
+    ),
+    TourPage(
+      'Et je suis vivant',
+      'Je garde mon look de curseur, mais je vis à côté de toi : je m\'endors quand tu pars 💤, je rêve, je porte une écharpe '
+          'quand il fait froid 🧣, je danse sur ta musique 🎵, j\'ai la tête qui tourne si tu secoues la souris 😵‍💫. '
+          'Trop présent ? Dis-moi « sois plus discret ».',
+      examples: ['T\'as rêvé de quoi ?', 'Tu dors ?'],
+      badge: 'Nouveau',
+    ),
+    TourPage(
+      'Prêt ?',
+      'Choisis mon cerveau (ton abonnement Claude Pro), puis maintiens Ctrl + Alt. Tout ce que je sais faire est dans ✨ sur '
+          'l\'accueil. Mon Hub se met à jour tout seul : tu auras toujours mes nouveautés.',
+    ),
+  ];
+
+}
+
+/// Une page de la visite.
+class TourPage {
+  const TourPage(this.title, this.text, {this.examples = const [], this.badge = ''});
+  final String title;
+  final String text;
+
+  /// Des phrases à essayer.
+  final List<String> examples;
+
+  /// « Nouveau » sur les nouveautés.
+  final String badge;
 }
 
 class _ClickyTutorialState extends State<ClickyTutorial> {
   final pages = PageController();
   int page = 0;
 
-  static const _count = 8;
+  static int get _count => ClickyTutorial.tour.length;
+  static List<TourPage> get tour => ClickyTutorial.tour;
 
   void _go(int i) {
     if (i >= _count) {
@@ -59,80 +158,68 @@ class _ClickyTutorialState extends State<ClickyTutorial> {
     );
   }
 
+  void _try(String phrase) {
+    final f = widget.onTry;
+    if (f != null) {
+      f(phrase);
+    } else {
+      ClickyController.instance.askAnywhere(phrase);
+    }
+  }
+
   @override
   void dispose() {
     pages.dispose();
     super.dispose();
   }
 
+  Widget _visual(int i) => switch (i) {
+    0 => const _BootVisual(),
+    1 => const _KeysVisual(),
+    2 => const _PointVisual(),
+    3 => const _TaskVisual(),
+    4 => _BoardVisual(),
+    5 => const _SensesVisual(),
+    6 => const _IdeaVisual(),
+    7 => const _WatchVisual(),
+    8 => const _LifeGridVisual(),
+    9 => const _AliveVisual(),
+    _ => const _BootVisual(small: true),
+  };
+
+  List<(String, IconData, VoidCallback)> _actions(int i) => switch (i) {
+    5 => [
+      (
+        'Allumer mes yeux et mes oreilles',
+        Icons.visibility_rounded,
+        () => SensesPage.open(context),
+      ),
+    ],
+    10 => [
+      if (widget.onBrain != null)
+        (
+          'Choisir mon cerveau',
+          Icons.key_rounded,
+          () {
+            Navigator.of(context).maybePop();
+            widget.onBrain!();
+          },
+        ),
+      (
+        'Voir tout ce que je sais faire',
+        Icons.auto_awesome_rounded,
+        () {
+          final nav = Navigator.of(context);
+          nav.pop();
+          unawaited(nav.push(MaterialPageRoute<void>(builder: (_) => const ClickySkillsPage())));
+        },
+      ),
+    ],
+    _ => const [],
+  };
+
   @override
   Widget build(BuildContext context) {
-    final children = <Widget>[
-      const _Page(
-        title: 'Salut, moi c\'est Clicky',
-        text:
-            'Ton assistant personnel, façon JARVIS. Je vis à côté de ta souris, je vois ton écran, '
-            'je parle, je montre, j\'explique, et je m\'occupe de tes trucs.',
-        visual: _BootVisual(),
-      ),
-      const _Page(
-        title: 'Parle-moi',
-        text:
-            'Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris. '
-            'Ou active le mot d\'activation et dis simplement « Clicky ».',
-        visual: _KeysVisual(),
-      ),
-      const _Page(
-        title: 'Je vois et je montre',
-        text:
-            'Je vois ton écran : mon curseur vole jusqu\'au bon bouton, et je dessine dessus '
-            '(flèches, cercles) pour que tu comprennes. « Fais-le pour moi » : je clique à ta place, '
-            'après ton accord.',
-        visual: _PointVisual(),
-      ),
-      _Page(
-        title: 'Je t\'explique comme un prof',
-        text:
-            'Tableaux visuels, schémas, étapes, quiz. Je note ce qu\'on apprend et je te fais réviser '
-            'au bon moment.',
-        visual: _BoardVisual(),
-      ),
-      const _Page(
-        title: 'Hologrammes 3D',
-        text: 'Molécules, planètes, solides… je les projette en 3D. Glisse pour les faire tourner.',
-        visual: SizedBox(width: 420, child: HoloView(scene: HoloScene.demo)),
-      ),
-      const _Page(
-        title: 'Ton carnet',
-        text:
-            '« Retiens que… », « note ça », « j\'ai dépensé 12 € », « 80 kg au squat », « protocole travail », '
-            '« qu\'est-ce que je mets aujourd\'hui ? ». Je range tout dans ton Carnet.',
-        visual: _CarnetVisual(),
-      ),
-      const _Page(
-        title: 'Ta musique',
-        text:
-            'Ce que tu écoutes sur Spotify ou Deezer, la pochette qui tourne, la tracklist au dos. '
-            '« Mets ma playlist chill », « monte le son ».',
-        visual: SizedBox(width: 340, child: _MusicVisual()),
-      ),
-      _Page(
-        title: 'Prêt ?',
-        text:
-            'Choisis mon cerveau (ton abonnement Claude Pro), puis maintiens Ctrl + Alt. '
-            'Mon Hub se met à jour tout seul : tu auras toujours mes nouveautés.',
-        visual: const _BootVisual(small: true),
-        action: widget.onBrain == null
-            ? null
-            : (
-                'Choisir mon cerveau',
-                () {
-                  Navigator.of(context).maybePop();
-                  widget.onBrain!();
-                },
-              ),
-      ),
-    ];
     return Scaffold(
       backgroundColor: const Color(0xFF060D16),
       body: CallbackShortcuts(
@@ -154,36 +241,57 @@ class _ClickyTutorialState extends State<ClickyTutorial> {
             child: SafeArea(
               child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      child: const Text('Passer', style: TextStyle(color: Colors.white54)),
-                    ),
+                  Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20),
+                        child: Text(
+                          '${page + 1} / $_count',
+                          style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        child: const Text('Passer', style: TextStyle(color: Colors.white54)),
+                      ),
+                    ],
                   ),
                   Expanded(
                     child: PageView(
                       controller: pages,
                       onPageChanged: (i) => setState(() => page = i),
-                      children: children,
+                      children: [
+                        for (var i = 0; i < _count; i++)
+                          _Page(page: tour[i], visual: _visual(i), actions: _actions(i), onTry: _try),
+                      ],
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                     child: Row(
                       children: [
-                        for (var i = 0; i < _count; i++)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            margin: const EdgeInsets.only(right: 6),
-                            width: i == page ? 26 : 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: i == page ? hudCyan : Colors.white24,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (var i = 0; i < _count; i++)
+                                GestureDetector(
+                                  onTap: () => _go(i),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    width: i == page ? 26 : 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: i == page ? hudCyan : Colors.white24,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        const Spacer(),
+                        ),
                         if (page > 0)
                           TextButton(
                             onPressed: () => _go(page - 1),
@@ -212,51 +320,80 @@ class _ClickyTutorialState extends State<ClickyTutorial> {
 }
 
 class _Page extends StatelessWidget {
-  const _Page({required this.title, required this.text, required this.visual, this.action});
-  final String title;
-  final String text;
+  const _Page({required this.page, required this.visual, this.actions = const [], required this.onTry});
+  final TourPage page;
   final Widget visual;
-  final (String, VoidCallback)? action;
+  final List<(String, IconData, VoidCallback)> actions;
+  final void Function(String) onTry;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final wide = box.maxWidth > 820;
+      final align = wide ? CrossAxisAlignment.start : CrossAxisAlignment.center;
       final words = Column(
-        crossAxisAlignment: wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: align,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            textAlign: wide ? TextAlign.start : TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-              height: 1.1,
+          if (page.badge.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(color: const Color(0xFFE5487B), borderRadius: BorderRadius.circular(10)),
+              child: Text(page.badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
             ),
+          Text(
+            page.title,
+            textAlign: wide ? TextAlign.start : TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, height: 1.1),
           ),
           const SizedBox(height: 14),
           Text(
-            text,
+            page.text,
             textAlign: wide ? TextAlign.start : TextAlign.center,
-            style: const TextStyle(color: Color(0xFFB7D9E6), fontSize: 16, height: 1.5),
+            style: const TextStyle(color: Color(0xFFB7D9E6), fontSize: 16, height: 1.5, fontFamilyFallback: emojiFonts),
           ),
-          if (action != null) ...[
+          if (page.examples.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('Essaie, maintenant :', style: TextStyle(color: Colors.white54, fontSize: 13)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+              children: [
+                for (final e in page.examples)
+                  ActionChip(
+                    avatar: const Icon(Icons.play_arrow_rounded, size: 18, color: hudCyan),
+                    backgroundColor: const Color(0xFF12263A),
+                    side: BorderSide(color: hudCyan.withValues(alpha: 0.5)),
+                    label: Text('« $e »', style: const TextStyle(color: Colors.white)),
+                    onPressed: () => onTry(e),
+                  ),
+              ],
+            ),
+          ],
+          if (actions.isNotEmpty) ...[
             const SizedBox(height: 18),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: hudCyan,
-                foregroundColor: Colors.black,
-              ),
-              icon: const Icon(Icons.key_rounded),
-              label: Text(action!.$1),
-              onPressed: action!.$2,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+              children: [
+                for (final (label, icon, onTap) in actions)
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: hudCyan, foregroundColor: Colors.black),
+                    icon: Icon(icon),
+                    label: Text(label),
+                    onPressed: onTap,
+                  ),
+              ],
             ),
           ],
         ],
       );
-      final art = Center(child: _Appear(child: visual));
+      // Sur un petit écran, l'animation se réduit au lieu de déborder.
+      final art = Center(child: FittedBox(fit: BoxFit.scaleDown, child: _Appear(child: visual)));
       if (wide) {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 56),
@@ -264,7 +401,7 @@ class _Page extends StatelessWidget {
             children: [
               Expanded(child: art),
               const SizedBox(width: 40),
-              Expanded(child: words),
+              Expanded(child: SingleChildScrollView(child: words)),
             ],
           ),
         );
@@ -540,76 +677,450 @@ class _BoardVisual extends StatelessWidget {
   );
 }
 
-class _CarnetVisual extends StatelessWidget {
-  const _CarnetVisual();
 
-  static const items = [
-    (Icons.psychology_alt_rounded, 'Mémoire'),
-    (Icons.lightbulb_rounded, 'Idées'),
-    (Icons.checklist_rounded, 'Tâches'),
-    (Icons.savings_rounded, 'Budget'),
-    (Icons.fitness_center_rounded, 'Sport'),
-    (Icons.sports_esports_rounded, 'Jeux'),
-    (Icons.wb_sunny_rounded, 'Météo'),
-    (Icons.play_circle_rounded, 'Protocoles'),
-    (Icons.edit_note_rounded, 'Poèmes'),
-  ];
+/// Une carte sombre façon fenêtre (pour les nouvelles animations).
+class _Panel extends StatelessWidget {
+  const _Panel({super.key, required this.child, this.width = 420, this.title = ''});
+  final Widget child;
+  final double width;
+  final String title;
 
   @override
-  Widget build(BuildContext context) => _Ticker(
-    builder: (t) => SizedBox(
-      width: 380,
-      child: Wrap(
-        spacing: 14,
-        runSpacing: 14,
-        alignment: WrapAlignment.center,
-        children: [
-          for (final (i, (icon, label)) in items.indexed)
-            Transform.translate(
-              offset: Offset(0, math.sin(t * 1.6 + i) * 4),
-              child: Opacity(
-                opacity: ((t * 2 - i * 0.25)).clamp(0.0, 1.0),
-                child: Container(
-                  width: 110,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0E2236),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: hudCyan.withValues(alpha: 0.5)),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(icon, color: hudCyan, size: 30),
-                      const SizedBox(height: 6),
-                      Text(label, style: const TextStyle(color: Colors.white)),
-                    ],
-                  ),
-                ),
-              ),
+  Widget build(BuildContext context) => Container(
+    width: width,
+    decoration: BoxDecoration(
+      color: const Color(0xFF0B1A2A),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: hudCyan.withValues(alpha: 0.35)),
+      boxShadow: [BoxShadow(color: hudCyan.withValues(alpha: 0.15), blurRadius: 24)],
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF12263A),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-        ],
-      ),
+            child: Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+        Padding(padding: const EdgeInsets.all(14), child: child),
+      ],
     ),
   );
 }
 
-class _MusicVisual extends StatelessWidget {
-  const _MusicVisual();
+/// Une ligne de texte grise (faux contenu).
+class _Line extends StatelessWidget {
+  const _Line(this.width, {this.color = const Color(0xFF1E3A52)});
+  final double width;
+  final Color color;
 
   @override
-  Widget build(BuildContext context) => const SpinningCdCase(
-    period: Duration(seconds: 8),
-    front: CdCaseFront(color: musicRed),
-    back: CdCaseBack(
-      title: 'mon album',
-      artist: 'artiste',
-      current: 2,
-      tracks: [
-        MusicTrack(title: 'Intro'),
-        MusicTrack(title: 'Le morceau que tu écoutes'),
-        MusicTrack(title: 'Interlude'),
-        MusicTrack(title: 'Outro'),
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: 9,
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+  );
+}
+
+/// « Fais-le à ma place » : la pastille de tâche et le document qui se remplit.
+class _TaskVisual extends StatelessWidget {
+  const _TaskVisual();
+
+  @override
+  Widget build(BuildContext context) => _Ticker(
+    builder: (t) {
+      final steps = ['Je lis le cahier de texte…', 'J\'ouvre le PDF du prof…', 'Je fais les exercices…', 'Je range tout dans un Google Doc…', 'Fini ! ✅'];
+      final k = ((t % 10) / 2).floor().clamp(0, steps.length - 1);
+      final lines = ((t % 10) * 1.4).floor().clamp(0, 12);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            constraints: const BoxConstraints(maxWidth: 380),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(color: const Color(0xFF2B6CFF), borderRadius: BorderRadius.circular(20)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (k < steps.length - 1)
+                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    steps[k],
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontFamilyFallback: emojiFonts),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Panel(
+            width: 360,
+            title: '📄 Devoirs de maths — Google Docs',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Exercice 3 p. 112', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                for (var i = 0; i < lines; i++) _Line(120.0 + (i * 37) % 180, color: i % 4 == 3 ? hudCyan.withValues(alpha: 0.5) : const Color(0xFF1E3A52)),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// Ses yeux : une fenêtre lue ligne par ligne, puis « tu te souviens ? ».
+class _SensesVisual extends StatelessWidget {
+  const _SensesVisual();
+
+  @override
+  Widget build(BuildContext context) => _Ticker(
+    builder: (t) {
+      final scan = (t % 4) / 4;
+      final remember = (t % 8) > 4;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 400,
+            height: 210,
+            child: Stack(
+              children: [
+                const _Panel(
+                  width: 400,
+                  title: 'Volcan — Wikipédia',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Volcan', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                      _Line(320),
+                      _Line(280),
+                      _Line(340),
+                      _Line(250),
+                      _Line(300),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  top: 40 + scan * 150,
+                  child: Container(height: 2, color: hudCyan, child: const SizedBox.shrink()),
+                ),
+                const Positioned(right: 14, top: 8, child: Text('👀', style: TextStyle(fontSize: 22, fontFamilyFallback: emojiFonts))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          AnimatedOpacity(
+            opacity: remember ? 1 : 0,
+            duration: const Duration(milliseconds: 400),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(color: hudGlass, borderRadius: BorderRadius.circular(8), border: Border.all(color: hudCyan)),
+              child: const Text(
+                '« Oui ! Hier vers 16 h 10, dans Chrome : Volcan — Wikipédia. »',
+                style: TextStyle(color: hudCyan, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// Il prend les devants : une idée avec Oui / Non, et le presse-papier malin.
+class _IdeaVisual extends StatelessWidget {
+  const _IdeaVisual();
+
+  @override
+  Widget build(BuildContext context) => _Ticker(
+    builder: (t) {
+      final ideas = [
+        ('💡', 'Ça fait 45 min de YouTube et t\'as SVT demain. On fait 25 minutes ?'),
+        ('📥', 'Tu viens de télécharger « DM_maths.pdf ». Je le range dans Cours/Maths ?'),
+        ('📋', 'C\'est en anglais : je te le traduis ?'),
+        ('💬', 'Lucas t\'a écrit « tu viens ce soir ? ». Je te prépare une réponse ?'),
+      ];
+      final (emoji, text) = ideas[((t / 3.5).floor()) % ideas.length];
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 450),
+        child: _Panel(
+          key: ValueKey(text),
+          width: 380,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 26, fontFamilyFallback: emojiFonts)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4))),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  for (final (label, fill) in const [('Plus tard', false), ('Non', false), ('Oui', true)])
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: fill ? hudCyan : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: hudCyan),
+                        ),
+                        child: Text(label, style: TextStyle(color: fill ? Colors.black : hudCyan, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// « Préviens-moi quand… » : les alertes qui arrivent.
+class _WatchVisual extends StatelessWidget {
+  const _WatchVisual();
+
+  static const alerts = [
+    ('🔔', 'Ta note de maths est tombée', '15/20 · Contrôle de géométrie'),
+    ('💬', 'Lucas t\'a écrit', '« tu viens ce soir ? »'),
+    ('💸', 'Hades est en promo', 'de 24,99 € à 12,49 €'),
+    ('📶', 'Internet est revenu !', 'Tu peux reprendre ta partie'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => _Ticker(
+    builder: (t) {
+      final shown = ((t % 10) / 2).floor().clamp(0, alerts.length);
+      return SizedBox(
+        width: 380,
+        height: 300,
+        child: Column(
+          children: [
+            for (var i = 0; i < shown; i++)
+              TweenAnimationBuilder<double>(
+                key: ValueKey('$i-${(t / 10).floor()}'),
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOutBack,
+                builder: (context, v, child) => Opacity(
+                  opacity: v.clamp(0.0, 1.0),
+                  child: Transform.translate(offset: Offset(40 * (1 - v), 0), child: child),
+                ),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF12263A),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(alerts[i].$1, style: const TextStyle(fontSize: 24, fontFamilyFallback: emojiFonts)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(alerts[i].$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                            Text(alerts[i].$3, style: const TextStyle(color: Colors.white60)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+/// Toute ta vie : les tuiles qui apparaissent en cascade.
+class _LifeGridVisual extends StatelessWidget {
+  const _LifeGridVisual();
+
+  static const tiles = [
+    ('🎵', 'Musique'),
+    ('💰', 'Abonnements'),
+    ('📦', 'Colis'),
+    ('📱', 'Téléphone'),
+    ('🎉', 'Soirée'),
+    ('🎂', 'Anniversaires'),
+    ('🌙', 'Sommeil'),
+    ('🛡️', 'Sécurité'),
+    ('🔎', 'Recherche'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 360,
+    child: Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.center,
+      children: [
+        for (var i = 0; i < tiles.length; i++)
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 350 + 110 * i),
+            curve: Curves.easeOutBack,
+            builder: (context, v, child) => Transform.scale(scale: v, child: child),
+            child: Container(
+              width: 104,
+              height: 92,
+              decoration: BoxDecoration(
+                color: const Color(0xFF12263A),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: hudCyan.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(tiles[i].$1, style: const TextStyle(fontSize: 30, fontFamilyFallback: emojiFonts)),
+                  const SizedBox(height: 6),
+                  Text(tiles[i].$2, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
       ],
     ),
   );
+}
+
+/// Clicky vivant : le vrai curseur avec ses émojis qui changent.
+class _AliveVisual extends StatefulWidget {
+  const _AliveVisual();
+
+  @override
+  State<_AliveVisual> createState() => _AliveVisualState();
+}
+
+class _AliveVisualState extends State<_AliveVisual> {
+  final life = ClickyLife();
+  Timer? _t;
+  int _k = 0;
+
+  static const moods = ['💤', '🥱', '🎵', '😵‍💫', '🥰', '🤩'];
+  static const says = [
+    'Il fait la sieste quand tu pars…',
+    'Il bâille le soir.',
+    'Il danse sur ta musique.',
+    'Tu as secoué la souris !',
+    'Une caresse : il adore.',
+    'Bonne note : il saute de joie.',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    life.refreshAccessory(DateTime(2026, 1, 15), weather: const {'temperature': 1.0, 'maintenant': '1 °C'});
+    _apply();
+    _t = Timer.periodic(const Duration(milliseconds: 1800), (_) {
+      if (mounted) setState(_apply);
+    });
+  }
+
+  void _apply() {
+    final m = moods[_k % moods.length];
+    life
+      ..wake()
+      ..setDancing(m == '🎵');
+    if (m == '💤') {
+      life.fallAsleep();
+    } else if (m == '🎵') {
+      for (var i = 0; i < 4; i++) {
+        Timer(Duration(milliseconds: 420 * i), () {
+          if (mounted) life.onBeat(steady: true);
+        });
+      }
+    } else {
+      if (m == '😵‍💫') life.wobble.value++;
+      life.show(m, seconds: 1.6);
+    }
+    _k++;
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox(
+        width: 260,
+        height: 220,
+        child: Center(
+          child: Transform.scale(
+            scale: 3.2,
+            child: SizedBox(
+              width: 60,
+              height: 50,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ClickyLifeBody(
+                  life: life,
+                  child: CustomPaint(size: const Size(22, 22), painter: _CursorPainter()),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Text(says[(_k - 1) % says.length], style: const TextStyle(color: hudCyan, fontSize: 16, fontStyle: FontStyle.italic)),
+    ],
+  );
+}
+
+/// Le curseur bleu de Clicky.
+class _CursorPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(s.width, s.height * 0.42)
+      ..lineTo(s.width * 0.45, s.height * 0.55)
+      ..lineTo(s.width * 0.32, s.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFF3B82F6));
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

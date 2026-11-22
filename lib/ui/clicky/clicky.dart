@@ -1525,6 +1525,11 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
+  /// Pose une question à Clicky depuis une page de Mon Hub (« Essayer » du
+  /// catalogue, de la visite guidée) : c'est Clicky partout qui répond s'il
+  /// est là.
+  void askAnywhere(String question) => _explainScreen(question);
+
   /// Il ouvre sa boîte et répond à une question sur l'écran (Clicky partout
   /// s'il est là).
   void _explainScreen(String question) {
