@@ -3,7 +3,7 @@ import 'package:hub/core/hub_feed.dart';
 import 'package:hub/core/module_store.dart';
 import 'package:hub/ui/clicky/clicky_settings_page.dart';
 import 'package:hub/ui/clicky/jarvis.dart';
-import 'package:hub/ui/clicky/jarvis_view.dart';
+import 'package:hub/ui/clicky/skills.dart';
 import 'package:hub/ui/clicky/quick.dart';
 import 'package:hub/ui/clicky/thrift.dart';
 import 'package:material_ui/material_ui.dart';
@@ -227,6 +227,10 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(const MaterialApp(home: ClickySkillsPage()));
+      expect(find.text('Lui parler'), findsOneWidget);
+      // Le thème « Concentration » se trouve en cherchant.
+      await tester.enterText(find.byType(TextField), 'concentration');
+      await tester.pump();
       expect(find.text('Concentration'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

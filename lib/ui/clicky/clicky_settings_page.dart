@@ -9,7 +9,8 @@ import 'clicky.dart';
 import 'clicky_desktop.dart';
 import 'browser_setup_page.dart';
 import 'course_page.dart';
-import 'jarvis_view.dart';
+import 'skills.dart';
+import 'tutorial.dart';
 import 'mic_test.dart';
 import 'mind_page.dart';
 import 'settings.dart';
@@ -47,7 +48,8 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
     super.dispose();
   }
 
-  List<_Entry> _entries(ClickyController c) {
+  /// Les rubriques, rangées par thème (titre du thème → rubriques).
+  List<(String, List<_Entry>)> _groups(ClickyController c) {
     ClickySection sec(String id) => ClickySection.byId(id)!;
     _Entry page(String id) {
       final s = sec(id);
@@ -55,68 +57,84 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
     }
 
     return [
-      _Entry(
-        'Ce que Clicky sait faire',
-        'Des exemples de phrases : concentration, état du PC, rappels, cours, écran…',
-        Icons.tips_and_updates_rounded,
-        const Color(0xFF0EA5E9),
-        (ctx) => ClickySkillsPage.open(ctx),
-      ),
-      _Entry(
-        'Cerveau',
-        switch (c.provider) {
-          'claudecode' => 'Ton abonnement Claude (Claude Pro)',
-          'ollama' => 'Ollama, une IA sur ton PC',
-          _ => 'Clé API Claude, modèle',
-        },
-        Icons.psychology_rounded,
-        const Color(0xFFD97757),
-        (ctx) => ClaudeModule.showBrain(ctx),
-      ),
-      page('voice'),
-      page('listen'),
-      page('look'),
-      _Entry(
-        'Personnalité et conscience',
-        'Son humeur, ses souvenirs, sa façon de vivre sur ton écran',
-        Icons.psychology_alt_rounded,
-        const Color(0xFF2B6CFF),
-        (ctx) => MindPage.open(ctx),
-      ),
-      _Entry(
-        'Ses yeux et ses oreilles',
-        'Il voit ton écran et entend le son du PC en continu (sur le PC), et s\'en souvient',
-        Icons.visibility_rounded,
-        const Color(0xFF0EA5E9),
-        (ctx) => SensesPage.open(ctx),
-      ),
-      _Entry(
-        'Clicky prend les devants',
-        'Rappels de devoirs, plan de la journée, objectifs, idées (toujours avec ton accord)',
-        Icons.auto_awesome_rounded,
-        const Color(0xFF7C5CFF),
-        (ctx) => AssistantPage.open(ctx),
-      ),
-      page('topo'),
-      page('teach'),
-      _Entry(
-        'Clicky dans le navigateur',
-        'L\'extension Chrome : il utilise tes sites dans ses onglets, pendant que tu fais autre chose',
-        Icons.extension_rounded,
-        const Color(0xFF10B981),
-        (ctx) => BrowserSetupPage.open(ctx),
-      ),
-      _Entry(
-        'Écouter un cours',
-        'Il écoute tout le cours et te fait le compte rendu',
-        Icons.mic_external_on_rounded,
-        const Color(0xFFE5484D),
-        (ctx) => CoursePage.open(ctx),
-      ),
-      page('privacy'),
-      page('tools'),
+      ('Bien démarrer', [
+        _Entry(
+          'Ce que Clicky sait faire',
+          'Tout ce que tu peux lui demander, par thème, avec des phrases à essayer en un clic',
+          Icons.auto_awesome_rounded,
+          const Color(0xFF7C5CFF),
+          (ctx) => ClickySkillsPage.open(ctx),
+        ),
+        _Entry(
+          'Revoir la visite guidée',
+          'La présentation animée de Clicky, avec ses nouveautés',
+          Icons.slideshow_rounded,
+          const Color(0xFF0EA5E9),
+          (ctx) => ClickyTutorial.show(ctx),
+        ),
+      ]),
+      ('Lui parler', [
+        _Entry(
+          'Cerveau',
+          switch (c.provider) {
+            'claudecode' => 'Ton abonnement Claude (Claude Pro)',
+            'ollama' => 'Ollama, une IA sur ton PC',
+            _ => 'Clé API Claude, modèle',
+          },
+          Icons.psychology_rounded,
+          const Color(0xFFD97757),
+          (ctx) => ClaudeModule.showBrain(ctx),
+        ),
+        page('voice'),
+        page('listen'),
+      ]),
+      ('Ce qu\'il fait pour toi', [
+        _Entry(
+          'Clicky prend les devants',
+          'Rappels de devoirs, plan de la journée, objectifs, idées (toujours avec ton accord)',
+          Icons.lightbulb_rounded,
+          const Color(0xFFF59E0B),
+          (ctx) => AssistantPage.open(ctx),
+        ),
+        _Entry(
+          'Ses yeux et ses oreilles',
+          'Il voit ton écran et entend le son du PC (sur le PC), presse-papier malin, « préviens-moi quand… »',
+          Icons.visibility_rounded,
+          const Color(0xFF0EA5E9),
+          (ctx) => SensesPage.open(ctx),
+        ),
+        page('topo'),
+        page('teach'),
+        _Entry(
+          'Écouter un cours',
+          'Il écoute tout le cours et te fait le compte rendu',
+          Icons.mic_external_on_rounded,
+          const Color(0xFFE5484D),
+          (ctx) => CoursePage.open(ctx),
+        ),
+        _Entry(
+          'Clicky dans le navigateur',
+          'L\'extension Chrome : il utilise tes sites dans ses onglets, pendant que tu fais autre chose',
+          Icons.extension_rounded,
+          const Color(0xFF10B981),
+          (ctx) => BrowserSetupPage.open(ctx),
+        ),
+      ]),
+      ('Sa personnalité', [
+        _Entry(
+          'Personnalité et vie à lui',
+          'Son humeur, ses souvenirs, sa vie (il dort, rêve, danse…), ta ville pour sa météo',
+          Icons.pets_rounded,
+          const Color(0xFF2B6CFF),
+          (ctx) => MindPage.open(ctx),
+        ),
+        page('look'),
+      ]),
+      ('Vie privée et avancé', [page('privacy'), page('tools')]),
     ];
   }
+
+  List<_Entry> _entries(ClickyController c) => [for (final (_, list) in _groups(c)) ...list];
 
   static String _plain(String s) {
     const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
@@ -171,16 +189,21 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
                   const SizedBox(height: 14),
                   if (words.isEmpty) ...[
                     _Essentials(c: c),
-                    const SizedBox(height: 18),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 6),
-                      child: Text(
-                        'RUBRIQUES',
-                        style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary, letterSpacing: 1.1),
-                      ),
-                    ),
+                    const SizedBox(height: 4),
                   ],
-                  for (final e in shown) _EntryTile(entry: e),
+                  if (words.isEmpty)
+                    for (final (title, list) in _groups(c)) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
+                        child: Text(
+                          title.toUpperCase(),
+                          style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary, letterSpacing: 1.1),
+                        ),
+                      ),
+                      for (final e in list) _EntryTile(entry: e),
+                    ]
+                  else
+                    for (final e in shown) _EntryTile(entry: e),
                   if (words.isNotEmpty) ClickyMoreSettings(query: q),
                 ],
               );

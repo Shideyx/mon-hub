@@ -26,6 +26,9 @@ import '../core/updater.dart';
 import '../core/vault.dart';
 import '../core/version.dart';
 import 'clicky/clicky_settings_page.dart';
+import 'clicky/life_view.dart' show emojiFonts;
+import 'clicky/skills.dart';
+import 'clicky/tutorial.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -40,30 +43,118 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late final name = TextEditingController(text: ModuleStore.prefs.getString('hub.name'));
+  final search = TextEditingController();
+  String q = '';
+
+  @override
+  void dispose() {
+    name.dispose();
+    search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
     final n = widget.notifications;
     final theme = Theme.of(context);
-    Widget section(String t) => Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-      child: Text(
-        t.toUpperCase(),
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.primary,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
       body: ListenableBuilder(
         listenable: Listenable.merge([c, n, AppSession.instance]),
-        builder: (context, _) => ListView(
-          padding: const EdgeInsets.only(bottom: 32),
-          children: [
+        builder: (context, _) {
+          final cats = SettingsCategory.find(q).where((k) => k.id != 'demarrage' || AppShortcuts.supported).toList();
+          final showClicky = SettingsCategory.clickyMatches(q);
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  TextField(
+                    controller: search,
+                    onChanged: (v) => setState(() => q = v),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintText: 'Chercher un réglage (thème, téléphone, notifications…)',
+                      filled: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+                      suffixIcon: q.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => setState(() {
+                                search.clear();
+                                q = '';
+                              }),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (showClicky) const _ClickyHero(),
+                  if (cats.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 18, 4, 6),
+                      child: Text(
+                        'MON HUB',
+                        style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary, letterSpacing: 1.1),
+                      ),
+                    ),
+                  for (final k in cats)
+                    Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: k.color.withValues(alpha: 0.14),
+                          child: Text(k.emoji, style: const TextStyle(fontSize: 20, fontFamilyFallback: emojiFonts)),
+                        ),
+                        title: Text(k.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(k.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _SettingsSection.open(
+                          context,
+                          title: '${k.emoji} ${k.title}',
+                          listenable: Listenable.merge([c, n, AppSession.instance]),
+                          build: (ctx, refresh) => _content(k.id, ctx, refresh),
+                        ),
+                      ),
+                    ),
+                  if (!showClicky && cats.isEmpty)
+                    const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Rien trouvé : essaie un autre mot.'))),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      'Mon Hub $appVersion${Updater.supported ? ' · se met à jour tout seul' : ''}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Le contenu d'une rubrique ([refresh] : redessiner sa page).
+  List<Widget> _content(String id, BuildContext context, VoidCallback refresh) {
+    final c = widget.controller;
+    final n = widget.notifications;
+    final theme = Theme.of(context);
+    return switch (id) {
+      'compte' => [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: name,
+                decoration: const InputDecoration(
+                  labelText: 'Ton prénom (pour le message d\'accueil)',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+                onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
+              ),
+            ),
             ListTile(
               leading: const Icon(Icons.info_outline_rounded),
               title: const Text('Version de Mon Hub'),
@@ -91,19 +182,51 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ),
-            section('Profil'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: name,
-                decoration: const InputDecoration(
-                  labelText: 'Ton prénom (pour le message d\'accueil)',
-                  prefixIcon: Icon(Icons.person_rounded),
-                ),
-                onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
-              ),
+            ListTile(
+              leading: const Icon(Icons.account_circle_rounded),
+              title: Text(AppSession.instance.current?.name ?? ''),
+              subtitle: Text('@${AppSession.instance.current?.login ?? ''}'),
             ),
-            section('Apparence'),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const Text('Se déconnecter'),
+              subtitle: const Text('Tes données restent sur l\'appareil'),
+              onTap: () {
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                AppSession.instance.signOut();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
+              title: Text('Supprimer mon compte', style: TextStyle(color: theme.colorScheme.error)),
+              onTap: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('Supprimer ton compte ?'),
+                    content: const Text(
+                      'Tes réglages, livres, évènements et connexions '
+                      'seront effacés de cet appareil.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(d, false),
+                        child: const Text('Annuler'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(d, true),
+                        child: const Text('Supprimer'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok != true || !context.mounted) return;
+                Navigator.of(context).popUntil((r) => r.isFirst);
+                await AppSession.instance.deleteAccount();
+              },
+            ),
+      ],
+      'apparence' => [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SegmentedButton<ThemeMode>(
@@ -151,84 +274,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   selected: {Browser.choice},
                   onSelectionChanged: (v) async {
                     await Browser.setChoice(v.first);
-                    setState(() {});
+                    refresh();
                   },
                 ),
               ),
             ],
-            section('Google'),
-            ListTile(
-              leading: const Icon(Icons.g_mobiledata_rounded, size: 32),
-              title: const Text('Connexion Google'),
-              subtitle: Text(
-                !GoogleAuth.available
-                    ? 'À activer une fois (5 min) : Drive, Google Docs, agenda, Gmail'
-                    : GoogleAuth.driveAccount == null
-                        ? 'Activée : connecte ton compte'
-                        : 'Compte : ${GoogleAuth.driveAccount}',
-              ),
-              onTap: () => GoogleSetupPage.open(context).then((_) => setState(() {})),
-            ),
-            section('Sauvegarde'),
-            ListTile(
-              leading: const Icon(Icons.cloud_done_rounded),
-              title: const Text('Sauvegarde de mes travaux'),
-              subtitle: const Text('Documents et Bureau copiés tout seuls dans ton Google Drive'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => WorkBackupPage.open(context),
-            ),
-            section('Rangement'),
-            ListTile(
-              leading: const Icon(Icons.auto_fix_high_rounded),
-              title: const Text('Ranger mon PC et mon Drive'),
-              subtitle: const Text('Téléchargements, Bureau, Documents, Google Drive : par type et par matière, annulable'),
-              onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TidyPage())),
-            ),
-            section('Compte'),
-            ListTile(
-              leading: const Icon(Icons.account_circle_rounded),
-              title: Text(AppSession.instance.current?.name ?? ''),
-              subtitle: Text('@${AppSession.instance.current?.login ?? ''}'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout_rounded),
-              title: const Text('Se déconnecter'),
-              subtitle: const Text('Tes données restent sur l\'appareil'),
-              onTap: () {
-                Navigator.of(context).popUntil((r) => r.isFirst);
-                AppSession.instance.signOut();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
-              title: Text('Supprimer mon compte', style: TextStyle(color: theme.colorScheme.error)),
-              onTap: () async {
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (d) => AlertDialog(
-                    title: const Text('Supprimer ton compte ?'),
-                    content: const Text(
-                      'Tes réglages, livres, évènements et connexions '
-                      'seront effacés de cet appareil.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(d, false),
-                        child: const Text('Annuler'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(d, true),
-                        child: const Text('Supprimer'),
-                      ),
-                    ],
-                  ),
-                );
-                if (ok != true || !context.mounted) return;
-                Navigator.of(context).popUntil((r) => r.isFirst);
-                await AppSession.instance.deleteAccount();
-              },
-            ),
-            section('Notifications'),
+      ],
+      'notifs' => [
             ListTile(
               leading: const Icon(Icons.timer_outlined),
               title: const Text('Vérifier toutes les'),
@@ -273,7 +325,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
-            section('Modules'),
+      ],
+      'modules' => [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
@@ -322,111 +375,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               },
             ),
-            section('Clicky'),
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0x227C5CFF),
-                child: Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
-              ),
-              title: const Text('Réglages de Clicky'),
-              subtitle: const Text(
-                'Tout au même endroit : voix, micro, cerveau, apparence, prend les devants, écouter un cours…',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => ClickySettingsPage.open(context),
-            ),
-            if (AppShortcuts.supported) ...[
-              section('Raccourcis'),
-              ListTile(
-                leading: const Icon(Icons.shortcut_rounded),
-                title: Text(
-                  Platform.isWindows
-                      ? 'Recréer les raccourcis (Bureau et menu Démarrer)'
-                      : 'Recréer le raccourci du menu des applications',
-                ),
-                subtitle: const Text('Ils sont créés tout seuls au premier lancement'),
-                onTap: () async {
-                  final ok = await AppShortcuts.create();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          ok
-                              ? 'Raccourcis créés ✅'
-                              : 'Impossible de créer les raccourcis sur ce PC',
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
-              if (Platform.isWindows)
-                StatefulBuilder(
-                  builder: (context, setState) => SwitchListTile(
-                    secondary: const Icon(Icons.power_settings_new_rounded),
-                    title: const Text('Lancer Mon Hub au démarrage de Windows'),
-                    subtitle: const Text('Pratique pour avoir Clicky et les alertes tout de suite'),
-                    value: AppShortcuts.startup,
-                    onChanged: (v) async {
-                      await AppShortcuts.setStartup(v);
-                      setState(() {});
-                    },
-                  ),
-                ),
-            ],
-            section('Bien-être'),
-            ListTile(
-              leading: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFF5B5BD6)),
-              title: const Text('Temps d\'écran et sommeil'),
-              subtitle: const Text('Temps par appli, limites douces, heure du coucher, mode jeu'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => ScreenTimePage.open(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.cake_rounded, color: Color(0xFFE5487B)),
-              title: const Text('Anniversaires des proches'),
-              subtitle: const Text('Google Agenda + ceux que tu ajoutes, rappel la veille et le jour même'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => BirthdaysPage.open(context),
-            ),
-            section('Confidentialité et sécurité'),
-            ListTile(
-              leading: const Icon(Icons.verified_user_rounded, color: Colors.green),
-              title: const Text('Bilan de sécurité'),
-              subtitle: const Text('Antivirus, pare-feu, mises à jour, double authentification, bouclier anti-arnaque'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => SecurityPage.open(context),
-            ),
-            const ListTile(
-              leading: Icon(Icons.lock_rounded),
-              title: Text('Tout reste sur cet appareil'),
-              subtitle: Text(
-                'Mon Hub n\'a aucun serveur : personne d\'autre que toi (ni le créateur de l\'appli) '
-                'ne voit tes comptes, messages, notes ou conversations. Mots de passe et jetons sont '
-                'dans le coffre du système (Gestionnaire d\'identification Windows, Trousseau, '
-                'Keystore Android) ; historiques, journal, carnet et routines sont chiffrés '
-                '(AES-256) avec une clé qui ne quitte pas l\'appareil. Si tu actives « Mon compte sur '
-                'tous mes appareils », une copie chiffrée avec ton mot de passe va dans ton propre '
-                'Google Drive (illisible pour Google).',
-              ),
-            ),
-            const ListTile(
-              leading: Icon(Icons.public_rounded),
-              title: Text('Ce qui part sur internet'),
-              subtitle: Text(
-                'Seulement vers le service concerné, directement depuis ton appareil : École Directe, '
-                'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Clicky va à '
-                'Claude (ton compte Anthropic) ; la voix neurale à Microsoft. Les mises à jour viennent '
-                'de GitHub, qui ne reçoit rien de toi.',
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.bug_report_rounded),
-              title: const Text('Journal des erreurs'),
-              subtitle: const Text('Ce qui a planté (gardé sur ce PC uniquement) : utile pour corriger un souci.'),
-              onTap: () => _errors(context),
-            ),
-            section('Mes appareils'),
+      ],
+      'appareils' => [
             // Le compte sur tous tes appareils, sans export (Google Drive).
             const AccountSyncSection(),
             if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
@@ -468,10 +418,130 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
+      ],
+      'google' => [
+            ListTile(
+              leading: const Icon(Icons.g_mobiledata_rounded, size: 32),
+              title: const Text('Connexion Google'),
+              subtitle: Text(
+                !GoogleAuth.available
+                    ? 'À activer une fois (5 min) : Drive, Google Docs, agenda, Gmail'
+                    : GoogleAuth.driveAccount == null
+                        ? 'Activée : connecte ton compte'
+                        : 'Compte : ${GoogleAuth.driveAccount}',
+              ),
+              onTap: () => GoogleSetupPage.open(context).then((_) => refresh()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cloud_done_rounded),
+              title: const Text('Sauvegarde de mes travaux'),
+              subtitle: const Text('Documents et Bureau copiés tout seuls dans ton Google Drive'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => WorkBackupPage.open(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_fix_high_rounded),
+              title: const Text('Ranger mon PC et mon Drive'),
+              subtitle: const Text('Téléchargements, Bureau, Documents, Google Drive : par type et par matière, annulable'),
+              onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TidyPage())),
+            ),
+      ],
+      'bienetre' => [
+            ListTile(
+              leading: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFF5B5BD6)),
+              title: const Text('Temps d\'écran et sommeil'),
+              subtitle: const Text('Temps par appli, limites douces, heure du coucher, mode jeu'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => ScreenTimePage.open(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cake_rounded, color: Color(0xFFE5487B)),
+              title: const Text('Anniversaires des proches'),
+              subtitle: const Text('Google Agenda + ceux que tu ajoutes, rappel la veille et le jour même'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => BirthdaysPage.open(context),
+            ),
+      ],
+      'securite' => [
+            ListTile(
+              leading: const Icon(Icons.verified_user_rounded, color: Colors.green),
+              title: const Text('Bilan de sécurité'),
+              subtitle: const Text('Antivirus, pare-feu, mises à jour, double authentification, bouclier anti-arnaque'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => SecurityPage.open(context),
+            ),
+            const ListTile(
+              leading: Icon(Icons.lock_rounded),
+              title: Text('Tout reste sur cet appareil'),
+              subtitle: Text(
+                'Mon Hub n\'a aucun serveur : personne d\'autre que toi (ni le créateur de l\'appli) '
+                'ne voit tes comptes, messages, notes ou conversations. Mots de passe et jetons sont '
+                'dans le coffre du système (Gestionnaire d\'identification Windows, Trousseau, '
+                'Keystore Android) ; historiques, journal, carnet et routines sont chiffrés '
+                '(AES-256) avec une clé qui ne quitte pas l\'appareil. Si tu actives « Mon compte sur '
+                'tous mes appareils », une copie chiffrée avec ton mot de passe va dans ton propre '
+                'Google Drive (illisible pour Google).',
+              ),
+            ),
+            const ListTile(
+              leading: Icon(Icons.public_rounded),
+              title: Text('Ce qui part sur internet'),
+              subtitle: Text(
+                'Seulement vers le service concerné, directement depuis ton appareil : École Directe, '
+                'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Clicky va à '
+                'Claude (ton compte Anthropic) ou à Gemini (ta clé Google), et sa voix aussi à Gemini. Les mises à jour viennent '
+                'de GitHub, qui ne reçoit rien de toi.',
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bug_report_rounded),
+              title: const Text('Journal des erreurs'),
+              subtitle: const Text('Ce qui a planté (gardé sur ce PC uniquement) : utile pour corriger un souci.'),
+              onTap: () => _errors(context),
+            ),
+      ],
+      'demarrage' => [
+            if (AppShortcuts.supported) ...[
+              ListTile(
+                leading: const Icon(Icons.shortcut_rounded),
+                title: Text(
+                  Platform.isWindows
+                      ? 'Recréer les raccourcis (Bureau et menu Démarrer)'
+                      : 'Recréer le raccourci du menu des applications',
+                ),
+                subtitle: const Text('Ils sont créés tout seuls au premier lancement'),
+                onTap: () async {
+                  final ok = await AppShortcuts.create();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Raccourcis créés ✅'
+                              : 'Impossible de créer les raccourcis sur ce PC',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              if (Platform.isWindows)
+                StatefulBuilder(
+                  builder: (context, setState) => SwitchListTile(
+                    secondary: const Icon(Icons.power_settings_new_rounded),
+                    title: const Text('Lancer Mon Hub au démarrage de Windows'),
+                    subtitle: const Text('Pratique pour avoir Clicky et les alertes tout de suite'),
+                    value: AppShortcuts.startup,
+                    onChanged: (v) async {
+                      await AppShortcuts.setStartup(v);
+                      setState(() {});
+                    },
+                  ),
+                ),
+            ],
+      ],
+      _ => const <Widget>[],
+    };
   }
 
   Future<String> _dump() async {
@@ -662,4 +732,178 @@ class _SettingsPageState extends State<SettingsPage> {
       if (context.mounted) showError(context, e);
     }
   }
+}
+
+/// Une rubrique des réglages de Mon Hub.
+class SettingsCategory {
+  const SettingsCategory(this.id, this.emoji, this.title, this.subtitle, this.color, this.keywords);
+  final String id;
+  final String emoji;
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  /// Mots qui la font trouver dans la recherche.
+  final String keywords;
+
+  static const all = [
+    SettingsCategory('compte', '👤', 'Mon compte', 'Ton prénom, la version et les mises à jour, se déconnecter', Color(0xFF7C5CFF),
+        'prenom nom profil version mise a jour deconnexion supprimer compte'),
+    SettingsCategory('apparence', '🎨', 'Apparence', 'Clair ou sombre, le navigateur pour les liens', Color(0xFFE5487B),
+        'theme sombre clair couleur navigateur chrome lien'),
+    SettingsCategory('notifs', '🔔', 'Notifications', 'Toutes les combien, les regrouper, tester une alerte', Color(0xFFF59E0B),
+        'alerte alertes notification notifications regrouper resume tester'),
+    SettingsCategory('modules', '🧩', 'Mes modules', 'Afficher, cacher et ranger les cartes de l\'accueil', Color(0xFF2B6CFF),
+        'module modules carte cartes ordre afficher cacher accueil'),
+    SettingsCategory('appareils', '📱', 'Mes appareils', 'Ton compte sur tous tes appareils, ton téléphone, ton iPhone',
+        Color(0xFF0EA5E9), 'telephone iphone synchro synchronisation appareils export import fichier usb pc principal'),
+    SettingsCategory('google', '☁️', 'Google, sauvegarde et rangement', 'Connexion Google, sauvegarde de tes travaux, ranger ton PC',
+        Color(0xFF16A34A), 'google drive docs agenda gmail sauvegarde ranger rangement telechargements'),
+    SettingsCategory('bienetre', '🌙', 'Bien-être', 'Temps d\'écran, heure du coucher, mode jeu, anniversaires', Color(0xFF5B5BD6),
+        'temps ecran sommeil coucher anniversaire anniversaires limite jeu habitudes'),
+    SettingsCategory('securite', '🛡️', 'Sécurité et vie privée', 'Bilan de sécurité, ce qui reste sur ton PC, journal des erreurs',
+        Color(0xFF16A34A), 'securite antivirus arnaque confidentialite vie privee erreurs journal donnees'),
+    SettingsCategory('demarrage', '⌨️', 'Démarrage et raccourcis', 'Lancer Mon Hub avec Windows, raccourcis du Bureau',
+        Color(0xFF64748B), 'demarrage windows raccourci raccourcis bureau menu demarrer lancer'),
+  ];
+
+  static String _plain(String s) {
+    const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
+    const to = 'aaaaaaceeeeiiiinooooouuuuyyoa';
+    final b = StringBuffer();
+    for (final ch in s.toLowerCase().split('')) {
+      final i = from.indexOf(ch);
+      b.write(i < 0 ? ch : to[i]);
+    }
+    return b.toString();
+  }
+
+  static List<String> _words(String q) => _plain(q).split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 2).toList();
+
+  /// Les rubriques qui parlent de [q] (toutes si [q] est vide).
+  static List<SettingsCategory> find(String q) {
+    final ws = _words(q);
+    if (ws.isEmpty) return all;
+    return [
+      for (final k in all)
+        if (ws.every((w) => _plain('${k.title} ${k.subtitle} ${k.keywords}').contains(w))) k,
+    ];
+  }
+
+  /// La carte de Clicky correspond-elle à [q] ?
+  static bool clickyMatches(String q) {
+    final ws = _words(q);
+    return ws.isEmpty ||
+        ws.every((w) => 'clicky assistant voix micro cerveau claude gemini ecran yeux oreilles visite tuto tutoriel aide sait faire'
+            .contains(w));
+  }
+}
+
+/// La carte de Clicky, en tête des réglages : ses réglages, tout ce qu'il
+/// sait faire, et la visite guidée.
+class _ClickyHero extends StatelessWidget {
+  const _ClickyHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    ButtonStyle white() => FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF5B3FD9));
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(colors: [Color(0xFF7C5CFF), Color(0xFF2B6CFF)]),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🤖', style: TextStyle(fontSize: 34, fontFamilyFallback: emojiFonts)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Clicky', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Sa voix, son micro, son cerveau, ses yeux et ses oreilles, ce qu\'il fait tout seul…',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                style: white(),
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Réglages de Clicky'),
+                onPressed: () => ClickySettingsPage.open(context),
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white70)),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Ce qu\'il sait faire'),
+                onPressed: () => ClickySkillsPage.open(context),
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white70)),
+                icon: const Icon(Icons.slideshow_rounded),
+                label: const Text('Revoir la visite guidée'),
+                onPressed: () => ClickyTutorial.show(context),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Une rubrique des réglages, sur sa propre page.
+class _SettingsSection extends StatefulWidget {
+  const _SettingsSection({required this.title, required this.listenable, required this.build});
+  final String title;
+  final Listenable listenable;
+  final List<Widget> Function(BuildContext context, VoidCallback refresh) build;
+
+  static Future<void> open(
+    BuildContext context, {
+    required String title,
+    required Listenable listenable,
+    required List<Widget> Function(BuildContext context, VoidCallback refresh) build,
+  }) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(builder: (_) => _SettingsSection(title: title, listenable: listenable, build: build)),
+  );
+
+  @override
+  State<_SettingsSection> createState() => _SettingsSectionState();
+}
+
+class _SettingsSectionState extends State<_SettingsSection> {
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.title)),
+    body: ListenableBuilder(
+      listenable: widget.listenable,
+      builder: (context, _) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 32),
+            children: widget.build(context, () {
+              if (mounted) setState(() {});
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
 }

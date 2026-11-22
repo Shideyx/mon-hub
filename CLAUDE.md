@@ -446,3 +446,16 @@
   likés (`musique_titres_likes`), API publique Deezer (recherche d'artiste + albums), `fresh` < 10 jours, 3 annonces max,
   `veille.json` jamais synchronisé, réglage `app.veille`). Interrupteurs dans la page Ses yeux et ses oreilles. Tests :
   `test/v172_watchers_test.dart`.
+- **Menus plus clairs + nouvelle visite (v1.59)** : Réglages de Mon Hub (`ui/settings_page.dart`) = recherche + carte
+  **Clicky** en tête (`_ClickyHero` : Réglages de Clicky, Ce qu'il sait faire, Revoir la visite) + rubriques
+  `SettingsCategory.all` (Mon compte, Apparence, Notifications, Mes modules, Mes appareils, Google/sauvegarde/rangement,
+  Bien-être, Sécurité et vie privée, Démarrage et raccourcis ; `find` par mots-clés, `clickyMatches`) ouvertes chacune sur
+  sa page (`_SettingsSection`, contenu `_content(id, context, refresh)` — utiliser `refresh()` et pas `setState` dedans).
+  Réglages de Clicky (`clicky_settings_page.dart` `_groups`) rangés par thème : Bien démarrer, Lui parler, Ce qu'il fait
+  pour toi, Sa personnalité, Vie privée et avancé. Catalogue **« Ce que Clicky sait faire »** = `ui/clicky/skills.dart`
+  (`ClickySkills.groups` : `SkillGroup` emoji/titre/`isNew`, `Skill(text, tryIt:)` ; recherche `search`, filtres, ▶ =
+  essayer → `ClickyController.askAnywhere` ; bouton ✨ dans l'en-tête de l'accueil) — **y ajouter chaque nouvelle
+  capacité**. Visite guidée `ui/clicky/tutorial.dart` (`ClickyTutorial.tour` : 11 `TourPage` avec `examples` à essayer
+  en direct et `badge` « Nouveau » ; animations `_TaskVisual`, `_SensesVisual`, `_IdeaVisual`, `_WatchVisual`,
+  `_LifeGridVisual`, `_AliveVisual` (vrai `ClickyLifeBody`) ; `FittedBox` sur petit écran ; clé `tutorial.v159` =
+  remontrée une fois à tous ; changer la clé quand la visite change beaucoup). Tests `test/v173_menus_tour_test.dart`.
