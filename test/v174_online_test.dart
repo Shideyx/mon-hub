@@ -11,6 +11,7 @@ import 'package:hub/core/pc_apps.dart';
 import 'package:hub/core/prompt_shield.dart';
 import 'package:hub/ui/hud/home_layout.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase/supabase.dart' show AuthFlowType;
 
 void main() {
   group('Mon Hub en ligne : serveur et compte', () {
@@ -30,6 +31,10 @@ void main() {
       expect(OnlineServer.cleanUrl('pas une adresse'), isNull);
       expect(OnlineServer.looksLikeKey('sb_publishable_abcdefghijklmnop'), isTrue);
       expect(OnlineServer.looksLikeKey('mon mot de passe'), isFalse);
+    });
+
+    test('création du compte : pas de mode PKCE (il plantait sans stockage)', () {
+      expect(Online.authOptions.authFlowType, AuthFlowType.implicit);
     });
 
     test('le serveur ne reçoit jamais le vrai mot de passe', () {

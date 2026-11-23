@@ -120,6 +120,9 @@ class Online extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  static const authOptions = AuthClientOptions(authFlowType: AuthFlowType.implicit);
+
   SupabaseClient? _client;
   OnlineServer? _clientFor;
   StreamSubscription<AuthState>? _authSub;
@@ -135,7 +138,10 @@ class Online extends ChangeNotifier {
     if (c != null && _clientFor?.url == s.url && _clientFor?.key == s.key) return c;
     unawaited(_authSub?.cancel());
     unawaited(c?.dispose());
-    final n = SupabaseClient(s.url, s.key);
+    // Connexion par mot de passe seulement : le mode PKCE (par défaut) exige un
+    // stockage que le client Dart pur n'a pas → « Null check operator » à la
+    // création du compte (signUp).
+    final n = SupabaseClient(s.url, s.key, authOptions: authOptions);
     _client = n;
     _clientFor = s;
     _authSub = n.auth.onAuthStateChange.listen(_onAuth, onError: (Object _) {});
