@@ -35,6 +35,19 @@ class ClickySkills {
       Skill('« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile', tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?'),
       Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
     ]),
+    SkillGroup('🌐', 'Espaces partagés et discussions', Color(0xFF7C5CFF), isNew: true, [
+      Skill('Crée un espace (exposé, classe, équipe, entreprise) et invite tes amis avec un code : tableau de tâches et discussion en direct.'),
+      Skill('Épingle tes espaces : ils restent en haut du menu, sur tous tes appareils.'),
+      Skill('Écris « @clicky résume la discussion » dans un espace : ton Clicky répond pour tout le monde.'),
+      Skill('Allume « Mon Clicky peut parler avec les Clicky des autres » (Réglages → Compte en ligne) : vos Clicky se répondent.'),
+      Skill('Même compte partout : sur un autre PC, un Android ou un iPhone, « Mon compte en ligne » et tout revient.'),
+    ]),
+    SkillGroup('🚀', 'Toutes tes applis', Color(0xFF0EA5E9), isNew: true, [
+      Skill('Tape le nom d\'une appli dans la console de l\'accueil (ou Ctrl + K) : Entrée l\'ouvre, plus besoin de la touche Windows.'),
+      Skill('Partout sur le PC : Ctrl + Alt + Espace, puis le nom de l\'appli.'),
+      Skill('« Mes applis » dans le menu : tout le menu Démarrer ; clic droit pour épingler sur l\'accueil.'),
+      Skill('Accueil à ta façon : « Personnaliser » pour déplacer les blocs, changer leur taille, en ajouter.'),
+    ]),
     SkillGroup('👀', 'Ses yeux et ses oreilles', Color(0xFF0EA5E9), isNew: true, [
       Skill('Il voit ton écran et entend le son du PC en continu, sur le PC (à allumer une fois dans ses réglages).'),
       Skill('« Tu te souviens du site sur les volcans que j\'ai vu hier ? »', tryIt: 'Tu te souviens du site sur les volcans que j\'ai vu hier ?'),

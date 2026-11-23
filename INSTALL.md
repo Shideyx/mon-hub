@@ -88,6 +88,13 @@ Le micro de Windows doit comprendre le français : *Paramètres → Heure et lan
 
 ## 4. Ton compte sur un autre appareil (sans export)
 
+**Le plus simple (v1.60) : Mon Hub en ligne.** Sur ton PC : **Réglages → Compte en ligne et espaces** → règle ton serveur
+une fois (5 minutes, voir `docs/SUPABASE.md`) → ton adresse mail + ton mot de passe Mon Hub → **Mettre en ligne**. Sur
+l'autre appareil (PC, Android, iPhone) : page de connexion → **Mon compte en ligne (adresse mail)** → même adresse, même
+mot de passe : tout ton Mon Hub revient, déjà configuré. Ça sert aussi aux **espaces partagés** avec tes amis.
+
+Autre méthode, avec ton Google Drive :
+
 1. Sur ton PC habituel : **Réglages → Mes appareils → Activer la synchronisation** → choisis ton compte Google.
 2. Sur l'autre appareil, installe Mon Hub puis, sur la page de connexion : **Retrouver mon compte d'un autre appareil** → **Se connecter avec Google** (le même compte) → ton mot de passe Mon Hub.
 3. C'est tout : ton compte est là, et ce que tu changes d'un côté arrive de l'autre tout seul (toutes les 3 minutes quand Mon Hub est ouvert).

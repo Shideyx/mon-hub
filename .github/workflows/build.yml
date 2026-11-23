@@ -1,4 +1,4 @@
-# Compile automatiquement l'appli pour Windows, Android, Mac et Linux
+# Compile automatiquement l'appli pour Windows, Android et iPhone (Mac et Linux en option)
 # à chaque push. Les fichiers prêts à installer apparaissent dans l'onglet
 # « Actions » de GitHub > dernier run > « Artifacts ».
 name: Build
@@ -6,7 +6,10 @@ name: Build
 env:
   # Connexion Google (secrets du dépôt, facultatifs) + numéro de version
   # affiché dans l'appli (le même que celui de la publication).
-  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} --dart-define=APP_VERSION=v1.${{ github.run_number }} --dart-define=UPDATE_REPO=${{ github.repository }}
+  # Mon Hub en ligne (facultatif) : SUPABASE_URL + SUPABASE_ANON_KEY (la clé
+  # « anon » est publique par nature). Vides : le serveur se règle dans
+  # l'appli (Réglages → Compte en ligne).
+  GOOGLE_DEFINES: --dart-define=GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} --dart-define=GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} --dart-define=APP_VERSION=v1.${{ github.run_number }} --dart-define=UPDATE_REPO=${{ github.repository }} --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
 on:
   push:
@@ -49,14 +52,15 @@ jobs:
           name: MonHub-Windows
           path: build/windows/x64/runner/Release/
 
+  # L'appli Android (APK à installer directement) : ajoutée à la publication
+  # dès qu'elle est prête, sans retarder la mise à jour du PC.
   android:
     needs: test
-    # Désactivé : seule la version Windows est compilée (mettre true pour
-    # recompiler Android).
-    if: false
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21' }
       - uses: subosito/flutter-action@v2
@@ -173,6 +177,30 @@ jobs:
             --latest \
             --title "Mon Hub v1.${{ github.run_number }}" \
             --notes-file notes.md
+
+  # L'appli Android, ajoutée à la publication quand elle est prête.
+  release-android:
+    needs: [release, android]
+    if: ${{ always() && needs.release.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: MonHub-Android
+          path: dist
+      - name: Ajouter MonHub-Android.apk à la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f dist/app-release.apk ]; then
+            cp dist/app-release.apk dist/MonHub-Android.apk
+            gh release upload "v1.${{ github.run_number }}" dist/MonHub-Android.apk --clobber --repo "${{ github.repository }}"
+          else
+            echo "Pas d'appli Android cette fois (la compilation Android a échoué)."
+          fi
 
   # L'appli iPhone, ajoutée à la publication quand elle est prête.
   release-ios:

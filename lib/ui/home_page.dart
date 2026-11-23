@@ -1,79 +1,105 @@
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-import '../core/custom_modules.dart';
 import '../core/desktop_widgets.dart';
-import '../core/session.dart';
-
+import '../core/freeze_watch.dart';
 import '../core/hub_controller.dart';
 import '../core/hub_module.dart';
 import '../core/module_store.dart';
 import '../core/notifications.dart';
-import 'add_module.dart';
+import '../core/online/online.dart';
+import '../core/online/spaces.dart';
+import '../core/pc_apps.dart';
+import '../core/session.dart';
+import 'apps_page.dart';
+import 'clicky/clicky.dart';
+import 'clicky/skills.dart';
 import 'hub_feed_view.dart';
+import 'hud/home_layout.dart';
+import 'hud/hud.dart';
 import 'notifications_page.dart';
+import 'online/online_page.dart';
 import 'phone_link_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
-import 'clicky/skills.dart';
-import 'clicky/win.dart';
-import 'motion.dart';
-import 'widgets.dart';
-import '../core/freeze_watch.dart';
+import 'spaces/spaces_page.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.controller, required this.notifications, this.onOpen});
+/// **Aujourd'hui** : l'accueil de Mon Hub, façon HUD. En haut la console de
+/// Clicky (une question, ou le nom d'une appli à lancer), puis des blocs que
+/// l'on range comme on veut (« Personnaliser » : glisser, taille, ajouter,
+/// retirer).
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+    required this.controller,
+    required this.notifications,
+    this.onOpen,
+    this.onOpenSpace,
+    this.onOpenSpaces,
+    this.onOpenApps,
+  });
 
   final HubController controller;
   final NotificationCenter notifications;
 
   /// Ouvre la section d'un module (fourni par le squelette de l'appli).
   final ValueChanged<HubModule>? onOpen;
+  final ValueChanged<Space>? onOpenSpace;
+  final VoidCallback? onOpenSpaces;
+  final VoidCallback? onOpenApps;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    if (PcApps.supported) unawaited(PcApps.instance.load());
+  }
+
+  Set<String> get _specialsHere => {
+    'fil',
+    'espaces',
+    'taches',
+    'discussions',
+    if (PcApps.supported) 'applis',
+  };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: ListenableBuilder(
-        listenable: Listenable.merge([controller, DesktopWidgets.instance]),
+        listenable: Listenable.merge([widget.controller, DesktopWidgets.instance, HomeLayout.instance]),
         builder: (context, _) {
           final desk = DesktopWidgets.instance;
-          final all = controller.enabled;
+          final all = widget.controller.enabled;
           // Les widgets détachés vivent sur le bureau, pas dans l'accueil.
-          final modules = [
-            for (final m in all)
-              if (!desk.isDetached(m.id)) m,
-          ];
-          final away = [
-            for (final m in all)
-              if (desk.isDetached(m.id)) m,
-          ];
+          final modules = [for (final m in all) if (!desk.isDetached(m.id)) m];
+          final away = [for (final m in all) if (desk.isDetached(m.id)) m];
+          final byId = {for (final m in modules) m.id: m};
+          final layout = HomeLayout.instance;
+          final blocks = layout.blocks(modules: modules.map((m) => m.id).toList(), specialsHere: _specialsHere);
           return RefreshIndicator(
-            onRefresh: notifications.pollNow,
+            onRefresh: widget.notifications.pollNow,
             child: CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(
-                  child: EnterAnimation(
-                    offset: 10,
-                    child: _Header(controller: controller, notifications: notifications, modules: all),
-                  ),
-                ),
-                // Ce qui compte maintenant, relié entre les modules.
-                SliverToBoxAdapter(
-                  child: HubFeedStrip(controller: controller, onOpen: onOpen),
-                ),
+                SliverToBoxAdapter(child: _Header(controller: widget.controller, notifications: widget.notifications, modules: all)),
+                SliverToBoxAdapter(child: _Console(onOpenApps: widget.onOpenApps, onOpenSpace: widget.onOpenSpace)),
                 if (away.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                      padding: EdgeInsets.fromLTRB(_side(context), 4, _side(context), 4),
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text('Sur le bureau :', style: Theme.of(context).textTheme.bodySmall),
+                          Text('SUR LE BUREAU', style: hudLabel(context, size: 10)),
                           for (final m in away)
                             InputChip(
                               avatar: Icon(m.icon, size: 16, color: m.color),
@@ -88,72 +114,21 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (modules.isEmpty)
-                  const SliverFillRemaining(child: EmptyHint('Aucun module actif. Active-en dans les réglages.'))
+                if (layout.editing) SliverToBoxAdapter(child: _EditBar(blocks: blocks, modules: modules, specialsHere: _specialsHere)),
+                if (blocks.isEmpty)
+                  SliverToBoxAdapter(
+                    child: HudEmpty(
+                      'Ton accueil est vide. « Personnaliser » pour y mettre des blocs.',
+                      action: HudButton(label: 'Personnaliser', onPressed: () => layout.setEditing(true)),
+                    ),
+                  )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    sliver: SliverGrid.builder(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 440,
-                        mainAxisExtent: 268,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      // La dernière carte : « + Ajouter un module ».
-                      itemCount: modules.length + 1,
-                      // Les cartes arrivent en cascade et s'enfoncent quand on appuie.
-                      itemBuilder: (context, i) => i == modules.length
-                          ? EnterAnimation(
-                              key: const ValueKey('enter-add'),
-                              index: i + 1,
-                              child: AddModuleCard(controller: controller),
-                            )
-                          : EnterAnimation(
-                              key: ValueKey('enter-${modules[i].id}'),
-                              index: i + 1,
-                              child: PressScale(
-                                scale: 0.975,
-                                child: ModuleCard(
-                                  module: modules[i],
-                                  onOpen: onOpen,
-                                  onRemove: CustomModules.isCustom(modules[i].id)
-                                      ? () async {
-                                          final m = modules[i];
-                                          final ok = await showDialog<bool>(
-                                            context: context,
-                                            builder: (c) => AlertDialog(
-                                              title: Text('Retirer « ${m.name} » ?'),
-                                              content: const Text(
-                                                'Le module disparaît de ton accueil. Tu pourras le rajouter quand tu veux.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(c, false),
-                                                  child: const Text('Annuler'),
-                                                ),
-                                                FilledButton(
-                                                  onPressed: () => Navigator.pop(c, true),
-                                                  child: const Text('Retirer'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (ok != true) return;
-                                          await CustomModules.remove(m.id);
-                                          controller.remove(m.id);
-                                        }
-                                      : null,
-                                  // Glisser une carte sur une autre : elles échangent leur place.
-                                  onDropped: (dragged) {
-                                    final order = controller.ordered.map((m) => m.id).toList();
-                                    final from = order.indexOf(dragged.id);
-                                    final to = order.indexOf(modules[i].id);
-                                    if (from >= 0 && to >= 0 && from != to) controller.reorder(from, to);
-                                  },
-                                ),
-                              ),
-                            ),
+                    padding: EdgeInsets.fromLTRB(_side(context), 12, _side(context), 32),
+                    sliver: _Grid(
+                      blocks: blocks,
+                      editing: layout.editing,
+                      builder: (b) => _block(context, b, byId),
                     ),
                   ),
               ],
@@ -163,7 +138,246 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+
+  Widget _block(BuildContext context, HomeBlock b, Map<String, HubModule> byId) {
+    final m = b.moduleId == null ? null : byId[b.moduleId];
+    if (m != null) return _ModuleBlock(key: ValueKey(m.id), module: m, onOpen: widget.onOpen);
+    return switch (b.id) {
+      'fil' => HubFeedStrip(controller: widget.controller, onOpen: widget.onOpen),
+      'espaces' => _SpacesBlock(onOpen: widget.onOpenSpace, onAll: widget.onOpenSpaces),
+      'taches' => _TasksBlock(onOpen: widget.onOpenSpace),
+      'discussions' => _ChatsBlock(onOpen: widget.onOpenSpace, onAll: widget.onOpenSpaces),
+      'applis' => _AppsBlock(onAll: widget.onOpenApps),
+      _ => const SizedBox.shrink(),
+    };
+  }
 }
+
+/// Marge sur les côtés : plus petite sur un téléphone.
+double _side(BuildContext context) => MediaQuery.sizeOf(context).width < 600 ? 12 : 24;
+
+/// Hauteur d'un bloc (le fil garde la sienne).
+double? _heightOf(HomeBlock b) => b.id == 'fil' ? null : 268;
+
+/// Les blocs, rangés en rangées de 1 à 4 colonnes (selon la largeur). Les
+/// rangées sont construites **seulement quand elles arrivent à l'écran** :
+/// l'accueil s'ouvre vite même avec beaucoup de modules.
+class _Grid extends StatelessWidget {
+  const _Grid({required this.blocks, required this.editing, required this.builder});
+  final List<HomeBlock> blocks;
+  final bool editing;
+  final Widget Function(HomeBlock) builder;
+
+  static const gap = 16.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.crossAxisExtent;
+        final cols = columnsFor(width);
+        final colW = (width - gap * (cols - 1)) / cols;
+        final rows = HomeLayout.rows(blocks, cols);
+        double widthOf(HomeBlock b) {
+          final span = HomeLayout.spanIn(b, cols);
+          return colW * span + gap * (span - 1);
+        }
+
+        Widget cell(HomeBlock b) => SizedBox(
+          key: ValueKey('bloc-${b.id}'),
+          width: widthOf(b),
+          height: _heightOf(b),
+          child: editing ? _Editable(block: b, blocks: blocks, child: builder(b)) : RepaintBoundary(child: builder(b)),
+        );
+
+        return SliverList.builder(
+          itemCount: rows.length,
+          itemBuilder: (context, i) => Padding(
+            padding: EdgeInsets.only(bottom: i == rows.length - 1 ? 0 : gap),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final (j, b) in rows[i].indexed) ...[
+                  if (j > 0) const SizedBox(width: gap),
+                  cell(b),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 1 à 4 colonnes d'au moins 300 points.
+  static int columnsFor(double width) => ((width + gap) / (300 + gap)).floor().clamp(1, 4);
+}
+
+/// Un bloc en mode « Personnaliser » : on l'attrape pour le déplacer, on
+/// change sa largeur, on le retire.
+class _Editable extends StatelessWidget {
+  const _Editable({required this.block, required this.blocks, required this.child});
+  final HomeBlock block;
+  final List<HomeBlock> blocks;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    final layout = HomeLayout.instance;
+    final touch = Platform.isAndroid || Platform.isIOS;
+    final bar = Material(
+      color: c.hotBg,
+      shape: const SlantBorder(slant: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.drag_indicator_rounded, size: 18, color: c.accentText),
+            for (final s in const [1, 2, 3])
+              Tooltip(
+                message: s == 3 ? 'Toute la largeur' : '$s colonne${s > 1 ? 's' : ''}',
+                child: InkWell(
+                  onTap: () => layout.resize(blocks, block.id, s),
+                  child: Container(
+                    width: 28,
+                    height: 26,
+                    alignment: Alignment.center,
+                    color: block.span == s ? c.accent : Colors.transparent,
+                    child: Text(s == 3 ? 'L' : (s == 2 ? 'M' : 'S'), style: hudLabel(context, size: 11, color: block.span == s ? Colors.white : c.muted)),
+                  ),
+                ),
+              ),
+            IconButton(
+              tooltip: 'Retirer de l\'accueil',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.close_rounded, size: 18, color: c.bad),
+              onPressed: () => layout.remove(blocks, block.id),
+            ),
+          ],
+        ),
+      ),
+    );
+    final framed = Stack(
+      // Le bloc lui-même donne la taille (le fil n'a pas de hauteur fixe).
+      fit: StackFit.passthrough,
+      children: [
+        IgnorePointer(child: Opacity(opacity: 0.55, child: child)),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: ShapeDecoration(shape: hudCut(14, side: BorderSide(color: c.accent, width: 1.5))),
+            ),
+          ),
+        ),
+        Positioned(top: 8, right: 8, child: bar),
+      ],
+    );
+    final feedback = Material(
+      color: Colors.transparent,
+      child: SizedBox(width: 260, height: 90, child: HudPanel(hot: true, child: Center(child: Text(_title(block), style: hudTitle(context, size: 16))))),
+    );
+    final draggable = touch
+        ? LongPressDraggable<String>(data: block.id, feedback: feedback, childWhenDragging: Opacity(opacity: .3, child: framed), child: framed)
+        : Draggable<String>(data: block.id, feedback: feedback, childWhenDragging: Opacity(opacity: .3, child: framed), child: MouseRegion(cursor: SystemMouseCursors.grab, child: framed));
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (d) => d.data != block.id,
+      onAcceptWithDetails: (d) => layout.move(blocks, d.data, block.id),
+      builder: (context, cand, _) => cand.isEmpty
+          ? draggable
+          : DecoratedBox(
+              position: DecorationPosition.foreground,
+              decoration: ShapeDecoration(shape: hudCut(14, side: BorderSide(color: c.pink, width: 3))),
+              child: draggable,
+            ),
+    );
+  }
+}
+
+String _title(HomeBlock b) => HomeLayout.specials[b.id] ?? (b.moduleId ?? b.id);
+
+/// La barre du mode « Personnaliser ».
+class _EditBar extends StatelessWidget {
+  const _EditBar({required this.blocks, required this.modules, required this.specialsHere});
+  final List<HomeBlock> blocks;
+  final List<HubModule> modules;
+  final Set<String> specialsHere;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    final layout = HomeLayout.instance;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_side(context), 8, _side(context), 0),
+      child: HudPanel(
+        hot: true,
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 10,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Hatch(width: 10, height: 40),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('MODE PERSONNALISATION', style: hudTitle(context, size: 17)),
+                    Text('Glisse les blocs, S / M / L pour la largeur, × pour retirer.', style: TextStyle(color: c.muted, fontSize: 13)),
+                  ],
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                HudButton(label: '+ Bloc', onPressed: () => _add(context)),
+                HudButton(label: 'Réinitialiser', onPressed: () => layout.reset()),
+                HudButton(label: 'Terminé', primary: true, onPressed: () => layout.setEditing(false)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _add(BuildContext context) async {
+    final shown = {for (final b in blocks) b.id};
+    final options = [
+      for (final e in HomeLayout.specials.entries)
+        if (specialsHere.contains(e.key) && !shown.contains(e.key)) (e.key, e.value, Icons.dashboard_customize_rounded),
+      for (final m in modules)
+        if (!shown.contains('mod:${m.id}')) ('mod:${m.id}', m.name, m.icon),
+    ];
+    final id = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: options.isEmpty
+            ? const Padding(padding: EdgeInsets.all(24), child: Text('Tous les blocs sont déjà sur ton accueil.'))
+            : ListView(
+                shrinkWrap: true,
+                children: [
+                  Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text('AJOUTER UN BLOC', style: hudTitle(ctx, size: 18))),
+                  for (final o in options)
+                    ListTile(leading: Icon(o.$3), title: Text(o.$2), trailing: const Icon(Icons.add_rounded), onTap: () => Navigator.pop(ctx, o.$1)),
+                ],
+              ),
+      ),
+    );
+    if (id != null) await HomeLayout.instance.add(blocks, id, span: id == 'fil' ? 3 : 1);
+  }
+}
+
+// ------------------------------------------------------------ En-tête
 
 class _Header extends StatelessWidget {
   const _Header({required this.controller, required this.notifications, required this.modules});
@@ -172,146 +386,318 @@ class _Header extends StatelessWidget {
   final NotificationCenter notifications;
   final List<HubModule> modules;
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 5 || h >= 18) return 'Bonsoir';
-    return 'Bonjour';
+  static const _days = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    final now = DateTime.now();
+    final userName = ModuleStore.prefs.getString('hub.name') ?? AppSession.instance.current?.name ?? '';
+    final greeting = now.hour < 5 || now.hour >= 18 ? 'BONSOIR' : 'BONJOUR';
+    String two(int n) => n.toString().padLeft(2, '0');
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final sep = TextSpan(text: '  //  ', style: TextStyle(color: c.bracket));
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_side(context), 24, _side(context) - 8, 4),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        spacing: 16,
+        runSpacing: 12,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  style: hudLabel(context),
+                  children: [
+                    TextSpan(text: '${_days[now.weekday - 1]} ${two(now.day)}.${two(now.month)}.${now.year}'),
+                    sep,
+                    TextSpan(text: '${two(now.hour)}:${two(now.minute)}'),
+                    sep,
+                    TextSpan(text: 'SYSTÈME OK', style: TextStyle(color: c.ok)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$greeting${userName.isEmpty ? '' : ' ${userName.toUpperCase()}'}',
+                style: hudTitle(context, size: MediaQuery.sizeOf(context).width < 600 ? 32 : 40),
+              ),
+              const SizedBox(height: 12),
+              ListenableBuilder(
+                listenable: Listenable.merge([for (final m in modules) m.badge, Spaces.instance]),
+                builder: (context, _) {
+                  final stats = [
+                    for (final m in modules)
+                      if (m.badge.value > 0) '${m.badge.value} ${m.name}',
+                    if (Spaces.instance.totalUnread > 0) '${Spaces.instance.totalUnread} message${Spaces.instance.totalUnread > 1 ? 's' : ''} en ligne',
+                  ];
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Hatch(width: 84, height: 8),
+                      const SizedBox(width: 12),
+                      const Barcode(),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          stats.isEmpty ? 'RIEN DE NOUVEAU' : stats.take(4).join(' · ').toUpperCase(),
+                          overflow: TextOverflow.ellipsis,
+                          style: hudLabel(context, size: 10),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 2,
+            children: [
+              IconButton(
+                tooltip: 'Chercher partout (Ctrl + Espace)',
+                icon: const Icon(Icons.search_rounded),
+                onPressed: () => SearchPage.show(),
+              ),
+              ListenableBuilder(
+                listenable: notifications,
+                builder: (context, _) => IconButton(
+                  tooltip: 'Notifications',
+                  icon: Badge(
+                    isLabelVisible: notifications.unread > 0,
+                    label: Text('${notifications.unread}'),
+                    backgroundColor: c.pink,
+                    child: const Icon(Icons.notifications_none_rounded),
+                  ),
+                  onPressed: () {
+                    notifications.markRead();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => NotificationsPage(notifications: notifications, controller: controller)),
+                    );
+                  },
+                ),
+              ),
+              if (Platform.isWindows)
+                IconButton(
+                  tooltip: 'Mon téléphone (fichiers, télécommande)',
+                  icon: const Icon(Icons.devices_rounded),
+                  onPressed: () => PhoneLinkPage.open(context),
+                ),
+              IconButton(
+                tooltip: 'Ce que Clicky sait faire',
+                icon: const Icon(Icons.auto_awesome_outlined),
+                onPressed: () => ClickySkillsPage.open(context),
+              ),
+              IconButton(
+                tooltip: dark ? 'Mode clair' : 'Mode sombre',
+                icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                onPressed: () => AppSession.instance.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark),
+              ),
+              IconButton(
+                tooltip: 'Personnaliser l\'accueil',
+                icon: const Icon(Icons.dashboard_customize_outlined),
+                onPressed: () => HomeLayout.instance.setEditing(!HomeLayout.instance.editing),
+              ),
+              IconButton(
+                tooltip: 'Réglages',
+                icon: const Icon(Icons.tune_rounded),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SettingsPage(controller: controller, notifications: notifications)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------ Console
+
+/// La console de Clicky : une question (Entrée), ou le nom d'une appli du PC
+/// (elle apparaît tout de suite : Entrée l'ouvre).
+class _Console extends StatefulWidget {
+  const _Console({this.onOpenApps, this.onOpenSpace});
+  final VoidCallback? onOpenApps;
+  final ValueChanged<Space>? onOpenSpace;
+
+  @override
+  State<_Console> createState() => _ConsoleState();
+}
+
+class _ConsoleState extends State<_Console> {
+  final _text = TextEditingController();
+  List<PcApp> _apps = const [];
+  List<Space> _spaces = const [];
+
+  static const _shortcuts = ['fais le point', 'qu\'est-ce que j\'ai raté', 'prépare mon sac', 'mode concentration 25 min'];
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _changed(String q) {
+    final t = q.trim();
+    setState(() {
+      _apps = t.length < 2 || !PcApps.supported ? const [] : PcApps.instance.search(t, max: 6);
+      final low = t.toLowerCase();
+      _spaces = t.length < 2 ? const [] : Spaces.instance.all.where((s) => Spaces.instance.titleOf(s).toLowerCase().contains(low)).take(3).toList();
+    });
+  }
+
+  /// Entrée : l'appli dont le nom commence par le texte, sinon Clicky.
+  void _submit(String q) {
+    final t = q.trim();
+    if (t.isEmpty) return;
+    final low = t.toLowerCase();
+    final app = _apps.where((a) => a.name.toLowerCase().startsWith(low)).firstOrNull;
+    _clear();
+    if (app != null) {
+      unawaited(PcApps.instance.launch(app));
+      return;
+    }
+    FreezeWatch.note('console : question à Clicky');
+    unawaited(ClickyController.instance.ask(t));
+  }
+
+  void _clear() {
+    _text.clear();
+    setState(() {
+      _apps = const [];
+      _spaces = const [];
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final now = DateTime.now();
-    final userName = ModuleStore.prefs.getString('hub.name') ?? '';
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.fromLTRB(24, 20, 16, 22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6D4AFF), Color(0xFFE0457B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF7C5CFF).withValues(alpha: 0.3), blurRadius: 30, offset: const Offset(0, 12)),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
+    final c = HudColors.of(context);
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_side(context), 14, _side(context), 4),
+      child: HudPanel(
+        hot: true,
+        padding: EdgeInsets.zero,
+        cut: 18,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}'.toUpperCase(),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                if (Platform.isWindows)
-                  IconButton(
-                    tooltip: 'Mon téléphone (fichiers, télécommande)',
-                    color: Colors.white,
-                    icon: const Icon(Icons.devices_rounded),
-                    onPressed: () => PhoneLinkPage.open(context),
-                  ),
-                IconButton(
-                  tooltip: 'Ce que Clicky sait faire',
-                  color: Colors.white,
-                  icon: const Icon(Icons.auto_awesome_rounded),
-                  onPressed: () => ClickySkillsPage.open(context),
-                ),
-                IconButton(
-                  tooltip: 'Chercher partout (Ctrl + Espace)',
-                  color: Colors.white,
-                  icon: const Icon(Icons.search_rounded),
-                  onPressed: () => SearchPage.show(),
-                ),
-                ListenableBuilder(
-                  listenable: notifications,
-                  builder: (context, _) => IconButton(
-                    tooltip: 'Notifications',
-                    color: Colors.white,
-                    icon: Badge(
-                      isLabelVisible: notifications.unread > 0,
-                      label: Text('${notifications.unread}'),
-                      child: const Icon(Icons.notifications_rounded),
-                    ),
-                    onPressed: () {
-                      notifications.markRead();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => NotificationsPage(notifications: notifications, controller: controller),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                IconButton(
-                  tooltip: theme.brightness == Brightness.dark ? 'Mode clair' : 'Mode sombre',
-                  color: Colors.white,
-                  icon: Icon(theme.brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-                  onPressed: () => AppSession.instance.setThemeMode(
-                    theme.brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Réglages',
-                  color: Colors.white,
-                  icon: const Icon(Icons.tune_rounded),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SettingsPage(controller: controller, notifications: notifications),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    '$_greeting${userName.isEmpty ? '' : ' $userName'}',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // La main fait coucou une fois, à l'ouverture.
-                const _WavingHand(),
-              ],
-            ),
-            const SizedBox(height: 14),
-            ListenableBuilder(
-              listenable: Listenable.merge([for (final m in modules) m.badge]),
-              builder: (context, _) => Wrap(
-                spacing: 8,
-                runSpacing: 8,
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _HeaderChip(icon: Icons.schedule_rounded, text: hhmm(now)),
-                  for (final (n, m) in [for (final m in modules) if (m.badge.value > 0) m].indexed)
-                    // Les pastilles arrivent l'une après l'autre.
-                    EnterAnimation(
-                      key: ValueKey('chip-${m.id}-${m.badge.value}'),
-                      index: n + 1,
-                      step: 70,
-                      offset: 8,
-                      child: _HeaderChip(icon: m.icon, text: '${m.badge.value} · ${m.name}'),
+                  ClipPath(
+                    clipper: const _TabClipper(),
+                    child: Container(
+                      color: c.accent,
+                      padding: EdgeInsets.fromLTRB(narrow ? 12 : 18, 0, narrow ? 26 : 34, 0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.near_me_rounded, color: Colors.white, size: 18),
+                          if (!narrow) ...[
+                            const SizedBox(width: 10),
+                            Text('CLICKY', style: hudTitle(context, size: 15, color: Colors.white).copyWith(letterSpacing: 2.4)),
+                          ],
+                        ],
+                      ),
                     ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(left: narrow ? 8 : 14, right: 6),
+                    child: Center(child: Text('>_', style: hudMono(context, size: 17, color: c.accentText, weight: FontWeight.w700))),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: TextField(
+                        controller: _text,
+                        onChanged: _changed,
+                        onSubmitted: _submit,
+                        style: hudMono(context, size: 15),
+                        decoration: InputDecoration(
+                          hintText: narrow ? 'demande à Clicky…' : 'demande, cherche, ou tape le nom d\'une appli…',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding: EdgeInsets.symmetric(vertical: 18),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: narrow ? 6 : 12, vertical: 9),
+                    child: Row(
+                      children: [
+                        if (!narrow) ...[const HudKey('Ctrl K'), const SizedBox(width: 10)],
+                        HudButton(
+                          icon: Icons.mic_rounded,
+                          primary: true,
+                          tooltip: 'Parler à Clicky',
+                          onPressed: () => unawaited(ClickyController.instance.startListening()),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
+            if (_apps.isNotEmpty || _spaces.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: c.hotLine))),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (_apps.isNotEmpty) Text('APPLIS', style: hudLabel(context, size: 10)),
+                    for (final a in _apps)
+                      ActionChip(
+                        avatar: HexAvatar(a.initials, size: 20, color: HexAvatar.colorFor(a.name)),
+                        label: Text(a.name),
+                        onPressed: () {
+                          _clear();
+                          unawaited(PcApps.instance.launch(a));
+                        },
+                      ),
+                    if (_spaces.isNotEmpty) Text('ESPACES', style: hudLabel(context, size: 10)),
+                    for (final s in _spaces)
+                      ActionChip(
+                        avatar: HudDiamond(s.colorValue),
+                        label: Text(Spaces.instance.titleOf(s)),
+                        onPressed: () {
+                          _clear();
+                          widget.onOpenSpace?.call(s);
+                        },
+                      ),
+                    Text('ENTRÉE : ${_apps.isNotEmpty ? 'OUVRIR / ' : ''}DEMANDER À CLICKY', style: hudLabel(context, size: 9, color: c.dim)),
+                  ],
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: c.hotLine))),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('RACCOURCIS', style: hudLabel(context, size: 10)),
+                    for (final s in _shortcuts)
+                      _Cmd(text: s, onTap: () => unawaited(ClickyController.instance.ask(s))),
+                    if (PcApps.supported) _Cmd(text: 'mes applis', onTap: widget.onOpenApps),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -319,95 +705,111 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// 👋 qui fait coucou une seule fois (pas d'animation sans fin).
-class _WavingHand extends StatefulWidget {
-  const _WavingHand();
+class _TabClipper extends CustomClipper<Path> {
+  const _TabClipper();
+
   @override
-  State<_WavingHand> createState() => _WavingHandState();
+  Path getClip(Size s) => Path()
+    ..lineTo(s.width, 0)
+    ..lineTo(s.width - 18, s.height)
+    ..lineTo(0, s.height)
+    ..close();
+
+  @override
+  bool shouldReclip(_TabClipper oldClipper) => false;
 }
 
-class _WavingHandState extends State<_WavingHand> with SingleTickerProviderStateMixin {
-  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
-  Timer? _start;
-
-  @override
-  void initState() {
-    super.initState();
-    _start = Timer(const Duration(milliseconds: 450), () {
-      if (mounted) _a.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _start?.cancel();
-    _a.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _a,
-    builder: (context, child) {
-      final t = _a.value;
-      final angle = math.sin(t * math.pi * 5) * 0.45 * (1 - t);
-      return Transform.rotate(angle: angle, alignment: const Alignment(0.3, 0.8), child: child);
-    },
-    child: Text('👋', style: Theme.of(context).textTheme.headlineMedium),
-  );
-}
-
-class _HeaderChip extends StatelessWidget {
-  const _HeaderChip({required this.icon, required this.text});
-  final IconData icon;
+class _Cmd extends StatelessWidget {
+  const _Cmd({required this.text, this.onTap});
   final String text;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(30)),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: Colors.white),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    const shape = SlantBorder(slant: 8);
+    return Material(
+      color: c.chip,
+      shape: shape,
+      child: InkWell(
+        customBorder: shape,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(text: '» ', style: TextStyle(color: c.pink, fontWeight: FontWeight.w700)),
+              TextSpan(text: text),
+            ]),
+            style: hudMono(context, size: 12),
+          ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
-class ModuleCard extends StatefulWidget {
-  const ModuleCard({super.key, required this.module, this.onOpen, this.onDropped, this.onRemove});
+// ------------------------------------------------------------- Blocs
 
+/// En-tête commun des blocs : « [n] TITRE » + lien.
+class _BlockHead extends StatelessWidget {
+  const _BlockHead({required this.title, this.action, this.onAction, this.trailing, this.icon, this.color, this.natural = false});
+  final String title;
+
+  /// Le nom tel quel (un module), en police des titres.
+  final bool natural;
+  final String? action;
+  final VoidCallback? onAction;
+  final Widget? trailing;
+  final IconData? icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    return Row(
+      children: [
+        if (icon != null) ...[
+          HexAvatar('', size: 26, color: color ?? c.accent, child: Icon(icon, size: 14, color: Colors.white)),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: natural
+              ? Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: hudTitle(context, size: 16, weight: FontWeight.w600))
+              : Text(title.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: hudLabel(context)),
+        ),
+        ?trailing,
+        if (action != null)
+          InkWell(
+            onTap: onAction,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Text('${action!.toUpperCase()} ›', style: hudLabel(context, size: 10, color: c.accentText)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ModuleBlock extends StatefulWidget {
+  const _ModuleBlock({super.key, required this.module, this.onOpen});
   final HubModule module;
   final ValueChanged<HubModule>? onOpen;
 
-  /// Module perso : on peut le retirer (bouton de la carte).
-  final VoidCallback? onRemove;
-
-  /// Une autre carte a été lâchée sur celle-ci (pour les réordonner).
-  final ValueChanged<HubModule>? onDropped;
-
   @override
-  State<ModuleCard> createState() => _ModuleCardState();
+  State<_ModuleBlock> createState() => _ModuleBlockState();
 }
 
-class _ModuleCardState extends State<ModuleCard> {
-  bool hover = false;
-
-  /// Le contenu de la carte, gardé tel quel quand on la survole : avant, un
-  /// simple passage de souris reconstruisait tout le résumé (et relançait
-  /// ses chargements), ce qui faisait ramer l'accueil.
+class _ModuleBlockState extends State<_ModuleBlock> {
+  /// Le résumé est gardé tel quel (pas reconstruit à chaque passage de
+  /// souris : avant, l'accueil ramait).
   Widget? _summary;
 
   @override
-  void didUpdateWidget(ModuleCard old) {
+  void didUpdateWidget(_ModuleBlock old) {
     super.didUpdateWidget(old);
-    _summary = null;
+    if (old.module != widget.module) _summary = null;
   }
 
   @override
@@ -416,196 +818,304 @@ class _ModuleCardState extends State<ModuleCard> {
     _summary = null; // thème, taille…
   }
 
-  void _open(BuildContext context) {
+  void _open() {
     final m = widget.module;
     FreezeWatch.note('ouvre ${m.name}');
-    widget.onOpen != null
-        ? widget.onOpen!(m)
-        : Navigator.push(context, MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)));
-  }
-
-  /// Le titre de la carte (on l'attrape pour la déplacer).
-  Widget _header(BuildContext context, {bool dragging = false}) {
-    final m = widget.module;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 6),
-      child: Row(
-        children: [
-          // Au survol, l'icône se redresse et grandit un peu (une fois).
-          AnimatedRotation(
-            turns: hover && !dragging ? -0.025 : 0,
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutBack,
-            child: AnimatedScale(
-              scale: hover && !dragging ? 1.12 : 1,
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutBack,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(11),
-                  gradient: LinearGradient(
-                    colors: [m.color, Color.lerp(m.color, Colors.black, 0.3)!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    if (hover && !dragging)
-                      BoxShadow(color: m.color.withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Icon(m.icon, color: Colors.white, size: 20),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              m.name,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          ValueListenableBuilder(
-            valueListenable: m.badge,
-            builder: (context, n, _) => n == 0
-                ? const SizedBox.shrink()
-                : Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(color: m.color, borderRadius: BorderRadius.circular(20)),
-                    child: Text(
-                      '$n',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                    ),
-                  ),
-          ),
-          if (!dragging && widget.onRemove != null)
-            IconButton(
-              tooltip: 'Retirer ce module perso',
-              visualDensity: VisualDensity.compact,
-              color: theme.colorScheme.onSurfaceVariant,
-              icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-              onPressed: widget.onRemove,
-            ),
-          if (!dragging && DesktopWidgets.supported)
-            IconButton(
-              tooltip: 'Détacher sur le bureau (ou glisse la carte hors de Mon Hub)',
-              visualDensity: VisualDensity.compact,
-              color: theme.colorScheme.onSurfaceVariant,
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              onPressed: () => DesktopWidgets.instance.detach(m.id),
-            ),
-          if (!dragging) Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant),
-        ],
-      ),
-    );
+    widget.onOpen != null ? widget.onOpen!(m) : Navigator.push(context, MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)));
   }
 
   @override
   Widget build(BuildContext context) {
     final m = widget.module;
-    final theme = Theme.of(context);
-    final card = MouseRegion(
-      onEnter: (_) => setState(() => hover = true),
-      onExit: (_) => setState(() => hover = false),
-      // Au survol : la carte se soulève, avec une ombre de sa couleur.
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        transform: Matrix4.translationValues(0, hover ? -4 : 0, 0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: m.color.withValues(alpha: hover ? 0.28 : 0),
-              blurRadius: hover ? 26 : 0,
-              offset: Offset(0, hover ? 12 : 0),
-            ),
-          ],
-        ),
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              // Halo coloré discret dans le coin.
-              Positioned(
-                top: -60,
-                right: -60,
-                child: Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(colors: [m.color.withValues(alpha: 0.22), m.color.withValues(alpha: 0)]),
-                  ),
-                ),
+    final c = HudColors.of(context);
+    return HudPanel(
+      padding: EdgeInsets.zero,
+      onTap: _open,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 4),
+            child: _BlockHead(
+              title: m.name,
+              natural: true,
+              icon: m.icon,
+              color: m.color,
+              trailing: ValueListenableBuilder(
+                valueListenable: m.badge,
+                builder: (context, n, _) => n == 0 ? const SizedBox.shrink() : HudTag('$n', color: c.pink, textColor: Colors.white),
               ),
-              InkWell(
-                onTap: () => _open(context),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Le titre s'attrape : lâché hors de Mon Hub, le widget
-                    // part sur le bureau ; lâché sur une autre carte, elles
-                    // échangent leur place.
-                    Draggable<HubModule>(
-                      data: m,
-                      dragAnchorStrategy: pointerDragAnchorStrategy,
-                      feedback: Material(
-                        color: Colors.transparent,
-                        child: Opacity(
-                          opacity: 0.9,
-                          child: Container(
-                            width: 320,
-                            decoration: BoxDecoration(
-                              color: theme.cardTheme.color ?? theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: m.color),
-                              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6))],
+              action: 'ouvrir',
+              onAction: _open,
+            ),
+          ),
+          Expanded(child: RepaintBoundary(child: _summary ??= m.buildSummary(context))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bloc « non connecté » : invitation à Mon Hub en ligne.
+Widget _offline(BuildContext context, String title, String text) => HudPanel(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _BlockHead(title: title, icon: Icons.hub_rounded),
+      const Spacer(),
+      Text(text, style: TextStyle(color: HudColors.of(context).muted, height: 1.4)),
+      const SizedBox(height: 12),
+      HudButton(label: 'Compte en ligne', compact: true, primary: true, onPressed: () => OnlinePage.open(context)),
+    ],
+  ),
+);
+
+class _SpacesBlock extends StatelessWidget {
+  const _SpacesBlock({this.onOpen, this.onAll});
+  final ValueChanged<Space>? onOpen;
+  final VoidCallback? onAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([Spaces.instance, Online.instance]),
+      builder: (context, _) {
+        final s = Spaces.instance;
+        if (!s.available) {
+          return _offline(context, 'Mes espaces', 'Partage des tâches et discute avec tes amis, ta classe ou ton équipe.');
+        }
+        final list = s.spaces;
+        return HudPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _BlockHead(title: 'Mes espaces', icon: Icons.hub_rounded, action: 'tous', onAction: onAll),
+              const SizedBox(height: 8),
+              Expanded(
+                child: list.isEmpty
+                    ? Center(child: HudButton(label: '+ Créer un espace', primary: true, onPressed: () => unawaited(SpaceActions.create(context).then((x) {
+                        if (x != null) onOpen?.call(x);
+                      }))))
+                    : ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          for (final sp in list.take(6))
+                            InkWell(
+                              onTap: () => onOpen?.call(sp),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                child: Row(
+                                  children: [
+                                    HudDiamond(sp.colorValue),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: Text(sp.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                    if (s.isPinned(sp.id)) Icon(Icons.push_pin_rounded, size: 13, color: c.dim),
+                                    if ((s.unread[sp.id] ?? 0) > 0) ...[const SizedBox(width: 8), HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white)],
+                                  ],
+                                ),
+                              ),
                             ),
-                            child: _header(context, dragging: true),
-                          ),
-                        ),
+                        ],
                       ),
-                      onDragEnd: (d) {
-                        final size = MediaQuery.sizeOf(context);
-                        final p = d.offset;
-                        // Hors de la fenêtre (ou tout contre son bord : Windows
-                        // ne suit pas toujours la souris au-delà).
-                        const edge = 12.0;
-                        final outside =
-                            p.dx < edge || p.dy < edge || p.dx > size.width - edge || p.dy > size.height - edge;
-                        if (outside && DesktopWidgets.supported) {
-                          unawaited(DesktopWidgets.instance.detach(m.id, at: Win.cursor()));
-                        }
-                      },
-                      child: MouseRegion(cursor: SystemMouseCursors.grab, child: _header(context)),
-                    ),
-                    Expanded(child: RepaintBoundary(child: _summary ??= m.buildSummary(context))),
-                  ],
-                ),
               ),
             ],
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+class _TasksBlock extends StatefulWidget {
+  const _TasksBlock({this.onOpen});
+  final ValueChanged<Space>? onOpen;
+
+  @override
+  State<_TasksBlock> createState() => _TasksBlockState();
+}
+
+class _TasksBlockState extends State<_TasksBlock> {
+  List<SpaceTask> _tasks = const [];
+  DateTime? _at;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Spaces.instance.addListener(_maybeLoad);
+    _maybeLoad();
+  }
+
+  @override
+  void dispose() {
+    Spaces.instance.removeListener(_maybeLoad);
+    super.dispose();
+  }
+
+  /// Relu au plus toutes les 20 s (les espaces préviennent souvent).
+  void _maybeLoad() {
+    final at = _at;
+    if (_loading || !Spaces.instance.available) return;
+    if (at != null && DateTime.now().difference(at) < const Duration(seconds: 20)) return;
+    _loading = true;
+    _at = DateTime.now();
+    unawaited(Spaces.instance.allTasks().then((t) {
+      if (mounted) setState(() => _tasks = t);
+    }).catchError((Object _) {}).whenComplete(() => _loading = false));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    final s = Spaces.instance;
+    if (!s.available) return _offline(context, 'Mes tâches', 'Les tâches de tous tes espaces partagés, ici.');
+    final me = s.me;
+    final mine = [for (final t in _tasks) if (t.assignee == me || t.assignee == null) t]
+      ..sort((a, b) => (a.due ?? DateTime(2999)).compareTo(b.due ?? DateTime(2999)));
+    return HudPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _BlockHead(
+            title: 'Mes tâches',
+            icon: Icons.view_kanban_rounded,
+            color: const Color(0xFF3B82F6),
+            trailing: Text(mine.length.toString().padLeft(2, '0'), style: hudTitle(context, size: 26, color: c.pink)),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: mine.isEmpty
+                ? Center(child: Text('Rien à faire pour toi. 👌', style: TextStyle(color: c.muted)))
+                : ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      for (final t in mine.take(8))
+                        InkWell(
+                          onTap: () {
+                            final sp = s.byId(t.spaceId);
+                            if (sp != null) widget.onOpen?.call(sp);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line.withValues(alpha: .6)))),
+                            child: Row(
+                              children: [
+                                HudDiamond(s.byId(t.spaceId)?.colorValue ?? c.accent, size: 7),
+                                const SizedBox(width: 10),
+                                Expanded(child: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                if (t.due != null)
+                                  Text(
+                                    '${t.due!.day.toString().padLeft(2, '0')}.${t.due!.month.toString().padLeft(2, '0')}',
+                                    style: hudMono(context, size: 11, color: t.lateAt(DateTime.now()) ? c.bad : c.muted),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
-    return DragTarget<HubModule>(
-      onWillAcceptWithDetails: (d) => d.data.id != m.id,
-      onAcceptWithDetails: (d) => widget.onDropped?.call(d.data),
-      builder: (context, cand, _) => cand.isEmpty
-          ? card
-          : DecoratedBox(
-              position: DecorationPosition.foreground,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: m.color, width: 2),
+  }
+}
+
+class _ChatsBlock extends StatelessWidget {
+  const _ChatsBlock({this.onOpen, this.onAll});
+  final ValueChanged<Space>? onOpen;
+  final VoidCallback? onAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([Spaces.instance, Online.instance]),
+      builder: (context, _) {
+        final s = Spaces.instance;
+        if (!s.available) return _offline(context, 'Discussions', 'Écris à tes amis avec leur @pseudo, et laisse vos Clicky se parler.');
+        final list = [...s.chats, ...s.spaces]..sort((a, b) => (s.unread[b.id] ?? 0).compareTo(s.unread[a.id] ?? 0));
+        return HudPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _BlockHead(title: 'Discussions', icon: Icons.forum_rounded, color: c.pink, action: 'nouveau', onAction: () => unawaited(SpaceActions.message(context).then((x) {
+                if (x != null) onOpen?.call(x);
+              }))),
+              const SizedBox(height: 6),
+              Expanded(
+                child: list.isEmpty
+                    ? Center(child: Text('Pas encore de discussion.', style: TextStyle(color: c.muted)))
+                    : ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          for (final sp in list.take(6))
+                            InkWell(
+                              onTap: () => onOpen?.call(sp),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  children: [
+                                    sp.isDm
+                                        ? HexAvatar(s.titleOf(sp).isEmpty ? '?' : s.titleOf(sp).substring(0, 1).toUpperCase(), size: 26)
+                                        : SizedBox(width: 26, child: Center(child: HudDiamond(sp.colorValue))),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: Text(s.titleOf(sp), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                    if ((s.unread[sp.id] ?? 0) > 0) HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
               ),
-              child: card,
-            ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AppsBlock extends StatelessWidget {
+  const _AppsBlock({this.onAll});
+  final VoidCallback? onAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = HudColors.of(context);
+    return ListenableBuilder(
+      listenable: PcApps.instance,
+      builder: (context, _) {
+        final p = PcApps.instance;
+        final apps = [...p.pinned, ...p.frequent().where((a) => !p.isPinned(a))].take(8).toList();
+        return HudPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _BlockHead(title: 'Mes applis', icon: Icons.apps_rounded, color: const Color(0xFF0EA5E9), action: 'toutes', onAction: onAll),
+              const SizedBox(height: 4),
+              Expanded(
+                child: apps.isEmpty
+                    ? Center(
+                        child: Text(
+                          p.apps.isEmpty ? 'Je lis la liste des applis du PC…' : 'Ouvre une appli depuis « toutes » (clic droit : épingler).',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: c.muted),
+                        ),
+                      )
+                    : GridView.extent(
+                        maxCrossAxisExtent: 92,
+                        padding: EdgeInsets.zero,
+                        childAspectRatio: .95,
+                        children: [for (final a in apps) AppTile(app: a, small: true, onOpen: (x) => unawaited(p.launch(x)))],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -42,6 +42,8 @@ class ModuleStore extends ChangeNotifier {
   static Future<void> writeSecretRaw(String key, String value) =>
       secure.write(key: '$profile$key', value: value);
 
+  static Future<String?> readSecretRaw(String key) => secure.read(key: '$profile$key');
+
   static Future<void> deleteSecretRaw(String key) => secure.delete(key: '$profile$key');
 
   static bool _owns(String fullKey) =>

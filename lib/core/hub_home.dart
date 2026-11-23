@@ -98,7 +98,9 @@ class _HubHomeLayerState extends State<HubHomeLayer> {
       return true;
     }
     final search = HubHome.instance.onSearchText;
-    if (search != null && e.logicalKey == LogicalKeyboardKey.space && HardwareKeyboard.instance.isControlPressed &&
+    // Ctrl + Espace ou Ctrl + K : la recherche (applis du PC comprises).
+    final ctrlK = e.logicalKey == LogicalKeyboardKey.keyK && HardwareKeyboard.instance.isControlPressed;
+    if (search != null && (ctrlK || e.logicalKey == LogicalKeyboardKey.space) && HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed) {
       search('');
       return true;

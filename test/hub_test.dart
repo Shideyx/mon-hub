@@ -75,9 +75,10 @@ void main() {
     await ModuleStore.init();
     final hub = HubController(buildModules());
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
-    expect(find.textContaining(RegExp(r'^(Bonjour|Bonsoir)')), findsOneWidget);
+    // Nouvel accueil (v1.60, façon HUD) : « BONJOUR … » en grand.
+    expect(find.textContaining(RegExp(r'^(Bonjour|Bonsoir)', caseSensitive: false)), findsOneWidget);
     expect(find.text('Agenda'), findsWidgets);
-    expect(find.text('Accueil'), findsOneWidget);
+    expect(find.text('Aujourd\'hui'), findsOneWidget);
   });
 
   testWidgets('sans Clicky configuré, rien de Clicky ne s\'affiche et l\'appli marche', (
@@ -103,7 +104,7 @@ void main() {
     expect(ClickyController.instance.panelOpen, isFalse);
     // Le reste du tableau de bord est là.
     expect(find.text('Agenda'), findsWidgets);
-    expect(find.text('Accueil'), findsOneWidget);
+    expect(find.text('Aujourd\'hui'), findsOneWidget);
   });
 }
 
