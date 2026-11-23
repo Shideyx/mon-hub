@@ -22,6 +22,7 @@ import 'oral_coach.dart';
 import 'video_notes.dart';
 import '../../core/ai_text.dart';
 import '../../core/camera_guard.dart';
+import '../../core/self_repair.dart';
 import '../../core/claude_api.dart';
 import '../../core/perf.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -3110,6 +3111,21 @@ class ClickyController extends ChangeNotifier {
   /// Les outils de dépannage de Clicky : l'IA peut voir ce qui ne va pas
   /// et réparer le micro elle-même (« mon micro ne marche pas »).
   List<HubTool> get repairTools => [
+    HubTool(
+      name: 'clicky_reparer',
+      description:
+          'Répare Clicky tout seul : relit le journal des erreurs du PC et corrige ce qui est '
+          'réparable (micro bloqué, certificats cassés, appli qui fige, Clicky partout qui n\'arrive '
+          'pas à tenir, disque presque plein). À utiliser quand la personne dit « répare-toi », '
+          '« tu bugues », « ça ne marche plus ».',
+      run: (_) async {
+        final done = await SelfRepair.instance.run(manual: true, diskFreeGb: SelfRepair.diskFreeGb());
+        return {
+          'resume': RepairRules.say(done),
+          'reparations': [for (final r in done) {'quoi': r.title, 'fait': r.fixed}],
+        };
+      },
+    ),
     HubTool(
       name: 'clicky_diagnostic',
       description:

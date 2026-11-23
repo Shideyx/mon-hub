@@ -1177,12 +1177,13 @@ class _ChatsBlock extends StatelessWidget {
       listenable: Listenable.merge([Spaces.instance, Online.instance]),
       builder: (context, _) {
         final s = Spaces.instance;
-        if (!s.available)
+        if (!s.available) {
           return _offline(
             context,
             'Discussions',
             'Écris à tes amis avec leur @pseudo, et laisse vos Clicky se parler.',
           );
+        }
         final list = [...s.chats, ...s.spaces]..sort((a, b) => (s.unread[b.id] ?? 0).compareTo(s.unread[a.id] ?? 0));
         return HudPanel(
           child: Column(
