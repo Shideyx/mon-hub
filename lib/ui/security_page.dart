@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/browser.dart';
+import '../core/camera_guard.dart';
 import '../core/pwned.dart';
 import '../core/safe_open.dart';
 import '../core/security_check.dart';
@@ -81,9 +82,15 @@ class _SecurityPageState extends State<SecurityPage> {
                   Card(
                     color: (bad == 0 ? Colors.green : Colors.orange).withValues(alpha: 0.10),
                     child: ListTile(
-                      leading: Icon(bad == 0 ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded, color: bad == 0 ? Colors.green : Colors.orange, size: 34),
-                      title: Text(bad == 0 ? 'Ton PC est bien protégé' : '$bad point${bad > 1 ? 's' : ''} à régler',
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                      leading: Icon(
+                        bad == 0 ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
+                        color: bad == 0 ? Colors.green : Colors.orange,
+                        size: 34,
+                      ),
+                      title: Text(
+                        bad == 0 ? 'Ton PC est bien protégé' : '$bad point${bad > 1 ? 's' : ''} à régler',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                       subtitle: Text(SecurityCheck.say(items)),
                     ),
                   ),
@@ -101,6 +108,8 @@ class _SecurityPageState extends State<SecurityPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  if (CameraGuard.supported) const CameraCard(),
                   const SizedBox(height: 8),
                   const PwnedCheckCard(),
                 ],
@@ -130,8 +139,7 @@ class _SecurityPageState extends State<SecurityPage> {
             spacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (i.fix != null && i.ok != true)
-                TextButton(onPressed: () => _fix(i.fix!), child: Text(i.fixLabel)),
+              if (i.fix != null && i.ok != true) TextButton(onPressed: () => _fix(i.fix!), child: Text(i.fixLabel)),
               if (i.manual)
                 FilterChip(
                   label: const Text('C\'est fait'),
@@ -253,6 +261,94 @@ class _PwnedCheckCardState extends State<PwnedCheckCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// **Caméra et micro** : les couper d'un clic (plus aucune appli ne peut
+/// filmer ou écouter), et voir qui s'en est servi.
+class CameraCard extends StatefulWidget {
+  const CameraCard({super.key});
+
+  @override
+  State<CameraCard> createState() => _CameraCardState();
+}
+
+class _CameraCardState extends State<CameraCard> {
+  final guard = CameraGuard.instance;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(guard.read(force: true));
+  }
+
+  Future<void> _toggle(bool off, {required bool mic}) async {
+    setState(() => _busy = true);
+    final ok = await guard.setBlocked(off, mic: mic);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) showError(context, 'Windows a refusé : Réglages de Windows → Confidentialité → Caméra');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListenableBuilder(
+        listenable: guard,
+        builder: (context, _) {
+          final cam = guard.camera, mic = guard.micro;
+          final using = cam.active.map((u) => u.app).toList();
+          final last = cam.recent.where((u) => !u.active && u.at != null).firstOrNull;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.videocam_off_rounded, color: Color(0xFF7C5CFF)),
+                  title: Text('Caméra et micro', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    'Coupe la caméra quand tu ne t\'en sers pas : même une appli piratée ne peut plus filmer. '
+                    'Tu peux aussi demander à Clicky : « coupe ma caméra ».',
+                  ),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.videocam_rounded),
+                  title: const Text('Caméra coupée'),
+                  subtitle: Text(
+                    using.isNotEmpty
+                        ? 'Utilisée en ce moment par ${using.join(', ')}'
+                        : last != null
+                        ? 'Personne ne s\'en sert. La dernière fois : ${last.app}.'
+                        : 'Personne ne s\'en sert.',
+                  ),
+                  value: cam.blocked,
+                  onChanged: _busy ? null : (v) => unawaited(_toggle(v, mic: false)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.mic_rounded),
+                  title: const Text('Micro coupé'),
+                  subtitle: Text(
+                    mic.active.isNotEmpty
+                        ? 'Utilisé en ce moment par ${mic.active.map((u) => u.app).join(', ')}'
+                        : 'Coupe-le si tu ne t\'en sers pas (Clicky non plus ne t\'entendra plus).',
+                  ),
+                  value: mic.blocked,
+                  onChanged: _busy ? null : (v) => unawaited(_toggle(v, mic: true)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.notifications_active_outlined),
+                  title: const Text('Me prévenir quand une appli allume la caméra'),
+                  value: guard.alerts,
+                  onChanged: (v) => unawaited(guard.setAlerts(v)),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

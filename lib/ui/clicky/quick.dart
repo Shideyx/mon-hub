@@ -243,6 +243,39 @@ class QuickAnswers {
       }
     }
 
+    // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----
+
+    if (has('camera_couper')) {
+      final off = RegExp(
+        r'^(?:coupe|ferme|desactive|eteins|bloque) (?:moi )?(?:ma|la|le) (camera|webcam|micro|microphone)$|'
+        r'^(?:je (?:ne )?veux pas etre (?:filme|filmee|espionne|espionnee))$|'
+        r'^(?:personne ne (?:doit|peut) me filmer)$',
+      ).firstMatch(n);
+      if (off != null) {
+        final mic = (off.group(1) ?? '').startsWith('mic');
+        final r = await call('camera_couper', {'couper': 'oui', 'appareil': mic ? 'micro' : 'camera'});
+        return QuickReply('${r is Map ? r['resume'] : 'C\'est coupé.'}');
+      }
+      final on = RegExp(
+        r'^(?:rallume|remets|reactive|debloque|ouvre) (?:moi )?(?:ma|la|le) (camera|webcam|micro|microphone)$',
+      ).firstMatch(n);
+      if (on != null) {
+        final mic = (on.group(1) ?? '').startsWith('mic');
+        final r = await call('camera_couper', {'couper': 'non', 'appareil': mic ? 'micro' : 'camera'});
+        return QuickReply('${r is Map ? r['resume'] : 'C\'est rallumé.'}');
+      }
+    }
+    if (has('camera_etat') &&
+        RegExp(
+          r'^(?:est ce que )?(?:ma|la) (?:camera|webcam) est (?:allumee|active|coupee|eteinte)\s?\??$|'
+          r'^(?:qui|quelle appli|quelle application) (?:utilise|se sert de) (?:ma|la) (?:camera|webcam|mon micro)\s?\??$|'
+          r'^(?:on me filme|quelqu un me filme|je suis filme|je suis filmee)\s?\??$|'
+          r'^etat de (?:ma|la) (?:camera|webcam)$',
+        ).hasMatch(n)) {
+      final r = await call('camera_etat', {});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+
     // ---- Façon JARVIS : état du PC, fenêtres, concentration, rappels ----
 
     // Le point de la situation (« rapport », « fais le point »).
@@ -391,8 +424,9 @@ class QuickAnswers {
 
     // Ses habitudes.
     if (has('clicky_habitudes') &&
-        RegExp(r'^(?:quelles sont |c est quoi )?mes habitudes(?: sur le pc)?$|^qu est ce que tu (?:sais|as remarque) (?:sur|de) mes habitudes$|^tu as remarque quoi sur (?:moi|mes habitudes)$|^tu me connais$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:quelles sont |c est quoi )?mes habitudes(?: sur le pc)?$|^qu est ce que tu (?:sais|as remarque) (?:sur|de) mes habitudes$|^tu as remarque quoi sur (?:moi|mes habitudes)$|^tu me connais$',
+        ).hasMatch(n)) {
       final r = await call('clicky_habitudes', {});
       if (r is Map) return QuickReply('${r['resume']}');
     }
@@ -408,10 +442,14 @@ class QuickAnswers {
       }
     }
     if (has('guetteur_liste')) {
-      if (RegExp(r'^(?:qu est ce que tu surveilles|tu surveilles quoi|mes alertes|quelles sont mes alertes|tu guettes quoi)$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:qu est ce que tu surveilles|tu surveilles quoi|mes alertes|quelles sont mes alertes|tu guettes quoi)$',
+      ).hasMatch(n)) {
         return QuickReply('${await call('guetteur_liste', {})}');
       }
-      final stop = RegExp(r'^(?:arrete de surveiller|ne surveille plus|annule (?:l alerte|les alertes|mes alertes))(?: (?:pour |de |du |la |le )?(.+))?$').firstMatch(n);
+      final stop = RegExp(
+        r'^(?:arrete de surveiller|ne surveille plus|annule (?:l alerte|les alertes|mes alertes))(?: (?:pour |de |du |la |le )?(.+))?$',
+      ).firstMatch(n);
       if (stop != null) return QuickReply('${await call('guetteur_liste', {'supprimer': (stop[1] ?? 'tout').trim()})}');
     }
 
@@ -431,7 +469,8 @@ class QuickAnswers {
         // Rien vu : l'IA cherche aussi dans vos conversations.
         if (r is Map && (r['resultats'] as List?)?.isNotEmpty == true) return QuickReply('${r['resume']}');
       }
-      final doing = RegExp(r'^qu est ce que je (?:faisais|regardais|lisais) (.{3,60})$|^je faisais quoi (.{3,60})$').firstMatch(n);
+      final doing = RegExp(r'^qu est ce que je (?:faisais|regardais|lisais) (.{3,60})$|^je faisais quoi (.{3,60})$')
+          .firstMatch(n);
       if (doing != null) {
         final r = await call('memoire_ecran', {'quand': (doing[1] ?? doing[2])!});
         if (r is Map && (r['moments'] as List?)?.isNotEmpty == true) return QuickReply('${r['resume']}');
@@ -455,8 +494,11 @@ class QuickAnswers {
       final r = await call('sens_etat', {});
       if (r is Map) {
         final said = '${r['vient_d_etre_dit'] ?? ''}'.trim();
-        if (said.isEmpty) return const QuickReply('Je n\'ai rien entendu ces 2 dernières minutes (ou mes oreilles sont éteintes).');
-        return QuickReply('Il vient de dire : « ${said.length > 320 ? '…${said.substring(said.length - 320)}' : said} »');
+        if (said.isEmpty)
+          return const QuickReply('Je n\'ai rien entendu ces 2 dernières minutes (ou mes oreilles sont éteintes).');
+        return QuickReply(
+          'Il vient de dire : « ${said.length > 320 ? '…${said.substring(said.length - 320)}' : said} »',
+        );
       }
     }
     if (has('sens_regler')) {
@@ -465,22 +507,41 @@ class QuickAnswers {
         return QuickReply(text);
       }
 
-      if (RegExp(r'^(?:regarde|surveille|tu peux regarder|vois) (?:mon |l )?ecran(?: en continu| tout le temps| en permanence)?$').hasMatch(n)) {
-        return set({'ecran': true}, 'D\'accord : je vois ton écran en continu, et tout reste sur ton PC (jamais tes messages, ta banque ni la navigation privée).');
+      if (RegExp(
+        r'^(?:regarde|surveille|tu peux regarder|vois) (?:mon |l )?ecran(?: en continu| tout le temps| en permanence)?$',
+      ).hasMatch(n)) {
+        return set(
+          {'ecran': true},
+          'D\'accord : je vois ton écran en continu, et tout reste sur ton PC (jamais tes messages, ta banque ni la navigation privée).',
+        );
       }
-      if (RegExp(r'^(?:arrete|stop) de (?:regarder|voir|surveiller) (?:mon |l )?ecran$|^ne regarde plus (?:mon |l )?ecran$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:arrete|stop) de (?:regarder|voir|surveiller) (?:mon |l )?ecran$|^ne regarde plus (?:mon |l )?ecran$',
+      ).hasMatch(n)) {
         return set({'ecran': false}, 'C\'est noté : je ne regarde plus ton écran.');
       }
-      if (RegExp(r'^(?:ecoute|tu peux ecouter|entends) (?:le son|ce qui passe|mes videos)(?: du pc| de mon pc| sur mon pc)?(?: en continu| tout le temps)?$').hasMatch(n)) {
-        return set({'son': true}, 'D\'accord : j\'écoute le son de ton PC (les vidéos, pas la musique), jamais pendant un appel, et tout reste sur ton PC.');
+      if (RegExp(
+        r'^(?:ecoute|tu peux ecouter|entends) (?:le son|ce qui passe|mes videos)(?: du pc| de mon pc| sur mon pc)?(?: en continu| tout le temps)?$',
+      ).hasMatch(n)) {
+        return set(
+          {'son': true},
+          'D\'accord : j\'écoute le son de ton PC (les vidéos, pas la musique), jamais pendant un appel, et tout reste sur ton PC.',
+        );
       }
-      if (RegExp(r'^(?:arrete|stop) d ecouter(?: le son)?(?: du pc| de mon pc)?$|^n ecoute plus(?: le son)?(?: du pc)?$').hasMatch(n)) {
+      if (RegExp(
+        r'^(?:arrete|stop) d ecouter(?: le son)?(?: du pc| de mon pc)?$|^n ecoute plus(?: le son)?(?: du pc)?$',
+      ).hasMatch(n)) {
         return set({'son': false}, 'C\'est noté : je n\'écoute plus le son de ton PC.');
       }
-      final eyes = RegExp(r'^(?:ferme les yeux|ne regarde pas|fais une pause d ecran)(?: pendant (.+))?$').firstMatch(n);
+      final eyes = RegExp(r'^(?:ferme les yeux|ne regarde pas|fais une pause d ecran)(?: pendant (.+))?$')
+          .firstMatch(n);
       if (eyes != null) {
-        final d = eyes[1] == null ? const Duration(hours: 1) : (FocusDuration.parse(eyes[1]!) ?? const Duration(hours: 1));
-        return set({'pause_minutes': d.inMinutes}, 'Je ferme les yeux et les oreilles pendant ${FocusDuration.say(d)}.');
+        final d = eyes[1] == null
+            ? const Duration(hours: 1)
+            : (FocusDuration.parse(eyes[1]!) ?? const Duration(hours: 1));
+        return set({
+          'pause_minutes': d.inMinutes,
+        }, 'Je ferme les yeux et les oreilles pendant ${FocusDuration.say(d)}.');
       }
     }
 
@@ -501,15 +562,18 @@ class QuickAnswers {
 
     // Mon argent : abonnements, colis, jeux gratuits.
     if (has('argent_abonnements') &&
-        RegExp(r'^(?:quels sont |montre |liste |donne )?(?:moi )?mes abonnements$|'
-                r'^combien (?:je depense|je paye|je paie|ca me coute)(?: par mois)? (?:en|pour mes|avec mes) abonnements$|'
-                r'^(?:j ai|ai je) (?:quels|des) abonnements$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:quels sont |montre |liste |donne )?(?:moi )?mes abonnements$|'
+          r'^combien (?:je depense|je paye|je paie|ca me coute)(?: par mois)? (?:en|pour mes|avec mes) abonnements$|'
+          r'^(?:j ai|ai je) (?:quels|des) abonnements$',
+        ).hasMatch(n)) {
       final r = await call('argent_abonnements', const {});
       if (r is Map) {
         final subs = _list(r['abonnements']).where((s) => s['resilie'] != true).toList();
         if (subs.isEmpty) {
-          return const QuickReply('Je ne connais aucun abonnement pour l\'instant. Ouvre « Mon argent » : je cherche dans tes mails.');
+          return const QuickReply(
+            'Je ne connais aucun abonnement pour l\'instant. Ouvre « Mon argent » : je cherche dans tes mails.',
+          );
         }
         final names = [for (final s in subs) s['prix'] == null ? '${s['service']}' : '${s['service']} (${s['prix']})'];
         final next = subs.where((s) => s['prochain'] != null).toList()
@@ -522,16 +586,18 @@ class QuickAnswers {
       }
     }
     if (has('argent_colis') &&
-        RegExp(r'^(?:ou (?:est|en est|en sont) (?:mon|mes) colis|mes colis|(?:il|elle) arrive quand mon colis|'
-                r'(?:j ai|est ce que j ai) (?:un|des) colis(?: a recuperer| a retirer)?)$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:ou (?:est|en est|en sont) (?:mon|mes) colis|mes colis|(?:il|elle) arrive quand mon colis|'
+          r'(?:j ai|est ce que j ai) (?:un|des) colis(?: a recuperer| a retirer)?)$',
+        ).hasMatch(n)) {
       final list = _list(await call('argent_colis', const {}));
       if (list.isEmpty) return const QuickReply('Aucun colis en cours dans tes mails.');
       return QuickReply([for (final p in list.take(4)) '📦 ${p['boutique']} : ${p['etat']}'].join('\n'));
     }
     if (has('argent_jeux') &&
-        RegExp(r'^(?:quels sont les |y a t il des |il y a des |c est quoi les )?jeux gratuits(?: cette semaine| en ce moment| sur epic)?$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:quels sont les |y a t il des |il y a des |c est quoi les )?jeux gratuits(?: cette semaine| en ce moment| sur epic)?$',
+        ).hasMatch(n)) {
       final r = await call('argent_jeux', const {});
       final free = r is Map ? _list(r['gratuits']).where((g) => g['maintenant'] == true).toList() : const <Map>[];
       if (free.isEmpty) return const QuickReply('Pas de jeu gratuit sur Epic en ce moment (ou pas d\'internet).');
@@ -540,17 +606,21 @@ class QuickAnswers {
 
     // Outils d'études : correction sur la photo, coach d'oral, carte mentale.
     if (has('copie_corriger') &&
-        RegExp(r'^corrige(?: moi)? (?:ma|mon|cette|la) (?:copie|redaction|dissertation|commentaire|photo|devoir|essai)$').hasMatch(n)) {
+        RegExp(
+          r'^corrige(?: moi)? (?:ma|mon|cette|la) (?:copie|redaction|dissertation|commentaire|photo|devoir|essai)$',
+        ).hasMatch(n)) {
       return QuickReply('${await call('copie_corriger', const {})}');
     }
     if (has('oral_coach') &&
-        RegExp(r'^(?:coach d oral|entraine moi (?:a|pour) (?:mon |l |le |mon grand )?(?:oral|expose|grand oral)|'
-                r'(?:je veux |aide moi a )?repeter mon (?:oral|expose|grand oral))$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:coach d oral|entraine moi (?:a|pour) (?:mon |l |le |mon grand )?(?:oral|expose|grand oral)|'
+          r'(?:je veux |aide moi a )?repeter mon (?:oral|expose|grand oral))$',
+        ).hasMatch(n)) {
       return QuickReply('${await call('oral_coach', const {})}');
     }
     if (has('carte_mentale')) {
-      final m = RegExp(r'^(?:fais|dessine|cree)(?: moi)? une carte mentale (?:sur |de |du |des |d )(.{2,80})$').firstMatch(n);
+      final m = RegExp(r'^(?:fais|dessine|cree)(?: moi)? une carte mentale (?:sur |de |du |des |d )(.{2,80})$')
+          .firstMatch(n);
       if (m != null) {
         return QuickReply('${await call('carte_mentale', {'sujet': QuickAnswers.original(raw, m[1]!.trim())})}');
       }
@@ -558,7 +628,8 @@ class QuickAnswers {
 
     // Langues : interprète et sous-titres en direct.
     if (has('interprete_ouvrir')) {
-      const langs = r'(anglais|espagnol|allemand|italien|portugais|arabe|chinois|japonais|coreen|russe|turc|ukrainien|polonais|neerlandais|roumain)';
+      const langs =
+          r'(anglais|espagnol|allemand|italien|portugais|arabe|chinois|japonais|coreen|russe|turc|ukrainien|polonais|neerlandais|roumain)';
       final m = RegExp(
         '^(?:mode |lance |ouvre |active )?(?:l |un |mon )?interprete(?: (?:en |d |de |pour l |pour |francais )?$langs)?\$|'
         '^traduis (?:ma |notre |la |cette )?conversation(?: (?:en |avec l )?$langs)?\$',
@@ -568,16 +639,19 @@ class QuickAnswers {
       }
     }
     if (has('soustitres_lancer') &&
-        RegExp(r'^(?:mets |lance |active |affiche )?(?:moi )?(?:les |des )?sous titres?(?: en direct| en francais)?$|'
-                r'^sous titre(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie)$|'
-                r'^traduis(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie|ce qu ils disent)$')
-            .hasMatch(n)) {
+        RegExp(
+          r'^(?:mets |lance |active |affiche )?(?:moi )?(?:les |des )?sous titres?(?: en direct| en francais)?$|'
+          r'^sous titre(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie)$|'
+          r'^traduis(?: moi)? (?:ce que j ecoute|la video|ce qui passe|la serie|ce qu ils disent)$',
+        ).hasMatch(n)) {
       return QuickReply('${await call('soustitres_lancer', const {})}');
     }
 
     // Playlist de soirée.
     if (has('soiree_ouvrir') &&
-        RegExp(r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$').hasMatch(n)) {
+        RegExp(
+          r'^(?:lance|ouvre|demarre|commence|fais)(?: une| la| ma)? (?:soiree|playlist de soiree|playlist soiree|fete)$|^mode (?:soiree|fete)$',
+        ).hasMatch(n)) {
       return QuickReply('${await call('soiree_ouvrir', const {})}');
     }
 

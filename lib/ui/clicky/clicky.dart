@@ -21,6 +21,7 @@ import 'mind_map.dart';
 import 'oral_coach.dart';
 import 'video_notes.dart';
 import '../../core/ai_text.dart';
+import '../../core/camera_guard.dart';
 import '../../core/claude_api.dart';
 import '../../core/perf.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -2582,6 +2583,8 @@ class ClickyController extends ChangeNotifier {
       },
     ),
     ...Replies.tools(),
+    // La caméra et le micro : qui s'en sert, et les couper d'un mot.
+    if (CameraGuard.supported) ...CameraGuard.instance.tools(),
     HubTool(
       name: 'temps_ecran',
       description:

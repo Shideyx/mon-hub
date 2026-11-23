@@ -506,3 +506,17 @@
   `main.dart`, `screen_time.dart`, `pc_watch.dart`, `senses.dart` (`screenOn`/`soundOn` faux en mode léger),
   `clicky.dart` (`_startPresence`), `clicky_desktop.dart` (`launch`/`watch`/boucle 16 ms), `error_log.dart`
   (`FreezeWatch`). Réglages → Vitesse de l'appli. Tests `test/v175_perf_test.dart`.
+- **Interface simplifiée (v1.61)** : accueil (`ui/home_page.dart`) = **un seul** menu « Plus » en haut (notifications +
+  `PopupMenuButton` : ce que Clicky sait faire, mon téléphone, clair/sombre, personnaliser, réglages) au lieu de sept
+  boutons dont trois doublaient le menu de gauche ; plus de faux jargon (« SYSTÈME OK », « RIEN DE NOUVEAU », code-barres) :
+  des phrases normales. Menu (`ui/app_shell.dart`) : **une seule** section « Espaces et messages » (avant « Espaces » +
+  « Discussions », mêmes pages) avec un seul « + » (créer / rejoindre / écrire). Tests `test/v162_iphone_test.dart`
+  (bouton « Plus »).
+- **Caméra et micro protégés (v1.61)** : `core/camera_guard.dart` (`CameraRules` sans Windows : `appName` (chemin ou
+  paquet), `expected`/`unexpected`, `fromFileTime`, `parse` (fin à 0 = en cours), `say` ; `CameraGuard` : registre
+  `CapabilityAccessManager\ConsentStore\webcam|microphone` par PowerShell, `setBlocked` = `Value` à Deny/Allow (HKCU,
+  sans administrateur), `tick` (dans le tour de 15 s de `main.dart`) → alerte « 🚨 <appli> filme » (une fois par appli),
+  réglage `app.camera.alerte`). Outils `camera_etat`, `camera_couper` (**action à autoriser**) dans `lifeTools`, phrases
+  sans IA (« coupe ma caméra », « qui utilise ma caméra ? », « on me filme ? »), carte `CameraCard` dans
+  `ui/security_page.dart`. Le flou n'est pas possible sans pilote de caméra virtuelle : on coupe, c'est plus sûr.
+  Tests `test/v176_camera_test.dart`.

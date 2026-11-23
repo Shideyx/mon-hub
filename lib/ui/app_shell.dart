@@ -123,7 +123,11 @@ class _AppShellState extends State<AppShell> {
   Widget _body(List<HubModule> modules) {
     if (selected.startsWith('mod:')) {
       final m = modules.where((m) => m.id == selected.substring(4)).firstOrNull;
-      if (m != null) return KeyedSubtree(key: ValueKey(m.id), child: Builder(builder: m.buildPage));
+      if (m != null)
+        return KeyedSubtree(
+          key: ValueKey(m.id),
+          child: Builder(builder: m.buildPage),
+        );
     }
     if (selected.startsWith('space:')) {
       return SpacePage(key: ValueKey(selected), spaceId: selected.substring(6), onClosed: () => _go('spaces'));
@@ -155,7 +159,9 @@ class _AppShellState extends State<AppShell> {
           onGo: _go,
           onSettings: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => SettingsPage(controller: widget.controller, notifications: widget.notifications)),
+            MaterialPageRoute(
+              builder: (_) => SettingsPage(controller: widget.controller, notifications: widget.notifications),
+            ),
           ),
         );
         // Changement de section : fondu + petite montée (façon Spotify).
@@ -166,7 +172,10 @@ class _AppShellState extends State<AppShell> {
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, a) => FadeTransition(
             opacity: a,
-            child: SlideTransition(position: Tween(begin: const Offset(0, 0.015), end: Offset.zero).animate(a), child: child),
+            child: SlideTransition(
+              position: Tween(begin: const Offset(0, 0.015), end: Offset.zero).animate(a),
+              child: child,
+            ),
           ),
           child: KeyedSubtree(key: ValueKey(selected), child: body),
         );
@@ -175,12 +184,14 @@ class _AppShellState extends State<AppShell> {
         if (wide) {
           return Scaffold(
             body: HudBackground(
-              child: _withBanners(Row(
-                children: [
-                  RepaintBoundary(child: menu),
-                  Expanded(child: switcher),
-                ],
-              )),
+              child: _withBanners(
+                Row(
+                  children: [
+                    RepaintBoundary(child: menu),
+                    Expanded(child: switcher),
+                  ],
+                ),
+              ),
             ),
           );
         }
@@ -275,7 +286,10 @@ class _SideMenu extends StatelessWidget {
 
           return Container(
             width: 252,
-            decoration: BoxDecoration(color: c.side, border: Border(right: BorderSide(color: c.line.withValues(alpha: .7)))),
+            decoration: BoxDecoration(
+              color: c.side,
+              border: Border(right: BorderSide(color: c.line.withValues(alpha: .7))),
+            ),
             child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -292,7 +306,8 @@ class _SideMenu extends StatelessWidget {
                             children: [
                               Text('MON HUB', style: hudTitle(context, size: 17).copyWith(letterSpacing: 1.4)),
                               Text(
-                                '$appVersion // ${sp.available ? '${sp.spaces.length} espace${sp.spaces.length > 1 ? 's' : ''}' : 'hors ligne'}'.toUpperCase(),
+                                '$appVersion // ${sp.available ? '${sp.spaces.length} espace${sp.spaces.length > 1 ? 's' : ''}' : 'hors ligne'}'
+                                    .toUpperCase(),
                                 style: hudLabel(context, size: 9),
                               ),
                             ],
@@ -308,12 +323,23 @@ class _SideMenu extends StatelessWidget {
                       child: Container(
                         height: 40,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(color: c.panelLow, border: Border.all(color: c.line)),
+                        decoration: BoxDecoration(
+                          color: c.panelLow,
+                          border: Border.all(color: c.line),
+                        ),
                         child: Row(
                           children: [
-                            Text('>', style: hudMono(context, color: c.pink, weight: FontWeight.w700)),
+                            Text(
+                              '>',
+                              style: hudMono(context, color: c.pink, weight: FontWeight.w700),
+                            ),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(PcApps.supported ? 'chercher, une appli…' : 'chercher…', style: hudMono(context, size: 12, color: c.muted))),
+                            Expanded(
+                              child: Text(
+                                PcApps.supported ? 'chercher, une appli…' : 'chercher…',
+                                style: hudMono(context, size: 12, color: c.muted),
+                              ),
+                            ),
                             const HudKey('Ctrl K'),
                           ],
                         ),
@@ -325,26 +351,45 @@ class _SideMenu extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
                       children: [
                         const HudSectionLabel('Perso'),
-                        _Item(label: 'Aujourd\'hui', icon: Icons.blur_on_rounded, selected: selected == 'home', onTap: () => onGo('home')),
+                        _Item(
+                          label: 'Aujourd\'hui',
+                          icon: Icons.blur_on_rounded,
+                          selected: selected == 'home',
+                          onTap: () => onGo('home'),
+                        ),
                         if (PcApps.supported)
-                          _Item(label: 'Mes applis', icon: Icons.apps_rounded, selected: selected == 'apps', onTap: () => onGo('apps')),
+                          _Item(
+                            label: 'Mes applis',
+                            icon: Icons.apps_rounded,
+                            selected: selected == 'apps',
+                            onTap: () => onGo('apps'),
+                          ),
+                        // Espaces et messages : c'était deux sections qui
+                        // menaient aux mêmes pages. Une seule, avec un seul
+                        // bouton « + ».
                         HudSectionLabel(
-                          'Espaces',
+                          'Espaces et messages',
                           open: !folded.contains('espaces'),
                           onTap: () => fold('espaces'),
                           trailing: sp.available
                               ? PopupMenuButton<String>(
-                                  tooltip: 'Nouvel espace / rejoindre',
+                                  tooltip: 'Créer, rejoindre ou écrire',
                                   padding: EdgeInsets.zero,
                                   iconSize: 16,
                                   icon: Icon(Icons.add_rounded, size: 16, color: c.muted),
                                   onSelected: (a) async {
-                                    final s = a == 'join' ? await SpaceActions.join(context) : await SpaceActions.create(context);
+                                    final action = switch (a) {
+                                      'join' => SpaceActions.join,
+                                      'message' => SpaceActions.message,
+                                      _ => SpaceActions.create,
+                                    };
+                                    final s = await action(context);
                                     if (s != null) onGo('space:${s.id}');
                                   },
                                   itemBuilder: (_) => const [
                                     PopupMenuItem(value: 'new', child: Text('Créer un espace')),
                                     PopupMenuItem(value: 'join', child: Text('Rejoindre avec un code')),
+                                    PopupMenuItem(value: 'message', child: Text('Écrire à quelqu\'un')),
                                   ],
                                 )
                               : null,
@@ -367,35 +412,25 @@ class _SideMenu extends StatelessWidget {
                                 pinned: sp.isPinned(s.id),
                                 onTap: () => onGo('space:${s.id}'),
                               ),
-                            _Item(label: 'Tous les espaces', icon: Icons.grid_view_rounded, dim: true, selected: selected == 'spaces', onTap: () => onGo('spaces')),
-                          ],
-                        ],
-                        if (sp.available) ...[
-                          HudSectionLabel(
-                            'Discussions',
-                            open: !folded.contains('discussions'),
-                            onTap: () => fold('discussions'),
-                            trailing: IconButton(
-                              tooltip: 'Nouveau message',
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                              iconSize: 16,
-                              icon: Icon(Icons.add_rounded, size: 16, color: c.muted),
-                              onPressed: () async {
-                                final s = await SpaceActions.message(context);
-                                if (s != null) onGo('space:${s.id}');
-                              },
-                            ),
-                          ),
-                          if (!folded.contains('discussions'))
                             for (final d in sp.chats)
                               _Item(
                                 label: sp.titleOf(d),
-                                leading: HexAvatar(sp.titleOf(d).isEmpty ? '?' : sp.titleOf(d).substring(0, 1).toUpperCase(), size: 20),
+                                leading: HexAvatar(
+                                  sp.titleOf(d).isEmpty ? '?' : sp.titleOf(d).substring(0, 1).toUpperCase(),
+                                  size: 20,
+                                ),
                                 selected: selected == 'space:${d.id}',
                                 count: sp.unread[d.id] ?? 0,
                                 onTap: () => onGo('space:${d.id}'),
                               ),
+                            _Item(
+                              label: 'Tout voir',
+                              icon: Icons.grid_view_rounded,
+                              dim: true,
+                              selected: selected == 'spaces',
+                              onTap: () => onGo('spaces'),
+                            ),
+                          ],
                         ],
                         HudSectionLabel('Modules', open: !folded.contains('modules'), onTap: () => fold('modules')),
                         if (!folded.contains('modules'))
@@ -481,11 +516,27 @@ class _Item extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 18,
-                  child: selected ? Text('>', textAlign: TextAlign.center, style: hudMono(context, color: c.accent, weight: FontWeight.w700)) : null,
+                  child: selected
+                      ? Text(
+                          '>',
+                          textAlign: TextAlign.center,
+                          style: hudMono(context, color: c.accent, weight: FontWeight.w700),
+                        )
+                      : null,
                 ),
                 SizedBox(
                   width: 24,
-                  child: Center(child: leading ?? (icon == null ? null : Icon(icon, size: 18, color: selected ? (iconColor ?? c.accentText) : (iconColor ?? c.muted)))),
+                  child: Center(
+                    child:
+                        leading ??
+                        (icon == null
+                            ? null
+                            : Icon(
+                                icon,
+                                size: 18,
+                                color: selected ? (iconColor ?? c.accentText) : (iconColor ?? c.muted),
+                              )),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -552,15 +603,30 @@ class _Banner extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                HexAvatar('', size: 28, color: color, child: Icon(module?.icon ?? Icons.notifications_active_rounded, size: 15, color: Colors.white)),
+                HexAvatar(
+                  '',
+                  size: 28,
+                  color: color,
+                  child: Icon(module?.icon ?? Icons.notifications_active_rounded, size: 15, color: Colors.white),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(n.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                      Text(
+                        n.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                       const SizedBox(height: 2),
-                      Text(n.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        n.body,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
