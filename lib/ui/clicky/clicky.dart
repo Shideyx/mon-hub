@@ -22,6 +22,7 @@ import 'oral_coach.dart';
 import 'video_notes.dart';
 import '../../core/ai_text.dart';
 import '../../core/claude_api.dart';
+import '../../core/perf.dart';
 import '../../modules/carnet/carnet_module.dart';
 import '../../modules/carnet/carnet_store.dart';
 import '../../core/claude_bridge.dart';
@@ -1246,7 +1247,8 @@ class ClickyController extends ChangeNotifier {
 
   void _startPresence() {
     if (_presence != null) return;
-    _presence = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_presenceTick()));
+    // Mode léger : un tour toutes les 5 s au lieu de 2.
+    _presence = Timer.periodic(Perf.slow(const Duration(seconds: 2)), (_) => unawaited(_presenceTick()));
   }
 
   bool get _calm =>

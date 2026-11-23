@@ -15,6 +15,7 @@ import '../../core/claude_bridge.dart';
 import '../../core/error_log.dart';
 import '../../core/hub_module.dart';
 import '../../core/module_store.dart';
+import '../../core/perf.dart';
 import '../../core/nav.dart';
 import '../../core/session.dart';
 import '../theme.dart';
@@ -58,6 +59,9 @@ class ClickyDesktop {
   static Future<void> launch() async {
     _paused = false;
     final c = ClickyController.instance;
+    // Mode léger (PC modeste) : Clicky reste dans la fenêtre de Mon Hub.
+    // Ce second programme est ce qui ralentissait le plus les petits PC.
+    if (!Perf.everywhere) return;
     // Pas de cerveau configuré : on ne lance rien du tout.
     if (!supported || !c.everywhere || !await c.refreshReady() || !c.enabled) return;
     if (await running()) return;
@@ -108,7 +112,7 @@ class ClickyDesktop {
     _watch?.cancel();
     _watch = Timer.periodic(const Duration(seconds: 15), (_) async {
       final c = ClickyController.instance;
-      if (_paused || !c.everywhere || !c.enabled) return;
+      if (_paused || !c.everywhere || !c.enabled || !Perf.everywhere) return;
       if (await running()) return;
       final now = DateTime.now();
       _restarts.removeWhere((t) => now.difference(t) > const Duration(minutes: 10));
@@ -496,7 +500,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
       _pinned = true;
       _place(force: true);
     };
-    _tick = Timer.periodic(const Duration(milliseconds: 16), (_) => _loop());
+    _tick = Timer.periodic(Perf.slow(const Duration(milliseconds: 16), factor: 2), (_) => _loop());
     _slow = Timer.periodic(const Duration(seconds: 3), (_) => _housekeeping());
   }
 

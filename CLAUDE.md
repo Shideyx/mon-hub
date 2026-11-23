@@ -498,3 +498,11 @@
   console. **Android** : job `android` réactivé (non bloquant) + `release-android` ajoute `MonHub-Android.apk` ;
   `Updater.phoneUpdate` prévient sur Android comme sur iPhone. Tests : `test/v174_online_test.dart`, `test/v135_test.dart`
   (nouvel accueil).
+- **Mode léger (v1.61)** : `core/perf.dart` (`Perf` : réglage `app.perf` = auto / `leger` / `complet`, détection
+  `PerfRules.modest` (cœurs `Platform.numberOfProcessors` + mémoire `GlobalMemoryStatusEx`), `Perf.slow(durée)` pour
+  tous les tours de surveillance, `Perf.everywhere` (Clicky partout = second programme, **coupé** sur un PC modeste :
+  c'est ce qui l'empêchait de démarrer), `Perf.heavy` (yeux/oreilles, sauvegarde, guetteur de gels), `Perf.animations`,
+  `Perf.later(rang, …)` = **démarrage étalé** au lieu de tout lancer à la connexion dans `HubApp._sync`). Branché dans
+  `main.dart`, `screen_time.dart`, `pc_watch.dart`, `senses.dart` (`screenOn`/`soundOn` faux en mode léger),
+  `clicky.dart` (`_startPresence`), `clicky_desktop.dart` (`launch`/`watch`/boucle 16 ms), `error_log.dart`
+  (`FreezeWatch`). Réglages → Vitesse de l'appli. Tests `test/v175_perf_test.dart`.

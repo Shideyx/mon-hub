@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'claude_bridge.dart';
 import 'freeze_watch.dart';
+import 'perf.dart';
 
 /// Journal des erreurs, **sur ton PC seulement** (rien n'est envoyé) :
 /// %APPDATA%\MonHub\journal-erreurs.log. Quand Clicky ou Mon Hub plante,
@@ -83,7 +84,7 @@ class ErrorLog {
   static void install(String who) {
     _who = who;
     // Le guetteur note quand l'appli fige (« Ne répond pas ») et pourquoi.
-    unawaited(FreezeWatch.start(who, path));
+    if (Perf.heavy) unawaited(FreezeWatch.start(who, path));
     final previous = FlutterError.onError;
     FlutterError.onError = (details) {
       record(details.exception, details.stack, where: details.library ?? 'affichage');

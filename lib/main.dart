@@ -4,6 +4,7 @@ import 'dart:io' show Directory, Platform;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/perf.dart';
 import 'core/online/clicky_chat.dart';
 import 'core/online/online.dart';
 import 'core/online/spaces.dart';
@@ -99,7 +100,8 @@ Future<void> _announceSenses(NotificationCenter n) async {
     HubNotification(
       id: 'sens:annonce',
       title: '👀 Nouveau : Clicky peut voir ton écran et entendre ton PC',
-      body: 'En continu, mais tout reste sur ton PC (jamais tes messages, ta banque ni pendant un appel). '
+      body:
+          'En continu, mais tout reste sur ton PC (jamais tes messages, ta banque ni pendant un appel). '
           'À allumer dans Réglages de Clicky → Ses yeux et ses oreilles.',
       moduleId: 'claude',
     ),
@@ -119,7 +121,8 @@ Future<void> _phoneUpdateNotice(NotificationCenter n) async {
       HubNotification(
         id: 'maj-android:$tag',
         title: '📲 Mon Hub $tag est prête',
-        body: 'Télécharge MonHub-Android.apk sur la page des versions de Mon Hub (GitHub → Releases), puis ouvre-le pour '
+        body:
+            'Télécharge MonHub-Android.apk sur la page des versions de Mon Hub (GitHub → Releases), puis ouvre-le pour '
             'mettre à jour. Tes données restent là.',
       ),
     );
@@ -129,7 +132,8 @@ Future<void> _phoneUpdateNotice(NotificationCenter n) async {
     HubNotification(
       id: 'maj-iphone:$tag',
       title: '📲 Mon Hub $tag est prête pour ton iPhone',
-      body: 'Sur ton PC : Réglages → Mes appareils → Ajouter mon iPhone → Télécharger, puis Sideloadly. '
+      body:
+          'Sur ton PC : Réglages → Mes appareils → Ajouter mon iPhone → Télécharger, puis Sideloadly. '
           'Tes données restent sur l\'iPhone.',
     ),
   );
@@ -286,14 +290,19 @@ class _HubAppState extends State<HubApp> {
                 ),
               ),
             );
-          }
-          ..start();
+          };
+        // Le compte sur tous tes appareils : un peu après l'ouverture.
+        Perf.later(2, AccountSync.instance.start);
         // Mon Hub en ligne (espaces partagés, discussions, même compte partout).
-        unawaited(_startOnline(n));
-        // Tes travaux (Documents, Bureau) copiés dans ton Drive.
-        WorkBackup.instance.start();
+        Perf.later(1, () => _startOnline(n));
+        // Démarrage **étalé** (Perf.later) : avant, tout partait d'un coup à
+        // la connexion et les petits PC s'étouffaient. Maintenant chaque
+        // service attend son tour (et attend plus longtemps en mode léger).
+        // Tes travaux (Documents, Bureau) copiés dans ton Drive : lourd, donc
+        // jamais en mode léger.
+        if (Perf.heavy) Perf.later(4, WorkBackup.instance.start);
         // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
-        unawaited(BrowserLink.instance.start());
+        Perf.later(3, BrowserLink.instance.start);
         // Les hologrammes ont été retirés (v1.60) : on efface la « vision des
         // mains » qu'ils avaient téléchargée (~ 30 Mo), une fois.
         unawaited(_removeHologramFiles());
@@ -303,14 +312,16 @@ class _HubAppState extends State<HubApp> {
             final id = 'tel:${DateTime.now().millisecondsSinceEpoch}';
             unawaited(n.post(HubNotification(id: id, title: title, body: body)));
           });
-          unawaited(PhoneLink.instance.start());
+          Perf.later(5, PhoneLink.instance.start);
         }
         // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier
         // plan toutes les 15 s (sur ce PC seulement).
         if (Win.supportedHere) {
           final st = ScreenTime.instance;
           st.alert = (title, body) {
-            unawaited(n.post(HubNotification(id: 'temps:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
+            unawaited(
+              n.post(HubNotification(id: 'temps:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
+            );
           };
           // Ce qu'il remarque à l'écran ou dans le son devient une idée (avec
           // ton accord) ou une petite pensée.
@@ -323,38 +334,57 @@ class _HubAppState extends State<HubApp> {
               return tools.where((t) => t.name == name).firstOrNull?.run(args);
             })
             ..busy = (() => FocusMode.instance.active || GameMode.instance.active || clicky.idea != null)
-            ..inCall = (() => const {PhoneState.ringing, PhoneState.calling, PhoneState.inCall}.contains(DiscordPhone.instance.state));
+            ..inCall = (() => const {
+              PhoneState.ringing,
+              PhoneState.calling,
+              PhoneState.inCall,
+            }.contains(DiscordPhone.instance.state));
           unawaited(_announceSenses(n));
           // Le presse-papier malin et les réactions du PC (téléchargements,
           // captures, clés USB…).
           PcWatch.instance
             ..think = ((t) => unawaited(clicky.think(t, aloud: false)))
             ..warn = ((title, body) {
-              unawaited(n.post(HubNotification(id: 'arnaque:pc:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
-            })
-            ..start();
-          st
-            ..onTick = () async {
-              try {
-                final exe = Win.foregroundExe(), title = Win.foregroundTitle();
-                await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
-                final full = Win.foregroundFullscreen();
-                final end = GameMode.instance.tick(exe: exe, fullscreen: full);
-                await PcWatch.instance.tick(title: title, idle: Win.idleSeconds(), diskFreeGb: PcWatch.instance.diskFree());
-                // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
-                await ClickySenses.instance.tick(
-                  exe: exe,
-                  title: title,
-                  idle: Win.idleSeconds(),
-                  fullscreen: full,
-                  game: GameMode.instance.active,
+              unawaited(
+                n.post(
+                  HubNotification(id: 'arnaque:pc:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body),
+                ),
+              );
+            });
+          Perf.later(3, PcWatch.instance.start);
+          st.onTick = () async {
+            try {
+              final exe = Win.foregroundExe(), title = Win.foregroundTitle();
+              await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
+              final full = Win.foregroundFullscreen();
+              final end = GameMode.instance.tick(exe: exe, fullscreen: full);
+              await PcWatch.instance.tick(
+                title: title,
+                idle: Win.idleSeconds(),
+                diskFreeGb: PcWatch.instance.diskFree(),
+              );
+              // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
+              await ClickySenses.instance.tick(
+                exe: exe,
+                title: title,
+                idle: Win.idleSeconds(),
+                fullscreen: full,
+                game: GameMode.instance.active,
+              );
+              if (end != null) {
+                unawaited(
+                  n.post(
+                    HubNotification(
+                      id: 'jeu:${DateTime.now().millisecondsSinceEpoch}',
+                      title: '🎮 Partie terminée',
+                      body: end,
+                    ),
+                  ),
                 );
-                if (end != null) {
-                  unawaited(n.post(HubNotification(id: 'jeu:${DateTime.now().millisecondsSinceEpoch}', title: '🎮 Partie terminée', body: end)));
-                }
-              } catch (_) {}
-            }
-            ..start();
+              }
+            } catch (_) {}
+          };
+          Perf.later(1, st.start);
         }
         // iPhone : pas de mise à jour automatique (Apple l'interdit hors App
         // Store) : on prévient quand une nouvelle version est prête.
@@ -397,17 +427,27 @@ class _HubAppState extends State<HubApp> {
           ..call = ((name, args) async =>
               ClickyController.instance.hubTools.where((t) => t.name == name).firstOrNull?.run(args))
           ..alert = (title, body) {
-            unawaited(n.post(HubNotification(id: 'veille:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body, moduleId: 'music')));
+            unawaited(
+              n.post(
+                HubNotification(
+                  id: 'veille:${DateTime.now().millisecondsSinceEpoch}',
+                  title: title,
+                  body: body,
+                  moduleId: 'music',
+                ),
+              ),
+            );
             unawaited(ClickyController.instance.think(body, aloud: false));
-          }
-          ..start();
+          };
+        Perf.later(6, ArtistWatch.instance.start);
         // Les guetteurs : notification + Clicky le dit.
-        Watchers.instance
-          ..alert = (title, body) {
-            unawaited(n.post(HubNotification(id: 'guetteur:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)));
-            unawaited(ClickyController.instance.think(body));
-          }
-          ..start();
+        Watchers.instance.alert = (title, body) {
+          unawaited(
+            n.post(HubNotification(id: 'guetteur:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
+          );
+          unawaited(ClickyController.instance.think(body));
+        };
+        Perf.later(2, Watchers.instance.start);
         // Alertes de Clicky (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(
@@ -428,11 +468,14 @@ class _HubAppState extends State<HubApp> {
     if (!ClickyTutorial.seen) {
       final ctx = await hubDialogContext(timeout: const Duration(seconds: 20));
       if (ctx == null || !ctx.mounted || ClickyTutorial.seen) return;
-      await ClickyTutorial.show(ctx, onBrain: () {
-        brain = true;
-        final c = hubNavigatorKey.currentContext;
-        if (c != null) ClaudeModule.showSettings(c);
-      });
+      await ClickyTutorial.show(
+        ctx,
+        onBrain: () {
+          brain = true;
+          final c = hubNavigatorKey.currentContext;
+          if (c != null) ClaudeModule.showSettings(c);
+        },
+      );
     } else {
       // Compte déjà là : on laisse l'appli s'ouvrir tranquillement.
       await Future<void>.delayed(const Duration(seconds: 4));

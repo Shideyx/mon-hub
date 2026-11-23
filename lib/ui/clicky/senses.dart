@@ -27,6 +27,7 @@ import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
 import '../../core/module_store.dart';
 import '../../core/prompt_shield.dart';
+import '../../core/perf.dart';
 import '../../core/screen_memory.dart';
 import '../../core/screen_time.dart';
 import 'autonomy.dart';
@@ -339,8 +340,10 @@ class ClickySenses extends ChangeNotifier {
     }
   }
 
-  bool get screenOn => _pref(_kScreen, false);
-  bool get soundOn => _pref(_kSound, false);
+  // Mode léger (PC modeste) : ses yeux et ses oreilles restent éteints,
+  // c'est ce qui coûte le plus cher (lecture de l'écran, écoute du son).
+  bool get screenOn => Perf.heavy && _pref(_kScreen, false);
+  bool get soundOn => Perf.heavy && _pref(_kSound, false);
 
   /// Le coup de pouce quand tu procrastines (oui par défaut).
   bool get nudgeOn => _pref(_kNudge, true);

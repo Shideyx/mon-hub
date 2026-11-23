@@ -22,6 +22,7 @@ import 'tidy_page.dart';
 import '../core/google_auth.dart';
 import '../core/hub_controller.dart';
 import '../core/module_store.dart';
+import '../core/perf.dart';
 import '../core/notifications.dart';
 import '../core/session.dart';
 import '../core/shortcuts.dart';
@@ -521,6 +522,47 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () => _errors(context),
             ),
       ],
+      'vitesse' => [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Text(
+                'Mon Hub regarde la puissance de ton PC et s\'adapte. En mode léger, Clicky reste dans la '
+                'fenêtre de Mon Hub (pas de second programme) et tout ce qui surveille en continu se fait '
+                'plus rarement.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            StatefulBuilder(
+              builder: (context, setState) {
+                Widget choice(String value, String title, String subtitle) {
+                  final on = Perf.choice == value;
+                  return ListTile(
+                    leading: Icon(on ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded),
+                    title: Text(title),
+                    subtitle: Text(subtitle),
+                    selected: on,
+                    onTap: () async {
+                      await Perf.setChoice(value);
+                      setState(() {});
+                    },
+                  );
+                }
+                return Column(
+                  children: [
+                    choice('auto', 'Automatique (conseillé)',
+                        Perf.light ? 'Ton PC est modeste : mode léger activé.' : 'Ton PC suit sans problème : tout est allumé.'),
+                    choice('leger', 'Toujours léger', 'À choisir si l\'appli rame ou chauffe.'),
+                    choice('complet', 'Toujours complet', 'Clicky partout, ses yeux et ses oreilles, sauvegarde en continu.'),
+                    ListTile(
+                      leading: const Icon(Icons.speed_rounded),
+                      title: Text(Perf.explain),
+                      subtitle: const Text('Change de mode puis redémarre Mon Hub pour que tout reparte au bon rythme.'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
       'demarrage' => [
             if (AppShortcuts.supported) ...[
               ListTile(
@@ -786,6 +828,8 @@ class SettingsCategory {
         'temps ecran sommeil coucher anniversaire anniversaires limite jeu habitudes'),
     SettingsCategory('securite', '🛡️', 'Sécurité et vie privée', 'Bilan de sécurité, ce qui reste sur ton PC, journal des erreurs',
         Color(0xFF16A34A), 'securite antivirus arnaque confidentialite vie privee erreurs journal donnees'),
+    SettingsCategory('vitesse', '⚡', 'Vitesse de l\'appli', 'Mode léger pour les PC modestes : tout reste fluide',
+        Color(0xFFF59E0B), 'vitesse lent lenteur rame rapide fluide leger performance ram memoire processeur clicky partout'),
     SettingsCategory('demarrage', '⌨️', 'Démarrage et raccourcis', 'Lancer Mon Hub avec Windows, raccourcis du Bureau',
         Color(0xFF64748B), 'demarrage windows raccourci raccourcis bureau menu demarrer lancer'),
   ];

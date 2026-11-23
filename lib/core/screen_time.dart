@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'hub_files.dart';
+import 'perf.dart';
 import 'module_store.dart';
 
 /// **Temps d'écran** (sur ce PC seulement, jamais envoyé) : le temps passé
@@ -204,7 +205,8 @@ class ScreenTime extends ChangeNotifier {
 
   void start() {
     _timer?.cancel();
-    _timer = Timer.periodic(step, (_) => onTick?.call());
+    // Mode léger : un tour toutes les 40 s au lieu de 15.
+    _timer = Timer.periodic(Perf.slow(step), (_) => onTick?.call());
   }
 
   void stop() {
