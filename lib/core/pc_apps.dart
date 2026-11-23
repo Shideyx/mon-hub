@@ -139,7 +139,9 @@ Get-StartApps | Select-Object Name, AppID | ConvertTo-Json -Compress
 
   /// Lance l'appli (comme un clic dans le menu Démarrer).
   Future<bool> launch(PcApp a) async {
-    final ok = await SafeOpen.launch('shell:AppsFolder\\${a.id}');
+    var ok = await SafeOpen.launch('shell:AppsFolder\\${a.id}');
+    // Quelques entrées donnent le chemin du programme lui-même.
+    if (!ok && RegExp(r'^[A-Za-z]:\\').hasMatch(a.id)) ok = await SafeOpen.launch(a.id);
     if (ok) {
       final u = usage;
       u[a.id] = (u[a.id] ?? 0) + 1;

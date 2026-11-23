@@ -23,6 +23,7 @@ ThemeData buildTheme(Brightness brightness) {
     surfaceContainerHigh: dark ? const Color(0xFF1A1C27) : const Color(0xFFF1EFF8),
     surfaceContainerHighest: dark ? const Color(0xFF1F2131) : const Color(0xFFE9E6F3),
     outlineVariant: h.line,
+    outline: dark ? const Color(0xFF4A4E6A) : const Color(0xFFB5AFD6),
   );
   final base = ThemeData(useMaterial3: true, colorScheme: scheme, brightness: brightness);
   // Titres en Chakra Petch ; le texte courant garde la police du système
@@ -63,9 +64,9 @@ ThemeData buildTheme(Brightness brightness) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: h.panelLow,
-      border: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.line)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.line)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.accent, width: 1.5)),
+      // Seulement « border » : sa couleur suit l'état (violet quand on écrit),
+      // et un champ qui dit « pas de bord » (InputBorder.none) le reste.
+      border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
     dialogTheme: DialogThemeData(backgroundColor: h.panel, shape: hudCut(18, side: BorderSide(color: h.hotLine))),
