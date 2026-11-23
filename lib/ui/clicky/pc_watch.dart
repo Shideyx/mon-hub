@@ -24,6 +24,7 @@ import '../../core/ai_text.dart';
 import '../../core/claude_bridge.dart';
 import '../../core/hub_module.dart';
 import '../../core/module_store.dart';
+import '../../core/perf.dart';
 import '../../core/scam_shield.dart';
 import '../../core/tidy.dart';
 import 'autonomy.dart';
@@ -264,7 +265,10 @@ class PcWatch {
   void start() {
     if (!supported) return;
     stop();
-    _clipTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _pollClip());
+    _clipTimer = Timer.periodic(
+      Perf.slow(const Duration(milliseconds: 1500), factor: 3),
+      (_) => _pollClip(),
+    );
     for (final what in ['telechargements', 'screenshots']) {
       final d = what == 'screenshots' ? _screenshots() : PcTidy.folder(what);
       if (d == null || !d.existsSync()) continue;
