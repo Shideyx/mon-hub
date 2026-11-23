@@ -520,3 +520,11 @@
   sans IA (« coupe ma caméra », « qui utilise ma caméra ? », « on me filme ? »), carte `CameraCard` dans
   `ui/security_page.dart`. Le flou n'est pas possible sans pilote de caméra virtuelle : on coupe, c'est plus sûr.
   Tests `test/v176_camera_test.dart`.
+- **Il se répare tout seul (v1.61)** : `core/self_repair.dart` (`RepairRules` sans fichiers : `recentLines` (48 h,
+  garde les lignes sans date), `diagnose` → `Repair` (micro bloqué ≥ 2 traces → `clicky_reparer_micro`,
+  `CERTIFICATE_VERIFY_FAILED` → `TrustedCertificates.install`, « figé » ≥ 3 ou Clicky partout fermé ≥ 3 →
+  `Perf.setChoice('leger')`, disque < 2 Go → `pc_ranger_apercu`, JSON abîmé → `AccountSync.syncNow`), `say` ;
+  `SelfRepair` : `run({manual})` (une panne réparée n'est retentée qu'à la demande, `app.repare.fait`), branché dans
+  `main.dart` (`Perf.later(7, …)` au démarrage, notification « 🔧 Clicky s'est réparé tout seul »), outil
+  `clicky_reparer` dans `repairTools`, phrases sans IA (« répare-toi », « tu bugues »)). Il ne supprime jamais rien et
+  dit toujours ce qu'il a fait. Tests `test/v177_self_repair_test.dart`.

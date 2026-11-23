@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
 import 'core/camera_guard.dart';
+import 'core/self_repair.dart';
 import 'core/perf.dart';
 import 'core/online/clicky_chat.dart';
 import 'core/online/online.dart';
@@ -458,6 +459,25 @@ class _HubAppState extends State<HubApp> {
           unawaited(ClickyController.instance.think(body));
         };
         Perf.later(2, Watchers.instance.start);
+        // Clicky se répare tout seul : il relit son journal d'erreurs et
+        // corrige ce qu'il sait corriger (micro bloqué, certificats cassés,
+        // appli qui fige, disque plein), puis il le dit.
+        SelfRepair.instance
+          ..call = ((name, args) async =>
+              ClickyController.instance.hubTools.where((t) => t.name == name).firstOrNull?.run(args))
+          ..restoreData = (() async {
+            final sync = AccountSync.instance;
+            if (!sync.enabled) return false;
+            await sync.syncNow();
+            return sync.error == null;
+          })
+          ..tell = ((title, body) {
+            unawaited(
+              n.post(HubNotification(id: 'repare:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body, moduleId: 'claude')),
+            );
+            unawaited(ClickyController.instance.think(body, aloud: false));
+          });
+        Perf.later(7, () => SelfRepair.instance.run(diskFreeGb: SelfRepair.diskFreeGb()));
         // Alertes de Clicky (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(

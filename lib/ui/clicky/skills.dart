@@ -139,6 +139,7 @@ class ClickySkills {
       Skill('Bouclier anti-arnaque : faux Nitro/Robux, faux sites, « teste mon jeu » avec un .exe'),
       Skill('« Ce lien est sûr ? » (après l\'avoir copié)', tryIt: 'Ce lien est sûr ?'),
       Skill('« Bilan de sécurité » : antivirus, pare-feu, mises à jour, double authentification', tryIt: 'Bilan de sécurité'),
+      Skill('« Répare-toi » : il relit son journal d\'erreurs et corrige ce qu\'il peut', tryIt: 'Répare-toi'),
       Skill('« Coupe ma caméra » : plus aucune appli ne peut filmer, même une appli piratée', tryIt: 'Coupe ma caméra'),
       Skill('« Qui utilise ma caméra ? » — et il te prévient dès qu\'une appli l\'allume', tryIt: 'Qui utilise ma caméra ?'),
     ]),

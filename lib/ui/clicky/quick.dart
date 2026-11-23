@@ -243,6 +243,18 @@ class QuickAnswers {
       }
     }
 
+    // ---- « Répare-toi » : il relit son journal et corrige ----
+
+    if (has('clicky_reparer') &&
+        RegExp(
+          r'^(?:repare|reparer|repare toi|reparer toi|auto reparation)$|'
+          r'^(?:tu (?:bugues|bug|plantes|deconnes)|ca (?:ne )?marche plus|rien ne marche|tu marches plus)\s?!?$|'
+          r'^(?:verifie|regarde) (?:si tout va bien|ton journal|tes erreurs)$',
+        ).hasMatch(n)) {
+      final r = await call('clicky_reparer', {});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+
     // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----
 
     if (has('camera_couper')) {
@@ -494,8 +506,9 @@ class QuickAnswers {
       final r = await call('sens_etat', {});
       if (r is Map) {
         final said = '${r['vient_d_etre_dit'] ?? ''}'.trim();
-        if (said.isEmpty)
+        if (said.isEmpty) {
           return const QuickReply('Je n\'ai rien entendu ces 2 dernières minutes (ou mes oreilles sont éteintes).');
+        }
         return QuickReply(
           'Il vient de dire : « ${said.length > 320 ? '…${said.substring(said.length - 320)}' : said} »',
         );
