@@ -22,7 +22,6 @@ import 'hud/hud.dart';
 import 'notifications_page.dart';
 import 'online/online_page.dart';
 import 'phone_link_page.dart';
-import 'search_page.dart';
 import 'settings_page.dart';
 import 'spaces/spaces_page.dart';
 
@@ -61,13 +60,7 @@ class _HomePageState extends State<HomePage> {
     if (PcApps.supported) unawaited(PcApps.instance.load());
   }
 
-  Set<String> get _specialsHere => {
-    'fil',
-    'espaces',
-    'taches',
-    'discussions',
-    if (PcApps.supported) 'applis',
-  };
+  Set<String> get _specialsHere => {'fil', 'espaces', 'taches', 'discussions', if (PcApps.supported) 'applis'};
 
   @override
   Widget build(BuildContext context) {
@@ -79,8 +72,14 @@ class _HomePageState extends State<HomePage> {
           final desk = DesktopWidgets.instance;
           final all = widget.controller.enabled;
           // Les widgets détachés vivent sur le bureau, pas dans l'accueil.
-          final modules = [for (final m in all) if (!desk.isDetached(m.id)) m];
-          final away = [for (final m in all) if (desk.isDetached(m.id)) m];
+          final modules = [
+            for (final m in all)
+              if (!desk.isDetached(m.id)) m,
+          ];
+          final away = [
+            for (final m in all)
+              if (desk.isDetached(m.id)) m,
+          ];
           final byId = {for (final m in modules) m.id: m};
           final layout = HomeLayout.instance;
           final blocks = layout.blocks(modules: modules.map((m) => m.id).toList(), specialsHere: _specialsHere);
@@ -88,8 +87,12 @@ class _HomePageState extends State<HomePage> {
             onRefresh: widget.notifications.pollNow,
             child: CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(child: _Header(controller: widget.controller, notifications: widget.notifications, modules: all)),
-                SliverToBoxAdapter(child: _Console(onOpenApps: widget.onOpenApps, onOpenSpace: widget.onOpenSpace)),
+                SliverToBoxAdapter(
+                  child: _Header(controller: widget.controller, notifications: widget.notifications, modules: all),
+                ),
+                SliverToBoxAdapter(
+                  child: _Console(onOpenApps: widget.onOpenApps, onOpenSpace: widget.onOpenSpace),
+                ),
                 if (away.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -99,7 +102,7 @@ class _HomePageState extends State<HomePage> {
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text('SUR LE BUREAU', style: hudLabel(context, size: 10)),
+                          Text('Sur le bureau', style: Theme.of(context).textTheme.bodySmall),
                           for (final m in away)
                             InputChip(
                               avatar: Icon(m.icon, size: 16, color: m.color),
@@ -114,7 +117,10 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-                if (layout.editing) SliverToBoxAdapter(child: _EditBar(blocks: blocks, modules: modules, specialsHere: _specialsHere)),
+                if (layout.editing)
+                  SliverToBoxAdapter(
+                    child: _EditBar(blocks: blocks, modules: modules, specialsHere: _specialsHere),
+                  ),
                 if (blocks.isEmpty)
                   SliverToBoxAdapter(
                     child: HudEmpty(
@@ -125,11 +131,7 @@ class _HomePageState extends State<HomePage> {
                 else
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(_side(context), 12, _side(context), 32),
-                    sliver: _Grid(
-                      blocks: blocks,
-                      editing: layout.editing,
-                      builder: (b) => _block(context, b, byId),
-                    ),
+                    sliver: _Grid(blocks: blocks, editing: layout.editing, builder: (b) => _block(context, b, byId)),
                   ),
               ],
             ),
@@ -197,10 +199,7 @@ class _Grid extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final (j, b) in rows[i].indexed) ...[
-                  if (j > 0) const SizedBox(width: gap),
-                  cell(b),
-                ],
+                for (final (j, b) in rows[i].indexed) ...[if (j > 0) const SizedBox(width: gap), cell(b)],
               ],
             ),
           ),
@@ -245,7 +244,10 @@ class _Editable extends StatelessWidget {
                     height: 26,
                     alignment: Alignment.center,
                     color: block.span == s ? c.accent : Colors.transparent,
-                    child: Text(s == 3 ? 'L' : (s == 2 ? 'M' : 'S'), style: hudLabel(context, size: 11, color: block.span == s ? Colors.white : c.muted)),
+                    child: Text(
+                      s == 3 ? 'L' : (s == 2 ? 'M' : 'S'),
+                      style: hudLabel(context, size: 11, color: block.span == s ? Colors.white : c.muted),
+                    ),
                   ),
                 ),
               ),
@@ -267,7 +269,9 @@ class _Editable extends StatelessWidget {
         Positioned.fill(
           child: IgnorePointer(
             child: DecoratedBox(
-              decoration: ShapeDecoration(shape: hudCut(14, side: BorderSide(color: c.accent, width: 1.5))),
+              decoration: ShapeDecoration(
+                shape: hudCut(14, side: BorderSide(color: c.accent, width: 1.5)),
+              ),
             ),
           ),
         ),
@@ -276,11 +280,28 @@ class _Editable extends StatelessWidget {
     );
     final feedback = Material(
       color: Colors.transparent,
-      child: SizedBox(width: 260, height: 90, child: HudPanel(hot: true, child: Center(child: Text(_title(block), style: hudTitle(context, size: 16))))),
+      child: SizedBox(
+        width: 260,
+        height: 90,
+        child: HudPanel(
+          hot: true,
+          child: Center(child: Text(_title(block), style: hudTitle(context, size: 16))),
+        ),
+      ),
     );
     final draggable = touch
-        ? LongPressDraggable<String>(data: block.id, feedback: feedback, childWhenDragging: Opacity(opacity: .3, child: framed), child: framed)
-        : Draggable<String>(data: block.id, feedback: feedback, childWhenDragging: Opacity(opacity: .3, child: framed), child: MouseRegion(cursor: SystemMouseCursors.grab, child: framed));
+        ? LongPressDraggable<String>(
+            data: block.id,
+            feedback: feedback,
+            childWhenDragging: Opacity(opacity: .3, child: framed),
+            child: framed,
+          )
+        : Draggable<String>(
+            data: block.id,
+            feedback: feedback,
+            childWhenDragging: Opacity(opacity: .3, child: framed),
+            child: MouseRegion(cursor: SystemMouseCursors.grab, child: framed),
+          );
     return DragTarget<String>(
       onWillAcceptWithDetails: (d) => d.data != block.id,
       onAcceptWithDetails: (d) => layout.move(blocks, d.data, block.id),
@@ -288,7 +309,9 @@ class _Editable extends StatelessWidget {
           ? draggable
           : DecoratedBox(
               position: DecorationPosition.foreground,
-              decoration: ShapeDecoration(shape: hudCut(14, side: BorderSide(color: c.pink, width: 3))),
+              decoration: ShapeDecoration(
+                shape: hudCut(14, side: BorderSide(color: c.pink, width: 3)),
+              ),
               child: draggable,
             ),
     );
@@ -329,7 +352,10 @@ class _EditBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('MODE PERSONNALISATION', style: hudTitle(context, size: 17)),
-                    Text('Glisse les blocs, S / M / L pour la largeur, × pour retirer.', style: TextStyle(color: c.muted, fontSize: 13)),
+                    Text(
+                      'Glisse les blocs, S / M / L pour la largeur, × pour retirer.',
+                      style: TextStyle(color: c.muted, fontSize: 13),
+                    ),
                   ],
                 ),
               ],
@@ -366,9 +392,17 @@ class _EditBar extends StatelessWidget {
             : ListView(
                 shrinkWrap: true,
                 children: [
-                  Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text('AJOUTER UN BLOC', style: hudTitle(ctx, size: 18))),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text('AJOUTER UN BLOC', style: hudTitle(ctx, size: 18)),
+                  ),
                   for (final o in options)
-                    ListTile(leading: Icon(o.$3), title: Text(o.$2), trailing: const Icon(Icons.add_rounded), onTap: () => Navigator.pop(ctx, o.$1)),
+                    ListTile(
+                      leading: Icon(o.$3),
+                      title: Text(o.$2),
+                      trailing: const Icon(Icons.add_rounded),
+                      onTap: () => Navigator.pop(ctx, o.$1),
+                    ),
                 ],
               ),
       ),
@@ -396,7 +430,10 @@ class _Header extends StatelessWidget {
     final greeting = now.hour < 5 || now.hour >= 18 ? 'BONSOIR' : 'BONJOUR';
     String two(int n) => n.toString().padLeft(2, '0');
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final sep = TextSpan(text: '  //  ', style: TextStyle(color: c.bracket));
+    final sep = TextSpan(
+      text: '  //  ',
+      style: TextStyle(color: c.bracket),
+    );
     return Padding(
       padding: EdgeInsets.fromLTRB(_side(context), 24, _side(context) - 8, 4),
       child: Wrap(
@@ -416,8 +453,6 @@ class _Header extends StatelessWidget {
                     TextSpan(text: '${_days[now.weekday - 1]} ${two(now.day)}.${two(now.month)}.${now.year}'),
                     sep,
                     TextSpan(text: '${two(now.hour)}:${two(now.minute)}'),
-                    sep,
-                    TextSpan(text: 'SYSTÈME OK', style: TextStyle(color: c.ok)),
                   ],
                 ),
               ),
@@ -433,20 +468,20 @@ class _Header extends StatelessWidget {
                   final stats = [
                     for (final m in modules)
                       if (m.badge.value > 0) '${m.badge.value} ${m.name}',
-                    if (Spaces.instance.totalUnread > 0) '${Spaces.instance.totalUnread} message${Spaces.instance.totalUnread > 1 ? 's' : ''} en ligne',
+                    if (Spaces.instance.totalUnread > 0)
+                      '${Spaces.instance.totalUnread} message${Spaces.instance.totalUnread > 1 ? 's' : ''} en ligne',
                   ];
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Hatch(width: 84, height: 8),
+                      const Hatch(width: 56, height: 8),
                       const SizedBox(width: 12),
-                      const Barcode(),
-                      const SizedBox(width: 12),
+                      // Une phrase normale plutôt que du jargon en majuscules.
                       Flexible(
                         child: Text(
-                          stats.isEmpty ? 'RIEN DE NOUVEAU' : stats.take(4).join(' · ').toUpperCase(),
+                          stats.isEmpty ? 'Rien de nouveau' : 'Nouveau : ${stats.take(3).join(', ')}',
                           overflow: TextOverflow.ellipsis,
-                          style: hudLabel(context, size: 10),
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
                     ],
@@ -455,14 +490,12 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
+          // Un seul menu « Plus » : avant, sept boutons en haut, dont trois
+          // qui refaisaient ce que le menu de gauche fait déjà.
           Wrap(
             spacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              IconButton(
-                tooltip: 'Chercher partout (Ctrl + Espace)',
-                icon: const Icon(Icons.search_rounded),
-                onPressed: () => SearchPage.show(),
-              ),
               ListenableBuilder(
                 listenable: notifications,
                 builder: (context, _) => IconButton(
@@ -477,39 +510,67 @@ class _Header extends StatelessWidget {
                     notifications.markRead();
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => NotificationsPage(notifications: notifications, controller: controller)),
+                      MaterialPageRoute(
+                        builder: (_) => NotificationsPage(notifications: notifications, controller: controller),
+                      ),
                     );
                   },
                 ),
               ),
-              if (Platform.isWindows)
-                IconButton(
-                  tooltip: 'Mon téléphone (fichiers, télécommande)',
-                  icon: const Icon(Icons.devices_rounded),
-                  onPressed: () => PhoneLinkPage.open(context),
-                ),
-              IconButton(
-                tooltip: 'Ce que Clicky sait faire',
-                icon: const Icon(Icons.auto_awesome_outlined),
-                onPressed: () => ClickySkillsPage.open(context),
-              ),
-              IconButton(
-                tooltip: dark ? 'Mode clair' : 'Mode sombre',
-                icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-                onPressed: () => AppSession.instance.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark),
-              ),
-              IconButton(
-                tooltip: 'Personnaliser l\'accueil',
-                icon: const Icon(Icons.dashboard_customize_outlined),
-                onPressed: () => HomeLayout.instance.setEditing(!HomeLayout.instance.editing),
-              ),
-              IconButton(
-                tooltip: 'Réglages',
-                icon: const Icon(Icons.tune_rounded),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => SettingsPage(controller: controller, notifications: notifications)),
-                ),
+              PopupMenuButton<String>(
+                tooltip: 'Plus',
+                icon: const Icon(Icons.more_horiz_rounded),
+                onSelected: (a) {
+                  switch (a) {
+                    case 'clicky':
+                      ClickySkillsPage.open(context);
+                    case 'telephone':
+                      PhoneLinkPage.open(context);
+                    case 'theme':
+                      AppSession.instance.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark);
+                    case 'perso':
+                      HomeLayout.instance.setEditing(!HomeLayout.instance.editing);
+                    case 'reglages':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SettingsPage(controller: controller, notifications: notifications),
+                        ),
+                      );
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'clicky',
+                    child: ListTile(
+                      leading: Icon(Icons.auto_awesome_outlined),
+                      title: Text('Ce que Clicky sait faire'),
+                    ),
+                  ),
+                  if (Platform.isWindows)
+                    const PopupMenuItem(
+                      value: 'telephone',
+                      child: ListTile(leading: Icon(Icons.devices_rounded), title: Text('Mon téléphone')),
+                    ),
+                  PopupMenuItem(
+                    value: 'theme',
+                    child: ListTile(
+                      leading: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                      title: Text(dark ? 'Passer en clair' : 'Passer en sombre'),
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'perso',
+                    child: ListTile(
+                      leading: Icon(Icons.dashboard_customize_outlined),
+                      title: Text('Personnaliser l\'accueil'),
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'reglages',
+                    child: ListTile(leading: Icon(Icons.tune_rounded), title: Text('Réglages')),
+                  ),
+                ],
               ),
             ],
           ),
@@ -537,7 +598,12 @@ class _ConsoleState extends State<_Console> {
   List<PcApp> _apps = const [];
   List<Space> _spaces = const [];
 
-  static const _shortcuts = ['fais le point', 'qu\'est-ce que j\'ai raté', 'prépare mon sac', 'mode concentration 25 min'];
+  static const _shortcuts = [
+    'fais le point',
+    'qu\'est-ce que j\'ai raté',
+    'prépare mon sac',
+    'mode concentration 25 min',
+  ];
 
   @override
   void dispose() {
@@ -550,7 +616,9 @@ class _ConsoleState extends State<_Console> {
     setState(() {
       _apps = t.length < 2 || !PcApps.supported ? const [] : PcApps.instance.search(t, max: 6);
       final low = t.toLowerCase();
-      _spaces = t.length < 2 ? const [] : Spaces.instance.all.where((s) => Spaces.instance.titleOf(s).toLowerCase().contains(low)).take(3).toList();
+      _spaces = t.length < 2
+          ? const []
+          : Spaces.instance.all.where((s) => Spaces.instance.titleOf(s).toLowerCase().contains(low)).take(3).toList();
     });
   }
 
@@ -604,7 +672,10 @@ class _ConsoleState extends State<_Console> {
                           const Icon(Icons.near_me_rounded, color: Colors.white, size: 18),
                           if (!narrow) ...[
                             const SizedBox(width: 10),
-                            Text('CLICKY', style: hudTitle(context, size: 15, color: Colors.white).copyWith(letterSpacing: 2.4)),
+                            Text(
+                              'CLICKY',
+                              style: hudTitle(context, size: 15, color: Colors.white).copyWith(letterSpacing: 2.4),
+                            ),
                           ],
                         ],
                       ),
@@ -612,7 +683,12 @@ class _ConsoleState extends State<_Console> {
                   ),
                   Padding(
                     padding: EdgeInsets.only(left: narrow ? 8 : 14, right: 6),
-                    child: Center(child: Text('>_', style: hudMono(context, size: 17, color: c.accentText, weight: FontWeight.w700))),
+                    child: Center(
+                      child: Text(
+                        '>_',
+                        style: hudMono(context, size: 17, color: c.accentText, weight: FontWeight.w700),
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: Center(
@@ -622,7 +698,9 @@ class _ConsoleState extends State<_Console> {
                         onSubmitted: _submit,
                         style: hudMono(context, size: 15),
                         decoration: InputDecoration(
-                          hintText: narrow ? 'demande à Clicky…' : 'demande, cherche, ou tape le nom d\'une appli…',
+                          hintText: narrow
+                              ? 'Demande à Clicky…'
+                              : 'Demande quelque chose à Clicky, ou tape le nom d\'une appli…',
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -651,14 +729,17 @@ class _ConsoleState extends State<_Console> {
             ),
             if (_apps.isNotEmpty || _spaces.isNotEmpty)
               Container(
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: c.hotLine))),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: c.hotLine)),
+                ),
                 padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (_apps.isNotEmpty) Text('APPLIS', style: hudLabel(context, size: 10)),
+                    if (_apps.isNotEmpty)
+                      Text('Applis', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: c.muted)),
                     for (final a in _apps)
                       ActionChip(
                         avatar: HexAvatar(a.initials, size: 20, color: HexAvatar.colorFor(a.name)),
@@ -668,7 +749,8 @@ class _ConsoleState extends State<_Console> {
                           unawaited(PcApps.instance.launch(a));
                         },
                       ),
-                    if (_spaces.isNotEmpty) Text('ESPACES', style: hudLabel(context, size: 10)),
+                    if (_spaces.isNotEmpty)
+                      Text('Espaces', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: c.muted)),
                     for (final s in _spaces)
                       ActionChip(
                         avatar: HudDiamond(s.colorValue),
@@ -678,22 +760,26 @@ class _ConsoleState extends State<_Console> {
                           widget.onOpenSpace?.call(s);
                         },
                       ),
-                    Text('ENTRÉE : ${_apps.isNotEmpty ? 'OUVRIR / ' : ''}DEMANDER À CLICKY', style: hudLabel(context, size: 9, color: c.dim)),
+                    Text(
+                      _apps.isNotEmpty ? 'Entrée : ouvrir l\'appli' : 'Entrée : demander à Clicky',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: c.dim),
+                    ),
                   ],
                 ),
               )
             else
               Container(
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: c.hotLine))),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: c.hotLine)),
+                ),
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('RACCOURCIS', style: hudLabel(context, size: 10)),
-                    for (final s in _shortcuts)
-                      _Cmd(text: s, onTap: () => unawaited(ClickyController.instance.ask(s))),
+                    Text('Essaie :', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: c.muted)),
+                    for (final s in _shortcuts) _Cmd(text: s, onTap: () => unawaited(ClickyController.instance.ask(s))),
                     if (PcApps.supported) _Cmd(text: 'mes applis', onTap: widget.onOpenApps),
                   ],
                 ),
@@ -737,10 +823,15 @@ class _Cmd extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text.rich(
-            TextSpan(children: [
-              TextSpan(text: '» ', style: TextStyle(color: c.pink, fontWeight: FontWeight.w700)),
-              TextSpan(text: text),
-            ]),
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '» ',
+                  style: TextStyle(color: c.pink, fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: text),
+              ],
+            ),
             style: hudMono(context, size: 12),
           ),
         ),
@@ -753,7 +844,15 @@ class _Cmd extends StatelessWidget {
 
 /// En-tête commun des blocs : « [n] TITRE » + lien.
 class _BlockHead extends StatelessWidget {
-  const _BlockHead({required this.title, this.action, this.onAction, this.trailing, this.icon, this.color, this.natural = false});
+  const _BlockHead({
+    required this.title,
+    this.action,
+    this.onAction,
+    this.trailing,
+    this.icon,
+    this.color,
+    this.natural = false,
+  });
   final String title;
 
   /// Le nom tel quel (un module), en police des titres.
@@ -770,12 +869,22 @@ class _BlockHead extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          HexAvatar('', size: 26, color: color ?? c.accent, child: Icon(icon, size: 14, color: Colors.white)),
+          HexAvatar(
+            '',
+            size: 26,
+            color: color ?? c.accent,
+            child: Icon(icon, size: 14, color: Colors.white),
+          ),
           const SizedBox(width: 10),
         ],
         Expanded(
           child: natural
-              ? Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: hudTitle(context, size: 16, weight: FontWeight.w600))
+              ? Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: hudTitle(context, size: 16, weight: FontWeight.w600),
+                )
               : Text(title.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: hudLabel(context)),
         ),
         ?trailing,
@@ -821,7 +930,9 @@ class _ModuleBlockState extends State<_ModuleBlock> {
   void _open() {
     final m = widget.module;
     FreezeWatch.note('ouvre ${m.name}');
-    widget.onOpen != null ? widget.onOpen!(m) : Navigator.push(context, MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)));
+    widget.onOpen != null
+        ? widget.onOpen!(m)
+        : Navigator.push(context, MaterialPageRoute(builder: (ctx) => m.buildPage(ctx)));
   }
 
   @override
@@ -843,7 +954,8 @@ class _ModuleBlockState extends State<_ModuleBlock> {
               color: m.color,
               trailing: ValueListenableBuilder(
                 valueListenable: m.badge,
-                builder: (context, n, _) => n == 0 ? const SizedBox.shrink() : HudTag('$n', color: c.pink, textColor: Colors.white),
+                builder: (context, n, _) =>
+                    n == 0 ? const SizedBox.shrink() : HudTag('$n', color: c.pink, textColor: Colors.white),
               ),
               action: 'ouvrir',
               onAction: _open,
@@ -883,7 +995,11 @@ class _SpacesBlock extends StatelessWidget {
       builder: (context, _) {
         final s = Spaces.instance;
         if (!s.available) {
-          return _offline(context, 'Mes espaces', 'Partage des tâches et discute avec tes amis, ta classe ou ton équipe.');
+          return _offline(
+            context,
+            'Mes espaces',
+            'Partage des tâches et discute avec tes amis, ta classe ou ton équipe.',
+          );
         }
         final list = s.spaces;
         return HudPanel(
@@ -894,9 +1010,17 @@ class _SpacesBlock extends StatelessWidget {
               const SizedBox(height: 8),
               Expanded(
                 child: list.isEmpty
-                    ? Center(child: HudButton(label: '+ Créer un espace', primary: true, onPressed: () => unawaited(SpaceActions.create(context).then((x) {
-                        if (x != null) onOpen?.call(x);
-                      }))))
+                    ? Center(
+                        child: HudButton(
+                          label: '+ Créer un espace',
+                          primary: true,
+                          onPressed: () => unawaited(
+                            SpaceActions.create(context).then((x) {
+                              if (x != null) onOpen?.call(x);
+                            }),
+                          ),
+                        ),
+                      )
                     : ListView(
                         padding: EdgeInsets.zero,
                         children: [
@@ -911,7 +1035,10 @@ class _SpacesBlock extends StatelessWidget {
                                     const SizedBox(width: 12),
                                     Expanded(child: Text(sp.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
                                     if (s.isPinned(sp.id)) Icon(Icons.push_pin_rounded, size: 13, color: c.dim),
-                                    if ((s.unread[sp.id] ?? 0) > 0) ...[const SizedBox(width: 8), HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white)],
+                                    if ((s.unread[sp.id] ?? 0) > 0) ...[
+                                      const SizedBox(width: 8),
+                                      HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -960,9 +1087,15 @@ class _TasksBlockState extends State<_TasksBlock> {
     if (at != null && DateTime.now().difference(at) < const Duration(seconds: 20)) return;
     _loading = true;
     _at = DateTime.now();
-    unawaited(Spaces.instance.allTasks().then((t) {
-      if (mounted) setState(() => _tasks = t);
-    }).catchError((Object _) {}).whenComplete(() => _loading = false));
+    unawaited(
+      Spaces.instance
+          .allTasks()
+          .then((t) {
+            if (mounted) setState(() => _tasks = t);
+          })
+          .catchError((Object _) {})
+          .whenComplete(() => _loading = false),
+    );
   }
 
   @override
@@ -971,8 +1104,10 @@ class _TasksBlockState extends State<_TasksBlock> {
     final s = Spaces.instance;
     if (!s.available) return _offline(context, 'Mes tâches', 'Les tâches de tous tes espaces partagés, ici.');
     final me = s.me;
-    final mine = [for (final t in _tasks) if (t.assignee == me || t.assignee == null) t]
-      ..sort((a, b) => (a.due ?? DateTime(2999)).compareTo(b.due ?? DateTime(2999)));
+    final mine = [
+      for (final t in _tasks)
+        if (t.assignee == me || t.assignee == null) t,
+    ]..sort((a, b) => (a.due ?? DateTime(2999)).compareTo(b.due ?? DateTime(2999)));
     return HudPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -986,7 +1121,9 @@ class _TasksBlockState extends State<_TasksBlock> {
           const SizedBox(height: 6),
           Expanded(
             child: mine.isEmpty
-                ? Center(child: Text('Rien à faire pour toi. 👌', style: TextStyle(color: c.muted)))
+                ? Center(
+                    child: Text('Rien à faire pour toi. 👌', style: TextStyle(color: c.muted)),
+                  )
                 : ListView(
                     padding: EdgeInsets.zero,
                     children: [
@@ -998,7 +1135,9 @@ class _TasksBlockState extends State<_TasksBlock> {
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line.withValues(alpha: .6)))),
+                            decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: c.line.withValues(alpha: .6))),
+                            ),
                             child: Row(
                               children: [
                                 HudDiamond(s.byId(t.spaceId)?.colorValue ?? c.accent, size: 7),
@@ -1007,7 +1146,11 @@ class _TasksBlockState extends State<_TasksBlock> {
                                 if (t.due != null)
                                   Text(
                                     '${t.due!.day.toString().padLeft(2, '0')}.${t.due!.month.toString().padLeft(2, '0')}',
-                                    style: hudMono(context, size: 11, color: t.lateAt(DateTime.now()) ? c.bad : c.muted),
+                                    style: hudMono(
+                                      context,
+                                      size: 11,
+                                      color: t.lateAt(DateTime.now()) ? c.bad : c.muted,
+                                    ),
                                   ),
                               ],
                             ),
@@ -1034,19 +1177,34 @@ class _ChatsBlock extends StatelessWidget {
       listenable: Listenable.merge([Spaces.instance, Online.instance]),
       builder: (context, _) {
         final s = Spaces.instance;
-        if (!s.available) return _offline(context, 'Discussions', 'Écris à tes amis avec leur @pseudo, et laisse vos Clicky se parler.');
+        if (!s.available)
+          return _offline(
+            context,
+            'Discussions',
+            'Écris à tes amis avec leur @pseudo, et laisse vos Clicky se parler.',
+          );
         final list = [...s.chats, ...s.spaces]..sort((a, b) => (s.unread[b.id] ?? 0).compareTo(s.unread[a.id] ?? 0));
         return HudPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _BlockHead(title: 'Discussions', icon: Icons.forum_rounded, color: c.pink, action: 'nouveau', onAction: () => unawaited(SpaceActions.message(context).then((x) {
-                if (x != null) onOpen?.call(x);
-              }))),
+              _BlockHead(
+                title: 'Discussions',
+                icon: Icons.forum_rounded,
+                color: c.pink,
+                action: 'nouveau',
+                onAction: () => unawaited(
+                  SpaceActions.message(context).then((x) {
+                    if (x != null) onOpen?.call(x);
+                  }),
+                ),
+              ),
               const SizedBox(height: 6),
               Expanded(
                 child: list.isEmpty
-                    ? Center(child: Text('Pas encore de discussion.', style: TextStyle(color: c.muted)))
+                    ? Center(
+                        child: Text('Pas encore de discussion.', style: TextStyle(color: c.muted)),
+                      )
                     : ListView(
                         padding: EdgeInsets.zero,
                         children: [
@@ -1058,11 +1216,15 @@ class _ChatsBlock extends StatelessWidget {
                                 child: Row(
                                   children: [
                                     sp.isDm
-                                        ? HexAvatar(s.titleOf(sp).isEmpty ? '?' : s.titleOf(sp).substring(0, 1).toUpperCase(), size: 26)
+                                        ? HexAvatar(
+                                            s.titleOf(sp).isEmpty ? '?' : s.titleOf(sp).substring(0, 1).toUpperCase(),
+                                            size: 26,
+                                          )
                                         : SizedBox(width: 26, child: Center(child: HudDiamond(sp.colorValue))),
                                     const SizedBox(width: 10),
                                     Expanded(child: Text(s.titleOf(sp), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                                    if ((s.unread[sp.id] ?? 0) > 0) HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white),
+                                    if ((s.unread[sp.id] ?? 0) > 0)
+                                      HudTag('${s.unread[sp.id]}', color: c.pink, textColor: Colors.white),
                                   ],
                                 ),
                               ),
@@ -1094,13 +1256,21 @@ class _AppsBlock extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _BlockHead(title: 'Mes applis', icon: Icons.apps_rounded, color: const Color(0xFF0EA5E9), action: 'toutes', onAction: onAll),
+              _BlockHead(
+                title: 'Mes applis',
+                icon: Icons.apps_rounded,
+                color: const Color(0xFF0EA5E9),
+                action: 'toutes',
+                onAction: onAll,
+              ),
               const SizedBox(height: 4),
               Expanded(
                 child: apps.isEmpty
                     ? Center(
                         child: Text(
-                          p.apps.isEmpty ? 'Je lis la liste des applis du PC…' : 'Ouvre une appli depuis « toutes » (clic droit : épingler).',
+                          p.apps.isEmpty
+                              ? 'Je lis la liste des applis du PC…'
+                              : 'Ouvre une appli depuis « toutes » (clic droit : épingler).',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: c.muted),
                         ),
@@ -1109,7 +1279,9 @@ class _AppsBlock extends StatelessWidget {
                         maxCrossAxisExtent: 92,
                         padding: EdgeInsets.zero,
                         childAspectRatio: .95,
-                        children: [for (final a in apps) AppTile(app: a, small: true, onOpen: (x) => unawaited(p.launch(x)))],
+                        children: [
+                          for (final a in apps) AppTile(app: a, small: true, onOpen: (x) => unawaited(p.launch(x))),
+                        ],
                       ),
               ),
             ],

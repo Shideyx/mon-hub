@@ -21,7 +21,10 @@ void main() {
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Agenda'), findsWidgets);
-    expect(find.byTooltip('Chercher partout (Ctrl + Espace)'), findsOneWidget);
+    // v1.61 : un seul menu « Plus » en haut (les six autres boutons ont
+    // disparu, ils refaisaient ce que le menu fait déjà).
+    expect(find.byTooltip('Plus'), findsOneWidget);
+    expect(find.byTooltip('Notifications'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

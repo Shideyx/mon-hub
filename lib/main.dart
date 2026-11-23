@@ -4,6 +4,7 @@ import 'dart:io' show Directory, Platform;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/camera_guard.dart';
 import 'core/perf.dart';
 import 'core/online/clicky_chat.dart';
 import 'core/online/online.dart';
@@ -352,6 +353,13 @@ class _HubAppState extends State<HubApp> {
               );
             });
           Perf.later(3, PcWatch.instance.start);
+          // Une appli allume la caméra : Clicky le dit tout de suite.
+          CameraGuard.instance.warn = (title, body) {
+            unawaited(
+              n.post(HubNotification(id: 'camera:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
+            );
+            unawaited(clicky.think(body, aloud: false));
+          };
           st.onTick = () async {
             try {
               final exe = Win.foregroundExe(), title = Win.foregroundTitle();
@@ -363,6 +371,8 @@ class _HubAppState extends State<HubApp> {
                 idle: Win.idleSeconds(),
                 diskFreeGb: PcWatch.instance.diskFree(),
               );
+              // La garde de la caméra : qui filme, et depuis quand.
+              await CameraGuard.instance.tick();
               // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
               await ClickySenses.instance.tick(
                 exe: exe,
