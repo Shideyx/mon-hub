@@ -17,6 +17,8 @@ import 'module_store.dart';
 import 'session.dart';
 import 'vault.dart';
 import 'freeze_watch.dart';
+import 'online/online.dart';
+import 'online/online_cloud.dart';
 import 'screen_time.dart';
 
 /// Ton compte Mon Hub sur tous tes appareils, **sans export**.
@@ -40,8 +42,15 @@ class AccountSync extends ChangeNotifier {
   AccountSync._();
   static final instance = AccountSync._();
 
-  /// Où est gardée la copie (tests : en mémoire).
-  static SyncCloud Function(String email) cloudFor = DriveFolder.new;
+  /// Où est gardée la copie (tests : en mémoire) : Mon Hub en ligne
+  /// (« monhub:adresse ») ou le Google Drive (adresse Google).
+  static SyncCloud Function(String email) cloudFor = defaultCloud;
+
+  static SyncCloud defaultCloud(String email) =>
+      Online.isSyncMail(email) ? OnlineCloud(email) : DriveFolder(email);
+
+  /// La copie est-elle dans Mon Hub en ligne (et pas dans le Drive) ?
+  bool get online => Online.isSyncMail(email);
 
   /// Rythme de la synchro quand Mon Hub est ouvert.
   static const every = Duration(minutes: 3);
@@ -284,9 +293,13 @@ class AccountSync extends ChangeNotifier {
         await SyncBox.open(h, key, acc.login);
       } on WrongPassword {
         if (!takeOver) {
-          throw 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
-              'faite sur un autre appareil : là-bas, Réglages → Mes appareils → « Récupérer les données '
-              'de mon PC principal ».';
+          throw Online.isSyncMail(mail)
+              ? 'Une copie du compte « ${acc.login} » existe déjà en ligne, faite sur un autre appareil avec un autre '
+                    'mot de passe. Sur cet appareil, déconnecte-toi puis, sur la page de connexion, choisis '
+                    '« Mon compte en ligne » : tout reviendra.'
+              : 'Une copie du compte « ${acc.login} » existe déjà dans ce Google Drive, '
+                    'faite sur un autre appareil : là-bas, Réglages → Mes appareils → « Récupérer les données '
+                    'de mon PC principal ».';
         }
         key = await SyncKey.forAccount(acc);
         replace = true;

@@ -55,6 +55,7 @@ dependencies:
   image: ^4.13.1
   xml: ^7.1.0
   qr: ^4.0.1
+  supabase: ^2.16.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -83,6 +84,27 @@ flutter:
     - assets/cacert.pem
     - assets/phone/
     - assets/party/
+    # Le script de la base Mon Hub en ligne (copié en un clic dans les réglages).
+    - supabase/schema.sql
+
+  # Polices de l'interface (licence libre OFL, voir assets/fonts/OFL-*.txt).
+  fonts:
+    - family: ChakraPetch
+      fonts:
+        - asset: assets/fonts/ChakraPetch-Regular.ttf
+        - asset: assets/fonts/ChakraPetch-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/ChakraPetch-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/ChakraPetch-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

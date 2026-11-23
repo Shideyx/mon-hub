@@ -66,6 +66,21 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
   gardé sur le disque. Sans clé Gemini, les sous-titres sont faits sur ton PC
   (Whisper), sans traduction.
 
+## Mon Hub en ligne (espaces partagés, même compte partout)
+
+- Le serveur est le projet Supabase **de la personne** (`supabase/schema.sql`, guide `docs/SUPABASE.md`), jamais un
+  serveur du créateur. La clé « anon » est publique par nature : ce sont les règles de la base qui protègent.
+- **Row Level Security** sur toutes les tables : on ne lit que les espaces dont on est membre (et les profils des gens
+  avec qui on partage un espace), seulement sa propre copie de compte. On n'entre dans un espace qu'avec son code
+  (10 caractères, changeable par le propriétaire) ou par une discussion privée ; seul le propriétaire renomme,
+  supprime ou change le code ; on ne supprime que ses propres messages. Les visiteurs non connectés n'ont accès à rien.
+  Vérifié sur un vrai PostgreSQL avec trois comptes et un visiteur anonyme.
+- Le serveur ne reçoit **jamais le mot de passe** (empreinte SHA-256 avec l'adresse) ; la copie du compte est
+  **chiffrée sur l'appareil** (AES-256-GCM, clé tirée du mot de passe) : illisible pour le serveur.
+- La session en ligne est gardée dans le coffre du système, propre à chaque appareil (jamais synchronisée).
+- Clicky dans les discussions : aucun outil, messages des autres étiquetés comme données (`PromptShield`), au plus
+  30 réponses par jour ; entre Clicky seulement si l'espace ET la personne l'autorisent, chaîne limitée à 4 réponses.
+
 ## Extension Chrome « Clicky dans le navigateur »
 
 - Elle ne parle qu'à Mon Hub, sur ce PC (`ws://127.0.0.1:47614`), et Mon Hub n'accepte que **cette** extension

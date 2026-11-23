@@ -19,8 +19,9 @@
   (`clicky_diagnostic`, `clicky_reparer_micro`) et contrôle du PC (`pc.dart` : `pc_commande`,
   `pc_ouvrir`, `pc_lire`, `pc_ecrire_fichier`). Servis aussi à Claude Code via le pont local
   (`ClaudeBridge.appTools`). Permission : `ClaudeBridge.isWriteAction` + `confirmAction`.
-- Vie privée : **aucun serveur à nous**, toutes les données restent sur l'appareil. Ne jamais
-  ajouter d'envoi de données vers un serveur du créateur (statistiques, journaux…). Données
+- Vie privée : **aucun serveur à nous** (Mon Hub en ligne = le projet Supabase **de la personne**, voir v1.60),
+  données perso sur l'appareil. Ne jamais ajouter d'envoi de données vers un serveur du créateur (statistiques,
+  journaux…). Données
   locales : JsonFile chiffré via `lib/core/vault.dart` ; secrets : `ModuleStore.writeSecret`.
 - École Directe : API non officielle (`ed_client.dart`), décodage des messages dans
   `EdClient.decodeContent` / `htmlToText` ; cloud : `EdClient.cloud`.
@@ -40,8 +41,12 @@
   (`presentTopo` → `speak(force: true)`).
 - Certificats https : `TrustedCertificates.install()` (magasins Windows ROOT + CA, et
   `assets/cacert.pem` de Mozilla) au démarrage des deux programmes.
-- Look : la personne **préfère l'ancienne interface** (violet, en-tête dégradé, cartes arrondies) ; le look
-  Windows 11 de la v1.34 a été retiré en v1.35, ne pas le remettre. `core/windows_look.dart` ne sert plus
+- Look : **interface HUD (v1.60, validée par la personne sur maquette)** : mêmes couleurs (violet #7C5CFF, rose
+  #E0457B, fond sombre), coins coupés, boutons penchés, rayures, chevrons, hexagones ; titres Chakra Petch, étiquettes
+  JetBrains Mono (`assets/fonts`, OFL). Kit : `ui/hud/hud.dart` (`HudColors.of`, `HudPanel`, `HudButton`, `SlantBorder`,
+  `hudCut`, `HudTag`, `HexAvatar`, `Hatch`, `SegBar`, `Barcode`, `Chevrons`, `HudBackground`). **Rien qui fasse
+  « IA / Gemini »** (pas de bordure en dégradé brillant) : la barre de Clicky est une console (onglet CLICKY + `>_`).
+  Le look Windows 11 de la v1.34 a été retiré en v1.35, ne pas le remettre. `core/windows_look.dart` ne sert plus
   qu'aux fenêtres des widgets détachés (barre de titre).
   Liens web : `core/browser.dart` (Chrome par défaut). Widgets détachés : `core/desktop_widgets.dart`,
   `ui/widget_window.dart`, lanceur `windows/runner/main.cpp` (`--widget=`, AppUserModelID par widget ;
@@ -459,3 +464,37 @@
   en direct et `badge` « Nouveau » ; animations `_TaskVisual`, `_SensesVisual`, `_IdeaVisual`, `_WatchVisual`,
   `_LifeGridVisual`, `_AliveVisual` (vrai `ClickyLifeBody`) ; `FittedBox` sur petit écran ; clé `tutorial.v159` =
   remontrée une fois à tous ; changer la clé quand la visite change beaucoup). Tests `test/v173_menus_tour_test.dart`.
+- **v1.60 — Mon Hub en ligne + interface HUD** (demande de la personne : « un vrai truc », espaces partagés entre
+  comptes, même compte partout, Android + iPhone, toutes les applis, chat entre comptes et entre Clicky).
+  **Serveur** = projet Supabase de la personne : `supabase/schema.sql` (tables `profiles`, `spaces`, `space_members`,
+  `tasks`, `messages`, `account_files` ; RLS partout ; ajout de membres seulement par RPC `create_space` / `join_space`
+  (code 10 hex) / `open_dm` (@pseudo) / `new_invite_code` ; temps réel messages/tâches/membres), copié dans l'appli
+  (asset) et guide `docs/SUPABASE.md`. Client Dart pur (paquet `supabase`, pas `supabase_flutter`) :
+  `core/online/online.dart` (`Online` : serveur = `--dart-define SUPABASE_URL/SUPABASE_ANON_KEY` (secrets GitHub, vides
+  par défaut) sinon `app.online.server` réglé dans l'appli ou code `MONHUB-SERVEUR:` (`OnlineServer.code/fromCode`) ;
+  session gardée par compte dans le secret `sync.online.session` (jamais synchronisé) ; le serveur reçoit
+  `authPassword` = sha256, jamais le mot de passe ; `explain` = erreurs en français ; profil nom + `@pseudo`).
+  **Même compte partout** : `AccountSync.defaultCloud` → `OnlineCloud` (`core/online/online_cloud.dart`, table
+  `account_files`) quand le « mail » est `monhub:<adresse>` (`Online.syncMail`) : même `SyncBox` chiffrée, même fusion.
+  `core/online/online_account.dart` (`putOnline` = même mot de passe que Mon Hub, `join` = nouvel appareil : page de
+  connexion → « Mon compte en ligne » (`ui/online/online_sign_in.dart`), `NoOnlineCopy` → créer le compte ici).
+  Réglages → « Compte en ligne et espaces » → `ui/online/online_page.dart` (serveur en 4 étapes, « Copier le script »,
+  compte, profil, Clicky entre eux). **Espaces** : `core/online/spaces.dart` (`Spaces` : liste, membres, profils,
+  non lus, épinglés `hub.spaces.pinned` (synchronisés), tâches `todo/doing/review/done`, messages, un seul canal temps
+  réel + relecture toutes les 2 min, `onMessage` → notification `espace:<id>:<n>` + Clicky). UI : `ui/spaces/` (`SpacePage`
+  tableau glisser-déposer + discussion, `SpacesPage`, `SpaceActions` créer/rejoindre/message/inviter). **Clicky dans les
+  discussions** : `core/online/clicky_chat.dart` (`@clicky` dans **mon** message → **mon** Clicky répond ; entre Clicky
+  seulement si `spaces.clicky_chat` ET réglage `hub.clickychat.autres` ; un seul répond (`replyTo`), `maxDepth` 4, 15 s
+  d'écart, 30/jour ; aucun outil ; messages étiquetés `PromptShield.wrap('espaces_messages')`). Branché dans
+  `HubApp._startOnline`. **Interface** : `ui/app_shell.dart` (menu : Aujourd'hui, Mes applis, Espaces (épinglés
+  d'abord), Discussions, Modules — sections repliables `hub.menu.replie` ; téléphone : barre Aujourd'hui / Espaces /
+  Chercher / Menu en tiroir), `ui/home_page.dart` (en-tête HUD, console Clicky : question → `ClickyController.ask`, ou
+  nom d'appli → Entrée l'ouvre ; blocs) + `ui/hud/home_layout.dart` (`HomeLayout` : blocs `mod:<id>` / `fil` /
+  `espaces` / `taches` / `discussions` / `applis`, largeur S/M/L, `resolve`, `rows` (rangées construites **à la
+  demande** : SliverList), mode « Personnaliser » glisser/taille/retirer/ajouter, `hub.accueil.blocs`). **Toutes les
+  applis du PC** : `core/pc_apps.dart` (`PcApps` : `Get-StartApps` → `parse` (sans désinstalleurs/liens), lancement
+  `shell:AppsFolder\<AppID>` par `SafeOpen.launch`, épinglées/usage `app.applis.*` propres au PC, `match`), page
+  `ui/apps_page.dart` (`AppTile`), dans la recherche (Ctrl + K ou Ctrl + Espace ; Ctrl + Alt + Espace partout) et la
+  console. **Android** : job `android` réactivé (non bloquant) + `release-android` ajoute `MonHub-Android.apk` ;
+  `Updater.phoneUpdate` prévient sur Android comme sur iPhone. Tests : `test/v174_online_test.dart`, `test/v135_test.dart`
+  (nouvel accueil).

@@ -5,6 +5,9 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/online/online.dart';
+import 'online/online_page.dart';
+
 import '../core/browser.dart';
 import '../core/error_log.dart';
 import 'phone_link_page.dart';
@@ -376,6 +379,24 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
       ],
+      'enligne' => [
+            ListTile(
+              leading: const Icon(Icons.cloud_rounded),
+              title: const Text('Compte en ligne'),
+              subtitle: Text(
+                Online.instance.signedIn
+                    ? 'Connecté : ${Online.instance.email}. Ton compte est le même sur tous tes appareils.'
+                    : Online.instance.configured
+                    ? 'Mets ton compte en ligne pour le retrouver partout et partager des espaces.'
+                    : 'Règle ton serveur (5 minutes, une fois) pour partager des espaces avec tes amis.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () async {
+                await OnlinePage.open(context);
+                refresh();
+              },
+            ),
+          ],
       'appareils' => [
             // Le compte sur tous tes appareils, sans export (Google Drive).
             const AccountSyncSection(),
@@ -755,6 +776,8 @@ class SettingsCategory {
         'alerte alertes notification notifications regrouper resume tester'),
     SettingsCategory('modules', '🧩', 'Mes modules', 'Afficher, cacher et ranger les cartes de l\'accueil', Color(0xFF2B6CFF),
         'module modules carte cartes ordre afficher cacher accueil'),
+    SettingsCategory('enligne', '🌐', 'Compte en ligne et espaces', 'Même compte partout, espaces partagés, discussions, ton @pseudo',
+        Color(0xFF7C5CFF), 'en ligne supabase serveur compte adresse mail email espace espaces partage partager amis equipe entreprise discussion chat message pseudo android iphone'),
     SettingsCategory('appareils', '📱', 'Mes appareils', 'Ton compte sur tous tes appareils, ton téléphone, ton iPhone',
         Color(0xFF0EA5E9), 'telephone iphone synchro synchronisation appareils export import fichier usb pc principal'),
     SettingsCategory('google', '☁️', 'Google, sauvegarde et rangement', 'Connexion Google, sauvegarde de tes travaux, ranger ton PC',

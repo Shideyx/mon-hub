@@ -1,58 +1,97 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'hud/hud.dart';
 import 'motion.dart';
 
 const _seed = Color(0xFF7C5CFF);
 
+/// Le thème de Mon Hub : violet et rose (comme toujours), en version « HUD »
+/// (v1.60) — coins coupés, boutons penchés, titres en police technique.
 ThemeData buildTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
+  final h = dark ? HudColors.dark : HudColors.light;
   final scheme = ColorScheme.fromSeed(
     seedColor: _seed,
     brightness: brightness,
-    surface: dark ? const Color(0xFF0E0F14) : const Color(0xFFF6F5FB),
+    surface: h.bg,
+  ).copyWith(
+    primary: h.accent,
+    secondary: h.pink,
+    surfaceContainerLowest: h.panelLow,
+    surfaceContainerLow: h.panelLow,
+    surfaceContainer: h.panel,
+    surfaceContainerHigh: dark ? const Color(0xFF1A1C27) : const Color(0xFFF1EFF8),
+    surfaceContainerHighest: dark ? const Color(0xFF1F2131) : const Color(0xFFE9E6F3),
+    outlineVariant: h.line,
   );
-  final radius = BorderRadius.circular(16);
-  return ThemeData(
-    useMaterial3: true,
-    colorScheme: scheme,
-    scaffoldBackgroundColor: scheme.surface,
+  final base = ThemeData(useMaterial3: true, colorScheme: scheme, brightness: brightness);
+  // Titres en Chakra Petch ; le texte courant garde la police du système
+  // (plus lisible pour lire longtemps).
+  TextStyle? display(TextStyle? s, {FontWeight w = FontWeight.w700}) =>
+      s?.copyWith(fontFamily: HudFonts.display, fontWeight: w, letterSpacing: 0.3);
+  final text = base.textTheme.copyWith(
+    displayLarge: display(base.textTheme.displayLarge),
+    displayMedium: display(base.textTheme.displayMedium),
+    displaySmall: display(base.textTheme.displaySmall),
+    headlineLarge: display(base.textTheme.headlineLarge),
+    headlineMedium: display(base.textTheme.headlineMedium),
+    headlineSmall: display(base.textTheme.headlineSmall),
+    titleLarge: display(base.textTheme.titleLarge),
+    titleMedium: display(base.textTheme.titleMedium, w: FontWeight.w600),
+  );
+  const slant = SlantBorder(slant: 9);
+  final cut = hudCut(14, side: BorderSide(color: h.line));
+  return base.copyWith(
+    scaffoldBackgroundColor: h.bg,
+    canvasColor: h.bg,
+    textTheme: text,
     visualDensity: VisualDensity.standard,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
+      backgroundColor: h.bg,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
-          fontSize: 22, fontWeight: FontWeight.w700, color: scheme.onSurface, letterSpacing: -0.3),
-    ),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      color: dark ? const Color(0xFF181A22) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: dark ? 0.35 : 0.5)),
+        fontFamily: HudFonts.display,
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: h.text,
+        letterSpacing: 0.4,
       ),
-      margin: EdgeInsets.zero,
     ),
+    cardTheme: CardThemeData(elevation: 0, color: h.panel, shape: cut, margin: EdgeInsets.zero),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      fillColor: h.panelLow,
+      border: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.line)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.line)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: h.accent, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
-    dialogTheme: DialogThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    dialogTheme: DialogThemeData(backgroundColor: h.panel, shape: hudCut(18, side: BorderSide(color: h.hotLine))),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: h.panel,
+      shape: const BeveledRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(18))),
     ),
-    listTileTheme: ListTileThemeData(
-      shape: RoundedRectangleBorder(borderRadius: radius),
+    popupMenuTheme: PopupMenuThemeData(color: h.panel, shape: hudCut(10, side: BorderSide(color: h.line))),
+    listTileTheme: const ListTileThemeData(shape: BeveledRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(8)))),
+    chipTheme: base.chipTheme.copyWith(shape: const SlantBorder(slant: 7), side: BorderSide(color: h.line)),
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating, shape: slant),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(shape: slant)),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(shape: slant)),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(shape: slant)),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(shape: slant)),
+    segmentedButtonTheme: SegmentedButtonThemeData(style: SegmentedButton.styleFrom(shape: const BeveledRectangleBorder())),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: h.side,
+      indicatorColor: h.selected,
+      indicatorShape: slant,
     ),
-    snackBarTheme: SnackBarThemeData(
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: radius),
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(color: dark ? const Color(0xFF242638) : const Color(0xFF2A2840)),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
     ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: radius)),
-    ),
+    dividerTheme: DividerThemeData(color: h.line, space: 1),
     // Pages qui glissent en douceur, façon Spotify.
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
       TargetPlatform.android: SpotifyPageTransitionsBuilder(),

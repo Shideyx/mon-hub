@@ -6,6 +6,8 @@ import '../core/account_sync.dart';
 import '../core/session.dart';
 import '../core/version.dart';
 import 'account_sync_view.dart';
+import 'hud/hud.dart';
+import 'online/online_sign_in.dart';
 
 /// Page d'accueil : se connecter à son compte Mon Hub ou en créer un.
 class LoginPage extends StatefulWidget {
@@ -24,6 +26,9 @@ class _LoginPageState extends State<LoginPage> {
 
   /// « Retrouver mon compte » (compte d'un autre appareil, synchronisé).
   bool _join = false;
+
+  /// « Mon compte en ligne » (adresse mail : même compte partout).
+  bool _online = false;
   bool _remember = true;
   bool _hide = true;
   bool _busy = false;
@@ -64,21 +69,7 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    cs.primaryContainer.withValues(alpha: 0.7),
-                    cs.surface,
-                    cs.tertiaryContainer.withValues(alpha: 0.6),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: HudBackground(child: SizedBox.expand())),
           Positioned(
             top: 8,
             right: 8,
@@ -89,10 +80,10 @@ class _LoginPageState extends State<LoginPage> {
               padding: const EdgeInsets.all(20),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: Card(
-                  elevation: 0,
-                  color: cs.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                child: HudPanel(
+                  hot: true,
+                  cut: 22,
+                  padding: EdgeInsets.zero,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
                     child: AutofillGroup(
@@ -102,10 +93,9 @@ class _LoginPageState extends State<LoginPage> {
                           Center(child: Image.asset('assets/logo.png', width: 72, height: 72)),
                           const SizedBox(height: 16),
                           Text(
-                            'Mon Hub',
+                            'MON HUB',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                            style: hudTitle(context, size: 30).copyWith(letterSpacing: 3),
                           ),
                           Text(
                             'Version $appVersion',
@@ -114,7 +104,9 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _join
+                            _online
+                                ? 'Ton adresse mail et ton mot de passe : tout ton Mon Hub revient ici'
+                                : _join
                                 ? 'Retrouve le compte de ton autre appareil'
                                 : _create
                                 ? 'Crée ton compte pour retrouver tes applis au même endroit'
@@ -123,7 +115,9 @@ class _LoginPageState extends State<LoginPage> {
                             style: TextStyle(color: cs.onSurfaceVariant),
                           ),
                           const SizedBox(height: 24),
-                          if (_join)
+                          if (_online)
+                            OnlineSignInView(onBack: () => setState(() => _online = false))
+                          else if (_join)
                             JoinAccountView(onBack: () => setState(() => _join = false))
                           else ...[
                             TextField(
@@ -216,6 +210,17 @@ class _LoginPageState extends State<LoginPage> {
                                     : 'Nouveau ? Créer un compte',
                               ),
                             ),
+                            FilledButton.tonalIcon(
+                              icon: const Icon(Icons.cloud_rounded),
+                              label: const Text('Mon compte en ligne (adresse mail)'),
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() {
+                                      _online = true;
+                                      _error = null;
+                                    }),
+                            ),
+                            const SizedBox(height: 8),
                             OutlinedButton.icon(
                               icon: const Icon(Icons.devices_rounded),
                               label: const Text('Retrouver mon compte d\'un autre appareil'),
@@ -228,8 +233,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Tes données restent sur tes appareils. Pour retrouver ton compte sur '
-                              'un autre : Réglages → Mes appareils → Activer la synchronisation.',
+                              'Même compte partout : Réglages → Compte en ligne, puis ici « Mon compte en '
+                              'ligne » sur ton autre appareil (PC, Android, iPhone).',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                             ),

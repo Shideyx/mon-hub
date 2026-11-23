@@ -4,6 +4,9 @@ import 'dart:io' show Directory, Platform;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/online/clicky_chat.dart';
+import 'core/online/online.dart';
+import 'core/online/spaces.dart';
 import 'core/phone_link.dart';
 import 'core/browser_link.dart';
 import 'core/work_backup.dart';
@@ -111,6 +114,17 @@ Future<void> _phoneUpdateNotice(NotificationCenter n) async {
   final key = 'iphone.maj.$tag';
   if (ModuleStore.global.getBool(key) == true) return;
   await ModuleStore.global.setBool(key, true);
+  if (Platform.isAndroid) {
+    await n.post(
+      HubNotification(
+        id: 'maj-android:$tag',
+        title: '📲 Mon Hub $tag est prête',
+        body: 'Télécharge MonHub-Android.apk sur la page des versions de Mon Hub (GitHub → Releases), puis ouvre-le pour '
+            'mettre à jour. Tes données restent là.',
+      ),
+    );
+    return;
+  }
   await n.post(
     HubNotification(
       id: 'maj-iphone:$tag',
@@ -156,6 +170,13 @@ class _HubAppState extends State<HubApp> {
 
   void _close() {
     NotificationCenter.onAny = null;
+    // Mon Hub en ligne : la session reste gardée pour ce compte.
+    Online.instance.removeListener(_onlineChanged);
+    Spaces.instance
+      ..onMessage = null
+      ..stop();
+    _spacesOn = false;
+    unawaited(Online.instance.close());
     unawaited(ClickySenses.instance.stop());
     PcWatch.instance.stop();
     Watchers.instance.stop();
@@ -175,6 +196,48 @@ class _HubAppState extends State<HubApp> {
     _notifications = null;
     _bridge = null;
     _openFor = null;
+  }
+
+  /// Espaces partagés démarrés (compte en ligne connecté).
+  bool _spacesOn = false;
+
+  void _onlineChanged() {
+    final on = Online.instance.signedIn;
+    if (on && !_spacesOn) {
+      _spacesOn = true;
+      unawaited(Spaces.instance.start());
+    } else if (!on && _spacesOn) {
+      _spacesOn = false;
+      Spaces.instance.stop();
+    }
+  }
+
+  /// Mon Hub en ligne : reprend la session du compte, puis les espaces, les
+  /// discussions (notification quand on t'écrit) et Clicky dans les
+  /// discussions (« @clicky », Clicky entre eux).
+  Future<void> _startOnline(NotificationCenter n) async {
+    Online.instance.addListener(_onlineChanged);
+    Spaces.instance.onMessage = (space, m) {
+      final sp = Spaces.instance;
+      final myName = ModuleStore.prefs.getString('hub.name') ?? AppSession.instance.current?.name ?? '';
+      unawaited(ClickyChat.instance.handle(space, m, myName: myName));
+      if (m.author == sp.me || sp.viewing == space.id) return;
+      final who = sp.person(m.author)?.label ?? 'Quelqu\'un';
+      final from = m.fromClicky ? 'Clicky de $who' : who;
+      unawaited(
+        n.post(
+          HubNotification(
+            id: 'espace:${space.id}:${m.id}',
+            title: space.isDm ? '💬 $from' : '💬 $from · ${sp.titleOf(space)}',
+            body: m.body.length > 300 ? '${m.body.substring(0, 297)}…' : m.body,
+          ),
+        ),
+      );
+    };
+    try {
+      await Online.instance.open();
+    } catch (_) {}
+    _onlineChanged();
   }
 
   static Future<void> _removeHologramFiles() async {
@@ -225,6 +288,8 @@ class _HubAppState extends State<HubApp> {
             );
           }
           ..start();
+        // Mon Hub en ligne (espaces partagés, discussions, même compte partout).
+        unawaited(_startOnline(n));
         // Tes travaux (Documents, Bureau) copiés dans ton Drive.
         WorkBackup.instance.start();
         // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
@@ -293,7 +358,7 @@ class _HubAppState extends State<HubApp> {
         }
         // iPhone : pas de mise à jour automatique (Apple l'interdit hors App
         // Store) : on prévient quand une nouvelle version est prête.
-        if (Platform.isIOS) unawaited(_phoneUpdateNotice(n));
+        if (Platform.isIOS || Platform.isAndroid) unawaited(_phoneUpdateNotice(n));
         // Ctrl + Espace (ici) ou Ctrl + Alt + Espace (partout) : la recherche.
         HubHome.instance.onSearchText = (text) => unawaited(SearchPage.show(text));
         // Première ouverture du compte : la visite guidée de Clicky.

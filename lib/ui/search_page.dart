@@ -7,6 +7,8 @@ import 'package:material_ui/material_ui.dart';
 import '../core/browser.dart';
 import '../core/everywhere_search.dart';
 import '../core/nav.dart';
+import '../core/pc_apps.dart';
+import 'apps_page.dart';
 import 'clicky/clicky.dart';
 import 'file_viewer.dart';
 import 'widgets.dart';
@@ -68,10 +70,27 @@ class _SearchPageState extends State<SearchPage> {
     'Livres': Icons.auto_stories_rounded,
   };
 
+  /// Les applis du PC qui correspondent (tout de suite, sans attendre).
+  List<PcApp> _apps = const [];
+
   @override
   void initState() {
     super.initState();
+    if (PcApps.supported) {
+      unawaited(PcApps.instance.load().then((_) {
+        if (mounted) setState(() => _apps = _appsFor(_text.text));
+      }));
+    }
+    _apps = _appsFor(widget.initial);
     if (widget.initial.trim().isNotEmpty) unawaited(_search(widget.initial));
+  }
+
+  static List<PcApp> _appsFor(String q) =>
+      !PcApps.supported || q.trim().isEmpty ? const [] : PcApps.instance.search(q, max: 8);
+
+  Future<void> _launch(PcApp a) async {
+    Navigator.of(context).pop();
+    await PcApps.instance.launch(a);
   }
 
   @override
@@ -83,6 +102,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _changed(String q) {
+    setState(() => _apps = _appsFor(q));
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 450), () => _search(q));
   }
@@ -178,12 +198,16 @@ class _SearchPageState extends State<SearchPage> {
                               autofocus: true,
                               style: theme.textTheme.titleLarge,
                               decoration: const InputDecoration(
-                                hintText: 'Cherche partout : PC, Drive, mails, Discord, cours…',
+                                hintText: 'Une appli, un fichier, un mail, un cours… (Entrée)',
                                 border: InputBorder.none,
                               ),
                               onChanged: _changed,
                               onSubmitted: (q) {
-                                if (_hits.isNotEmpty && q.trim() == _done) {
+                                // Le nom d'une appli : Entrée l'ouvre (comme la touche Windows).
+                                final app = _apps.where((a) => a.name.toLowerCase().startsWith(q.trim().toLowerCase())).firstOrNull;
+                                if (app != null && q.trim().isNotEmpty) {
+                                  unawaited(_launch(app));
+                                } else if (_hits.isNotEmpty && q.trim() == _done) {
                                   unawaited(_openHit(_hits.first));
                                 } else {
                                   _debounce?.cancel();
@@ -206,8 +230,22 @@ class _SearchPageState extends State<SearchPage> {
                       ),
                     ),
                     const Divider(height: 1),
+                    if (_apps.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                        child: SizedBox(
+                          height: 96,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              for (final a in _apps)
+                                SizedBox(width: 92, child: AppTile(app: a, small: true, onOpen: (x) => unawaited(_launch(x)))),
+                            ],
+                          ),
+                        ),
+                      ),
                     Flexible(
-                      child: _hits.isEmpty
+                      child: _hits.isEmpty && _apps.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(24),
                               child: Text(

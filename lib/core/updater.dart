@@ -114,7 +114,8 @@ class Updater extends ChangeNotifier {
   /// App Store. On regarde seulement s'il y a une nouvelle version iPhone
   /// (pour prévenir) : renvoie son numéro (« v1.60 »), ou null.
   static Future<String?> phoneUpdate() async {
-    if (kIsWeb || !Platform.isIOS || current == null) return null;
+    if (kIsWeb || !(Platform.isIOS || Platform.isAndroid) || current == null) return null;
+    final file = Platform.isIOS ? 'MonHub-iOS.ipa' : 'MonHub-Android.apk';
     try {
       final r = await http
           .get(
@@ -127,8 +128,8 @@ class Updater extends ChangeNotifier {
       if (j is! Map) return null;
       final tag = '${j['tag_name'] ?? ''}';
       final n = versionNumber(tag);
-      final hasIpa = (j['assets'] as List? ?? const []).any((a) => a is Map && a['name'] == 'MonHub-iOS.ipa');
-      return n != null && n > current! && hasIpa ? tag : null;
+      final ready = (j['assets'] as List? ?? const []).any((a) => a is Map && a['name'] == file);
+      return n != null && n > current! && ready ? tag : null;
     } catch (_) {
       return null;
     }
