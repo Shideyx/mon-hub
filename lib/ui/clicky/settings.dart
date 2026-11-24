@@ -42,7 +42,7 @@ class ClickySection {
     ClickySection(
       'look',
       'Apparence',
-      'Réacteur ou curseur, ton prénom, Nexo vivant, suivre la souris',
+      'Style de ses fenêtres, ton surnom, Nexo vivant, suivre la souris',
       Icons.palette_rounded,
       Color(0xFF7C5CFF),
     ),
@@ -62,8 +62,8 @@ class ClickySection {
     ),
     ClickySection(
       'topo',
-      'Topos du matin et du soir',
-      'Le résumé de ta journée, à l\'heure que tu veux',
+      'Annonces et topos',
+      'Il t\'annonce tes messages dès qu\'ils arrivent, et le résumé de ta journée à l\'heure que tu veux',
       Icons.wb_twilight_rounded,
       Color(0xFFF59E0B),
     ),
@@ -153,15 +153,15 @@ class ClickyMoreSettings extends StatelessWidget {
         // ---- Apparence ----
         add(
           'look',
-          'apparence reacteur anime curseur classique bleu look',
+          'apparence style fenetres tete haute hud simple curseur pointe look taille',
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'hud', icon: Icon(Icons.blur_circular_rounded), label: Text('Réacteur animé')),
-                  ButtonSegment(value: 'classic', icon: Icon(Icons.near_me_rounded), label: Text('Curseur classique')),
+                  ButtonSegment(value: 'hud', icon: Icon(Icons.blur_circular_rounded), label: Text('Tête haute')),
+                  ButtonSegment(value: 'classic', icon: Icon(Icons.near_me_rounded), label: Text('Simple')),
                 ],
                 selected: {c.hud ? 'hud' : 'classic'},
                 onSelectionChanged: (v) => c.setOption('look', v.first),
@@ -169,9 +169,8 @@ class ClickyMoreSettings extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 c.hud
-                    ? 'Un réacteur bleu animé à côté du curseur (il tourne quand Nexo réfléchit, '
-                          's\'anime quand il t\'écoute) et des fenêtres « tête haute ».'
-                    : 'Le petit curseur bleu d\'origine.',
+                    ? 'La Pointe en grand, et ses fenêtres façon « tête haute » (verre sombre, bords lumineux).'
+                    : 'La Pointe plus petite, et des bulles simples et arrondies.',
                 style: text.bodySmall,
               ),
               const SizedBox(height: 10),
@@ -211,6 +210,24 @@ class ClickyMoreSettings extends StatelessWidget {
           ),
         );
 
+        // ---- Annonces des messages ----
+        sw(
+          'topo',
+          'announce',
+          c.announce,
+          'Il m\'annonce mes messages',
+          'Discord, Instagram, mails, École Directe : « Léa sur Discord : t\'es là ? », à côté de ta souris, dès '
+              'que ça arrive. Jamais pendant un jeu, un appel ou le mode concentration.',
+        );
+        if (c.announce) {
+          sw(
+            'topo',
+            'announceAloud',
+            c.announceAloud,
+            'Les annoncer à voix haute',
+            'Il les dit aussi tout haut (les codes et mots de passe ne sont jamais lus).',
+          );
+        }
         // ---- Topos ----
         add('topo', 'topo matin soir briefing resume journee heure', const _TopoSettings());
 

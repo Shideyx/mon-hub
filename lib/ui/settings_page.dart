@@ -10,6 +10,7 @@ import 'online/online_page.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import '../core/install.dart';
 import '../modules/instagram/instagram_watch.dart';
 import 'phone_link_page.dart';
 import 'account_sync_view.dart';
@@ -160,7 +161,8 @@ class _SettingsPageState extends State<SettingsPage> {
           child: TextField(
             controller: name,
             decoration: const InputDecoration(
-              labelText: 'Ton prénom (pour le message d\'accueil)',
+              labelText: 'Ton prénom',
+              helperText: 'Pour l\'accueil, et c\'est comme ça que Nexo t\'appelle (sauf si tu lui donnes un surnom).',
               prefixIcon: Icon(Icons.person_rounded),
             ),
             onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
@@ -201,7 +203,20 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.logout_rounded),
           title: const Text('Se déconnecter'),
           subtitle: const Text('Tes données restent sur l\'appareil'),
-          onTap: () {
+          // Avant : un seul clic par erreur et on était déconnecté.
+          onTap: () async {
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (d) => AlertDialog(
+                title: const Text('Te déconnecter ?'),
+                content: const Text('Tes données restent sur l\'appareil : tu les retrouves en te reconnectant.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Annuler')),
+                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me déconnecter')),
+                ],
+              ),
+            );
+            if (ok != true || !context.mounted) return;
             Navigator.of(context).popUntil((r) => r.isFirst);
             AppSession.instance.signOut();
           },
@@ -220,7 +235,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Annuler')),
-                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Supprimer')),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
+                    onPressed: () => Navigator.pop(d, true),
+                    child: const Text('Supprimer'),
+                  ),
                 ],
               ),
             );
@@ -273,8 +292,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.timer_outlined),
           title: const Text('Vérifier toutes les'),
+          subtitle: const Text('Discord et Instagram arrivent tout de suite, sans attendre'),
           trailing: DropdownButton<int>(
-            value: n.interval,
+            // Une valeur hors de la liste faisait planter la page.
+            value: const [1, 2, 5, 10, 15, 30].contains(n.interval) ? n.interval : 2,
             underline: const SizedBox.shrink(),
             items: const [1, 2, 5, 10, 15, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v min'))).toList(),
             onChanged: (v) => n.interval = v ?? 2,
@@ -285,7 +306,7 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('Regrouper les notifications'),
           subtitle: const Text('Un seul résumé au lieu de 15 notifications d\'affilée (les appels passent toujours)'),
           trailing: DropdownButton<int>(
-            value: n.digest,
+            value: const [0, 15, 30, 60].contains(n.digest) ? n.digest : 30,
             underline: const SizedBox.shrink(),
             items: const [
               DropdownMenuItem(value: 0, child: Text('Non')),
@@ -552,8 +573,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.speed_rounded),
                   title: Text(Perf.explain),
-                  subtitle: const Text('Change de mode puis redémarre Mon Hub pour que tout reparte au bon rythme.'),
+                  subtitle: const Text('Après un changement de mode, Mon Hub redémarre pour que tout reparte au bon rythme.'),
                 ),
+                // Avant : « redémarre Mon Hub » sans bouton pour le faire.
+                if (AppInstall.canRestart)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Redémarrer Mon Hub maintenant'),
+                        onPressed: AppInstall.restart,
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -759,8 +793,10 @@ class _SettingsPageState extends State<SettingsPage> {
         final v = e.value;
         if (v is String) await prefs.setString(e.key, v);
         if (v is int) await prefs.setInt(e.key, v);
+        // Les nombres à virgule (vitesse de la voix…) étaient perdus à l'import.
+        if (v is double) await prefs.setDouble(e.key, v);
         if (v is bool) await prefs.setBool(e.key, v);
-        if (v is List) await prefs.setStringList(e.key, v.cast<String>());
+        if (v is List) await prefs.setStringList(e.key, [for (final x in v) '$x']);
       }
       for (final e in (j['secrets'] as Map<String, dynamic>).entries) {
         await ModuleStore.writeSecretRaw(e.key, e.value as String);

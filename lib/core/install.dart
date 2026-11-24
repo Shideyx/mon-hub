@@ -208,6 +208,21 @@ class AppInstall {
     }
   }
 
+  /// On peut relancer Mon Hub d'un bouton (Windows, version compilée).
+  static bool get canRestart => supported && !kDebugMode;
+
+  /// Redémarre Mon Hub (la nouvelle copie attend que celle-ci soit partie).
+  static Future<void> restart() async {
+    if (!canRestart) return;
+    final exe = Platform.resolvedExecutable;
+    try {
+      await Process.start(exe, const ['--relance'], workingDirectory: File(exe).parent.path, mode: ProcessStartMode.detached);
+    } catch (_) {
+      return;
+    }
+    exit(0);
+  }
+
   /// Copie le programme (sans le profil du navigateur, qui a son dossier).
   /// Un fichier en cours d'utilisation est renommé au lieu d'être écrasé
   /// (comme la mise à jour).

@@ -359,7 +359,7 @@ class _Page extends StatelessWidget {
                 for (final e in page.examples)
                   ActionChip(
                     avatar: const Icon(Icons.play_arrow_rounded, size: 18, color: hudCyan),
-                    backgroundColor: const Color(0xFF12263A),
+                    backgroundColor: const Color(0xFF221A3D),
                     side: BorderSide(color: hudCyan.withValues(alpha: 0.5)),
                     label: Text('« $e »', style: const TextStyle(color: Colors.white)),
                     onPressed: () => onTry(e),
@@ -531,7 +531,7 @@ class _KeysVisual extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         transform: Matrix4.translationValues(0, down ? 4 : 0, 0),
         decoration: BoxDecoration(
-          color: down ? hudCyan.withValues(alpha: 0.25) : const Color(0xFF12263A),
+          color: down ? hudCyan.withValues(alpha: 0.25) : const Color(0xFF221A3D),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: hudCyan.withValues(alpha: down ? 1 : 0.4)),
           boxShadow: down ? [BoxShadow(color: hudCyan.withValues(alpha: 0.5), blurRadius: 18)] : null,
@@ -678,7 +678,7 @@ class _Panel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: const BoxDecoration(
-              color: Color(0xFF12263A),
+              color: Color(0xFF221A3D),
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Text(
@@ -947,7 +947,7 @@ class _WatchVisual extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF12263A),
+                    color: const Color(0xFF221A3D),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -1012,7 +1012,7 @@ class _LifeGridVisual extends StatelessWidget {
               width: 104,
               height: 92,
               decoration: BoxDecoration(
-                color: const Color(0xFF12263A),
+                color: const Color(0xFF221A3D),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: hudCyan.withValues(alpha: 0.3)),
               ),

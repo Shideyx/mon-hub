@@ -14,6 +14,7 @@ import 'course_page.dart';
 import 'skills.dart';
 import 'tutorial.dart';
 import 'mic_test.dart';
+import 'wake.dart';
 import 'mind_page.dart';
 import 'settings.dart';
 
@@ -293,6 +294,19 @@ class _Essentials extends StatelessWidget {
               value: c.mic,
               onChanged: (v) => c.setOption('mic', v),
             ),
+            // Le réglage le plus « JARVIS » : avant, il était caché dans
+            // « Écoute et micro ».
+            if (WakeWord.supported && c.mic)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.record_voice_over_rounded),
+                title: const Text('Dis « Nexo » pour l\'appeler'),
+                subtitle: const Text(
+                  'Mains libres : « Nexo, fais le point ». Le mot est guetté sur ton PC, rien ne part avant.',
+                ),
+                value: c.wakeOn,
+                onChanged: (v) => c.setOption('wake', v),
+              ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.bolt_rounded),

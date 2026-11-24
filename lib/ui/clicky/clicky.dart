@@ -33,6 +33,7 @@ import '../../core/hub_controller.dart';
 import '../../core/hub_feed.dart';
 import '../../core/hub_files.dart';
 import '../../core/hub_module.dart';
+import '../../core/module_store.dart';
 import '../../core/nav.dart';
 import '../../core/prompt_shield.dart';
 import '../../core/session.dart';
@@ -68,6 +69,7 @@ import 'homework_auto.dart';
 import 'patience.dart';
 import 'quick.dart';
 import 'smily.dart';
+import 'announce.dart';
 import 'identity.dart';
 import 'ollama.dart';
 import 'pointer.dart';
@@ -428,10 +430,17 @@ class ClickyController extends ChangeNotifier {
   String get look => _opt('look', 'hud');
   bool get hud => look != 'classic';
 
-  /// Comment Nexo t'appelle (vide : ton prénom de compte Mon Hub).
+  /// Comment Nexo t'appelle. Vide : le prénom des Réglages de Mon Hub (avant,
+  /// il y avait deux prénoms différents, un par page de réglages), sinon le
+  /// prénom du compte.
   String get callName {
     final n = _opt('callName', '').trim();
     if (n.isNotEmpty) return n;
+    var hub = '';
+    try {
+      hub = (ModuleStore.prefs.getString('hub.name') ?? '').trim();
+    } catch (_) {}
+    if (hub.isNotEmpty) return hub;
     return (AppSession.instance.current?.name ?? '').split(' ').first;
   }
 
@@ -585,9 +594,13 @@ class ClickyController extends ChangeNotifier {
     final now = DateTime.now();
     if (!mind.on) return speak(clickyGreeting(callName, now));
     // Il se souvient, et prend des nouvelles.
-    final hello = mind.greeting(now: now, name: callName);
+    var hello = mind.greeting(now: now, name: callName);
     final loop = mind.dueLoops(now).firstOrNull;
     if (loop != null && hello.contains(loop.text)) unawaited(mind.markAsked(loop));
+    // Façon bras droit : la chose importante du moment (un contrôle demain,
+    // un cours qui commence…), si Mon Hub la connaît déjà.
+    final top = HubFeed.say(HubFeed.instance.items.firstOrNull);
+    if (top != null && loop == null) hello = '$hello $top';
     _set(ClickyState.speaking, status: '', reply: hello);
     await speak(hello);
     if (state == ClickyState.speaking) _set(ClickyState.idle);
@@ -1447,7 +1460,9 @@ class ClickyController extends ChangeNotifier {
   Future<void> think(String text, {bool aloud = true}) async {
     if (!active || text.trim().isEmpty) return;
     if (handledElsewhere) {
-      await ClickyDesktop.send('think64 ${base64Encode(utf8.encode(text))}');
+      // « En silence » doit le rester chez Nexo partout (avant, il disait à
+      // voix haute ce qui devait n'être qu'une bulle).
+      await ClickyDesktop.send('${aloud ? 'think64' : 'thinkq64'} ${base64Encode(utf8.encode(text))}');
       return;
     }
     if (!_calm) return;
@@ -2087,11 +2102,47 @@ class ClickyController extends ChangeNotifier {
   /// Une notification de Mon Hub arrive : il réagit (un émoji ; une phrase
   /// seulement pour une note).
   void reactTo(HubNotification n) {
+    // Un message de quelqu'un : il te l'annonce, comme un majordome.
+    if (_announceMessage(n)) return;
     final mind = ClickyMind.instance;
     if (!active || !mind.on || !mind.life || !mind.lifeReact) return;
     final f = ClickyLife.feelingFor(n.id, n.title, n.body);
     if (f == null) return;
     unawaited(feel(f.$1, text: f.$2));
+  }
+
+  /// « Il m'annonce mes messages » (oui par défaut) : une bulle à côté de la
+  /// souris dès qu'un message arrive (Discord, Instagram, mails, École
+  /// Directe, espaces).
+  bool get announce => _opt('announce', true);
+
+  /// … et à voix haute (non par défaut : la voix gratuite est comptée).
+  bool get announceAloud => _opt('announceAloud', false);
+
+  final _pacer = AnnouncePacer();
+
+  /// true si c'était un message (annoncé, ou gardé pour la prochaine bulle).
+  bool _announceMessage(HubNotification n) {
+    final line = MessageAnnounce.line(n);
+    if (line == null) return false;
+    if (!active || !announce) return true;
+    // Jamais pendant un jeu, le mode concentration, un appel ou une vidéo en
+    // plein écran (les notifications sont gardées pour après).
+    if (FocusMode.instance.active || GameMode.instance.active) return true;
+    if (Win.supportedHere) {
+      try {
+        if (Win.foregroundFullscreen() || CallRules.callApp(CameraGuard.instance.micro) != null) return true;
+      } catch (_) {}
+    }
+    // Un appel qui sonne : tout de suite, et à voix haute (comme un vrai
+    // majordome qui annonce l'appel).
+    if (MessageAnnounce.isCall(n)) {
+      unawaited(think(line));
+      return true;
+    }
+    final say = _pacer.onMessage(line, DateTime.now());
+    if (say != null) unawaited(think(say, aloud: announceAloud));
+    return true;
   }
 
   /// Ce qu'il ressent, à côté de lui (envoyé à Nexo partout s'il est là).
@@ -5650,7 +5701,8 @@ class _ClickyLayerState extends State<ClickyLayer> {
   Widget build(BuildContext context) => Overlay(initialEntries: [_entry]);
 }
 
-const clickyBlue = Color(0xFF3B82F6);
+/// La couleur de Nexo (le violet de son corps). Nom de code d'origine gardé.
+const clickyBlue = Color(0xFF7C5CFF);
 
 /// Le curseur bleu, la petite boîte de texte et le bouton.
 class ClickyBuddy extends StatefulWidget {

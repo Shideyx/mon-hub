@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Couleurs du look « tête haute » de Nexo (bleu-cyan).
-const hudCyan = Color(0xFF29E6FF);
-const hudBlue = Color(0xFF0A84FF);
-const hudGlass = Color(0xEE07121D);
+/// Couleurs du look « tête haute » de Nexo : celles de son corps (violet et
+/// rose de Mon Hub). Le nom `hudCyan` est resté, mais c'est la lumière
+/// lavande de Nexo (avant : cyan, qui ne lui ressemblait pas).
+const hudCyan = Color(0xFFC3B4FF);
+const hudBlue = Color(0xFF7C5CFF);
+const hudGlass = Color(0xEE120D24);
 const hudAmber = Color(0xFFFFB020);
 
 enum HudMode { idle, listening, thinking, speaking, pointing }
@@ -178,18 +180,18 @@ ThemeData hudTheme(ThemeData base) => base.copyWith(
     primary: hudCyan,
     onPrimary: Colors.black,
     surface: hudGlass,
-    onSurface: const Color(0xFFE6FBFF),
-    onSurfaceVariant: const Color(0xFF9FD8E6),
+    onSurface: const Color(0xFFF1EDFF),
+    onSurfaceVariant: const Color(0xFFB8AEDD),
     surfaceContainerHigh: hudGlass,
-    surfaceContainerHighest: const Color(0xFF10283A),
+    surfaceContainerHighest: const Color(0xFF221A3D),
     outline: hudCyan.withValues(alpha: 0.6),
     outlineVariant: hudCyan.withValues(alpha: 0.3),
   ),
-  textTheme: base.textTheme.apply(bodyColor: const Color(0xFFE6FBFF), displayColor: hudCyan),
+  textTheme: base.textTheme.apply(bodyColor: const Color(0xFFF1EDFF), displayColor: hudCyan),
   iconTheme: const IconThemeData(color: hudCyan),
   inputDecorationTheme: const InputDecorationTheme(
-    hintStyle: TextStyle(color: Color(0xFF7FB8C8)),
-    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0x8829E6FF))),
+    hintStyle: TextStyle(color: Color(0xFF9A90C2)),
+    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0x88C3B4FF))),
     focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: hudCyan, width: 1.5)),
     border: OutlineInputBorder(),
   ),

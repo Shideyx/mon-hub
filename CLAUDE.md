@@ -680,6 +680,22 @@
   RegOpenKeyEx / RegEnumKeyEx) au lieu de lancer PowerShell toutes les 30 s (PowerShell = secours), et ne redessine que
   si ça change. Bulle de l'assistant : `TypedText.nextCut/safePrefix` ne coupe plus un émoji en deux (« string is not
   well-formed UTF-16 », plantage vu dans le journal). Tests `test/v185_nexo_test.dart`.
+- **Nexo t'annonce tes messages (v1.66)** : `ui/clicky/announce.dart` (`MessageAnnounce.messageOf/line` sans IA :
+  Discord « Discord · X », Instagram `insta:`, espaces `espace:`, mails, École Directe `msg:` ; jamais les codes /
+  mots de passe `secretLike` ; appel `discord-appel` → « 📞 X t'appelle… Dis « décroche » ») + `AnnouncePacer` (une
+  bulle / 20 s, la rafale est comptée). Branché au début de `ClickyController.reactTo` (`_announceMessage` : rien en
+  jeu, concentration, appel, plein écran) → `think(aloud: announceAloud)` ; un appel est toujours dit. Réglages
+  `announce` (oui) / `announceAloud` (non) dans la rubrique `topo` (« Annonces et topos »). Phrases sans IA
+  `QuickAnswers.callAction` : décroche (en vidéo), refuse l'appel, raccroche → outil `discord_appel`.
+  **Bug corrigé** : `think(aloud: false)` envoyé à Nexo partout devenait parlé (`think64` sans le mode) → `thinkq64`.
+  Salutation du jour + `HubFeed.say` (la chose importante du moment). `selfAnswer` : « pourquoi tu t'appelles
+  Nexo ? » → `Nexo.lore`.
+- **Réglages remis d'aplomb (v1.66)** : un seul prénom (`callName` vide → `hub.name` des Réglages → prénom du compte) ;
+  « Dis Nexo » dans L'essentiel ; Apparence = « Tête haute / Simple » (l'ancien texte parlait d'un réacteur bleu qui
+  n'existe plus) ; couleurs des fenêtres de Nexo = violet/lavande (`hudCyan` garde son nom) et `clickyBlue` = violet ;
+  déconnexion confirmée ; bouton « Supprimer » en rouge ; listes déroulantes qui ne plantent plus sur une valeur hors
+  liste ; « Redémarrer Mon Hub maintenant » dans Vitesse (`AppInstall.restart`, `--relance`) ; l'import de
+  configuration garde les nombres à virgule.
 - Vérifier ici sous Windows : `dart analyze --fatal-infos` (pas `flutter analyze`, qui se perd dans le SDK quand il est
   dans un chemin long) ; 4 tests de l'accueil échouent **seulement sous Windows** (PowerShell de `PcApps.load` →
   minuteur en attente, texte « PC (Windows) ») : sous Linux (GitHub) ils passent.

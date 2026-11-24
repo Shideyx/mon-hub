@@ -11,8 +11,10 @@ import 'package:hub/core/notifications.dart';
 import 'package:hub/core/web_notify.dart';
 import 'package:hub/modules/discord/discord_phone.dart';
 import 'package:hub/modules/instagram/instagram_watch.dart';
+import 'package:hub/ui/clicky/announce.dart';
 import 'package:hub/ui/clicky/clicky.dart';
 import 'package:hub/ui/clicky/hud.dart';
+import 'package:hub/ui/clicky/quick.dart';
 import 'package:hub/ui/clicky/identity.dart';
 import 'package:hub/ui/clicky/mind.dart';
 import 'package:hub/ui/clicky/smily.dart';
@@ -195,6 +197,82 @@ void main() {
       await first;
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(a.calls, 2);
+    });
+  });
+
+  group('Nexo t\'annonce tes messages', () {
+    HubNotification note(String id, String title, String body, {String module = ''}) =>
+        HubNotification(id: id, title: title, body: body, moduleId: module);
+
+    test('les messages de quelqu\'un, d\'où ils viennent', () {
+      expect(
+        MessageAnnounce.line(note('1234', 'Discord · Léa', 't\'es là ?', module: 'discord')),
+        'Léa sur Discord : t\'es là ?',
+      );
+      expect(
+        MessageAnnounce.line(note('insta:1', '📸 tom.dlr', 'ce soir ?', module: 'instagram')),
+        'tom.dlr sur Instagram : ce soir ?',
+      );
+      expect(
+        MessageAnnounce.line(note('insta:2', '📸 Instagram', 'Tu as un nouveau message.', module: 'instagram')),
+        'Tu as un nouveau message.',
+      );
+      expect(
+        MessageAnnounce.line(note('msg:9', '📨 École Directe · M. Dupont', 'Sortie scolaire', module: 'ecoledirecte')),
+        'M. Dupont sur École Directe : Sortie scolaire',
+      );
+      expect(
+        MessageAnnounce.line(note('a|1|Promo', '✉️ Amazon', 'Votre colis', module: 'mail')),
+        'Un mail d\'Amazon : Votre colis',
+      );
+      expect(
+        MessageAnnounce.line(note('a|2|Sortie', '✉️ Lucas', 'Sortie samedi', module: 'mail')),
+        'Un mail de Lucas : Sortie samedi',
+      );
+    });
+
+    test('pas les notes, devoirs, arnaques ni le reste (ils ont leurs propres réactions)', () {
+      expect(MessageAnnounce.line(note('note:1', '📝 Nouvelle note en Maths', '16/20', module: 'ecoledirecte')), isNull);
+      expect(MessageAnnounce.line(note('devoir:1', '📚 Devoir en SVT', 'Pour demain', module: 'ecoledirecte')), isNull);
+      expect(MessageAnnounce.line(note('arnaque:9', '⚠️ Arnaque probable', 'lien', module: 'discord')), isNull);
+      expect(MessageAnnounce.line(note('maj:v1.90', '✨ Mon Hub v1.90 est installé', '')), isNull);
+    });
+
+    test('jamais un code ou un mot de passe lu tout haut', () {
+      final l = MessageAnnounce.line(note('1', 'Discord · Bot', 'Ton code de vérification : 482913', module: 'discord'));
+      expect(l, 'Bot sur Discord.');
+      expect(MessageAnnounce.line(note('2', 'Discord · Léa', 'mon mot de passe c\'est chat', module: 'discord')),
+          'Léa sur Discord.');
+    });
+
+    test('un appel est annoncé, avec quoi répondre', () {
+      final n = note('discord-appel-1', 'Appel Discord', 'Léa t\'appelle', module: 'discord');
+      expect(MessageAnnounce.isCall(n), isTrue);
+      expect(MessageAnnounce.line(n), contains('Léa t\'appelle sur Discord'));
+      expect(MessageAnnounce.line(n), contains('décroche'));
+    });
+
+    test('une rafale de messages = une seule bulle', () {
+      final p = AnnouncePacer();
+      final t = DateTime(2026, 11, 25, 16);
+      expect(p.onMessage('Léa sur Discord : salut', t), 'Léa sur Discord : salut');
+      expect(p.onMessage('Léa sur Discord : t\'es là ?', t.add(const Duration(seconds: 3))), isNull);
+      expect(p.onMessage('Tom sur Instagram : yo', t.add(const Duration(seconds: 5))), isNull);
+      expect(
+        p.onMessage('Léa sur Discord : réponds', t.add(const Duration(seconds: 30))),
+        'Léa sur Discord : réponds (et 2 autres messages avant).',
+      );
+    });
+
+    test('répondre à un appel à la voix', () {
+      expect(QuickAnswers.callAction('decroche'), 'repondre');
+      expect(QuickAnswers.callAction('reponds a l appel'), 'repondre');
+      expect(QuickAnswers.callAction('decroche en video'), 'repondre_video');
+      expect(QuickAnswers.callAction('refuse l appel'), 'refuser');
+      expect(QuickAnswers.callAction('raccroche'), 'raccrocher');
+      // Une vraie question ne déclenche rien.
+      expect(QuickAnswers.callAction('refuse'), isNull);
+      expect(QuickAnswers.callAction('comment je decroche un telephone'), isNull);
     });
   });
 

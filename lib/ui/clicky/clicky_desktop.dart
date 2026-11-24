@@ -194,6 +194,12 @@ Future<void> runClickyDesktop() async {
           unawaited(c.think(utf8.decode(base64Decode(cmd.substring(8)))));
         } catch (_) {}
       }
+      // La même, en silence (une bulle seulement).
+      if (cmd.startsWith('thinkq64 ')) {
+        try {
+          unawaited(c.think(utf8.decode(base64Decode(cmd.substring(9))), aloud: false));
+        } catch (_) {}
+      }
       // Question envoyée par Mon Hub (révisions du journal…).
       if (cmd.startsWith('ask ')) {
         c.openPanel();

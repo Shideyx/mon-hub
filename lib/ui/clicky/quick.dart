@@ -35,6 +35,23 @@ class QuickAnswers {
 
   static const _days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
+  /// « Décroche », « réponds en vidéo », « refuse l'appel », « raccroche »
+  /// (phrase nettoyée) → l'action de `discord_appel`, ou null.
+  static String? callAction(String n) {
+    if (RegExp(r'^(?:decroche|reponds|repond|accepte|prends)(?: l appel| a l appel)?(?: en video| avec la camera)$')
+        .hasMatch(n)) {
+      return 'repondre_video';
+    }
+    if (RegExp(r'^(?:decroche|decroches|accepte l appel|reponds a l appel|repond a l appel|prends l appel)$').hasMatch(n)) {
+      return 'repondre';
+    }
+    if (RegExp(r'^(?:refuse|refuses|rejette|ignore) (?:l appel|cet appel)$').hasMatch(n)) return 'refuser';
+    if (RegExp(r'^(?:raccroche|raccroches|coupe l appel|termine l appel|quitte l appel)$').hasMatch(n)) {
+      return 'raccrocher';
+    }
+    return null;
+  }
+
   /// La phrase nettoyée : minuscules, sans accents, sans « Nexo » ni
   /// « s'il te plaît ».
   static String clean(String raw) {
@@ -295,6 +312,25 @@ class QuickAnswers {
       if (q.split(' ').length > 3) q = q.split(' ').skip(1).take(3).join(' ');
       final r = await call('memoire_effacer_souvenir', {'quoi': q});
       if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+
+    // ---- Les appels Discord à la voix (« décroche », « raccroche ») ----
+    if (has('discord_appel')) {
+      final action = QuickAnswers.callAction(n);
+      if (action != null) {
+        try {
+          final r = await call('discord_appel', {'action': action});
+          final ok = r is Map && r['ok'] == true;
+          final who = r is Map && r['qui'] != null ? ' avec ${r['qui']}' : '';
+          return QuickReply(switch (action) {
+            'repondre' || 'repondre_video' => ok ? 'Je décroche$who.' : 'Je ne vois pas d\'appel qui sonne.',
+            'refuser' => ok ? 'Appel refusé.' : 'Je ne vois pas d\'appel qui sonne.',
+            _ => ok ? 'J\'ai raccroché.' : 'Tu n\'es pas en appel dans Mon Hub.',
+          });
+        } catch (e) {
+          return QuickReply('$e');
+        }
+      }
     }
 
     // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----

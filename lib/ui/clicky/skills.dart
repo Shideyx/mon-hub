@@ -35,6 +35,16 @@ class ClickySkills {
       ),
       Skill('« Qui es-tu ? » : il se présente.', tryIt: 'Qui es-tu ?'),
       Skill(
+        'Il t\'annonce tes messages dès qu\'ils arrivent : « Léa sur Discord : t\'es là ? » (Discord, Instagram, mails, '
+        'École Directe). À voix haute si tu veux : Réglages de Nexo → Annonces et topos.',
+      ),
+      Skill(
+        'Un appel Discord sonne : il te l\'annonce. Dis « décroche », « décroche en vidéo », « refuse l\'appel » ou '
+        '« raccroche ».',
+      ),
+      Skill('Au démarrage, il te salue avec la chose importante du moment (un contrôle demain, un cours…).'),
+      Skill('« Nexo, protocole travail » : il enchaîne tes actions préparées (Carnet → Protocoles).'),
+      Skill(
         'Messages Discord et Instagram en direct : tu es prévenu dès qu\'on t\'écrit (Instagram : Réglages → '
         'Notifications → Messages Instagram en direct).',
       ),
