@@ -227,6 +227,16 @@ class ToolRouter {
         'copie',
         'explique l ecran',
         'erreur',
+        'sais faire',
+        'capable',
+        'capacite',
+        'mise a jour',
+        'nouveaute',
+        'version',
+        'jeton',
+        'token',
+        'budget',
+        'consomm',
       ],
     ),
     'securite': (
@@ -256,7 +266,22 @@ class ToolRouter {
     ),
     'camera': (
       ['camera_', 'micro_', 'appel_'],
-      ['camera', 'webcam', 'filme', 'micro', 'sourdine', 'mute', 'appel', 'flou', 'arriere plan', 'espion', 'ecoute', 'visage', 'pirate', 'privee'],
+      [
+        'camera',
+        'webcam',
+        'filme',
+        'micro',
+        'sourdine',
+        'mute',
+        'appel',
+        'flou',
+        'arriere plan',
+        'espion',
+        'ecoute',
+        'visage',
+        'pirate',
+        'privee',
+      ],
     ),
     'jeu': (
       ['jeu_'],
@@ -377,7 +402,11 @@ class ToolRouter {
     final wanted = {for (final g in groupNames) g.trim()}..remove('');
     return [
       for (final t in all)
-        if (t.name == listName || t.name == callName || wanted.contains(groupOf(t.name) ?? '·')) t,
+        if (t.name == listName ||
+            t.name == callName ||
+            always.contains(t.name) ||
+            wanted.contains(groupOf(t.name) ?? '·'))
+          t,
     ];
   }
 
@@ -391,6 +420,10 @@ class ToolRouter {
     if (g.isEmpty) g.addAll(const ['assistant', 'carnet']);
     return g;
   }
+
+  /// Toujours envoyées (petites) : Smily vérifie ce qu'il sait faire avant
+  /// de dire « je ne sais pas ».
+  static const always = {'clicky_capacites'};
 
   static const listName = 'mon_hub_outils';
   static const callName = 'mon_hub_action';

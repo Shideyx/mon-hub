@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/hub_module.dart';
 import 'shot_encode.dart';
+import '../../core/token_budget.dart';
 
 /// Gemini Live : la conversation **en direct**, comme le JARVIS « Mark LII »
 /// (Gemini Live API). Le micro part vers Gemini pendant que tu parles, et la
@@ -231,6 +232,13 @@ class GeminiLive {
     if (m.containsKey('setupComplete')) {
       if (!ready.isCompleted) ready.complete();
       return;
+    }
+    // Les jetons de Gemini Live (gratuit, comptés pour information).
+    final um = m['usageMetadata'];
+    if (um is Map) {
+      final total = (um['totalTokenCount'] as num? ?? 0).toInt();
+      final prompt = (um['promptTokenCount'] as num? ?? 0).toInt();
+      unawaited(TokenBudget.instance.recordGemini(prompt, total - prompt).catchError((Object _) {}));
     }
     final sru = m['sessionResumptionUpdate'];
     if (sru is Map && sru['resumable'] == true && sru['newHandle'] is String) _resume = sru['newHandle'] as String;

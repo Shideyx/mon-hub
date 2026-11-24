@@ -18,6 +18,7 @@ import 'win.dart';
 import 'whisper.dart';
 import 'mic_test.dart' show WhisperInstallDialog;
 import 'thrift.dart';
+import '../../core/token_budget.dart';
 
 /// Un réglage de Smily : sa rubrique, les mots pour le retrouver, et son
 /// interrupteur (ou ses boutons).
@@ -390,6 +391,29 @@ class ClickyMoreSettings extends StatelessWidget {
           'Smily économe (Claude pour les demandes difficiles)',
           'Les questions simples vont à Gemini (gratuit) ; Claude ne reçoit que les actions utiles à ta question '
               'et réfléchit juste ce qu\'il faut. ${ClaudeUsage.summary}',
+        );
+        // Budget de jetons : Smily se règle tout seul selon ce qu'il a déjà
+        // dépensé aujourd'hui.
+        add(
+          'tools',
+          'jetons tokens budget claude cout economie',
+          ListenableBuilder(
+            listenable: TokenBudget.instance,
+            builder: (context, _) {
+              final b = TokenBudget.instance;
+              return ListTile(
+                leading: const Icon(Icons.savings_outlined),
+                title: const Text('Budget de jetons Claude par jour'),
+                subtitle: Text(b.say()),
+                trailing: DropdownButton<int>(
+                  value: TokenRules.budgets.contains(b.budget) ? b.budget : TokenRules.defaultBudget,
+                  underline: const SizedBox(),
+                  onChanged: (v) => v == null ? null : unawaited(b.setBudget(v)),
+                  items: [for (final v in TokenRules.budgets) DropdownMenuItem(value: v, child: Text(TokenRules.k(v)))],
+                ),
+              );
+            },
+          ),
         );
         if (Win.supportedHere) {
           sw(

@@ -8,6 +8,7 @@ import 'hub_module.dart';
 import 'module_store.dart';
 import 'prompt_shield.dart';
 import 'tool_router.dart';
+import 'token_budget.dart';
 
 /// Accès direct à Claude (API Anthropic) avec ta propre clé API.
 ///
@@ -25,6 +26,28 @@ class ClaudeApi {
     'claude-sonnet-5-5': 'Claude Sonnet 5.5 (plus rapide)',
     'claude-haiku-5-5': 'Claude Haiku 5.5 (le plus rapide, le moins cher)',
   };
+
+  /// Sépare, dans les consignes, ce qui ne change pas (gardé en cache chez
+  /// Claude : relu ≈ 20 fois moins cher) de ce qui change à chaque question
+  /// (l'heure, l'écran, la situation…), mis après.
+  static const momentMark = '\n\n— En ce moment —\n';
+
+  /// Les consignes au format de l'API : un bloc fixe (avec un point de
+  /// cache) puis le bloc du moment, s'il y a la marque.
+  static Object systemBlocks(String system) {
+    final i = system.indexOf(momentMark);
+    if (i <= 0) return system;
+    final fixed = system.substring(0, i).trimRight();
+    final moment = system.substring(i + momentMark.length).trim();
+    return [
+      {
+        'type': 'text',
+        'text': fixed,
+        'cache_control': {'type': 'ephemeral'},
+      },
+      if (moment.isNotEmpty) {'type': 'text', 'text': 'Contexte de cette question :\n$moment'},
+    ];
+  }
 
   static String get model {
     final m = store.getJson<String>('model');
@@ -86,7 +109,7 @@ class ClaudeApi {
       ..body = jsonEncode({
         'model': model,
         'max_tokens': maxTokens,
-        'system': system,
+        'system': systemBlocks(system),
         'messages': messages,
         'output_config': {'effort': effort},
         'fallbacks': 'default',
@@ -123,6 +146,8 @@ class ClaudeApi {
       final blocks = <int, Map<String, dynamic>>{};
       final json = <int, StringBuffer>{};
       var stop = '';
+      // Les jetons de cette demande (comptés pour le budget de Smily).
+      final usage = <String, dynamic>{};
       final shown = StringBuffer();
       await for (final line
           in res.stream.transform(utf8.decoder).transform(const LineSplitter()).timeout(const Duration(minutes: 3))) {
@@ -136,6 +161,9 @@ class ClaudeApi {
           continue;
         }
         switch (e['type']) {
+          case 'message_start':
+            final u = (e['message'] as Map?)?['usage'];
+            if (u is Map) usage.addAll(u.cast<String, dynamic>());
           case 'content_block_start':
             final i = (e['index'] as num).toInt();
             blocks[i] = Map<String, dynamic>.from(e['content_block'] as Map);
@@ -171,10 +199,18 @@ class ClaudeApi {
           case 'message_delta':
             final r = (e['delta'] as Map?)?['stop_reason'];
             if (r != null) stop = '$r';
+            // Les compteurs de fin remplacent ceux du début (cumulés).
+            final u = e['usage'];
+            if (u is Map) {
+              for (final en in u.entries) {
+                if (en.value is num) usage['${en.key}'] = en.value;
+              }
+            }
           case 'error':
             throw 'Claude : ${(e['error'] as Map?)?['message'] ?? 'erreur'}';
         }
       }
+      unawaited(TokenBudget.instance.recordClaude(model, usage).catchError((Object _) {}));
       final keys = blocks.keys.toList()..sort();
       return ([for (final k in keys) blocks[k]], stop);
     } finally {

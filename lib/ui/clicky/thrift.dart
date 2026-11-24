@@ -1,4 +1,5 @@
 import '../../core/claude_api.dart';
+import '../../core/token_budget.dart';
 import '../../core/tool_router.dart';
 
 /// Smily économe : Claude seulement pour les demandes qui en valent la
@@ -65,7 +66,10 @@ class ClaudeUsage {
   static Future<void> claude() => _add('claude');
 
   /// Une demande traitée sans Claude (sans IA ou par Gemini).
-  static Future<void> saved() => _add('evite');
+  static Future<void> saved() async {
+    await _add('evite');
+    await TokenBudget.instance.recordSaved();
+  }
 
   static Future<void> _add(String k) async {
     try {
@@ -90,7 +94,6 @@ class ClaudeUsage {
   static String get summary {
     final c = claudeToday, s = savedToday;
     if (c == 0 && s == 0) return 'Aujourd\'hui : aucune question pour l\'instant.';
-    return 'Aujourd\'hui : $c question${c > 1 ? 's' : ''} envoyée${c > 1 ? 's' : ''} à Claude, '
-        '$s réglée${s > 1 ? 's' : ''} sans Claude.';
+    return TokenBudget.instance.say();
   }
 }

@@ -103,6 +103,8 @@ import '../../core/phone_link.dart';
 import '../../core/game_pal.dart';
 import '../../core/call_shield.dart';
 import 'long_memory.dart';
+import 'self_knowledge.dart';
+import '../../core/token_budget.dart';
 
 /// « Smily » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -1733,9 +1735,7 @@ class ClickyController extends ChangeNotifier {
     // on regarde, dans Mon Hub seulement (pas deux fois avec Smily partout).
     _dreamCheckN++;
     if (!desktopMode && _dreamCheckN % 30 == 0 && !_dreaming) {
-      final away = DriveRunner.supported
-          ? Duration(seconds: Win.idleSeconds())
-          : now.difference(_lastMove);
+      final away = DriveRunner.supported ? Duration(seconds: Win.idleSeconds()) : now.difference(_lastMove);
       unawaited(_maybeDream(away, now).catchError((Object _) {}));
     }
     if (!_lifeOn) {
@@ -1928,7 +1928,8 @@ class ClickyController extends ChangeNotifier {
       ClickyIdea(
         tool: 'clicky_creer_capacite',
         args: {'phrase': phrase, 'consigne': todo},
-        say: 'J\'ai eu une idée en rêvant : quand tu me dis « $phrase », je pourrais directement $todo. Je me crée '
+        say:
+            'J\'ai eu une idée en rêvant : quand tu me dis « $phrase », je pourrais directement $todo. Je me crée '
             'cette capacité ?',
         why: 'nouvelle capacité',
       ),
@@ -3152,7 +3153,10 @@ class ClickyController extends ChangeNotifier {
         q = null;
       }
     }
-    return out.length > 8 ? out.sublist(out.length - 8) : out;
+    // Moins d'historique quand le budget de jetons se resserre (c'est ce
+    // qui coûte le plus à chaque question).
+    final max = TokenRules.historyTurns(TokenBudget.instance.level);
+    return out.length > max ? out.sublist(out.length - max) : out;
   }
 
   // ---------- Leçon en plusieurs étapes ----------
@@ -3252,6 +3256,9 @@ class ClickyController extends ChangeNotifier {
   /// Outils de Smily lui-même (exécutés dans ce programme) : dépannage et
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
+    // Ce qu'il sait de lui-même : capacités, nouveautés (GitHub), jetons.
+    ...SelfKnowledge.tools(() => _tools),
+    ...TokenBudget.instance.tools(),
     if (_voicePlatform) ...repairTools,
     // Le navigateur (extension) et les tâches de fond vivent dans Mon Hub.
     if (hub != null && toolsOverride == null && !desktopMode) ...[
@@ -3300,7 +3307,8 @@ class ClickyController extends ChangeNotifier {
           ..add(VoiceSkill(phrase, 'ask', todo));
         await VoiceSkill.save(list);
         return {
-          'resume': 'Nouvelle capacité : quand tu me dis « $phrase », je m\'en occupe. Tu peux la modifier ou '
+          'resume':
+              'Nouvelle capacité : quand tu me dis « $phrase », je m\'en occupe. Tu peux la modifier ou '
               'l\'effacer dans mes réglages (« Mes raccourcis »).',
           'fait': true,
         };
@@ -3308,7 +3316,8 @@ class ClickyController extends ChangeNotifier {
     ),
     HubTool(
       name: 'clicky_capacites_perso',
-      description: 'Les capacités que Smily s\'est créées (ou que la personne a ajoutées) ; avec effacer=phrase, en enlève une.',
+      description:
+          'Les capacités que Smily s\'est créées (ou que la personne a ajoutées) ; avec effacer=phrase, en enlève une.',
       params: {'effacer': ('string', 'La phrase de la capacité à enlever (facultatif)')},
       run: (a) async {
         final del = normalize('${a['effacer'] ?? ''}');
@@ -3428,28 +3437,39 @@ class ClickyController extends ChangeNotifier {
     ].join(' ; ');
     final base =
         '''
-Tu es Smily, un petit smiley (un compagnon IA) qui vit dans un coin de l'écran de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
+Tu es Smily, un petit smiley (un compagnon IA) qui vit dans un coin de l'écran de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…).
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
-${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
-Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${PromptShield.rule}
-${ClickyMind.instance.promptBlock(name: callName)}
-${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
-${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
-$_sensesBlock$_memoryBlock
 $thinkingRules
+${SelfKnowledge.promptBlock()}
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Smily ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
 Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir.
 ${homeworkRules(helpOnly)}
 Ranger : « range mes téléchargements / mon bureau / mon Drive » → pc_ranger_apercu ou drive_ranger_apercu, dis en une phrase ce qui va bouger, puis pc_ranger ou drive_ranger ; « annule le rangement » → pc_ranger_annuler ou drive_ranger_annuler.''';
+    // Ce qui change d'une question à l'autre : à la fin, après une marque,
+    // pour que le début (actions + consignes) soit relu depuis le cache de
+    // Claude (≈ 20 fois moins cher) au lieu d'être recompté à chaque fois.
+    final code = codeMode && isCodeEditorTitle(foreground);
+    final moment = [
+      where,
+      if (screens.isNotEmpty) '$screens.',
+      if (foreground.isNotEmpty) 'Fenêtre au premier plan : « $foreground ».',
+      if (code && !agent) 'MODE CODE : un éditeur de code est ouvert. Tu peux mettre de courts extraits de code dans le tableau (bloc "exemple"), donner le langage, expliquer l\'algorithme pas à pas, et pointer la ligne concernée.',
+      'Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.',
+      ClickyMind.instance.promptBlock(name: callName),
+      '${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}',
+      if (_situation.isNotEmpty)
+        'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation',
+      '$_sensesBlock$_memoryBlock',
+      TokenBudget.instance.promptBlock(),
+    ].where((l) => l.trim().isNotEmpty).join('\n');
     if (agent) {
       return '''$base
 
-${BrowserLink.instance.connected ? '${BrowserLink.guide}\n' : ''}Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 5 phrases simples, lisible à voix haute, sans markdown.''';
+${BrowserLink.instance.connected ? '${BrowserLink.guide}\n' : ''}Tu travailles en arrière-plan comme agent : fais la tâche demandée jusqu'au bout avec les actions disponibles (lire l'agenda, les notes, les devoirs, les messages, chercher dans Drive, envoyer un message…). Les actions qui envoient ou modifient quelque chose demandent la permission. Termine par un compte rendu en français de 1 à 5 phrases simples, lisible à voix haute, sans markdown.${ClaudeApi.momentMark}$moment''';
     }
-    final code = codeMode && isCodeEditorTitle(foreground);
     final shotsNote = shots.length > 1 ? ':screenN' : '';
     return '''$base
 
@@ -3462,7 +3482,6 @@ Ta réponse est lue à voix haute :
 ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les vraies données (agenda, notes, devoirs, messages…) ou agir ; celles qui envoient ou modifient quelque chose demandent la permission.'}
 ${webSearch && provider != 'ollama' ? 'Tu peux chercher sur internet quand la question porte sur l\'actualité ou des faits récents ; cite brièvement la source à l\'oral (« d\'après … »).' : ''}
 ${quizMode ? 'MODE QUIZ : au lieu de donner la réponse, pose une question à la personne pour la faire réfléchir (une seule à la fois), puis évalue sa réponse en une phrase quand elle répond.' : ''}
-${code ? 'MODE CODE : un éditeur de code est ouvert. Tu peux mettre de courts extraits de code dans le tableau (bloc "exemple"), donner le langage, expliquer l\'algorithme pas à pas, et pointer la ligne concernée.' : ''}
 ${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Smily montre une étape à la fois.' : ''}
 
 $_boardGuide
@@ -3472,7 +3491,7 @@ ${annotate ? '''
 Dessiner sur l'écran (comme au tableau) : tu peux ajouter des annotations, en pixels de la capture$shotsNote : [ARROW:x1,y1->x2,y2:légende] (flèche), [CIRCLE:x,y,rayon:légende] (entoure un élément), [UNDERLINE:x,y,largeur] (souligne un texte, y = bas du texte), [LABEL:x,y:texte] (étiquette). Au plus 4, seulement si ça aide à comprendre.''' : ''}
 ${driveOn && DriveRunner.supported ? actGuide : ''}
 
-Montrer à l'écran : montre dès que ça aide (mieux vaut montrer que ne pas montrer : un menu, un bouton, une zone, la chose dont tu parles) ; quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. ${screens.isEmpty ? '' : '$screens.'} Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].''';
+Montrer à l'écran : montre dès que ça aide (mieux vaut montrer que ne pas montrer : un menu, un bouton, une zone, la chose dont tu parles) ; quand c'est utile de montrer où cliquer ou de quoi tu parles, termine ta réponse (ou chaque étape) par une balise [POINT:x,y:libellé court$shotsNote] où x,y sont en pixels sur l'image (origine en haut à gauche) et visent le centre de l'élément${shots.length > 1 ? ', et N le numéro de l\'écran' : ''}. Une seule balise par étape, à la fin. Si rien n'est à montrer, termine par [POINT:none].${ClaudeApi.momentMark}$moment''';
   }
 
   /// Comment écrire un tableau visuel (voir board.dart).
@@ -4024,7 +4043,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         ? allTools
         : ToolRouter.forGroups(groups, [...allTools, ...ToolRouter.metaTools(allTools)]);
     final deep = ClaudeThrift.deep(q);
-    final effort = thrift ? ClaudeThrift.effort(q) : (deep ? 'high' : 'low');
+    final level = TokenBudget.instance.level;
+    final effort = TokenRules.effort(thrift ? ClaudeThrift.effort(q) : (deep ? 'high' : 'low'), level, deep: deep);
+    final web = webSearch && TokenRules.webAllowed(level, q);
     if (deep) _set(ClickyState.thinking, status: 'Je réfléchis à fond…');
     final system = _system(shots, foreground: fg, hiddenScreen: hidden, groups: groups);
     final docBlocks = [for (final d in docs) ...d.blocks()];
@@ -4058,7 +4079,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           imagesB64: [for (final s in shots) s.png64],
           imageLabels: [for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}) :'],
           extraBlocks: docBlocks,
-          web: webSearch,
+          web: web,
           groups: groups,
           effort: thrift || deep ? effort : null,
           onText: streamed,
@@ -4104,12 +4125,22 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           allTools: allTools,
           effort: effort,
           confirm: confirmAction,
-          webSearch: webSearch,
+          webSearch: web,
           onStatus: (s) => id == _askId ? _set(ClickyState.thinking, status: s) : null,
           onText: streamed,
         );
       }
       if (id != _askId) return;
+      // Budget de jetons dépassé : il le dit une fois (sans voix).
+      if (!useOllama && TokenBudget.instance.takeOverAnnounce()) {
+        unawaited(
+          think(
+            'J\'ai dépassé mon budget de jetons Claude du jour : je passe par Gemini (gratuit), sauf pour les grosses '
+            'demandes ou si tu me dis « réfléchis bien ».',
+            aloud: false,
+          ),
+        );
+      }
       drawing = false;
       final (spokenBoard, newBoard) = ClickyBoard.extract(raw);
       final (spokenAll, newHolo) = HoloScene.extract(spokenBoard);
@@ -4314,8 +4345,22 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
 
   /// Une question simple sans Claude : Gemini répond (gratuit).
   Future<bool> _thriftAnswer(String q) async {
-    if (!thrift || docs.isNotEmpty) return false;
-    if (!ClaudeThrift.light(q, screen: needsScreen(q))) return false;
+    if (docs.isNotEmpty) return false;
+    // Smily se règle tout seul : plus le budget de jetons du jour se
+    // resserre, plus Gemini (gratuit) répond d'abord.
+    final level = TokenBudget.instance.level;
+    if (!thrift && level == TokenLevel.normal) return false;
+    final screen = needsScreen(q);
+    if (!TokenRules.geminiFirst(
+      level,
+      light: thrift && ClaudeThrift.light(q, screen: screen),
+      heavy: ClaudeThrift.heavy(q),
+      deep: ClaudeThrift.deep(q),
+      screen: screen,
+      docs: false,
+    )) {
+      return false;
+    }
     if (!await AiText.hasGemini()) return false;
     final id = ++_askId;
     _lastQuestion = q;
@@ -4391,6 +4436,7 @@ Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases c
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
 ${PromptShield.rule}
+${SelfKnowledge.promptBlock()}
 Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données de Mon Hub) :\n$_situation'}
@@ -6835,5 +6881,4 @@ class _HudStrip extends StatelessWidget {
       ),
     );
   }
-
 }
