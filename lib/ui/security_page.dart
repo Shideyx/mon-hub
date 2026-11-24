@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../core/cam_blur.dart';
 import '../core/browser.dart';
 import '../core/camera_guard.dart';
 import '../core/pwned.dart';
@@ -316,6 +317,29 @@ class _CameraCardState extends State<CameraCard> {
                   ),
                 ),
                 SwitchListTile(
+                  secondary: const Icon(Icons.lock_rounded),
+                  title: const Text('Mode caméra privée'),
+                  subtitle: const Text(
+                    'Ta caméra reste coupée. Pendant un appel, Smily te demande avant de l\'allumer, '
+                    'et la recoupe quand tu raccroches.',
+                  ),
+                  value: guard.privateMode,
+                  onChanged: _busy
+                      ? null
+                      : (v) async {
+                          setState(() => _busy = true);
+                          final ok = await guard.setPrivate(v);
+                          if (!mounted) return;
+                          setState(() => _busy = false);
+                          if (!ok) {
+                            showError(
+                              this.context,
+                              'Windows a refusé : Réglages de Windows → Confidentialité → Caméra',
+                            );
+                          }
+                        },
+                ),
+                SwitchListTile(
                   secondary: const Icon(Icons.videocam_rounded),
                   title: const Text('Caméra coupée'),
                   subtitle: Text(
@@ -338,6 +362,23 @@ class _CameraCardState extends State<CameraCard> {
                   ),
                   value: mic.blocked,
                   onChanged: _busy ? null : (v) => unawaited(_toggle(v, mic: true)),
+                ),
+                ListenableBuilder(
+                  listenable: CamBlur.instance,
+                  builder: (context, _) => ListTile(
+                    leading: const Icon(Icons.blur_on_rounded),
+                    title: const Text('Flou dans les appels de Mon Hub'),
+                    subtitle: const Text(
+                      'Pour les appels Discord passés par Mon Hub. Se change aussi en plein appel '
+                      '(bouton en haut de l\'appel) ou en disant « floute mon visage ».',
+                    ),
+                    trailing: DropdownButton<String>(
+                      value: CamBlur.instance.mode,
+                      underline: const SizedBox(),
+                      onChanged: (m) => m == null ? null : unawaited(CamBlur.instance.setMode(m)),
+                      items: [for (final m in CamBlur.modes) DropdownMenuItem(value: m, child: Text(CamBlur.label(m)))],
+                    ),
+                  ),
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.notifications_active_outlined),

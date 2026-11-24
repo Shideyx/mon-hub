@@ -158,7 +158,10 @@ class OralCoach {
   static Future<String> _geminiKey() async => (await ClaudeApi.store.readSecret('gemini.key') ?? '').trim();
 
   /// Gemini écoute l'enregistrement lui-même (il entend les hésitations).
-  static Future<String> listen(String wav, String prompt, String key, {http.Client? client}) async {
+  ///
+  /// [fast] : sans « réflexion » (gemini-2.5-flash répond plus vite et
+  /// coûte moins de jetons ; pour les sous-titres).
+  static Future<String> listen(String wav, String prompt, String key, {http.Client? client, bool fast = false}) async {
     final audio = base64Encode(await File(wav).readAsBytes());
     final c = client ?? http.Client();
     try {
@@ -179,6 +182,10 @@ class OralCoach {
                     ],
                   },
                 ],
+                if (fast && model == 'gemini-2.5-flash')
+                  'generationConfig': {
+                    'thinkingConfig': {'thinkingBudget': 0},
+                  },
               }),
             )
             .timeout(const Duration(minutes: 3));

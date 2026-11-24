@@ -200,11 +200,24 @@ class ClickySkills {
       Skill('Mode jeu : notifications gardées pour la fin de la partie, puis le bilan'),
     ]),
     SkillGroup('📞', 'Pendant tes appels', Color(0xFFE5484D), isNew: true, [
-      Skill('« Coupe mon micro » / « remets mon micro » : sourdine instantanée, dans toutes les applis',
-          tryIt: 'Je suis mute ?'),
+      Skill(
+        '« Coupe mon micro » / « remets mon micro » : sourdine instantanée, dans toutes les applis',
+        tryIt: 'Je suis mute ?',
+      ),
       Skill('Pendant un appel, si une autre appli allume ta caméra ou ton micro : alerte, et il lui coupe l\'accès'),
-      Skill('« Floute mon arrière-plan » : comment faire dans Discord, Meet, Teams ou Zoom',
-          tryIt: 'Floute mon arrière-plan'),
+      Skill(
+        '« Floute mon arrière-plan » : comment faire dans Discord, Meet, Teams ou Zoom',
+        tryIt: 'Floute mon arrière-plan',
+      ),
+      Skill(
+        '« Floute mon visage » / « floute tout » / « enlève le flou » : dans les appels Discord passés par '
+        'Mon Hub, même en plein appel (si ton visage n\'est pas trouvé, toute l\'image est floue)',
+      ),
+      Skill(
+        '« Mode caméra privée » : ta caméra reste coupée, il te demande avant de l\'allumer pour un appel et la '
+        'recoupe quand tu raccroches',
+        tryIt: 'Mode caméra privée',
+      ),
     ]),
     SkillGroup('💻', 'Ton PC', Color(0xFFEA580C), [
       Skill('« Comment va mon PC ? »', tryIt: 'Comment va mon PC ?'),
@@ -213,8 +226,10 @@ class ClickySkills {
     ]),
     SkillGroup('📱', 'Ton téléphone', Color(0xFF0EA5E9), isNew: true, [
       Skill('Smily sur l\'iPhone sans PC : Réglages → Mes appareils → Ajouter mon iPhone → Version web (QR code).'),
-      Skill('Là-bas il appelle, prépare tes SMS, lance un itinéraire, un minuteur, un rappel dans l\'agenda, ta '
-          'musique et tes Raccourcis iPhone.'),
+      Skill(
+        'Là-bas il appelle, prépare tes SMS, lance un itinéraire, un minuteur, un rappel dans l\'agenda, ta '
+        'musique et tes Raccourcis iPhone.',
+      ),
       Skill('Réglages → Mes appareils → Mon téléphone : un QR code à scanner une fois.'),
       Skill('Photos vers le PC sans câble, fichiers, presse-papier partagé, télécommande du PC depuis ton lit.'),
       Skill('« Envoie le PDF de mon exposé sur mon téléphone »'),

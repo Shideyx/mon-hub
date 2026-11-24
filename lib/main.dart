@@ -3,6 +3,7 @@ import 'dart:io' show Directory, Platform;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'core/cam_blur_env.dart';
 import 'core/account_sync.dart';
 import 'core/call_shield.dart';
 import 'core/camera_guard.dart';
@@ -58,6 +59,8 @@ import 'ui/online/online_page.dart';
 import 'ui/spaces/spaces_page.dart';
 
 Future<void> main(List<String> args) async {
+  // Avant tout navigateur intégré : la détection des visages (flou caméra).
+  enableFaceDetection();
   // « hub.exe --clicky » : Smily partout (Windows), voir clicky_desktop.dart.
   if (args.contains('--clicky')) return runClickyDesktop();
   // « hub.exe --widget=musique » : un widget détaché sur le bureau.
@@ -371,11 +374,7 @@ class _HubAppState extends State<HubApp> {
           // appel → alerte tout de suite, et Smily propose de LUI couper l'accès.
           CallShield.instance
             ..warn = (title, body, key, mic) {
-              unawaited(
-                n.post(
-                  HubNotification(id: 'arnaque:appel:$key:$mic', title: title, body: body),
-                ),
-              );
+              unawaited(n.post(HubNotification(id: 'arnaque:appel:$key:$mic', title: title, body: body)));
               unawaited(
                 clicky.proposeIdea(
                   ClickyIdea(
@@ -391,6 +390,30 @@ class _HubAppState extends State<HubApp> {
               // En plein appel : jamais à voix haute.
               unawaited(clicky.think('Caméra allumée sur $call. Pour flouter ton arrière-plan : $how', aloud: false));
             };
+          // Mode caméra privée : coupée tout le temps ; pendant un appel,
+          // Smily demande avant de l'allumer, et la recoupe à la fin.
+          CameraGuard.inAppCall = () =>
+              const {PhoneState.calling, PhoneState.inCall}.contains(DiscordPhone.instance.state)
+              ? 'Discord (dans Mon Hub)'
+              : null;
+          CameraGuard.instance
+            ..onPrivateCall = (call, text) {
+              unawaited(
+                clicky.proposeIdea(
+                  ClickyIdea(tool: 'camera_couper', args: const {'couper': 'non'}, say: text, why: 'caméra privée'),
+                ),
+              );
+            }
+            ..onReblocked = (text) => unawaited(clicky.think(text, aloud: false));
+          String? callNow() => CallRules.callApp(CameraGuard.instance.micro) ?? CameraGuard.inAppCall?.call();
+          // Un appel dans Mon Hub : on n'attend pas le tour suivant.
+          var lastPhone = DiscordPhone.instance.state;
+          DiscordPhone.instance.addListener(() {
+            final st = DiscordPhone.instance.state;
+            if (st == lastPhone) return;
+            lastPhone = st;
+            unawaited(CameraGuard.instance.privateTick(callNow()));
+          });
           st.onTick = () async {
             try {
               final exe = Win.foregroundExe(), title = Win.foregroundTitle();
@@ -416,6 +439,8 @@ class _HubAppState extends State<HubApp> {
               await CameraGuard.instance.tick();
               // Pendant un appel : seule l'appli de l'appel filme et écoute.
               CallShield.instance.tick();
+              // Mode caméra privée : demander / recouper.
+              await CameraGuard.instance.privateTick(callNow());
               // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
               await ClickySenses.instance.tick(
                 exe: exe,

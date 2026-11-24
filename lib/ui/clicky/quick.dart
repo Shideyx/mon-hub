@@ -6,6 +6,7 @@ import '../widgets.dart';
 import 'tutor.dart' show normalize;
 import 'patience.dart';
 import 'watchers.dart' show WatchParse;
+import '../../core/cam_blur.dart';
 import '../../core/birthdays.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
@@ -308,9 +309,27 @@ class QuickAnswers {
         r'^(?:rallume|remets|rouvre|reactive) (?:moi )?(?:mon|le) (?:micro|microphone)$|^(?:unmute|demute)(?: moi)?$|'
         r'^(?:enleve|retire) (?:la )?sourdine$',
       ).hasMatch(n);
-      final ask = RegExp(r'^(?:je suis|suis je|est ce que je suis) (?:mute|muet|muette|en sourdine)\s?\??$').hasMatch(n);
+      final ask = RegExp(r'^(?:je suis|suis je|est ce que je suis) (?:mute|muet|muette|en sourdine)\s?\??$')
+          .hasMatch(n);
       if (mute || back || ask) {
         final r = await call('micro_sourdine', {'mode': mute ? 'on' : (back ? 'off' : 'etat')});
+        if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+      }
+    }
+    // Le flou du visage dans les appels de Mon Hub, et le mode caméra privée.
+    final blurMode = CamBlur.modeFrom(n);
+    if (blurMode != null && has('camera_flou')) {
+      final r = await call('camera_flou', {'mode': blurMode});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+    if (has('camera_privee')) {
+      final on = RegExp(
+        r'^(?:active |allume |mets |lance )?(?:le )?mode camera privee$|^(?:laisse|garde) (?:ma|la) camera coupee$|'
+        r'^j ai peur (?:qu on|que quelqu un) (?:pirate|hacke|espionne) ma (?:camera|webcam)$',
+      ).hasMatch(n);
+      final off = RegExp(r'^(?:desactive|eteins|arrete|enleve|coupe) (?:le )?mode camera privee$').hasMatch(n);
+      if (on || off) {
+        final r = await call('camera_privee', {'activer': on ? 'oui' : 'non'});
         if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
       }
     }
