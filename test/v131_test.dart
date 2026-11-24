@@ -71,26 +71,43 @@ void main() {
           ws.add(utf8.encode(jsonEncode({'setupComplete': <String, dynamic>{}})));
         }
         if ((m['realtimeInput'] as Map?)?.containsKey('activityEnd') == true) {
-          ws.add(jsonEncode({
-            'toolCall': {
-              'functionCalls': [
-                {'id': '1', 'name': 'agenda_lire', 'args': {'jours': 1}},
-              ],
-            },
-          }));
-        }
-        if (m.containsKey('toolResponse')) {
-          ws.add(jsonEncode({
-            'serverContent': {
-              'modelTurn': {
-                'parts': [
-                  {'inlineData': {'mimeType': 'audio/pcm;rate=24000', 'data': base64Encode([1, 2, 3, 4])}},
+          ws.add(
+            jsonEncode({
+              'toolCall': {
+                'functionCalls': [
+                  {
+                    'id': '1',
+                    'name': 'agenda_lire',
+                    'args': {'jours': 1},
+                  },
                 ],
               },
-              'outputTranscription': {'text': 'Tu as maths à 8 h.'},
-            },
-          }));
-          ws.add(jsonEncode({'serverContent': {'turnComplete': true}}));
+            }),
+          );
+        }
+        if (m.containsKey('toolResponse')) {
+          ws.add(
+            jsonEncode({
+              'serverContent': {
+                'modelTurn': {
+                  'parts': [
+                    {
+                      'inlineData': {
+                        'mimeType': 'audio/pcm;rate=24000',
+                        'data': base64Encode([1, 2, 3, 4]),
+                      },
+                    },
+                  ],
+                },
+                'outputTranscription': {'text': 'Tu as maths à 8 h.'},
+              },
+            }),
+          );
+          ws.add(
+            jsonEncode({
+              'serverContent': {'turnComplete': true},
+            }),
+          );
         }
       });
     });

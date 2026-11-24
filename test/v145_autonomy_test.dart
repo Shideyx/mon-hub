@@ -22,7 +22,13 @@ void main() {
   });
 
   test('il décide seul, mais jamais d\'envoyer un message ni de supprimer', () {
-    const tools = {'revision_preparer_controle', 'discord_envoyer', 'agenda_supprimer', 'pc_commande', 'musique_commande'};
+    const tools = {
+      'revision_preparer_controle',
+      'discord_envoyer',
+      'agenda_supprimer',
+      'pc_commande',
+      'musique_commande',
+    };
     expect(Autonomy.usable('revision_preparer_controle', tools), isTrue);
     expect(Autonomy.usable('musique_commande', tools), isTrue);
     expect(Autonomy.usable('discord_envoyer', tools), isFalse);
@@ -40,7 +46,14 @@ void main() {
     // … et ce qui est refusé.
     expect(Autonomy.parse({'rien': true}, tools), isNull);
     expect(Autonomy.parse({'dire': 'J\'envoie un message à Léa ?', 'outil': 'discord_envoyer'}, tools), isNull);
-    expect(Autonomy.parse({'dire': 'Je cherche ?', 'outil': 'agent', 'args': {'tache': 'x'}}, tools), isNull);
+    expect(
+      Autonomy.parse({
+        'dire': 'Je cherche ?',
+        'outil': 'agent',
+        'args': {'tache': 'x'},
+      }, tools),
+      isNull,
+    );
     expect(ClickyIdea.fromJson(i.toJson())!.say, i.say);
     // La consigne ne propose pas les actions interdites.
     final prompt = Autonomy.prompt(
@@ -58,18 +71,34 @@ void main() {
   });
 
   test('sans IA : des décisions évidentes selon l\'heure et la situation', () {
-    const all = {'revision_preparer_controle', 'assistant_briefing', 'assistant_ajouter_plan_journee', 'revision_lancer'};
+    const all = {
+      'revision_preparer_controle',
+      'assistant_briefing',
+      'assistant_ajouter_plan_journee',
+      'revision_lancer',
+    };
     expect(Autonomy.rules({'controle': 'Maths'}, DateTime(2026, 11, 17, 18), available: all)!.args['matiere'], 'Maths');
     expect(Autonomy.rules({}, DateTime(2026, 11, 17, 8), available: all)!.tool, 'assistant_briefing');
-    expect(Autonomy.rules({'trop': true}, DateTime(2026, 11, 17, 18), available: all)!.tool, 'assistant_ajouter_plan_journee');
+    expect(
+      Autonomy.rules({'trop': true}, DateTime(2026, 11, 17, 18), available: all)!.tool,
+      'assistant_ajouter_plan_journee',
+    );
     expect(Autonomy.rules({'cartes': 15}, DateTime(2026, 11, 17, 19), available: all)!.tool, 'revision_lancer');
     expect(Autonomy.rules({'cartes': 15}, DateTime(2026, 11, 17, 13), available: all), isNull);
     // Ce qu'il a appris à ne plus proposer.
-    expect(Autonomy.rules({'controle': 'Maths'}, DateTime(2026, 11, 17, 18), available: all, skip: {'revision_preparer_controle'}), isNull);
+    expect(
+      Autonomy.rules(
+        {'controle': 'Maths'},
+        DateTime(2026, 11, 17, 18),
+        available: all,
+        skip: {'revision_preparer_controle'},
+      ),
+      isNull,
+    );
   });
 
   test('tu réponds « oui » ou « non » à voix haute', () {
-    for (final y in ['oui', 'Ouais vas-y', 'OK', 'd\'accord', 'vas-y', 'Clicky fais-le', 'carrément']) {
+    for (final y in ['oui', 'Ouais vas-y', 'OK', 'd\'accord', 'vas-y', 'Smily fais-le', 'carrément']) {
       expect(Autonomy.answer(y), isTrue, reason: y);
     }
     for (final n in ['non', 'non merci', 'pas maintenant', 'laisse tomber', 'plus tard']) {
@@ -99,14 +128,23 @@ void main() {
     expect(mind.ideaAllowed(DateTime(2026, 11, 18, 2)), isFalse);
     await mind.setPace('souvent');
     expect(mind.ideaGap, const Duration(minutes: 25));
-    expect(mind.welcomeBack(now: now, name: 'Sam', away: const Duration(hours: 2)), startsWith('Ça fait un moment Sam'));
+    expect(
+      mind.welcomeBack(now: now, name: 'Sam', away: const Duration(hours: 2)),
+      startsWith('Ça fait un moment Sam'),
+    );
   });
 
   testWidgets('son idée s\'affiche avec Oui / Non / Plus tard', (tester) async {
     final c = ClickyController.instance;
     c.idea = ClickyIdea(say: 'Je t\'organise ta soirée ?', tool: 'outil_absent', why: 'soirée chargée');
     c.reply = 'Je t\'organise ta soirée ?';
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: ClickyBox(c: c)))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(child: ClickyBox(c: c)),
+        ),
+      ),
+    );
     await tester.pump();
     expect(find.text('Oui, vas-y'), findsOneWidget);
     expect(find.text('Pourquoi : soirée chargée'), findsOneWidget);

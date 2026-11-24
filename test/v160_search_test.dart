@@ -37,10 +37,19 @@ void main() {
           calls.add(tool);
           return switch (tool) {
             'drive_chercher' => [
-              {'nom': 'Exposé histoire.pptx', 'type': 'application/vnd.ms-powerpoint', 'lien': 'https://drive.google.com/x'},
+              {
+                'nom': 'Exposé histoire.pptx',
+                'type': 'application/vnd.ms-powerpoint',
+                'lien': 'https://drive.google.com/x',
+              },
             ],
             'mails_lister' => [
-              {'de': 'Prof <prof@lycee.fr>', 'objet': 'Consignes de l\'exposé', 'date': '2026-11-10T10:00:00', 'lu': true},
+              {
+                'de': 'Prof <prof@lycee.fr>',
+                'objet': 'Consignes de l\'exposé',
+                'date': '2026-11-10T10:00:00',
+                'lu': true,
+              },
               {'de': 'Promo <promo@shop.fr>', 'objet': 'Soldes', 'date': '2026-11-10T10:00:00', 'lu': false},
             ],
             'discord_conversations' => [
@@ -52,8 +61,12 @@ void main() {
               'fait': [],
             },
             'revision_paquets' => {
-              'paquets': [{'nom': 'Histoire', 'cartes': 12}],
-              'controles': [{'matiere': 'HISTOIRE', 'date': '2026-11-20', 'contenu': 'Exposé oral'}],
+              'paquets': [
+                {'nom': 'Histoire', 'cartes': 12},
+              ],
+              'controles': [
+                {'matiere': 'HISTOIRE', 'date': '2026-11-20', 'contenu': 'Exposé oral'},
+              ],
             },
             _ => null,
           };

@@ -1,4 +1,4 @@
-/// Ce que Clicky comprend sans demander à l'IA (commandes vocales), et les
+/// Ce que Smily comprend sans demander à l'IA (commandes vocales), et les
 /// petits outils du « prof » : protection de la vie privée, mode code,
 /// langue de la question, lecture du petit texte (OCR).
 library;
@@ -43,7 +43,7 @@ enum ClickyCommand {
   /// « protocole travail ».
   protocol,
 
-  /// « répare le micro », « le micro ne marche pas » : Clicky se répare.
+  /// « répare le micro », « le micro ne marche pas » : Smily se répare.
   repair,
 }
 
@@ -56,18 +56,14 @@ String normalize(String s) {
     final i = from.indexOf(c);
     b.write(i >= 0 ? to[i] : c);
   }
-  return '$b'
-      .replaceAll(RegExp(r"[^a-z0-9' ]+"), ' ')
-      .replaceAll("'", ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
+  return '$b'.replaceAll(RegExp(r"[^a-z0-9' ]+"), ' ').replaceAll("'", ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 /// Reconnaît une commande. Renvoie (commande, reste de la phrase).
 (ClickyCommand, String)? parseCommand(String raw) {
   var n = normalize(raw);
-  // « Clicky, … », « dis Clicky … » au début.
-  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?clicky ?'), '').trim();
+  // « Smily, … », « dis Smily … » au début.
+  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|simile) ?'), '').trim();
   if (n.isEmpty) return null;
   bool any(List<String> l) => l.any((p) => n == p || n == '$p s il te plait' || n == '$p merci');
   if (any([
@@ -87,22 +83,13 @@ String normalize(String s) {
   ])) {
     return (ClickyCommand.next, '');
   }
-  if (any([
-    'repete',
-    'repete ca',
-    'redis le',
-    'redis',
-    'tu peux repeter',
-    'repeat',
-    'encore une fois',
-  ])) {
+  if (any(['repete', 'repete ca', 'redis le', 'redis', 'tu peux repeter', 'repeat', 'encore une fois'])) {
     return (ClickyCommand.repeat, '');
   }
   if (any(['stop', 'arrete', 'arrete toi', 'annule', 'tais toi', 'silence', 'cancel', 'chut'])) {
     return (ClickyCommand.stop, '');
   }
-  if (RegExp(r'^(nouvelle conversation|on change de sujet|efface la conversation|repars de zero)')
-      .hasMatch(n)) {
+  if (RegExp(r'^(nouvelle conversation|on change de sujet|efface la conversation|repars de zero)').hasMatch(n)) {
     return (ClickyCommand.newChat, '');
   }
   if (RegExp(
@@ -120,31 +107,22 @@ String normalize(String s) {
   ).hasMatch(n)) {
     return (ClickyCommand.review, '');
   }
-  if (RegExp(r'^(interroge moi|teste moi|quiz|fais moi un quiz|pose moi des questions)')
-      .hasMatch(n)) {
+  if (RegExp(r'^(interroge moi|teste moi|quiz|fais moi un quiz|pose moi des questions)').hasMatch(n)) {
     return (
       ClickyCommand.quiz,
-      n
-          .replaceFirst(
-            RegExp(r'^(interroge moi|teste moi|quiz|fais moi un quiz|pose moi des questions)'),
-            '',
-          )
-          .trim(),
+      n.replaceFirst(RegExp(r'^(interroge moi|teste moi|quiz|fais moi un quiz|pose moi des questions)'), '').trim(),
     );
   }
-  if (RegExp(
-    r"(qu est ce que|qu ai je|qu est ce qu) (je viens|j ai) (de faire|fait)|ce que je viens de faire",
-  ).hasMatch(n)) {
+  if (RegExp(r"(qu est ce que|qu ai je|qu est ce qu) (je viens|j ai) (de faire|fait)|ce que je viens de faire")
+      .hasMatch(n)) {
     return (ClickyCommand.whatDidIDo, '');
   }
-  if (RegExp(
-    r'^(briefing|fais moi (le|un) (point|briefing)|le point du jour|rapport du jour|quoi de neuf aujourd hui)',
-  ).hasMatch(n)) {
+  if (RegExp(r'^(briefing|fais moi (le|un) (point|briefing)|le point du jour|rapport du jour|quoi de neuf aujourd hui)')
+      .hasMatch(n)) {
     return (ClickyCommand.briefing, '');
   }
-  final v = RegExp(
-    r'^(?:change(?:r)? (?:de |la )?voix|prends la voix|utilise la voix)(?: (?:pour|de|a))? ?(.*)$',
-  ).firstMatch(n);
+  final v = RegExp(r'^(?:change(?:r)? (?:de |la )?voix|prends la voix|utilise la voix)(?: (?:pour|de|a))? ?(.*)$')
+      .firstMatch(n);
   if (v != null) return (ClickyCommand.changeVoice, v.group(1)!.trim());
   final proto = RegExp(r'^(?:lance |active |demarre )?(?:le )?protocole (.+)$').firstMatch(n);
   if (proto != null) return (ClickyCommand.protocol, proto.group(1)!.trim());
@@ -161,7 +139,7 @@ String normalize(String s) {
   return null;
 }
 
-/// Fenêtres sensibles : Clicky ne prend pas de capture quand l'une d'elles
+/// Fenêtres sensibles : Smily ne prend pas de capture quand l'une d'elles
 /// est ouverte à l'écran (gestionnaires de mots de passe, banque…).
 bool isSensitiveTitle(String title) {
   final t = title.toLowerCase();
@@ -296,20 +274,7 @@ String detectLanguage(String text) {
       'puoi',
       'dove',
     ]),
-    'pt-PT': score([
-      'o',
-      'que',
-      'como',
-      'voce',
-      'uma',
-      'os',
-      'isso',
-      'eu',
-      'nao',
-      'porque',
-      'onde',
-      'pode',
-    ]),
+    'pt-PT': score(['o', 'que', 'como', 'voce', 'uma', 'os', 'isso', 'eu', 'nao', 'porque', 'onde', 'pode']),
   };
   var best = 'fr-FR';
   var top = scores['fr-FR']!;
@@ -333,7 +298,6 @@ bool wantsWeb(String q) => RegExp(
   r"cherche|recherche|actualite|actu |aujourd hui|en ce moment|derniere(s)? (nouvelle|version|info)|"
   r"meteo|qui a gagne|resultat du match|prix d|combien coute|sur internet|sur le web|google",
 ).hasMatch(normalize(q));
-
 
 /// La question a-t-elle besoin de l'écran ? Une question générale (l'heure,
 /// la météo, une définition, une blague, un calcul, l'agenda…) part sans

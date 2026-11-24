@@ -14,27 +14,42 @@ import 'package:hub/modules/books/books_module.dart';
 import 'package:hub/modules/books/read_finder.dart';
 import 'package:hub/modules/books/reader_page.dart';
 
-Map<String, dynamic> manga(String id, Map<String, String> title,
-        {List<Map<String, String>> alt = const [], List<String> langs = const ['fr', 'en'], String author = ''}) =>
+Map<String, dynamic> manga(
+  String id,
+  Map<String, String> title, {
+  List<Map<String, String>> alt = const [],
+  List<String> langs = const ['fr', 'en'],
+  String author = '',
+}) => {
+  'id': id,
+  'type': 'manga',
+  'attributes': {'title': title, 'altTitles': alt, 'availableTranslatedLanguages': langs, 'year': 1997},
+  'relationships': [
     {
-      'id': id,
-      'type': 'manga',
-      'attributes': {
-        'title': title,
-        'altTitles': alt,
-        'availableTranslatedLanguages': langs,
-        'year': 1997,
+      'id': 'c-$id',
+      'type': 'cover_art',
+      'attributes': {'fileName': 'cover-$id.jpg'},
+    },
+    if (author.isNotEmpty)
+      {
+        'id': 'a-$id',
+        'type': 'author',
+        'attributes': {'name': author},
       },
-      'relationships': [
-        {'id': 'c-$id', 'type': 'cover_art', 'attributes': {'fileName': 'cover-$id.jpg'}},
-        if (author.isNotEmpty) {'id': 'a-$id', 'type': 'author', 'attributes': {'name': author}},
-      ],
-    };
+  ],
+};
 
 Map<String, dynamic> chap(String id, String? n, String lang, {int pages = 20, String? vol, String? ext}) => {
   'id': id,
   'type': 'chapter',
-  'attributes': {'chapter': n, 'volume': vol, 'title': '', 'translatedLanguage': lang, 'pages': pages, 'externalUrl': ext},
+  'attributes': {
+    'chapter': n,
+    'volume': vol,
+    'title': '',
+    'translatedLanguage': lang,
+    'pages': pages,
+    'externalUrl': ext,
+  },
 };
 
 http.Response ok(Object body) => http.Response.bytes(utf8.encode(jsonEncode(body)), 200);
@@ -64,12 +79,15 @@ void main() {
         return ok({
           'data': [
             manga('m2', {'en': 'Attack on Titan: Junior High'}),
-            manga('m1', {'en': 'Attack on Titan'},
-                alt: [
-                  {'ja-ro': 'Shingeki no Kyojin'},
-                  {'fr': "L'Attaque des Titans"},
-                ],
-                author: 'Isayama Hajime'),
+            manga(
+              'm1',
+              {'en': 'Attack on Titan'},
+              alt: [
+                {'ja-ro': 'Shingeki no Kyojin'},
+                {'fr': "L'Attaque des Titans"},
+              ],
+              author: 'Isayama Hajime',
+            ),
           ],
         });
       }
@@ -77,7 +95,11 @@ void main() {
       if (r.url.host == 'openlibrary.org') {
         return ok({
           'docs': [
-            {'title': "L'Attaque des Titans", 'ebook_access': 'borrowable', 'ia': ['x']},
+            {
+              'title': "L'Attaque des Titans",
+              'ebook_access': 'borrowable',
+              'ia': ['x'],
+            },
           ],
         });
       }
@@ -101,7 +123,12 @@ void main() {
     expect(ReadFinder.confident([a, b]), false);
     // Seulement un titre qui ressemble : on ne l'ouvre pas tout seul.
     const musume = ReadMatch(source: 'mangadex', id: 'c', title: 'Monster Musume', coverUrl: 'x', languages: ['fr']);
-    expect(ReadFinder.confident([musume.withScore(ReadFinder.score(q, '', musume), similarity: ReadFinder.titleMatch(q, musume))]), false);
+    expect(
+      ReadFinder.confident([
+        musume.withScore(ReadFinder.score(q, '', musume), similarity: ReadFinder.titleMatch(q, musume)),
+      ]),
+      false,
+    );
   });
 
   test('un chapitre par numéro : lisible, en français d\'abord, dans l\'ordre', () async {
@@ -123,7 +150,11 @@ void main() {
       if (r.url.path == '/at-home/server/c1fr') {
         return ok({
           'baseUrl': 'https://abc.mangadex.network',
-          'chapter': {'hash': 'h1', 'data': ['1.png', '2.png'], 'dataSaver': ['1.jpg', '2.jpg']},
+          'chapter': {
+            'hash': 'h1',
+            'data': ['1.png', '2.png'],
+            'dataSaver': ['1.jpg', '2.jpg'],
+          },
         });
       }
       return http.Response('?', 404);
@@ -136,7 +167,10 @@ void main() {
     expect(ReadFinder.startIndex(list, ReadQuery.parse('Truc tome 2')), 3);
     expect(ReadFinder.startIndex(list, ReadQuery.parse('Truc chapitre 2')), 1);
     expect(ReadFinder.startIndex(list, ReadQuery.parse('Truc')), 0);
-    expect(await f.pages('c1fr'), ['https://abc.mangadex.network/data/h1/1.png', 'https://abc.mangadex.network/data/h1/2.png']);
+    expect(await f.pages('c1fr'), [
+      'https://abc.mangadex.network/data/h1/1.png',
+      'https://abc.mangadex.network/data/h1/2.png',
+    ]);
     expect((await f.pages('c1fr', saver: true)).first, 'https://abc.mangadex.network/data-saver/h1/1.jpg');
   });
 
@@ -156,7 +190,8 @@ void main() {
     })!;
     expect(g.author, 'Victor Hugo');
     expect(g.textUrl, 'https://www.gutenberg.org/ebooks/17489.txt.utf-8');
-    const raw = 'Licence…\r\n*** START OF THE PROJECT GUTENBERG EBOOK LES MISÉRABLES ***\r\n'
+    const raw =
+        'Licence…\r\n*** START OF THE PROJECT GUTENBERG EBOOK LES MISÉRABLES ***\r\n'
         'En 1815, M. Charles-François-Bienvenu Myriel\r\nétait évêque de Digne.\r\n\r\nC\'était un vieillard.\r\n'
         '*** END OF THE PROJECT GUTENBERG EBOOK ***\r\nFin de licence';
     final text = ReadFinder.cleanGutenberg(raw);
@@ -192,28 +227,39 @@ void main() {
     HubFiles.overrideRoot = dir.path;
     final m = BooksModule()..attach();
     final paras = [for (var i = 0; i < 40; i++) 'Paragraphe numéro $i. ${'bla ' * 80}'];
-    m.readFinder = ReadFinder(MockClient((r) async {
-      if (r.url.host == 'gutendex.com') {
-        return ok({
-          'results': [
-            {
-              'id': 1,
-              'title': 'Le Petit Prince',
-              'authors': [{'name': 'Saint-Exupéry, Antoine de'}],
-              'languages': ['fr'],
-              'formats': {'text/plain; charset=utf-8': 'https://www.gutenberg.org/ebooks/1.txt.utf-8'},
-            },
-          ],
-        });
-      }
-      if (r.url.host == 'www.gutenberg.org') {
-        return http.Response.bytes(utf8.encode('*** START OF THE PROJECT GUTENBERG EBOOK X ***\n${paras.join('\n\n')}'), 200);
-      }
-      return ok({'data': [], 'docs': []});
-    }));
+    m.readFinder = ReadFinder(
+      MockClient((r) async {
+        if (r.url.host == 'gutendex.com') {
+          return ok({
+            'results': [
+              {
+                'id': 1,
+                'title': 'Le Petit Prince',
+                'authors': [
+                  {'name': 'Saint-Exupéry, Antoine de'},
+                ],
+                'languages': ['fr'],
+                'formats': {'text/plain; charset=utf-8': 'https://www.gutenberg.org/ebooks/1.txt.utf-8'},
+              },
+            ],
+          });
+        }
+        if (r.url.host == 'www.gutenberg.org') {
+          return http.Response.bytes(
+            utf8.encode('*** START OF THE PROJECT GUTENBERG EBOOK X ***\n${paras.join('\n\n')}'),
+            200,
+          );
+        }
+        return ok({'data': [], 'docs': []});
+      }),
+    );
     final b = Book(id: 'b1', title: 'Le Petit Prince', status: BookStatus.toRead);
     await m.upsert(b);
-    await tester.pumpWidget(MaterialApp(home: BookDetailPage(module: m, book: b)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BookDetailPage(module: m, book: b),
+      ),
+    );
     await tester.ensureVisible(find.text('Lire'));
     await tester.tap(find.text('Lire'));
     for (var i = 0; i < 20; i++) {
@@ -247,22 +293,35 @@ void main() {
     await ModuleStore.init();
     HubFiles.overrideRoot = Directory.systemTemp.createTempSync('scans').path;
     final m = BooksModule()..attach();
-    m.readFinder = ReadFinder(MockClient((r) async {
-      if (r.url.path == '/manga/m1/feed') {
-        return ok({'total': 2, 'data': [chap('c1', '1', 'fr', pages: 2), chap('c2', '2', 'fr', pages: 2)]});
-      }
-      if (r.url.path.startsWith('/at-home/server/')) {
-        return ok({
-          'baseUrl': 'https://x.mangadex.network',
-          'chapter': {'hash': 'h', 'data': ['1.png', '2.png'], 'dataSaver': ['1.jpg', '2.jpg']},
-        });
-      }
-      return http.Response('?', 404);
-    }));
+    m.readFinder = ReadFinder(
+      MockClient((r) async {
+        if (r.url.path == '/manga/m1/feed') {
+          return ok({
+            'total': 2,
+            'data': [chap('c1', '1', 'fr', pages: 2), chap('c2', '2', 'fr', pages: 2)],
+          });
+        }
+        if (r.url.path.startsWith('/at-home/server/')) {
+          return ok({
+            'baseUrl': 'https://x.mangadex.network',
+            'chapter': {
+              'hash': 'h',
+              'data': ['1.png', '2.png'],
+              'dataSaver': ['1.jpg', '2.jpg'],
+            },
+          });
+        }
+        return http.Response('?', 404);
+      }),
+    );
     final b = Book(id: 'b2', title: 'Frieren', status: BookStatus.reading)
       ..read = ReadLink(source: 'mangadex', id: 'm1', title: 'Frieren');
     await m.upsert(b);
-    await tester.pumpWidget(MaterialApp(home: BookDetailPage(module: m, book: b)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BookDetailPage(module: m, book: b),
+      ),
+    );
     await tester.ensureVisible(find.text('Lire'));
     await tester.tap(find.text('Lire'));
     for (var i = 0; i < 10; i++) {
@@ -291,4 +350,3 @@ void main() {
     expect(find.textContaining('Chapitre 2 · page 1'), findsOneWidget);
   });
 }
-

@@ -24,7 +24,7 @@ class DocLine {
 }
 
 /// Conversions du contenu des documents (format « Delta » de l'éditeur) :
-/// texte de Clicky (Markdown), Word (.docx), texte brut.
+/// texte de Smily (Markdown), Word (.docx), texte brut.
 class DocFormat {
   DocFormat._();
 
@@ -41,10 +41,12 @@ class DocFormat {
         final parts = ins.split('\n');
         for (var i = 0; i < parts.length; i++) {
           if (parts[i].isNotEmpty) {
-            cur.runs.add(DocRun(parts[i], {
-              for (final e in attrs.entries)
-                if (!_blockKeys.contains(e.key)) e.key: e.value,
-            }));
+            cur.runs.add(
+              DocRun(parts[i], {
+                for (final e in attrs.entries)
+                  if (!_blockKeys.contains(e.key)) e.key: e.value,
+              }),
+            );
           }
           if (i < parts.length - 1) {
             cur.block = {
@@ -75,7 +77,10 @@ class DocFormat {
         last['insert'] = '${last['insert']}$t';
         return;
       }
-      out.add({'insert': t, if (a.isNotEmpty) 'attributes': {...a}});
+      out.add({
+        'insert': t,
+        if (a.isNotEmpty) 'attributes': {...a},
+      });
     }
 
     for (final l in lines) {
@@ -86,7 +91,10 @@ class DocFormat {
           text(r.text, r.attrs);
         }
       }
-      out.add({'insert': '\n', if (l.block.isNotEmpty) 'attributes': {...l.block}});
+      out.add({
+        'insert': '\n',
+        if (l.block.isNotEmpty) 'attributes': {...l.block},
+      });
     }
     if (out.isEmpty) out.add({'insert': '\n'});
     return out;
@@ -102,7 +110,7 @@ class DocFormat {
 
   // ---------------------------------------------------------------- Markdown
 
-  /// Le texte de Clicky (Markdown simple) en document.
+  /// Le texte de Smily (Markdown simple) en document.
   static List<Map<String, dynamic>> fromMarkdown(String md) {
     final out = <DocLine>[];
     var code = false;
@@ -160,9 +168,7 @@ class DocFormat {
     return ops(out);
   }
 
-  static final _inline = RegExp(
-    r'\[([^\]]+)\]\(([^)\s]+)\)|(\*\*\*|\*\*|__|~~|==|\*|_|`)(?=\S)(.+?)(?<=\S)\3',
-  );
+  static final _inline = RegExp(r'\[([^\]]+)\]\(([^)\s]+)\)|(\*\*\*|\*\*|__|~~|==|\*|_|`)(?=\S)(.+?)(?<=\S)\3');
 
   /// Gras, italique, barré, code, liens du Markdown.
   static List<DocRun> inline(String s, [Map<String, dynamic> base = const {}]) {
@@ -200,7 +206,7 @@ class DocFormat {
     return out;
   }
 
-  /// Le document en Markdown (pour que Clicky le lise).
+  /// Le document en Markdown (pour que Smily le lise).
   static String toMarkdown(List<dynamic> ops) {
     final b = StringBuffer();
     var n = 0;
@@ -351,7 +357,9 @@ class DocFormat {
       final list = bl['list'];
       final indent = (bl['indent'] as num?)?.toInt() ?? 0;
       if (list == 'bullet' || list == 'ordered') {
-        pPr.write('<w:numPr><w:ilvl w:val="${indent.clamp(0, 8)}"/><w:numId w:val="${list == 'bullet' ? 1 : 2}"/></w:numPr>');
+        pPr.write(
+          '<w:numPr><w:ilvl w:val="${indent.clamp(0, 8)}"/><w:numId w:val="${list == 'bullet' ? 1 : 2}"/></w:numPr>',
+        );
       } else if (indent > 0) {
         pPr.write('<w:ind w:left="${indent * 720}"/>');
       }
@@ -531,7 +539,9 @@ class DocFormat {
       final pPr = p.findElements('w:pPr').firstOrNull;
       if (pPr != null) {
         final style = pPr.findElements('w:pStyle').firstOrNull?.getAttribute('w:val');
-        final h = headingOf[style] ?? (style == null ? null : int.tryParse(RegExp(r'^Heading(\d)$').firstMatch(style)?.group(1) ?? ''));
+        final h =
+            headingOf[style] ??
+            (style == null ? null : int.tryParse(RegExp(r'^Heading(\d)$').firstMatch(style)?.group(1) ?? ''));
         if (h != null) line.block['header'] = h.clamp(1, 3);
         final numPr = pPr.findElements('w:numPr').firstOrNull;
         if (numPr != null) {
@@ -583,7 +593,8 @@ class DocFormat {
             case 'w:br' || 'w:cr':
               line.runs.add(DocRun(' ', {...a}));
             case 'w:drawing' || 'w:pict':
-              final blip = c.findAllElements('a:blip').firstOrNull?.getAttribute('r:embed') ??
+              final blip =
+                  c.findAllElements('a:blip').firstOrNull?.getAttribute('r:embed') ??
                   c.findAllElements('v:imagedata').firstOrNull?.getAttribute('r:id');
               final target = rels[blip];
               if (target != null) {

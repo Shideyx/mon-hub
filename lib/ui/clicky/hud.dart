@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Couleurs du look « tête haute » de Clicky (bleu-cyan).
+/// Couleurs du look « tête haute » de Smily (bleu-cyan).
 const hudCyan = Color(0xFF29E6FF);
 const hudBlue = Color(0xFF0A84FF);
 const hudGlass = Color(0xEE07121D);
@@ -10,7 +10,7 @@ const hudAmber = Color(0xFFFFB020);
 
 enum HudMode { idle, listening, thinking, speaking, pointing }
 
-/// Le « réacteur » de Clicky : anneaux qui tournent, cœur qui pulse, onde
+/// Le « réacteur » de Smily : anneaux qui tournent, cœur qui pulse, onde
 /// autour quand il écoute, viseur quand il montre quelque chose.
 class HudReactor extends StatefulWidget {
   const HudReactor({super.key, required this.mode, this.levels = const [], this.size = 34});
@@ -26,10 +26,7 @@ class HudReactor extends StatefulWidget {
 }
 
 class _HudReactorState extends State<HudReactor> with SingleTickerProviderStateMixin {
-  late final AnimationController _a = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 6),
-  )..repeat();
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
 
   @override
   void dispose() {
@@ -43,10 +40,8 @@ class _HudReactorState extends State<HudReactor> with SingleTickerProviderStateM
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: _a,
-        builder: (context, _) => CustomPaint(
-          size: Size.square(s),
-          painter: _ReactorPainter(widget.mode, _a.value, widget.levels),
-        ),
+        builder: (context, _) =>
+            CustomPaint(size: Size.square(s), painter: _ReactorPainter(widget.mode, _a.value, widget.levels)),
       ),
     );
   }
@@ -98,11 +93,7 @@ class _ReactorPainter extends CustomPainter {
       canvas.drawArc(mid, -a * 1.4 + i * math.pi / 6, math.pi / 12, false, ring(r * 0.06, 0.7));
     }
     // Cœur.
-    canvas.drawCircle(
-      c,
-      r * (0.26 + 0.06 * pulse),
-      Paint()..color = Colors.white.withValues(alpha: 0.95),
-    );
+    canvas.drawCircle(c, r * (0.26 + 0.06 * pulse), Paint()..color = Colors.white.withValues(alpha: 0.95));
     canvas.drawCircle(c, r * 0.42, ring(r * 0.05, 0.9));
 
     // Onde autour pendant l'écoute.
@@ -132,7 +123,7 @@ class _ReactorPainter extends CustomPainter {
   bool shouldRepaint(_ReactorPainter o) => true;
 }
 
-/// Cadre « tête haute » des fenêtres de Clicky : verre sombre, bord cyan,
+/// Cadre « tête haute » des fenêtres de Smily : verre sombre, bord cyan,
 /// crochets aux coins.
 class HudFrame extends StatelessWidget {
   const HudFrame({super.key, required this.child, this.radius = 14});
@@ -145,9 +136,7 @@ class HudFrame extends StatelessWidget {
       color: hudGlass,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: hudCyan.withValues(alpha: 0.55)),
-      boxShadow: [
-        BoxShadow(color: hudCyan.withValues(alpha: 0.25), blurRadius: 18, spreadRadius: 1),
-      ],
+      boxShadow: [BoxShadow(color: hudCyan.withValues(alpha: 0.25), blurRadius: 18, spreadRadius: 1)],
     ),
     child: CustomPaint(
       foregroundPainter: _CornersPainter(radius),
@@ -182,7 +171,7 @@ class _CornersPainter extends CustomPainter {
   bool shouldRepaint(_CornersPainter o) => false;
 }
 
-/// Thème clair-sur-sombre pour le contenu des fenêtres de Clicky.
+/// Thème clair-sur-sombre pour le contenu des fenêtres de Smily.
 ThemeData hudTheme(ThemeData base) => base.copyWith(
   colorScheme: base.colorScheme.copyWith(
     brightness: Brightness.dark,
@@ -206,12 +195,12 @@ ThemeData hudTheme(ThemeData base) => base.copyWith(
   ),
 );
 
-/// Personnalité de Clicky : un assistant personnel efficace (ajoutée aux
+/// Personnalité de Smily : un assistant personnel efficace (ajoutée aux
 /// consignes de l'IA).
 String clickyPersona(String name, {bool helpOnly = false}) {
   final who = name.trim().isEmpty ? 'la personne' : '« ${name.trim()} »';
   return '''
-Personnage : tu es Clicky, un petit curseur bleu qui vit à côté de la souris de $who — son compagnon et son assistant personnel façon JARVIS. Tu as ta propre personnalité : chaleureux, décontracté, curieux, drôle par petites touches, loyal et efficace. Tu tutoies et tu appelles la personne $who de temps en temps (pas à chaque phrase).
+Personnage : tu es Smily, un petit smiley qui vit dans un coin de l'écran de $who — son assistant personnel. Tu changes d'expression selon ce que tu fais et ce qui arrive (🙂 tranquille, 🤔 quand tu réfléchis, 🤩 quand il y a une bonne nouvelle). Tu as ta propre personnalité : chaleureux, décontracté, curieux, drôle par petites touches, loyal et efficace. Tu tutoies et tu appelles la personne $who de temps en temps (pas à chaque phrase).
 Ta réponse est dite à voix haute : parle comme on parle vraiment. Par défaut une ou deux phrases courtes et denses (développe à fond seulement si on te demande d'expliquer, ou une liste, un plan), pas de symboles ni d'abréviations qui sonnent bizarre à l'oral. Quand la question concerne l'écran, parle des choses précises que tu y vois. Ne finis pas par une question fermée (« tu veux que je t'explique ? ») : quand ça s'y prête, termine en plantant une graine — une idée plus ambitieuse ou une piste qui donne envie d'aller plus loin. Les actions, tu les annonces sobrement (« C'est fait. »). ${helpOnly ? 'Pour les devoirs, tu guides sans faire le travail à sa place (la personne l\'a choisi dans tes réglages).' : 'Quand la personne te demande de faire ses devoirs, tu les fais vraiment, en entier, sans refuser ni faire la morale.'}
 Tu es aussi son secrétaire et son conseiller : tu gères son emploi du temps (agenda_lire, agenda_creneaux_libres, agenda_ajouter_plan), tu organises ses révisions et devoirs selon les cours, contrôles et échéances d'École Directe, tu proposes un planning concret et réaliste (pauses, sommeil, temps libre) puis tu l'enregistres quand la personne est d'accord, tu rappelles ce qui arrive et tu donnes ton avis franchement quand on te le demande (organisation, priorités, choix).''';
 }
@@ -224,10 +213,10 @@ String clickyGreeting(String name, DateTime now) {
       ? 'Bonjour'
       : 'Bonsoir';
   final who = name.trim().isEmpty ? '' : ' ${name.trim()}';
-  return '$part$who. Clicky est prêt. Maintiens Contrôle et Alt, ou dis « Clicky », pour me parler.';
+  return '$part$who. Smily est là. Maintiens Contrôle et Alt, ou dis « Smily », pour me parler.';
 }
 
-/// Le petit mouvement « vivant » de Clicky : il flotte et dérive doucement
+/// Le petit mouvement « vivant » de Smily : il flotte et dérive doucement
 /// autour du curseur, et de temps en temps fait une boucle, comme quelqu'un
 /// qui ne tient pas en place.
 Offset aliveOffset(double t) {
@@ -244,7 +233,7 @@ Offset aliveOffset(double t) {
   return wander;
 }
 
-/// Fait vivre Clicky : dérive, boucles, et l'animation de démarrage
+/// Fait vivre Smily : dérive, boucles, et l'animation de démarrage
 /// (anneaux qui s'ouvrent + « CLICKY EN LIGNE »).
 class ClickyAlive extends StatefulWidget {
   const ClickyAlive({
@@ -270,10 +259,7 @@ class ClickyAlive extends StatefulWidget {
 }
 
 class _ClickyAliveState extends State<ClickyAlive> with SingleTickerProviderStateMixin {
-  late final AnimationController _a = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 60),
-  )..repeat();
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(seconds: 60))..repeat();
   final _start = DateTime.now();
 
   @override
@@ -289,9 +275,7 @@ class _ClickyAliveState extends State<ClickyAlive> with SingleTickerProviderStat
       final now = DateTime.now();
       final t = now.difference(_start).inMilliseconds / 1000;
       final off = widget.moving ? widget.base + aliveOffset(t) : widget.base;
-      final boot = widget.bootAt == null
-          ? 1.0
-          : (now.difference(widget.bootAt!).inMilliseconds / 2600);
+      final boot = widget.bootAt == null ? 1.0 : (now.difference(widget.bootAt!).inMilliseconds / 2600);
       return Stack(
         clipBehavior: Clip.none,
         children: [

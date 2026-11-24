@@ -145,7 +145,7 @@ class CameraRules {
     return SensorState(blocked: blocked, uses: out);
   }
 
-  /// La phrase dite à la personne (ou à Clicky).
+  /// La phrase dite à la personne (ou à Smily).
   static String say(SensorState cam, SensorState mic) {
     final parts = <String>[];
     if (cam.blocked) {
@@ -279,7 +279,7 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
     return false;
   }
 
-  /// Ce que Clicky dit de l'état.
+  /// Ce que Smily dit de l'état.
   String say() => CameraRules.say(camera, micro);
 
   // Les applis déjà signalées (on ne prévient pas deux fois).
@@ -309,7 +309,7 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
   }
 }
 
-/// Les outils de Clicky pour la caméra et le micro.
+/// Les outils de Smily pour la caméra et le micro.
 extension CameraTools on CameraGuard {
   List<HubTool> tools() => [
     HubTool(

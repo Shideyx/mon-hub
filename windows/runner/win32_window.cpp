@@ -153,7 +153,7 @@ bool Win32Window::Create(const std::wstring& title,
   UpdateTheme(window);
   if (overlay_) {
     MakeTransparent(window);
-    // Clicky suit la souris dans Windows même (voir clicky_follow.h).
+    // Smily suit la souris dans Windows même (voir clicky_follow.h).
     clicky_follow::Attach(window);
   }
 
@@ -161,12 +161,12 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  // La fenêtre de Clicky est affichée par Dart, au bon endroit.
+  // La fenêtre de Smily est affichée par Dart, au bon endroit.
   if (overlay_) return true;
   return ShowWindow(window_handle_, SW_SHOWNORMAL);
 }
 
-// Fond transparent : seuls le curseur bleu et la bulle de Clicky se voient.
+// Fond transparent : seuls le curseur bleu et la bulle de Smily se voient.
 static void MakeTransparent(HWND hwnd) {
   MARGINS margins = {-1, -1, -1, -1};
   DwmExtendFrameIntoClientArea(hwnd, &margins);

@@ -29,7 +29,10 @@ class FicheView extends StatelessWidget {
       final h = (b['header'] as num?)?.toInt();
       final style = switch (h) {
         1 => theme.textTheme.headlineSmall!.copyWith(fontWeight: FontWeight.w900, color: color),
-        2 => theme.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.w800, color: Color.lerp(color, theme.colorScheme.onSurface, 0.25)),
+        2 => theme.textTheme.titleLarge!.copyWith(
+          fontWeight: FontWeight.w800,
+          color: Color.lerp(color, theme.colorScheme.onSurface, 0.25),
+        ),
         3 => theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.w800),
         _ => base,
       };
@@ -42,7 +45,11 @@ class FicheView extends StatelessWidget {
                 fontWeight: r.attrs['bold'] == true ? FontWeight.w800 : null,
                 fontStyle: r.attrs['italic'] == true ? FontStyle.italic : null,
                 decoration: r.attrs['strike'] == true ? TextDecoration.lineThrough : null,
-                color: r.attrs['link'] != null ? color : (r.attrs['bold'] == true && h == null ? Color.lerp(color, theme.colorScheme.onSurface, 0.35) : null),
+                color: r.attrs['link'] != null
+                    ? color
+                    : (r.attrs['bold'] == true && h == null
+                          ? Color.lerp(color, theme.colorScheme.onSurface, 0.35)
+                          : null),
                 backgroundColor: _hex(r.attrs['background'])?.withValues(alpha: 0.5),
                 fontFamily: r.attrs['code'] == true ? 'Consolas' : null,
               ),
@@ -65,12 +72,19 @@ class FicheView extends StatelessWidget {
               SizedBox(
                 width: 26,
                 child: switch (list) {
-                  'ordered' => Text('$n.', style: base.copyWith(fontWeight: FontWeight.w800, color: color)),
+                  'ordered' => Text(
+                    '$n.',
+                    style: base.copyWith(fontWeight: FontWeight.w800, color: color),
+                  ),
                   'checked' => Icon(Icons.check_box_rounded, size: 20, color: color),
                   'unchecked' => Icon(Icons.check_box_outline_blank_rounded, size: 20, color: color),
                   _ => Padding(
                     padding: const EdgeInsets.only(top: 9),
-                    child: Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
                   ),
                 },
               ),
@@ -90,7 +104,10 @@ class FicheView extends StatelessWidget {
           child: text,
         );
       } else if (h != null) {
-        text = Padding(padding: EdgeInsets.only(top: h == 1 ? 4 : 18, bottom: 6), child: text);
+        text = Padding(
+          padding: EdgeInsets.only(top: h == 1 ? 4 : 18, bottom: 6),
+          child: text,
+        );
       } else {
         text = Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: text);
       }

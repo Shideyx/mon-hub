@@ -78,20 +78,24 @@ class TrustedCertificates {
   @visibleForTesting
   static String toPem(List<int> der) {
     final b64 = base64.encode(der);
-    final lines = [for (var i = 0; i < b64.length; i += 64) b64.substring(i, i + 64 > b64.length ? b64.length : i + 64)];
+    final lines = [
+      for (var i = 0; i < b64.length; i += 64) b64.substring(i, i + 64 > b64.length ? b64.length : i + 64),
+    ];
     return '-----BEGIN CERTIFICATE-----\n${lines.join('\n')}\n-----END CERTIFICATE-----\n';
   }
 
   /// Les certificats d'un magasin de Windows (« ROOT », « CA »).
   static List<Uint8List> _windowsStore(String name) {
     final crypt32 = DynamicLibrary.open('crypt32.dll');
-    final open = crypt32.lookupFunction<Pointer Function(IntPtr, Pointer<Utf16>), Pointer Function(int, Pointer<Utf16>)>(
-      'CertOpenSystemStoreW',
-    );
-    final next = crypt32.lookupFunction<
-      Pointer<CERT_CONTEXT> Function(Pointer, Pointer<CERT_CONTEXT>),
-      Pointer<CERT_CONTEXT> Function(Pointer, Pointer<CERT_CONTEXT>)
-    >('CertEnumCertificatesInStore');
+    final open = crypt32
+        .lookupFunction<Pointer Function(IntPtr, Pointer<Utf16>), Pointer Function(int, Pointer<Utf16>)>(
+          'CertOpenSystemStoreW',
+        );
+    final next = crypt32
+        .lookupFunction<
+          Pointer<CERT_CONTEXT> Function(Pointer, Pointer<CERT_CONTEXT>),
+          Pointer<CERT_CONTEXT> Function(Pointer, Pointer<CERT_CONTEXT>)
+        >('CertEnumCertificatesInStore');
     final close = crypt32.lookupFunction<Int32 Function(Pointer, Uint32), int Function(Pointer, int)>('CertCloseStore');
     final out = <Uint8List>[];
     final n = name.toNativeUtf16();

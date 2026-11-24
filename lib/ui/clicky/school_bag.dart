@@ -76,8 +76,7 @@ class SchoolBag {
     bool same(DateTime? x) => x != null && x.year == d.year && x.month == d.month && x.day == d.day;
     final lessons = [
       for (final e in events)
-        if (e['annule'] != true && same(_date(e['debut'])) && '${e['source'] ?? ''}'.toLowerCase().contains('cole'))
-          e,
+        if (e['annule'] != true && same(_date(e['debut'])) && '${e['source'] ?? ''}'.toLowerCase().contains('cole')) e,
     ]..sort((a, b) => _date(a['debut'])!.compareTo(_date(b['debut'])!));
     if (lessons.isEmpty) return null;
     final subjects = <String>[];
@@ -107,8 +106,11 @@ class SchoolBag {
   static String _list(List<String> l) =>
       l.length <= 1 ? l.join() : '${l.sublist(0, l.length - 1).join(', ')} et ${l.last}';
 
-  /// Ce que Clicky dit ([day] : « demain », « lundi »).
-  static String say(({List<String> subjects, List<String> items, List<String> homework, List<String> tests}) p, String day) {
+  /// Ce que Smily dit ([day] : « demain », « lundi »).
+  static String say(
+    ({List<String> subjects, List<String> items, List<String> homework, List<String> tests}) p,
+    String day,
+  ) {
     final cap = day.isEmpty ? day : day[0].toUpperCase() + day.substring(1);
     return [
       '$cap, tu as ${_list(p.subjects)}.',

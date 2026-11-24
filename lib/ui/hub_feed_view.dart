@@ -40,7 +40,10 @@ class _HubFeedStripState extends State<HubFeedStrip> {
 
   void _refresh({bool force = false}) {
     final mods = widget.controller.enabled;
-    final tools = {for (final m in mods) for (final t in m.tools) t.name: t};
+    final tools = {
+      for (final m in mods)
+        for (final t in m.tools) t.name: t,
+    };
     unawaited(
       HubFeed.instance
           .refresh(
@@ -168,11 +171,17 @@ class _FeedCardState extends State<_FeedCard> {
             borderRadius: BorderRadius.circular(20),
             color: theme.cardTheme.color ?? theme.colorScheme.surface,
             gradient: LinearGradient(
-              colors: [c.withValues(alpha: hover ? 0.20 : 0.13), c.withValues(alpha: 0.03)],
+              colors: [
+                c.withValues(alpha: hover ? 0.20 : 0.13),
+                c.withValues(alpha: 0.03),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(color: c.withValues(alpha: urgent ? 0.7 : (hover ? 0.45 : 0.2)), width: urgent ? 1.6 : 1),
+            border: Border.all(
+              color: c.withValues(alpha: urgent ? 0.7 : (hover ? 0.45 : 0.2)),
+              width: urgent ? 1.6 : 1,
+            ),
             boxShadow: [
               if (hover) BoxShadow(color: c.withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 8)),
             ],
@@ -220,12 +229,18 @@ class _FeedCardState extends State<_FeedCard> {
                         padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: Icon(Icons.arrow_forward_rounded, size: 11, color: theme.colorScheme.onSurfaceVariant),
                       ),
-                    Tooltip(message: s.name, child: Icon(s.icon, size: 14, color: s.color)),
+                    Tooltip(
+                      message: s.name,
+                      child: Icon(s.icon, size: 14, color: s.color),
+                    ),
                   ],
                   const Spacer(),
                   AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
-                    style: theme.textTheme.labelMedium!.copyWith(color: c, fontWeight: hover ? FontWeight.w800 : FontWeight.w600),
+                    style: theme.textTheme.labelMedium!.copyWith(
+                      color: c,
+                      fontWeight: hover ? FontWeight.w800 : FontWeight.w600,
+                    ),
                     child: Text(i.action),
                   ),
                   AnimatedPadding(

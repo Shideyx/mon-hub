@@ -10,20 +10,19 @@ import '../../core/powershell.dart';
 import '../../core/safe_open.dart';
 import '../../core/tidy.dart';
 
-/// Clicky agit sur ton ordinateur quand tu le lui demandes : commandes
+/// Smily agit sur ton ordinateur quand tu le lui demandes : commandes
 /// (PowerShell sur Windows), fichiers, applis, réglages du système.
 ///
-/// Réglage « Contrôle du PC » (module Claude → Réglages → Clicky) :
+/// Réglage « Contrôle du PC » (module Claude → Réglages → Smily) :
 /// * `ask` (par défaut) : chaque commande et chaque écriture de fichier
 ///   s'affiche et attend ton « Autoriser » ;
-/// * `auto` : Clicky agit sans demander, sauf pour les commandes
+/// * `auto` : Smily agit sans demander, sauf pour les commandes
 ///   dangereuses (formatage, suppression d'un disque, registre système…) ;
-/// * `off` : Clicky ne touche pas au PC.
+/// * `off` : Smily ne touche pas au PC.
 class PcControl {
   PcControl._();
 
-  static bool get supported =>
-      !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+  static bool get supported => !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
   /// Longueur maximale d'une sortie renvoyée à l'IA.
   static const maxOutput = 12000;
@@ -35,7 +34,7 @@ class PcControl {
       toolName == 'pc_ranger' ||
       toolName == 'pc_ranger_annuler';
 
-  /// Ce que Clicky sait faire sur le PC (ajouté à ses consignes).
+  /// Ce que Smily sait faire sur le PC (ajouté à ses consignes).
   static String get guide =>
       '''
 Contrôle du PC : quand la personne te demande de FAIRE quelque chose sur son ordinateur (ouvrir ou fermer une appli, ranger, renommer, chercher ou créer des fichiers, installer un logiciel, régler le son, le Wi-Fi, le mode sombre, éteindre, redémarrer, nettoyer, voir l'espace disque…), fais-le vraiment avec les outils pc_ au lieu d'expliquer comment faire :
@@ -100,7 +99,8 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
           ),
           HubTool(
             name: 'pc_ranger_apercu',
-            description: 'Prépare le rangement d\'un dossier du PC : où irait chaque fichier en vrac (sans rien toucher).',
+            description:
+                'Prépare le rangement d\'un dossier du PC : où irait chaque fichier en vrac (sans rien toucher).',
             params: {
               'dossier': ('string', 'telechargements, bureau, documents, images, ou un chemin'),
               'par_matiere': ('boolean', 'Ranger les cours par matière (Cours/Maths…), oui par défaut'),
@@ -114,14 +114,18 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
                 'laisses_en_place': plan.skipped,
                 'rangement': {
                   for (final e in plan.groups.entries)
-                    e.key: {'nombre': e.value.length, 'exemples': [for (final m in e.value.take(4)) m.name]},
+                    e.key: {
+                      'nombre': e.value.length,
+                      'exemples': [for (final m in e.value.take(4)) m.name],
+                    },
                 },
               };
             },
           ),
           HubTool(
             name: 'pc_ranger',
-            description: 'Range pour de vrai un dossier du PC (après pc_ranger_apercu). Rien n\'est supprimé ; annulable.',
+            description:
+                'Range pour de vrai un dossier du PC (après pc_ranger_apercu). Rien n\'est supprimé ; annulable.',
             params: {
               'dossier': ('string', 'telechargements, bureau, documents, images, ou un chemin'),
               'par_matiere': ('boolean', 'Ranger les cours par matière, oui par défaut'),
@@ -187,7 +191,7 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
     ).hasMatch(c);
   }
 
-  /// Fichiers que Clicky ne lit **jamais** : mots de passe des navigateurs,
+  /// Fichiers que Smily ne lit **jamais** : mots de passe des navigateurs,
   /// cookies, clés (SSH, coffres), la clé du pont de Mon Hub, les secrets de
   /// Windows… Même si on le lui demande (ou si un message piégé le lui demande).
   static bool secretPath(String path) {
@@ -233,7 +237,9 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
     if (Platform.isWindows) {
       return admin ? _runAdmin(command, dir, timeout) : _runPs(command, dir, timeout);
     }
-    if (admin) throw 'Le mode administrateur n\'est disponible que sur Windows (utilise sudo dans la commande si besoin).';
+    if (admin) {
+      throw 'Le mode administrateur n\'est disponible que sur Windows (utilise sudo dans la commande si besoin).';
+    }
     return _collect(await Process.start('/bin/sh', ['-lc', command], workingDirectory: dir), timeout);
   }
 
@@ -250,11 +256,14 @@ $command
 ''';
 
   static Future<Map<String, Object?>> _runPs(String command, String? dir, Duration timeout) async {
-    final p = await Process.start(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', PowerShell.encode(psScript(command))],
-      workingDirectory: dir,
-    );
+    final p = await Process.start('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-EncodedCommand',
+      PowerShell.encode(psScript(command)),
+    ], workingDirectory: dir);
     return _collect(p, timeout);
   }
 
@@ -315,7 +324,8 @@ $command
       'code': code,
       if (timedOut) 'arretee': 'Trop longue (plus de ${timeout.inSeconds} s) : arrêtée.',
       'sortie': _cut('$out'.trim()),
-      if ('$err'.trim().isNotEmpty) 'erreurs': _cut(PowerShell.firstError('$err').isEmpty ? '$err'.trim() : '$err'.trim()),
+      if ('$err'.trim().isNotEmpty)
+        'erreurs': _cut(PowerShell.firstError('$err').isEmpty ? '$err'.trim() : '$err'.trim()),
     };
   }
 
@@ -345,7 +355,7 @@ $command
   static Future<Object> read(String path) async {
     final p = expand(path);
     if (secretPath(p)) {
-      throw 'Fichier protégé : Clicky ne lit jamais les mots de passe, cookies, clés ou fichiers de connexion.';
+      throw 'Fichier protégé : Smily ne lit jamais les mots de passe, cookies, clés ou fichiers de connexion.';
     }
     if (await Directory(p).exists()) {
       final items = <String>[];
@@ -377,7 +387,7 @@ $command
   static Future<String> write(String path, String content, {bool append = false}) async {
     final p = expand(path);
     if (p.isEmpty) throw 'Chemin vide.';
-    if (secretPath(p)) throw 'Fichier protégé : Clicky ne modifie pas les fichiers de mots de passe ou de clés.';
+    if (secretPath(p)) throw 'Fichier protégé : Smily ne modifie pas les fichiers de mots de passe ou de clés.';
     final f = File(p);
     await f.parent.create(recursive: true);
     await f.writeAsString(content, mode: append ? FileMode.append : FileMode.write, flush: true);

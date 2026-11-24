@@ -50,7 +50,11 @@ class PhoneLinkPage extends StatelessWidget {
     }
     if (files.isNotEmpty && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sur ton téléphone : onglet « Du PC » (${files.length} fichier${files.length > 1 ? 's' : ''}).')),
+        SnackBar(
+          content: Text(
+            'Sur ton téléphone : onglet « Du PC » (${files.length} fichier${files.length > 1 ? 's' : ''}).',
+          ),
+        ),
       );
     }
   }
@@ -267,7 +271,13 @@ class PhoneRemote {
         Timer(const Duration(seconds: 1), Win.sleep);
         return 'Le PC se met en veille 🌙';
       case 'eteindre':
-        final r = await Process.run('shutdown', ['/s', '/t', '60', '/c', 'Mon Hub : extinction demandée depuis ton téléphone.']);
+        final r = await Process.run('shutdown', [
+          '/s',
+          '/t',
+          '60',
+          '/c',
+          'Mon Hub : extinction demandée depuis ton téléphone.',
+        ]);
         if (r.exitCode != 0) return 'Le PC refuse de s\'éteindre (une extinction est peut-être déjà prévue).';
         PhoneLink.instance.notify?.call(
           '⏻ Le PC s\'éteint dans 1 minute',

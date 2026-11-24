@@ -51,9 +51,15 @@ void main() {
   });
 
   test('FSRS : Facile > Bien > Difficile, et les étiquettes des boutons', () {
-    final c = Fsrs.review(Fsrs.review(StudyCard(id: '1', front: 'a', back: 'b'), 3, t0), 3, t0.add(const Duration(minutes: 10)));
+    final c = Fsrs.review(
+      Fsrs.review(StudyCard(id: '1', front: 'a', back: 'b'), 3, t0),
+      3,
+      t0.add(const Duration(minutes: 10)),
+    );
     final now = c.due;
-    final days = [for (final g in [2, 3, 4]) Fsrs.review(c, g, now).due.difference(now).inDays];
+    final days = [
+      for (final g in [2, 3, 4]) Fsrs.review(c, g, now).due.difference(now).inDays,
+    ];
     expect(days[0], lessThanOrEqualTo(days[1]));
     expect(days[1], lessThan(days[2]));
     expect(Fsrs.label(StudyCard(id: 'n', front: 'a', back: 'b'), 1, t0), '1 min');
@@ -70,15 +76,19 @@ void main() {
     expect(Answer.correct('', 'Rome'), isFalse);
   });
 
-  test('import « question - réponse » et cartes de Clicky', () {
-    final l = RevisionsStore.parseLines('Capitale de l\'Italie - Rome\n1789 : Révolution française\nH2O = eau\nligne sans réponse\n- Mitochondrie\tcentrale énergétique');
+  test('import « question - réponse » et cartes de Smily', () {
+    final l = RevisionsStore.parseLines(
+      'Capitale de l\'Italie - Rome\n1789 : Révolution française\nH2O = eau\nligne sans réponse\n- Mitochondrie\tcentrale énergétique',
+    );
     expect(l, [
       ('Capitale de l\'Italie', 'Rome'),
       ('1789', 'Révolution française'),
       ('H2O', 'eau'),
       ('Mitochondrie', 'centrale énergétique'),
     ]);
-    final cards = RevisionsModule.parseCards('Voici :\n```json\n[{"q":"Date de la chute du mur","r":"1989"},{"question":"Doctrine de 1947","reponse":"Truman"},{"q":"","r":"x"}]\n```');
+    final cards = RevisionsModule.parseCards(
+      'Voici :\n```json\n[{"q":"Date de la chute du mur","r":"1989"},{"question":"Doctrine de 1947","reponse":"Truman"},{"q":"","r":"x"}]\n```',
+    );
     expect(cards, [('Date de la chute du mur', '1989'), ('Doctrine de 1947', 'Truman')]);
   });
 
@@ -90,7 +100,7 @@ void main() {
     expect(o.toSet(), hasLength(4));
   });
 
-  test('séances, série de jours, cartes générées par Clicky', () async {
+  test('séances, série de jours, cartes générées par Smily', () async {
     SharedPreferences.setMockInitialValues({});
     await ModuleStore.init();
     final dir = Directory.systemTemp.createTempSync('rev');
@@ -114,7 +124,7 @@ void main() {
       expect(s.streak(t0.add(const Duration(days: 1))), 2);
       expect(s.streak(t0.add(const Duration(days: 3))), 0);
 
-      // Clicky fabrique des cartes (IA simulée).
+      // Smily fabrique des cartes (IA simulée).
       AiText.override = (prompt, system) async {
         expect(prompt, contains('guerre froide'));
         return '[{"q":"Qui a construit le mur de Berlin ?","r":"La RDA"},{"q":"Année de la crise de Cuba","r":"1962"}]';

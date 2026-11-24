@@ -76,16 +76,11 @@ class AppShortcuts {
         '\$s=\$sh.CreateShortcut((Join-Path ([Environment]::GetFolderPath($folder)) \'Mon Hub.lnk\'));'
         '\$s.TargetPath=${_ps(exe)};\$s.WorkingDirectory=${_ps(dir)};'
         '\$s.IconLocation=${_ps('$exe,0')};\$s.Description=\'Mon Hub\';\$s.Save();';
-    final script =
-        StringBuffer(r"$ErrorActionPreference='Stop';$sh=New-Object -ComObject WScript.Shell;")
-          ..write(link("'Desktop'"))
-          ..write(link("'Programs'"));
+    final script = StringBuffer(r"$ErrorActionPreference='Stop';$sh=New-Object -ComObject WScript.Shell;")
+      ..write(link("'Desktop'"))
+      ..write(link("'Programs'"));
     final startupLink = "(Join-Path ([Environment]::GetFolderPath('Startup')) 'Mon Hub.lnk')";
-    script.write(
-      atStartup
-          ? link("'Startup'")
-          : 'if(Test-Path $startupLink){Remove-Item $startupLink -Force};',
-    );
+    script.write(atStartup ? link("'Startup'") : 'if(Test-Path $startupLink){Remove-Item $startupLink -Force};');
     return '$script';
   }
 

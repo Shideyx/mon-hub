@@ -28,7 +28,7 @@ class MindNode {
 }
 
 /// **Carte mentale animée** d'un cours ou d'un sujet : les branches se
-/// déplient, on zoome, et Clicky explique une branche à voix haute.
+/// déplient, on zoome, et Smily explique une branche à voix haute.
 class MindMaps {
   MindMaps._();
 
@@ -99,7 +99,9 @@ class MindMaps {
   }
 
   static Future<MindNode> make(String input) async {
-    final r = parse(await AiText.ask(prompt(input), system: 'Tu es un professeur clair. Tu réponds seulement en JSON valide.'));
+    final r = parse(
+      await AiText.ask(prompt(input), system: 'Tu es un professeur clair. Tu réponds seulement en JSON valide.'),
+    );
     if (r == null) throw 'Je n\'ai pas réussi à faire la carte. Essaie avec un sujet plus précis.';
     return r;
   }
@@ -132,8 +134,14 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
   String? _error;
 
   static const _colors = [
-    Color(0xFF7C5CFF), Color(0xFF0EA5E9), Color(0xFF16A34A), Color(0xFFEA580C),
-    Color(0xFFE11D48), Color(0xFFCA8A04), Color(0xFF0D9488), Color(0xFFDB2777),
+    Color(0xFF7C5CFF),
+    Color(0xFF0EA5E9),
+    Color(0xFF16A34A),
+    Color(0xFFEA580C),
+    Color(0xFFE11D48),
+    Color(0xFFCA8A04),
+    Color(0xFF0D9488),
+    Color(0xFFDB2777),
   ];
   static const _size = 2600.0;
 
@@ -202,7 +210,9 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
 
   void _toggle(MindNode n) {
     // Les positions de maintenant deviennent le départ de l'animation.
-    _from = {for (final e in {..._from.keys, ..._to.keys}) e: _pos(e)};
+    _from = {
+      for (final e in {..._from.keys, ..._to.keys}) e: _pos(e),
+    };
     n.open = !n.open;
     if (!n.open) {
       void close(MindNode x) {
@@ -267,7 +277,8 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
                   child: CustomPaint(
                     painter: _Links([
                       for (final n in nodes)
-                        if (n.parent != null) (c + _pos(n.parent!), c + _pos(n), _colors[n.branch % _colors.length], n.depth),
+                        if (n.parent != null)
+                          (c + _pos(n.parent!), c + _pos(n), _colors[n.branch % _colors.length], n.depth),
                     ]),
                   ),
                 ),
@@ -323,7 +334,11 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
               ),
               if (n.children.isNotEmpty && n != root) ...[
                 const SizedBox(width: 4),
-                Icon(n.open ? Icons.remove_circle_outline_rounded : Icons.add_circle_outline_rounded, size: 16, color: n.depth <= 1 ? Colors.white : color),
+                Icon(
+                  n.open ? Icons.remove_circle_outline_rounded : Icons.add_circle_outline_rounded,
+                  size: 16,
+                  color: n.depth <= 1 ? Colors.white : color,
+                ),
               ],
             ],
           ),
@@ -346,12 +361,19 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
             IconButton(
               tooltip: 'En faire un Google Doc',
               icon: const Icon(Icons.description_rounded),
-              onPressed: () => _tool('doc_creer', {'titre': 'Carte mentale — ${root.title}', 'contenu': root.markdown()}, 'Google Doc créé ✓'),
+              onPressed: () => _tool('doc_creer', {
+                'titre': 'Carte mentale — ${root.title}',
+                'contenu': root.markdown(),
+              }, 'Google Doc créé ✓'),
             ),
             IconButton(
               tooltip: 'Faire des cartes de révision',
               icon: const Icon(Icons.style_rounded),
-              onPressed: () => _tool('revision_generer', {'paquet': '🧠 ${root.title}', 'texte': root.markdown(), 'nombre': 15}, 'Cartes ajoutées dans Révisions ✓'),
+              onPressed: () => _tool('revision_generer', {
+                'paquet': '🧠 ${root.title}',
+                'texte': root.markdown(),
+                'nombre': 15,
+              }, 'Cartes ajoutées dans Révisions ✓'),
             ),
           ],
         ],
@@ -367,7 +389,10 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
                     controller: _input,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Un sujet (« la photosynthèse ») ou colle ton cours', prefixIcon: Icon(Icons.hub_rounded)),
+                    decoration: const InputDecoration(
+                      hintText: 'Un sujet (« la photosynthèse ») ou colle ton cours',
+                      prefixIcon: Icon(Icons.hub_rounded),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -375,13 +400,22 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
               ],
             ),
           ),
-          if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: TextStyle(color: theme.colorScheme.error))),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+            ),
           Expanded(
             child: root == null
                 ? Center(
                     child: _busy
-                        ? const Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Je dessine la carte…')])
-                        : const Text('Écris un sujet ou colle un cours : la carte se dessine ici, branche par branche.'),
+                        ? const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Je dessine la carte…')],
+                          )
+                        : const Text(
+                            'Écris un sujet ou colle un cours : la carte se dessine ici, branche par branche.',
+                          ),
                   )
                 : ClipRect(child: _map()),
           ),
@@ -399,11 +433,19 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
                         children: [
                           Text(sel.title, style: theme.textTheme.titleMedium),
                           if (sel.detail.isNotEmpty) Text(sel.detail),
-                          if (sel.children.isNotEmpty && !sel.open) Text('Touche-la pour voir ses ${sel.children.length} idées.', style: theme.textTheme.bodySmall),
+                          if (sel.children.isNotEmpty && !sel.open)
+                            Text(
+                              'Touche-la pour voir ses ${sel.children.length} idées.',
+                              style: theme.textTheme.bodySmall,
+                            ),
                         ],
                       ),
                     ),
-                    IconButton.filledTonal(tooltip: 'Clicky explique', onPressed: () => _explain(sel), icon: const Icon(Icons.record_voice_over_rounded)),
+                    IconButton.filledTonal(
+                      tooltip: 'Smily explique',
+                      onPressed: () => _explain(sel),
+                      icon: const Icon(Icons.record_voice_over_rounded),
+                    ),
                   ],
                 ),
               ),

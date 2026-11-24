@@ -69,8 +69,7 @@ class DriveModule extends HubModule {
     return all.firstOrNull;
   }
 
-  static const _fields =
-      'nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,modifiedTime,size,starred)';
+  static const _fields = 'nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,modifiedTime,size,starred)';
 
   static String _quote(String s) => s.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
 
@@ -88,14 +87,11 @@ class DriveModule extends HubModule {
         ? "name contains '${_quote(search.trim())}' and trashed=false"
         : switch (view) {
             DriveView.mine => "'${_quote(folder)}' in parents and trashed=false",
-            DriveView.recent =>
-              "trashed=false and mimeType!='application/vnd.google-apps.folder'",
+            DriveView.recent => "trashed=false and mimeType!='application/vnd.google-apps.folder'",
             DriveView.shared => 'sharedWithMe and trashed=false',
             DriveView.starred => 'starred and trashed=false',
           };
-    final order = view == DriveView.recent && search.isEmpty
-        ? 'viewedByMeTime desc'
-        : 'folder,modifiedTime desc';
+    final order = view == DriveView.recent && search.isEmpty ? 'viewedByMeTime desc' : 'folder,modifiedTime desc';
     final url = Uri.https('www.googleapis.com', '/drive/v3/files', {
       'q': q,
       'fields': _fields,
@@ -125,11 +121,7 @@ class DriveModule extends HubModule {
   }
 
   Future<(int, int?)> quota() async {
-    final j = await GoogleAuth.api(
-      account!,
-      'GET',
-      'https://www.googleapis.com/drive/v3/about?fields=storageQuota',
-    );
+    final j = await GoogleAuth.api(account!, 'GET', 'https://www.googleapis.com/drive/v3/about?fields=storageQuota');
     final q = j['storageQuota'] as Map? ?? const {};
     return (int.tryParse('${q['usage']}') ?? 0, int.tryParse('${q['limit']}'));
   }
@@ -152,7 +144,8 @@ class DriveModule extends HubModule {
   List<HubTool> get tools => [
     HubTool(
       name: 'drive_ranger_apercu',
-      description: 'Prépare le rangement du Google Drive : où irait chaque fichier en vrac à la racine '
+      description:
+          'Prépare le rangement du Google Drive : où irait chaque fichier en vrac à la racine '
           '(Documents, PDF, Photos, Cours/Maths…), sans rien toucher.',
       params: {'par_matiere': ('boolean', 'Ranger les cours par matière, oui par défaut')},
       run: (a) async {
@@ -189,11 +182,7 @@ class DriveModule extends HubModule {
       description: 'Cherche des fichiers dans Google Drive par leur nom (ou liste les récents).',
       params: {'nom': ('string', 'Texte à chercher dans le nom (vide = fichiers récents)')},
       run: (a) async => [
-        for (final f in await list(
-          view: DriveView.recent,
-          search: '${a['nom'] ?? ''}',
-          pageSize: 25,
-        ))
+        for (final f in await list(view: DriveView.recent, search: '${a['nom'] ?? ''}', pageSize: 25))
           {'nom': f.name, 'type': f.mime, 'modifie': f.modified, 'lien': f.link},
       ],
     ),
@@ -224,9 +213,7 @@ class DriveModule extends HubModule {
         builder: (context, snap) {
           if (snap.hasError) {
             return EmptyHint(
-              needsReconnect(snap.error!)
-                  ? 'Autorise Mon Hub à lire ton Drive'
-                  : '${snap.error}',
+              needsReconnect(snap.error!) ? 'Autorise Mon Hub à lire ton Drive' : '${snap.error}',
               action: needsReconnect(snap.error!) ? ('Autoriser', () => connect(context)) : null,
             );
           }
@@ -243,10 +230,7 @@ class DriveModule extends HubModule {
                 childAspectRatio: 1.1,
                 padding: const EdgeInsets.all(6),
                 physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  for (final f in files.take(cols * 2))
-                    _FileCard(module: this, file: f, compact: true),
-                ],
+                children: [for (final f in files.take(cols * 2)) _FileCard(module: this, file: f, compact: true)],
               );
             },
           );
@@ -349,10 +333,13 @@ class _DrivePageState extends State<_DrivePage> {
               ? EmptyHint(
                   'Connecte ton compte Google pour voir tes dossiers et fichiers ici.',
                   icon: Icons.add_to_drive_rounded,
-                  action: ('Se connecter avec Google', () async {
-                    await m.connect(context);
-                    _reload();
-                  }),
+                  action: (
+                    'Se connecter avec Google',
+                    () async {
+                      await m.connect(context);
+                      _reload();
+                    },
+                  ),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -391,10 +378,7 @@ class _DrivePageState extends State<_DrivePage> {
                       },
                     ),
               filled: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide.none,
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
               isDense: true,
             ),
             onSubmitted: (v) {
@@ -508,11 +492,14 @@ class _DrivePageState extends State<_DrivePage> {
                     'compte Google et coche l\'accès à Drive.'
               : '${snap.error}',
           action: reconnect
-              ? ('Autoriser l\'accès', () async {
-                  await m.connect(context);
-                  quota = null;
-                  _reload();
-                })
+              ? (
+                  'Autoriser l\'accès',
+                  () async {
+                    await m.connect(context);
+                    quota = null;
+                    _reload();
+                  },
+                )
               : ('Réessayer', _reload),
         );
       }
@@ -528,10 +515,12 @@ class _DrivePageState extends State<_DrivePage> {
               ListTile(
                 leading: _Thumb(module: m, file: f, size: 40),
                 title: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text([
-                  if (f.modified != null) 'Modifié ${timeAgo(f.modified!)}',
-                  if (f.size != null) _size(f.size!),
-                ].join(' · ')),
+                subtitle: Text(
+                  [
+                    if (f.modified != null) 'Modifié ${timeAgo(f.modified!)}',
+                    if (f.size != null) _size(f.size!),
+                  ].join(' · '),
+                ),
                 trailing: f.starred ? const Icon(Icons.star_rounded, size: 18) : null,
                 onTap: () => f.isFolder ? openFolder(f) : _open(context, m, f),
               ),
@@ -565,9 +554,7 @@ class _DrivePageState extends State<_DrivePage> {
                                 children: [
                                   Icon(Icons.folder_rounded, color: f.look.$2),
                                   const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  ),
+                                  Expanded(child: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
                                 ],
                               ),
                             ),
@@ -658,7 +645,9 @@ class _FileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: _Thumb(module: module, file: file)),
+            Expanded(
+              child: _Thumb(module: module, file: file),
+            ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: compact ? 4 : 8),
               child: Row(

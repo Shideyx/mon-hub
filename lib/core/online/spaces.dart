@@ -28,7 +28,7 @@ class Space {
   final String owner;
   final String? inviteCode;
 
-  /// Les Clicky des membres peuvent se parler entre eux ici.
+  /// Les Smily des membres peuvent se parler entre eux ici.
   final bool clickyChat;
 
   bool get isDm => kind == 'dm';
@@ -60,7 +60,8 @@ class Person {
   final String? handle;
 
   String get label => name.trim().isNotEmpty ? name.trim() : (handle != null ? '@$handle' : 'Quelqu\'un');
-  String get initial => label.replaceAll('@', '').isEmpty ? '?' : label.replaceAll('@', '').substring(0, 1).toUpperCase();
+  String get initial =>
+      label.replaceAll('@', '').isEmpty ? '?' : label.replaceAll('@', '').substring(0, 1).toUpperCase();
 
   factory Person.fromJson(Map j) => Person('${j['id']}', '${j['name'] ?? ''}', j['handle'] as String?);
 }
@@ -130,10 +131,10 @@ class ChatMessage {
   final String author;
   final String body;
 
-  /// Écrit par le Clicky de [author] (pas par la personne elle-même).
+  /// Écrit par le Smily de [author] (pas par la personne elle-même).
   final bool fromClicky;
 
-  /// Combien de Clicky se sont répondu à la suite (garde-fou anti-boucle).
+  /// Combien de Smily se sont répondu à la suite (garde-fou anti-boucle).
   final int depth;
   final int? replyTo;
   final DateTime? at;
@@ -171,7 +172,7 @@ class Spaces extends ChangeNotifier {
   /// Espace affiché à l'écran (ses messages ne comptent pas comme non lus).
   String? viewing;
 
-  /// Un message est arrivé (notification, Clicky…).
+  /// Un message est arrivé (notification, Smily…).
   void Function(Space space, ChatMessage m)? onMessage;
 
   RealtimeChannel? _channel;
@@ -258,7 +259,9 @@ class Spaces extends ChangeNotifier {
           callback: (p) {
             final space = '${p.newRecord['space_id'] ?? p.oldRecord['space_id'] ?? ''}';
             // Une suppression ne dit pas toujours de quel espace : tous relisent.
-            final targets = space.isEmpty ? _taskListeners.values.expand((s) => s) : (_taskListeners[space] ?? const {});
+            final targets = space.isEmpty
+                ? _taskListeners.values.expand((s) => s)
+                : (_taskListeners[space] ?? const {});
             for (final f in [...targets]) {
               f();
             }
@@ -338,10 +341,16 @@ class Spaces extends ChangeNotifier {
   }
 
   /// Espaces partagés : les épinglés d'abord (dans l'ordre des épingles).
-  List<Space> get spaces => sortPinned([for (final s in all) if (!s.isDm) s], pinned);
+  List<Space> get spaces => sortPinned([
+    for (final s in all)
+      if (!s.isDm) s,
+  ], pinned);
 
   /// Conversations privées.
-  List<Space> get chats => sortPinned([for (final s in all) if (s.isDm) s], pinned);
+  List<Space> get chats => sortPinned([
+    for (final s in all)
+      if (s.isDm) s,
+  ], pinned);
 
   @visibleForTesting
   static List<Space> sortPinned(List<Space> l, List<String> pins) {
@@ -453,7 +462,7 @@ class Spaces extends ChangeNotifier {
     }
   }
 
-  /// Les tâches de tous mes espaces (pour l'accueil et Clicky).
+  /// Les tâches de tous mes espaces (pour l'accueil et Smily).
   Future<List<SpaceTask>> allTasks() async {
     if (!available) return const [];
     try {
@@ -464,7 +473,14 @@ class Spaces extends ChangeNotifier {
     }
   }
 
-  Future<void> addTask(String spaceId, String title, {String status = 'todo', String tag = '', String? assignee, DateTime? due}) async {
+  Future<void> addTask(
+    String spaceId,
+    String title, {
+    String status = 'todo',
+    String tag = '',
+    String? assignee,
+    DateTime? due,
+  }) async {
     final t = title.trim();
     if (t.isEmpty) return;
     try {
@@ -490,10 +506,8 @@ class Spaces extends ChangeNotifier {
     }
   }
 
-  Future<void> moveTask(SpaceTask t, String status) => updateTask(t, {
-    'status': status,
-    'position': DateTime.now().millisecondsSinceEpoch / 1000,
-  });
+  Future<void> moveTask(SpaceTask t, String status) =>
+      updateTask(t, {'status': status, 'position': DateTime.now().millisecondsSinceEpoch / 1000});
 
   Future<void> deleteTask(SpaceTask t) async {
     try {

@@ -74,9 +74,10 @@ class FreeClassics {
     final head = RegExp(r'\n-{20,}\s*\n').firstMatch(t);
     if (head != null && head.start < 4000) t = t.substring(head.end);
     // La licence commence après « THE END » ou par le texte de licence.
-    final end = RegExp(r'\n\s*(THE END|-{20,}\s*\n\s*This eBook|Project Gutenberg of Australia License)', caseSensitive: false)
-        .allMatches(t)
-        .lastOrNull;
+    final end = RegExp(
+      r'\n\s*(THE END|-{20,}\s*\n\s*This eBook|Project Gutenberg of Australia License)',
+      caseSensitive: false,
+    ).allMatches(t).lastOrNull;
     if (end != null && end.start > t.length * 0.8) t = t.substring(0, end.start);
     return t.trim();
   }
@@ -102,7 +103,8 @@ class Wikisource {
   static String textUrl(String page) =>
       Uri.https('ws-export.wmcloud.org', '/', {'format': 'txt', 'lang': 'fr', 'page': page}).toString();
 
-  static String webUrl(String page) => 'https://fr.wikisource.org/wiki/${Uri.encodeComponent(page.replaceAll(' ', '_'))}';
+  static String webUrl(String page) =>
+      'https://fr.wikisource.org/wiki/${Uri.encodeComponent(page.replaceAll(' ', '_'))}';
 
   /// Lit la réponse de la recherche.
   static List<ReadMatch> fromSearch(Map j) {

@@ -17,16 +17,25 @@ class CallPage extends StatefulWidget {
   final bool video;
   final Color? color;
 
-  static Future<void> open(BuildContext context, {required String url, required String title, required bool video, Color? color}) =>
-      Navigator.push(
-        context,
-        MaterialPageRoute<void>(builder: (_) => CallPage(url: url, title: title, video: video, color: color)),
-      );
+  static Future<void> open(
+    BuildContext context, {
+    required String url,
+    required String title,
+    required bool video,
+    Color? color,
+  }) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => CallPage(url: url, title: title, video: video, color: color),
+    ),
+  );
 
   /// Le script qui trouve et appuie sur le bouton d'appel (français ou
   /// anglais, Discord et Instagram).
   static String clickScript({required bool video}) {
-    final words = video ? 'appel vidéo|video call|démarrer un appel vidéo' : 'appel vocal|appel audio|voice call|audio call|démarrer un appel vocal';
+    final words = video
+        ? 'appel vidéo|video call|démarrer un appel vidéo'
+        : 'appel vocal|appel audio|voice call|audio call|démarrer un appel vocal';
     return '''
 (function () {
   var re = new RegExp("($words)", "i");
@@ -110,7 +119,9 @@ class _CallPageState extends State<CallPage> {
             ),
           ),
         ),
-        Expanded(child: HubWebView(url: widget.url, desktopUserAgent: true, onController: _start)),
+        Expanded(
+          child: HubWebView(url: widget.url, desktopUserAgent: true, onController: _start),
+        ),
       ],
     ),
   );

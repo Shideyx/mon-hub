@@ -4,16 +4,10 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:file_selector/file_selector.dart';
 
-/// Un document joint à Clicky : il s'en sert pour tes prochaines questions
+/// Un document joint à Smily : il s'en sert pour tes prochaines questions
 /// (cours en PDF, exercice en Word, tableau Excel, photo d'un livre…).
 class ClickyDoc {
-  ClickyDoc({
-    required this.name,
-    this.text = '',
-    this.pdf64,
-    this.image64,
-    this.mime = 'image/png',
-  });
+  ClickyDoc({required this.name, this.text = '', this.pdf64, this.image64, this.mime = 'image/png'});
 
   final String name;
 
@@ -109,8 +103,7 @@ class ClickyDoc {
   /// Lit un fichier d'après son extension.
   static Future<ClickyDoc> read(String name, List<int> bytes) async {
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    String cap(String t) =>
-        t.length > maxChars ? '${t.substring(0, maxChars)}\n[… document coupé]' : t;
+    String cap(String t) => t.length > maxChars ? '${t.substring(0, maxChars)}\n[… document coupé]' : t;
     switch (ext) {
       case 'png' || 'jpg' || 'jpeg' || 'webp' || 'gif':
         if (bytes.length > 5 * 1024 * 1024) throw 'Image trop lourde (5 Mo au plus) : $name';
@@ -169,10 +162,7 @@ class ClickyDoc {
     final b = StringBuffer();
     for (final p in RegExp(r'<w:(p|tr)\b[\s\S]*?</w:\1>').allMatches(xml)) {
       final cells = p.group(1) == 'tr'
-          ? [
-              for (final c in RegExp(r'<w:tc\b[\s\S]*?</w:tc>').allMatches(p.group(0)!))
-                _runs(c.group(0)!),
-            ].join(' | ')
+          ? [for (final c in RegExp(r'<w:tc\b[\s\S]*?</w:tc>').allMatches(p.group(0)!)) _runs(c.group(0)!)].join(' | ')
           : _runs(p.group(0)!);
       if (cells.trim().isNotEmpty) b.writeln(cells.trim());
     }
@@ -199,18 +189,14 @@ class ClickyDoc {
     ].join('\n');
   }
 
-  static int _n(String s) =>
-      int.tryParse(RegExp(r'(\d+)\.xml$').firstMatch(s)?.group(1) ?? '') ?? 0;
+  static int _n(String s) => int.tryParse(RegExp(r'(\d+)\.xml$').firstMatch(s)?.group(1) ?? '') ?? 0;
 
   /// Excel : cellules des feuilles (valeurs et formules), limité.
   static String xlsxText(List<int> bytes) {
     final a = _zip(bytes);
     final shared = [
       for (final si in RegExp(r'<si>([\s\S]*?)</si>').allMatches(_entry(a, 'xl/sharedStrings.xml')))
-        _unescape(
-          [for (final t in RegExp(r'<t[^>]*>([^<]*)</t>').allMatches(si.group(1)!)) t.group(1)]
-              .join(),
-        ),
+        _unescape([for (final t in RegExp(r'<t[^>]*>([^<]*)</t>').allMatches(si.group(1)!)) t.group(1)].join()),
     ];
     final sheets = [
       for (final f in a.files)
@@ -251,14 +237,9 @@ class ClickyDoc {
     for (final m in RegExp(r'stream\r?\n([\s\S]*?)\r?\nendstream').allMatches(raw)) {
       var content = m.group(1)!;
       try {
-        content = latin1.decode(
-          ZLibDecoder().decodeBytes(latin1.encode(content)),
-          allowInvalid: true,
-        );
+        content = latin1.decode(ZLibDecoder().decodeBytes(latin1.encode(content)), allowInvalid: true);
       } catch (_) {}
-      for (final t in RegExp(
-        r'\((?:[^()\\]|\\.)*\)\s*Tj|\[((?:[^\]])*)\]\s*TJ',
-      ).allMatches(content)) {
+      for (final t in RegExp(r'\((?:[^()\\]|\\.)*\)\s*Tj|\[((?:[^\]])*)\]\s*TJ').allMatches(content)) {
         final s = t.group(0)!;
         for (final part in RegExp(r'\(((?:[^()\\]|\\.)*)\)').allMatches(s)) {
           b.write(

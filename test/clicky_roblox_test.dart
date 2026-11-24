@@ -5,10 +5,8 @@ import 'package:hub/modules/roblox/roblox_module.dart';
 import 'package:hub/ui/clicky/clicky.dart';
 
 void main() {
-  test('Clicky lit la balise [POINT:x,y:libellé]', () {
-    final (t, p, l, _) = ClickyController.parsePoint(
-      'Clique sur Réglages en bas à gauche. [POINT:120,640:Réglages]',
-    );
+  test('Smily lit la balise [POINT:x,y:libellé]', () {
+    final (t, p, l, _) = ClickyController.parsePoint('Clique sur Réglages en bas à gauche. [POINT:120,640:Réglages]');
     expect(t, 'Clique sur Réglages en bas à gauche.');
     expect(p, const Offset(120, 640));
     expect(l, 'Réglages');

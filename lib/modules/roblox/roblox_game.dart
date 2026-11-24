@@ -32,8 +32,7 @@ class RobloxGame {
 
   double? get likeRatio => upVotes + downVotes == 0 ? null : upVotes / (upVotes + downVotes);
   String get playUrl => 'https://www.roblox.com/games/$rootPlaceId';
-  String get creatorHubUrl =>
-      'https://create.roblox.com/dashboard/creations/experiences/$universeId/overview';
+  String get creatorHubUrl => 'https://create.roblox.com/dashboard/creations/experiences/$universeId/overview';
   String get analyticsUrl =>
       'https://create.roblox.com/dashboard/creations/experiences/$universeId/analytics/performance';
 }
@@ -154,29 +153,31 @@ class RobloxGamesApi {
   Future<void> refreshAll(RobloxGame g) async {
     await refreshStats(g);
     final u = g.universeId;
-    await Future.wait([
-      () async {
-        final j = await _get(
-          'https://thumbnails.roblox.com/v1/games/icons?universeIds=$u'
-          '&returnPolicy=PlaceHolder&size=256x256&format=Png&isCircular=false',
-        );
-        g.icon = (((j as Map)['data'] as List?)?.firstOrNull as Map?)?['imageUrl'] as String?;
-      }(),
-      () async {
-        final j = await _get(
-          'https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds=$u'
-          '&countPerUniverse=6&defaults=true&size=768x432&format=Png&isCircular=false',
-        );
-        final first = ((j as Map)['data'] as List?)?.firstOrNull as Map?;
-        g.thumbnails = [
-          for (final t in (first?['thumbnails'] as List?) ?? const [])
-            if ((t as Map)['imageUrl'] != null) '${t['imageUrl']}',
-        ];
-      }(),
-      _servers(g),
-      _badges(g),
-      _passes(g),
-    ].map((f) => f.catchError((_) {})));
+    await Future.wait(
+      [
+        () async {
+          final j = await _get(
+            'https://thumbnails.roblox.com/v1/games/icons?universeIds=$u'
+            '&returnPolicy=PlaceHolder&size=256x256&format=Png&isCircular=false',
+          );
+          g.icon = (((j as Map)['data'] as List?)?.firstOrNull as Map?)?['imageUrl'] as String?;
+        }(),
+        () async {
+          final j = await _get(
+            'https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds=$u'
+            '&countPerUniverse=6&defaults=true&size=768x432&format=Png&isCircular=false',
+          );
+          final first = ((j as Map)['data'] as List?)?.firstOrNull as Map?;
+          g.thumbnails = [
+            for (final t in (first?['thumbnails'] as List?) ?? const [])
+              if ((t as Map)['imageUrl'] != null) '${t['imageUrl']}',
+          ];
+        }(),
+        _servers(g),
+        _badges(g),
+        _passes(g),
+      ].map((f) => f.catchError((_) {})),
+    );
   }
 
   Future<void> _servers(RobloxGame g) async {
@@ -191,13 +192,15 @@ class RobloxGamesApi {
       ) as Map;
       for (final s in (j['data'] as List?) ?? const []) {
         final m = s as Map;
-        out.add(RobloxServer(
-          '${m['id']}',
-          _i(m['playing']),
-          _i(m['maxPlayers']),
-          (m['ping'] as num?)?.toInt(),
-          (m['fps'] as num?)?.toDouble(),
-        ));
+        out.add(
+          RobloxServer(
+            '${m['id']}',
+            _i(m['playing']),
+            _i(m['maxPlayers']),
+            (m['ping'] as num?)?.toInt(),
+            (m['fps'] as num?)?.toDouble(),
+          ),
+        );
       }
       cursor = j['nextPageCursor'] as String?;
       if (cursor == null) break;
@@ -207,9 +210,8 @@ class RobloxGamesApi {
   }
 
   Future<void> _badges(RobloxGame g) async {
-    final j = await _get(
-      'https://badges.roblox.com/v1/universes/${g.universeId}/badges?limit=100&sortOrder=Asc',
-    ) as Map;
+    final j =
+        await _get('https://badges.roblox.com/v1/universes/${g.universeId}/badges?limit=100&sortOrder=Asc') as Map;
     final list = [
       for (final b in (j['data'] as List?) ?? const [])
         () {
@@ -256,9 +258,8 @@ class RobloxGamesApi {
           ),
       ];
     } catch (_) {
-      final j = await _get(
-        'https://games.roblox.com/v1/games/${g.universeId}/game-passes?limit=100&sortOrder=Asc',
-      ) as Map;
+      final j =
+          await _get('https://games.roblox.com/v1/games/${g.universeId}/game-passes?limit=100&sortOrder=Asc') as Map;
       list = [
         for (final p in (j['data'] as List?) ?? const [])
           RobloxPass(

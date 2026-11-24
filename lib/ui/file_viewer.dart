@@ -30,8 +30,12 @@ class FileViewer extends StatefulWidget {
   /// Télécharge le fichier (appelé une seule fois).
   final Future<List<int>> Function() load;
 
-  static Future<void> open(BuildContext context, String name, Future<List<int>> Function() load) =>
-      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FileViewer(name: name, load: load)));
+  static Future<void> open(BuildContext context, String name, Future<List<int>> Function() load) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => FileViewer(name: name, load: load),
+    ),
+  );
 
   static String extOf(String name) {
     final n = name.trim().toLowerCase();
@@ -40,7 +44,23 @@ class FileViewer extends StatefulWidget {
   }
 
   static const _images = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'};
-  static const _texts = {'txt', 'csv', 'md', 'json', 'xml', 'log', 'ini', 'tex', 'py', 'dart', 'js', 'css', 'java', 'c', 'cpp'};
+  static const _texts = {
+    'txt',
+    'csv',
+    'md',
+    'json',
+    'xml',
+    'log',
+    'ini',
+    'tex',
+    'py',
+    'dart',
+    'js',
+    'css',
+    'java',
+    'c',
+    'cpp',
+  };
   static const _media = {'mp3', 'wav', 'm4a', 'ogg', 'oga', 'opus', 'aac', 'flac', 'mp4', 'webm', 'mov', 'm4v'};
 
   /// Type d'un fichier d'après son nom (et ses premiers octets s'il n'a pas
@@ -103,7 +123,7 @@ class FileViewer extends StatefulWidget {
     final kind = kindOf(name, bytes.take(16).toList());
     if (kind == FileKind.pdf) {
       if (!await AiText.hasGemini()) {
-        throw 'Pour lire un PDF, Clicky a besoin de ta clé Gemini gratuite (Réglages de Clicky → Voix).';
+        throw 'Pour lire un PDF, Smily a besoin de ta clé Gemini gratuite (Réglages de Smily → Voix).';
       }
       if (bytes.length > 15 * 1024 * 1024) throw 'Ce PDF est trop gros pour être lu par l\'IA (15 Mo au plus).';
       return AiText.ask(ask, pdf: base64Encode(bytes));
@@ -209,7 +229,9 @@ class _FileViewerState extends State<FileViewer> {
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.warning_amber_rounded),
           title: const Text('Ce fichier peut lancer un programme'),
-          content: Text('« ${widget.name} » n\'est pas un simple document. Ne l\'ouvre que si tu as confiance en l\'expéditeur.'),
+          content: Text(
+            '« ${widget.name} » n\'est pas un simple document. Ne l\'ouvre que si tu as confiance en l\'expéditeur.',
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ouvrir quand même')),
@@ -324,8 +346,8 @@ class _FileViewerState extends State<FileViewer> {
           body: snap.hasError
               ? EmptyHint('Impossible d\'ouvrir ce fichier : ${snap.error}', icon: Icons.error_outline_rounded)
               : f == null
-                  ? const Center(child: LoadingHint())
-                  : _body(context, f),
+              ? const Center(child: LoadingHint())
+              : _body(context, f),
         );
       },
     );

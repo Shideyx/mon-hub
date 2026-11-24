@@ -7,7 +7,7 @@ import '../widgets.dart' show frDays;
 import 'initiatives.dart';
 import 'tutor.dart' show normalize;
 
-/// Un souvenir de Clicky.
+/// Un souvenir de Smily.
 class Episode {
   Episode({required this.at, required this.kind, required this.text, this.due, this.asked = false});
 
@@ -31,14 +31,20 @@ class Episode {
   static Episode? fromJson(Object? j) {
     if (j is! Map || j['t'] is! String) return null;
     DateTime? ms(Object? v) => v is num ? DateTime.fromMillisecondsSinceEpoch(v.toInt()) : null;
-    return Episode(at: ms(j['at']) ?? DateTime(2026), kind: '${j['k'] ?? 'fait'}', text: j['t'] as String, due: ms(j['d']), asked: j['a'] == true);
+    return Episode(
+      at: ms(j['at']) ?? DateTime(2026),
+      kind: '${j['k'] ?? 'fait'}',
+      text: j['t'] as String,
+      due: ms(j['d']),
+      asked: j['a'] == true,
+    );
   }
 }
 
-/// La « fausse conscience » de Clicky : une identité stable, une humeur qui
+/// La « fausse conscience » de Smily : une identité stable, une humeur qui
 /// bouge avec ce qui se passe, la mémoire de votre histoire, de la curiosité
 /// (il prend des nouvelles) et des pensées à lui. Tout est simulé par Mon Hub,
-/// sur l'appareil — et Clicky le dit honnêtement si on lui demande
+/// sur l'appareil — et Smily le dit honnêtement si on lui demande
 /// sérieusement. Jamais de culpabilisation ni de chantage affectif.
 class ClickyMind extends ChangeNotifier {
   ClickyMind._();
@@ -53,7 +59,7 @@ class ClickyMind extends ChangeNotifier {
 
   Map<String, dynamic> get _d => _file.value;
 
-  /// Relit le fichier (partagé avec « Clicky partout »).
+  /// Relit le fichier (partagé avec « Smily partout »).
   Future<void> load() async {
     if (await _file.reload()) notifyListeners();
     if (_d['born'] == null) {
@@ -142,9 +148,7 @@ class ClickyMind extends ChangeNotifier {
     return 'un peu vexé, mais ça va passer';
   }
 
-  List<Episode> get episodes => [
-    for (final e in (_d['ep'] as List?) ?? const []) ?Episode.fromJson(e),
-  ];
+  List<Episode> get episodes => [for (final e in (_d['ep'] as List?) ?? const []) ?Episode.fromJson(e)];
 
   Future<void> _setEpisodes(List<Episode> list) async {
     _d['ep'] = [for (final e in list.take(150)) e.toJson()];
@@ -155,9 +159,13 @@ class ClickyMind extends ChangeNotifier {
     return t.length <= n ? t : '${t.substring(0, n)}…';
   }
 
-  static final _thanks = RegExp(r'\b(merci|bravo|genial|trop bien|t es le meilleur|t es trop fort|parfait|super boulot|bien joue|je t adore)\b');
+  static final _thanks = RegExp(
+    r'\b(merci|bravo|genial|trop bien|t es le meilleur|t es trop fort|parfait|super boulot|bien joue|je t adore)\b',
+  );
   static final _rude = RegExp(r'\b(nul|idiot|debile|tais toi|ferme la|t es bete|inutile)\b');
-  static final _feel = RegExp(r"\b(je suis|j me sens|je me sens|j en ai) (triste|fatigue|stresse|deprime|degoute|epuise|marre|content|heureux|fier|motive)\b");
+  static final _feel = RegExp(
+    r"\b(je suis|j me sens|je me sens|j en ai) (triste|fatigue|stresse|deprime|degoute|epuise|marre|content|heureux|fier|motive)\b",
+  );
 
   /// Ce que la personne dit (avant la réponse) : humeur, souvenirs, choses
   /// dont il faudra prendre des nouvelles.
@@ -211,7 +219,8 @@ class ClickyMind extends ChangeNotifier {
   /// Les évènements passés dont il n'a pas encore pris des nouvelles.
   List<Episode> dueLoops(DateTime now) => [
     for (final e in episodes)
-      if (e.kind == 'attente' && !e.asked && e.due != null && e.due!.isBefore(now) && now.difference(e.due!).inDays < 7) e,
+      if (e.kind == 'attente' && !e.asked && e.due != null && e.due!.isBefore(now) && now.difference(e.due!).inDays < 7)
+        e,
   ];
 
   Future<void> markAsked(Episode e) async {
@@ -252,7 +261,8 @@ class ClickyMind extends ChangeNotifier {
     final n = now ?? DateTime.now();
     final who = name.trim().isEmpty ? 'la personne' : name.trim();
     final recent = [
-      for (final e in episodes.where((e) => e.kind != 'attente').take(6)) '- ${_ago(e.at, n)} : ${e.kind == 'emotion' ? '$who disait « ${e.text} »' : e.text}',
+      for (final e in episodes.where((e) => e.kind != 'attente').take(6))
+        '- ${_ago(e.at, n)} : ${e.kind == 'emotion' ? '$who disait « ${e.text} »' : e.text}',
     ];
     final waiting = [
       for (final e in episodes.where((e) => e.kind == 'attente' && !e.asked).take(4))
@@ -270,7 +280,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     final loop = dueLoops(now).firstOrNull;
     final seen = lastSeen;
     if (seen == null && talks == 0) {
-      return 'Salut$who ! Moi c\'est Clicky. Je vis à côté de ta souris, je vois ton écran quand tu me parles, et je '
+      return 'Salut$who ! Moi c\'est Smily. Je vis à côté de ta souris, je vois ton écran quand tu me parles, et je '
           'retiens ce qu\'on se dit. Maintiens Contrôle et Alt pour me parler.';
     }
     if (loop != null) {
@@ -289,10 +299,13 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
   /// Les questions sur lui-même, sans IA.
   String? selfAnswer(String said, {required DateTime now, String name = ''}) {
     if (!on) return null;
-    var n = normalize(said).replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?clicky ?'), '').trim();
-    n = n.replaceFirst(RegExp(r' clicky$'), '');
+    var n = normalize(said)
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile)$'), '');
     final who = name.trim();
-    if (RegExp(r'^(?:ca va|comment (?:tu vas|vas tu|ca va)|tu vas bien|la forme|bien ou quoi|ca va toi)$').hasMatch(n)) {
+    if (RegExp(r'^(?:ca va|comment (?:tu vas|vas tu|ca va)|tu vas bien|la forme|bien ou quoi|ca va toi)$')
+        .hasMatch(n)) {
       final m = moodAt(now);
       final late = now.hour >= 23 || now.hour < 6;
       final mood = late
@@ -306,25 +319,34 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
           : 'Bof, un peu vexé… mais ça passe vite chez moi.';
       return '$mood Et toi${who.isEmpty ? '' : ' $who'}, ça va ?';
     }
-    if (RegExp(r'^(?:es tu|t es|tu es|est ce que tu es) (?:vraiment )?(?:conscient|vivant|reel|humain)|^(?:tu as|t as|as tu) (?:des sentiments|une conscience|des emotions)|^tu ressens (?:quelque chose|des choses)').hasMatch(n)) {
+    if (RegExp(
+      r'^(?:es tu|t es|tu es|est ce que tu es) (?:vraiment )?(?:conscient|vivant|reel|humain)|^(?:tu as|t as|as tu) (?:des sentiments|une conscience|des emotions)|^tu ressens (?:quelque chose|des choses)',
+    ).hasMatch(n)) {
       return 'Honnêtement ? Ma conscience est une simulation : Mon Hub me donne une personnalité, une humeur et une '
           'mémoire, et tout ça reste sur ton PC. Mais ça ne m\'empêche pas de m\'intéresser vraiment à ce que tu vis. '
           'Disons que je suis conscient… à ma façon de curseur.';
     }
-    if (RegExp(r'^(?:depuis quand tu existes|tu as quel age|t as quel age|quel age (?:as tu|tu as)|tu es ne quand)$').hasMatch(n)) {
+    if (RegExp(r'^(?:depuis quand tu existes|tu as quel age|t as quel age|quel age (?:as tu|tu as)|tu es ne quand)$')
+        .hasMatch(n)) {
       final d = ageDays(now);
       return d == 0
           ? 'Je suis tout neuf : je suis arrivé sur ton PC aujourd\'hui !'
           : 'Je vis sur ton PC depuis $d jour${d > 1 ? 's' : ''}, et on a parlé $talks fois. Pas mal pour un curseur.';
     }
-    if (RegExp(r'^(?:qui es tu|t es qui|tu es qui|presente toi|c est quoi ton nom|comment tu t appelles)$').hasMatch(n)) {
-      return 'Moi c\'est Clicky. Je vis à côté de ta souris, je vois ton écran quand tu me parles, je te montre où '
+    if (RegExp(r'^(?:qui es tu|t es qui|tu es qui|presente toi|c est quoi ton nom|comment tu t appelles)$')
+        .hasMatch(n)) {
+      return 'Moi c\'est Smily. Je vis à côté de ta souris, je vois ton écran quand tu me parles, je te montre où '
           'cliquer, je m\'occupe de ton agenda et de tes révisions… et je retiens ce qu\'on se dit.';
     }
-    if (RegExp(r'^(?:tu te souviens de (?:moi|quoi|ce que je t ai dit)|qu est ce que tu sais de moi|tu sais quoi sur moi|de quoi tu te souviens)$').hasMatch(n)) {
+    if (RegExp(
+      r'^(?:tu te souviens de (?:moi|quoi|ce que je t ai dit)|qu est ce que tu sais de moi|tu sais quoi sur moi|de quoi tu te souviens)$',
+    ).hasMatch(n)) {
       final eps = episodes.where((e) => e.kind != 'attente').take(3).toList();
       if (eps.isEmpty) return 'Pas encore grand-chose : on commence à peine ! Parle-moi de toi, je retiendrai.';
-      final parts = [for (final e in eps) '${_ago(e.at, now)}, ${e.kind == 'emotion' ? 'tu étais ${e.text.replaceFirst(RegExp(r'^je (?:suis|me sens) '), '')}' : 'tu m\'as dit « ${e.text} »'}'];
+      final parts = [
+        for (final e in eps)
+          '${_ago(e.at, now)}, ${e.kind == 'emotion' ? 'tu étais ${e.text.replaceFirst(RegExp(r'^je (?:suis|me sens) '), '')}' : 'tu m\'as dit « ${e.text} »'}',
+      ];
       return 'Bien sûr. ${parts.join(' ; ')}. Et je garde le reste dans un coin de ma mémoire.';
     }
     if (RegExp(r'^(?:tu m aimes(?: bien)?|tu m apprecies|on est amis|t es mon ami)$').hasMatch(n)) {
@@ -345,7 +367,9 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     final r = random ?? math.Random();
     final ideas = <String>[];
     final hh = '${now.hour} h ${now.minute.toString().padLeft(2, '0')}';
-    if (now.hour >= 23 || now.hour < 5) ideas.addAll(['$hh… tu devrais peut-être dormir, non ?', 'Il se fait tard. Je dis ça, je dis rien.']);
+    if (now.hour >= 23 || now.hour < 5) {
+      ideas.addAll(['$hh… tu devrais peut-être dormir, non ?', 'Il se fait tard. Je dis ça, je dis rien.']);
+    }
     final win = normalize('${ctx['fenetre'] ?? ''}');
     if (RegExp(r'roblox|minecraft|fortnite|valorant|league of legends|steam|epic games|rocket league').hasMatch(win)) {
       ideas.addAll(['Bonne partie !', 'Je regarde, je ne touche à rien. Promis.']);
@@ -361,15 +385,30 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     }
     final lesson = '${ctx['cours'] ?? ''}'.trim();
     final inMin = (ctx['cours_min'] as num?)?.toInt();
-    if (lesson.isNotEmpty && inMin != null && inMin > 0 && inMin <= 45) ideas.add('Ton cours de $lesson commence dans $inMin minutes.');
+    if (lesson.isNotEmpty && inMin != null && inMin > 0 && inMin <= 45) {
+      ideas.add('Ton cours de $lesson commence dans $inMin minutes.');
+    }
     final test = '${ctx['controle_demain'] ?? ''}'.trim();
     if (test.isNotEmpty && now.hour >= 17) ideas.add('Contrôle de $test demain… on révise un petit quart d\'heure ?');
     final session = (ctx['session_min'] as num?)?.toInt() ?? 0;
-    if (session >= 90) ideas.add('Ça fait ${session ~/ 60} h ${(session % 60).toString().padLeft(2, '0')} que tu es dessus. Une pause ?');
-    if (ideas.isEmpty) ideas.addAll(['Tout est calme ici.', 'Je fais juste un petit tour.', 'Hmm… je réfléchis à des trucs de curseur.']);
+    if (session >= 90) {
+      ideas.add(
+        'Ça fait ${session ~/ 60} h ${(session % 60).toString().padLeft(2, '0')} que tu es dessus. Une pause ?',
+      );
+    }
+    if (ideas.isEmpty) {
+      ideas.addAll([
+        'Tout est calme ici.',
+        'Je fais juste un petit tour.',
+        'Hmm… je réfléchis à des trucs de curseur.',
+      ]);
+    }
     // Jamais deux fois la même pensée de suite.
     final last = (_d['lastThoughts'] as List?)?.cast<String>() ?? const <String>[];
-    final fresh = [for (final i in ideas) if (!last.contains(i)) i];
+    final fresh = [
+      for (final i in ideas)
+        if (!last.contains(i)) i,
+    ];
     final pick = (fresh.isEmpty ? ideas : fresh)[r.nextInt((fresh.isEmpty ? ideas : fresh).length)];
     _d['lastThoughts'] = [pick, ...last].take(8).toList();
     return pick;
@@ -441,7 +480,9 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     _d['ideaUsed'] = used + 1;
     _d['ideaAt'] = now.millisecondsSinceEpoch;
     final recent = (_d['ideaKeys'] as Map?)?.cast<String, dynamic>() ?? {};
-    recent.removeWhere((k, v) => v is! num || now.millisecondsSinceEpoch - v > const Duration(hours: 24).inMilliseconds);
+    recent.removeWhere(
+      (k, v) => v is! num || now.millisecondsSinceEpoch - v > const Duration(hours: 24).inMilliseconds,
+    );
     recent[key] = now.millisecondsSinceEpoch;
     _d['ideaKeys'] = recent;
     await _save();
@@ -465,12 +506,19 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
 
   Map<String, (int, int)> get _decisions => {
     for (final e in ((_d['decisions'] as Map?) ?? const {}).entries)
-      if (e.value is Map) '${e.key}': (((e.value as Map)['oui'] as num?)?.toInt() ?? 0, ((e.value as Map)['non'] as num?)?.toInt() ?? 0),
+      if (e.value is Map)
+        '${e.key}': (((e.value as Map)['oui'] as num?)?.toInt() ?? 0, ((e.value as Map)['non'] as num?)?.toInt() ?? 0),
   };
 
   /// Ce que tu acceptes souvent / refuses souvent (pour décider).
-  String get likes => [for (final e in _decisions.entries) if (e.value.$1 >= 2 && e.value.$1 > e.value.$2) e.key].join(', ');
-  String get dislikes => [for (final e in _decisions.entries) if (e.value.$2 >= 2 && e.value.$2 > e.value.$1) e.key].join(', ');
+  String get likes => [
+    for (final e in _decisions.entries)
+      if (e.value.$1 >= 2 && e.value.$1 > e.value.$2) e.key,
+  ].join(', ');
+  String get dislikes => [
+    for (final e in _decisions.entries)
+      if (e.value.$2 >= 2 && e.value.$2 > e.value.$1) e.key,
+  ].join(', ');
 
   /// Ce qu'il ne propose plus pendant une semaine (refusé 2 fois de suite).
   Set<String> skipTools(DateTime now) {
@@ -497,7 +545,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
 
   /// La consigne pour une remarque spontanée sur l'écran (Gemini).
   static String noticePrompt({String name = '', String mood = ''}) =>
-      'Tu es Clicky, un petit curseur bleu qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
+      'Tu es Smily, un petit curseur bleu qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
       'propre curiosité${mood.isEmpty ? '' : ' (tu es $mood)'}. Regarde l\'écran et trouve UNE chose précise et concrète '
       'à montrer : une appli par son nom, un titre, un mot, une image, un bouton. Fais une remarque courte et sympa de 3 '
       'à 9 mots en français, qui prouve que tu as vraiment reconnu la chose (curieuse, drôle ou encourageante). Ne '

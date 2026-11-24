@@ -16,9 +16,11 @@ import 'package:hub/ui/clicky/voice.dart';
 import 'package:hub/ui/clicky/whisper.dart';
 
 void main() {
-  group('Clicky agit', () {
+  group('Smily agit', () {
     test('lit une action, même entourée de texte', () {
-      final s = ActStep.parse('Voilà : {"pense":"Je clique sur la barre","action":"clic","x":640,"y":52,"libelle":"Rechercher"} ok');
+      final s = ActStep.parse(
+        'Voilà : {"pense":"Je clique sur la barre","action":"clic","x":640,"y":52,"libelle":"Rechercher"} ok',
+      );
       expect(s, isNotNull);
       expect(s!.action, 'clic');
       expect(s.point!.$1, const Offset(640, 52));
@@ -30,7 +32,9 @@ void main() {
     });
 
     test('balise [AGIR] séparée de la réponse', () {
-      final (text, goal) = ClickyController.extractAct('Je m\'en occupe. [AGIR]Ouvre YouTube et lance la vidéo de Karpathy[/AGIR]');
+      final (text, goal) = ClickyController.extractAct(
+        'Je m\'en occupe. [AGIR]Ouvre YouTube et lance la vidéo de Karpathy[/AGIR]',
+      );
       expect(text, 'Je m\'en occupe.');
       expect(goal, 'Ouvre YouTube et lance la vidéo de Karpathy');
     });
@@ -66,9 +70,18 @@ void main() {
   });
 
   test('Spotify : refus 403 expliqués', () {
-    expect(SpotifyApi.explain403('Active premium subscription required for the owner of the app.'), contains('février 2026'));
-    expect(SpotifyApi.isBlocked(SpotifyApi.explain403('Active premium subscription required for the owner of the app.')), isTrue);
-    expect(SpotifyApi.explain403('Check settings on developer.spotify.com/dashboard, the user may not be registered.'), contains('User Management'));
+    expect(
+      SpotifyApi.explain403('Active premium subscription required for the owner of the app.'),
+      contains('février 2026'),
+    );
+    expect(
+      SpotifyApi.isBlocked(SpotifyApi.explain403('Active premium subscription required for the owner of the app.')),
+      isTrue,
+    );
+    expect(
+      SpotifyApi.explain403('Check settings on developer.spotify.com/dashboard, the user may not be registered.'),
+      contains('User Management'),
+    );
   });
 
   test('micro par Gemini : transcription', () async {
@@ -85,7 +98,7 @@ void main() {
             {
               'content': {
                 'parts': [
-                  {'text': 'Bonjour Clicky '},
+                  {'text': 'Bonjour Smily '},
                 ],
               },
             },
@@ -94,7 +107,7 @@ void main() {
         200,
       );
     });
-    expect(await GeminiTranscriber.transcribe(wav.path, 'cle', client: client), 'Bonjour Clicky');
+    expect(await GeminiTranscriber.transcribe(wav.path, 'cle', client: client), 'Bonjour Smily');
   });
 
   test('espaces de travail École Directe', () {

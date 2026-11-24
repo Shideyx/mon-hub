@@ -21,25 +21,15 @@ class CarnetItem {
   String get category => '${data['category'] ?? ''}';
 }
 
-/// Le Carnet : tout ce que Clicky retient pour toi (porté des plugins de
+/// Le Carnet : tout ce que Smily retient pour toi (porté des plugins de
 /// ton JARVIS) — tâches, notes, idées en vrac, mémoire, budget, sport, jeux,
 /// poèmes, protocoles, presse-papier. Un fichier par compte, partagé avec
-/// Clicky partout.
+/// Smily partout.
 class Carnet extends ChangeNotifier {
   Carnet._();
   static final instance = Carnet._();
 
-  static const lists = [
-    'todos',
-    'notes',
-    'inbox',
-    'memory',
-    'money',
-    'sport',
-    'games',
-    'poems',
-    'clipboard',
-  ];
+  static const lists = ['todos', 'notes', 'inbox', 'memory', 'money', 'sport', 'games', 'poems', 'clipboard'];
 
   final _file = JsonFile<Map<String, dynamic>>(
     'carnet.json',
@@ -127,7 +117,7 @@ class Carnet extends ChangeNotifier {
 
   // ---------- Mémoire ----------
 
-  /// Ce que Clicky sait de toi (ajouté à ses consignes).
+  /// Ce que Smily sait de toi (ajouté à ses consignes).
   List<String> get facts => [for (final m in list('memory')) m.text];
 
   // ---------- Budget ----------
@@ -154,9 +144,7 @@ class Carnet extends ChangeNotifier {
   /// Progrès sur un exercice : (meilleure charge, dernière séance, séances).
   (double, CarnetItem?, int) progress(String exercise) {
     final q = exercise.toLowerCase().trim();
-    final l = list('sport')
-        .where((e) => '${e.data['exercise']}'.toLowerCase().contains(q))
-        .toList();
+    final l = list('sport').where((e) => '${e.data['exercise']}'.toLowerCase().contains(q)).toList();
     var best = 0.0;
     for (final e in l) {
       final w = (e.data['weight'] as num?)?.toDouble() ?? 0;
@@ -197,13 +185,11 @@ class Carnet extends ChangeNotifier {
       'revenus_du_jour': earned,
       'sport_du_jour': [
         for (final x in list('sport'))
-          if (isToday(x))
-            '${x.data['exercise']} ${x.data['weight'] ?? ''} kg × ${x.data['reps'] ?? ''}',
+          if (isToday(x)) '${x.data['exercise']} ${x.data['weight'] ?? ''} kg × ${x.data['reps'] ?? ''}',
       ],
       'jeux_du_jour': [
         for (final x in list('games'))
-          if (isToday(x) && x.data['minutes'] != null)
-            '${x.data['game']} (${x.data['minutes']} min)',
+          if (isToday(x) && x.data['minutes'] != null) '${x.data['game']} (${x.data['minutes']} min)',
       ],
     };
   }
@@ -212,10 +198,7 @@ class Carnet extends ChangeNotifier {
 
   static const defaultProtocols = {
     'travail': [
-      {
-        'type': 'dire',
-        'valeur': 'Protocole travail. Je mets ta playlist focus, concentre-toi bien.',
-      },
+      {'type': 'dire', 'valeur': 'Protocole travail. Je mets ta playlist focus, concentre-toi bien.'},
       {'type': 'spotify', 'valeur': 'playlist', 'requete': 'focus'},
     ],
     'nuit': [
@@ -377,22 +360,13 @@ class Weather {
 class PhoneNotify {
   PhoneNotify._();
 
-  static Future<void> send(
-    String topic,
-    String title,
-    String message, {
-    bool urgent = false,
-  }) async {
+  static Future<void> send(String topic, String title, String message, {bool urgent = false}) async {
     final t = topic.trim();
     if (t.isEmpty) throw 'Choisis ton topic ntfy dans Carnet → Réglages';
     final r = await http
         .post(
           Uri.parse('https://ntfy.sh/${Uri.encodeComponent(t)}'),
-          headers: {
-            'Title': _ascii(title),
-            'Priority': urgent ? 'high' : 'default',
-            'Tags': 'robot',
-          },
+          headers: {'Title': _ascii(title), 'Priority': urgent ? 'high' : 'default', 'Tags': 'robot'},
           body: utf8.encode(message),
         )
         .timeout(const Duration(seconds: 15));

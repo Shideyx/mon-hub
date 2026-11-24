@@ -140,7 +140,12 @@ TextStyle hudTitle(BuildContext context, {double size = 28, Color? color, FontWe
 
 /// Texte en police à chasse fixe (heures, chiffres).
 TextStyle hudMono(BuildContext context, {double size = 13, Color? color, FontWeight weight = FontWeight.w400}) =>
-    TextStyle(fontFamily: HudFonts.mono, fontSize: size, fontWeight: weight, color: color ?? HudColors.of(context).text);
+    TextStyle(
+      fontFamily: HudFonts.mono,
+      fontSize: size,
+      fontWeight: weight,
+      color: color ?? HudColors.of(context).text,
+    );
 
 /// Forme à coins coupés (en haut à droite et en bas à gauche).
 BeveledRectangleBorder hudCut(double cut, {BorderSide side = BorderSide.none}) => BeveledRectangleBorder(
@@ -413,7 +418,8 @@ class HexAvatar extends StatelessWidget {
         height: size,
         color: color ?? colorFor(text),
         alignment: Alignment.center,
-        child: child ??
+        child:
+            child ??
             Text(
               text,
               maxLines: 1,
@@ -455,7 +461,11 @@ class HudDiamond extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Transform.rotate(
     angle: math.pi / 4,
-    child: SizedBox(width: size, height: size, child: ColoredBox(color: color)),
+    child: SizedBox(
+      width: size,
+      height: size,
+      child: ColoredBox(color: color),
+    ),
   );
 }
 
@@ -736,7 +746,11 @@ class HudEmpty extends StatelessWidget {
           children: [
             Chevrons(color: c.accent, size: 14, down: true),
             const SizedBox(height: 14),
-            Text(text, textAlign: TextAlign.center, style: TextStyle(color: c.muted, height: 1.45)),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: c.muted, height: 1.45),
+            ),
             if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),

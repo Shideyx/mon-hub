@@ -84,11 +84,7 @@ true;
 
   /// Lance l'import dans la page ouverte. [onProgress] reçoit le nombre de
   /// conversations déjà lues.
-  static Future<int> run(
-    InAppWebViewController c, {
-    int limit = 60,
-    void Function(int done)? onProgress,
-  }) async {
+  static Future<int> run(InAppWebViewController c, {int limit = 60, void Function(int done)? onProgress}) async {
     final url = '${await c.getUrl()}';
     if (!url.contains('claude.ai')) throw 'Ouvre d\'abord claude.ai dans cet onglet';
     await c.evaluateJavascript(source: script(limit));
@@ -142,11 +138,9 @@ class _ClaudeAiTabState extends State<ClaudeAiTab> with AutomaticKeepAliveClient
     try {
       final n = await ClaudeAiSync.run(
         c,
-        onProgress: (d) =>
-            mounted ? setState(() => status = 'Lecture de tes conversations… ($d)') : null,
+        onProgress: (d) => mounted ? setState(() => status = 'Lecture de tes conversations… ($d)') : null,
       );
-      status =
-          '$n conversation${n > 1 ? 's' : ''} claude.ai dans ton historique (onglet Discuter).';
+      status = '$n conversation${n > 1 ? 's' : ''} claude.ai dans ton historique (onglet Discuter).';
     } catch (e) {
       status = '$e';
     }
@@ -183,11 +177,7 @@ class _ClaudeAiTabState extends State<ClaudeAiTab> with AutomaticKeepAliveClient
                 ),
                 FilledButton.tonalIcon(
                   icon: busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.sync_rounded),
                   label: const Text('Synchroniser l\'historique'),
                   onPressed: busy || _c == null ? null : _sync,

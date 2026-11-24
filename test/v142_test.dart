@@ -66,7 +66,9 @@ void main() {
               child: FilledButton(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Center(child: Text('Page coincée')))),
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Scaffold(body: Center(child: Text('Page coincée'))),
+                  ),
                 ),
                 child: const Text('Ouvrir'),
               ),
@@ -90,7 +92,11 @@ void main() {
   });
 
   testWidgets('animations : les cartes arrivent en douceur', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: EnterAnimation(index: 2, child: Text('Carte')))));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: EnterAnimation(index: 2, child: Text('Carte'))),
+      ),
+    );
     final start = tester.widget<Opacity>(find.ancestor(of: find.text('Carte'), matching: find.byType(Opacity))).opacity;
     expect(start, 0);
     await tester.pumpAndSettle();

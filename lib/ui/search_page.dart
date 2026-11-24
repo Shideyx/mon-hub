@@ -77,9 +77,11 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     if (PcApps.supported) {
-      unawaited(PcApps.instance.load().then((_) {
-        if (mounted) setState(() => _apps = _appsFor(_text.text));
-      }));
+      unawaited(
+        PcApps.instance.load().then((_) {
+          if (mounted) setState(() => _apps = _appsFor(_text.text));
+        }),
+      );
     }
     _apps = _appsFor(widget.initial);
     if (widget.initial.trim().isNotEmpty) unawaited(_search(widget.initial));
@@ -123,9 +125,12 @@ class _SearchPageState extends State<SearchPage> {
       _busy = true;
       _hits = const [];
     });
-    final all = await ClickyController.instance.search(q, onPart: (part) {
-      if (mounted && run == _run) setState(() => _hits = part);
-    });
+    final all = await ClickyController.instance.search(
+      q,
+      onPart: (part) {
+        if (mounted && run == _run) setState(() => _hits = part);
+      },
+    );
     if (!mounted || run != _run) return;
     setState(() {
       _hits = all;
@@ -168,9 +173,7 @@ class _SearchPageState extends State<SearchPage> {
     final theme = Theme.of(context);
     final w = EverywhereSearch.words(_text.text);
     return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () => Navigator.of(context).pop(),
-      },
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => Navigator.of(context).pop()},
       child: SafeArea(
         child: Align(
           alignment: const Alignment(0, -0.6),
@@ -204,7 +207,9 @@ class _SearchPageState extends State<SearchPage> {
                               onChanged: _changed,
                               onSubmitted: (q) {
                                 // Le nom d'une appli : Entrée l'ouvre (comme la touche Windows).
-                                final app = _apps.where((a) => a.name.toLowerCase().startsWith(q.trim().toLowerCase())).firstOrNull;
+                                final app = _apps
+                                    .where((a) => a.name.toLowerCase().startsWith(q.trim().toLowerCase()))
+                                    .firstOrNull;
                                 if (app != null && q.trim().isNotEmpty) {
                                   unawaited(_launch(app));
                                 } else if (_hits.isNotEmpty && q.trim() == _done) {
@@ -239,7 +244,10 @@ class _SearchPageState extends State<SearchPage> {
                             scrollDirection: Axis.horizontal,
                             children: [
                               for (final a in _apps)
-                                SizedBox(width: 92, child: AppTile(app: a, small: true, onOpen: (x) => unawaited(_launch(x)))),
+                                SizedBox(
+                                  width: 92,
+                                  child: AppTile(app: a, small: true, onOpen: (x) => unawaited(_launch(x))),
+                                ),
                             ],
                           ),
                         ),
@@ -267,7 +275,10 @@ class _SearchPageState extends State<SearchPage> {
                                 final h = _hits[i];
                                 return ListTile(
                                   dense: true,
-                                  leading: Icon(_icons[h.source] ?? Icons.label_rounded, color: theme.colorScheme.primary),
+                                  leading: Icon(
+                                    _icons[h.source] ?? Icons.label_rounded,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                   title: Text(h.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                                   subtitle: Text(
                                     [

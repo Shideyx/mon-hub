@@ -8,15 +8,13 @@ class DiscordUser {
   final String name;
   final String? avatar;
 
-  String? get avatarUrl => avatar == null
-      ? null
-      : 'https://cdn.discordapp.com/avatars/$id/$avatar.png?size=64';
+  String? get avatarUrl => avatar == null ? null : 'https://cdn.discordapp.com/avatars/$id/$avatar.png?size=64';
 
   factory DiscordUser.fromJson(Map<String, dynamic> j) => DiscordUser(
-        '${j['id']}',
-        (j['global_name'] as String?) ?? (j['username'] as String? ?? '?'),
-        j['avatar'] as String?,
-      );
+    '${j['id']}',
+    (j['global_name'] as String?) ?? (j['username'] as String? ?? '?'),
+    j['avatar'] as String?,
+  );
 }
 
 /// Une réaction sous un message Discord.
@@ -122,7 +120,9 @@ class DiscordMessage {
             RegExp(r'\.(mp4|mov|webm)$', caseSensitive: false).hasMatch('${a['filename']}'))
           '${a['url'] ?? a['proxy_url']}',
       for (final e in (j['embeds'] as List?) ?? const [])
-        if (e is Map && (e['type'] == 'gifv' || e['type'] == 'video') && (e['video']?['url'] ?? e['video']?['proxy_url']) is String)
+        if (e is Map &&
+            (e['type'] == 'gifv' || e['type'] == 'video') &&
+            (e['video']?['url'] ?? e['video']?['proxy_url']) is String)
           '${e['video']?['proxy_url'] ?? e['video']?['url']}',
     ];
     final embeds = <DiscordEmbed>[
@@ -133,10 +133,7 @@ class DiscordMessage {
     final others = atts.length - images.length - (audio == null ? 0 : 1) - videos.length;
     if (content.isEmpty && others > 0) content = '📎 Pièce jointe';
 
-    if (content.isEmpty &&
-        images.isEmpty &&
-        audio == null &&
-        (j['sticker_items'] as List?)?.isNotEmpty == true) {
+    if (content.isEmpty && images.isEmpty && audio == null && (j['sticker_items'] as List?)?.isNotEmpty == true) {
       content = '🖼️ Sticker';
     }
     if (content.isEmpty && images.isEmpty && audio == null) {
@@ -168,7 +165,10 @@ class DiscordMessage {
       ],
       videos,
       embeds,
-      [for (final a in atts) if (a is Map && a['filename'] != null) '${a['filename']}'],
+      [
+        for (final a in atts)
+          if (a is Map && a['filename'] != null) '${a['filename']}',
+      ],
     );
   }
 }
@@ -187,7 +187,9 @@ class DiscordEmbed {
     title: e['title'] as String?,
     description: e['description'] as String?,
     url: e['url'] as String?,
-    image: (e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['image']?['proxy_url'] ?? e['image']?['url']) as String?,
+    image:
+        (e['thumbnail']?['proxy_url'] ?? e['thumbnail']?['url'] ?? e['image']?['proxy_url'] ?? e['image']?['url'])
+            as String?,
     site: (e['provider']?['name'] ?? e['author']?['name']) as String?,
     color: (e['color'] as num?)?.toInt(),
   );
@@ -218,12 +220,12 @@ class DiscordGuild {
       : 'https://cdn.discordapp.com/icons/$id/$icon.${icon!.startsWith('a_') ? 'gif' : 'png'}?size=128';
 
   factory DiscordGuild.fromJson(Map<String, dynamic> j) => DiscordGuild(
-        '${j['id']}',
-        j['name'] as String? ?? 'Serveur',
-        j['icon'] as String?,
-        members: (j['approximate_member_count'] as num?)?.toInt(),
-        online: (j['approximate_presence_count'] as num?)?.toInt(),
-      );
+    '${j['id']}',
+    j['name'] as String? ?? 'Serveur',
+    j['icon'] as String?,
+    members: (j['approximate_member_count'] as num?)?.toInt(),
+    online: (j['approximate_presence_count'] as num?)?.toInt(),
+  );
 }
 
 /// Un salon d'un serveur (textuel, vocal, catégorie…).
@@ -243,13 +245,13 @@ class DiscordChannel {
   bool get isVoice => type == 2 || type == 13;
 
   factory DiscordChannel.fromJson(Map<String, dynamic> j) => DiscordChannel(
-        '${j['id']}',
-        j['name'] as String? ?? '',
-        (j['type'] as num?)?.toInt() ?? 0,
-        parentId: j['parent_id'] as String?,
-        position: (j['position'] as num?)?.toInt() ?? 0,
-        topic: j['topic'] as String? ?? '',
-      );
+    '${j['id']}',
+    j['name'] as String? ?? '',
+    (j['type'] as num?)?.toInt() ?? 0,
+    parentId: j['parent_id'] as String?,
+    position: (j['position'] as num?)?.toInt() ?? 0,
+    topic: j['topic'] as String? ?? '',
+  );
 
   /// Rangés comme dans Discord : d'abord les salons sans catégorie, puis
   /// chaque catégorie ; dans une catégorie, les salons écrits avant les
@@ -295,29 +297,33 @@ class DiscordApi {
 
   /// Mêmes informations que le client web officiel : sans elles, Discord
   /// renvoie parfois des listes vides ou refuse la lecture des messages.
-  static final _superProps = base64.encode(utf8.encode(jsonEncode({
-    'os': 'Windows',
-    'browser': 'Chrome',
-    'device': '',
-    'system_locale': 'fr-FR',
-    'browser_user_agent': _ua,
-    'browser_version': '131.0.0.0',
-    'os_version': '10',
-    'release_channel': 'stable',
-    'client_build_number': 360000,
-  })));
+  static final _superProps = base64.encode(
+    utf8.encode(
+      jsonEncode({
+        'os': 'Windows',
+        'browser': 'Chrome',
+        'device': '',
+        'system_locale': 'fr-FR',
+        'browser_user_agent': _ua,
+        'browser_version': '131.0.0.0',
+        'os_version': '10',
+        'release_channel': 'stable',
+        'client_build_number': 360000,
+      }),
+    ),
+  );
 
   Map<String, String> get _headers => {
-        'Authorization': token,
-        'Content-Type': 'application/json',
-        'User-Agent': _ua,
-        'X-Super-Properties': _superProps,
-        'X-Discord-Locale': 'fr',
-        'X-Discord-Timezone': 'Europe/Paris',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-        'Origin': 'https://discord.com',
-        'Referer': 'https://discord.com/channels/@me',
-      };
+    'Authorization': token,
+    'Content-Type': 'application/json',
+    'User-Agent': _ua,
+    'X-Super-Properties': _superProps,
+    'X-Discord-Locale': 'fr',
+    'X-Discord-Timezone': 'Europe/Paris',
+    'Accept-Language': 'fr-FR,fr;q=0.9',
+    'Origin': 'https://discord.com',
+    'Referer': 'https://discord.com/channels/@me',
+  };
 
   /// Requête avec une nouvelle tentative si Discord demande de ralentir.
   Future<http.Response> _send(Future<http.Response> Function() run) async {
@@ -340,26 +346,29 @@ class DiscordApi {
     return r.body.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
   }
 
-  Future<dynamic> _post(String path, Object body) async => _check(await _send(() => _http
-      .post(Uri.parse('$_base$path'), headers: _headers, body: jsonEncode(body))));
+  Future<dynamic> _post(String path, Object body) async =>
+      _check(await _send(() => _http.post(Uri.parse('$_base$path'), headers: _headers, body: jsonEncode(body))));
 
   /// Envoie un message dans une conversation.
   Future<DiscordMessage> send(String channelId, String content) async {
     final nonce = (BigInt.from(DateTime.now().millisecondsSinceEpoch - 1420070400000) << 22).toString();
-    final j = await _post('/channels/$channelId/messages',
-        {'content': content, 'nonce': nonce, 'tts': false, 'flags': 0});
+    final j = await _post('/channels/$channelId/messages', {
+      'content': content,
+      'nonce': nonce,
+      'tts': false,
+      'flags': 0,
+    });
     return DiscordMessage.fromJson(j as Map<String, dynamic>);
   }
 
   /// Envoie une photo (ou n'importe quel fichier) dans une conversation.
-  Future<DiscordMessage> sendFile(String channelId, String filename, List<int> bytes,
-      {String content = ''}) async {
+  Future<DiscordMessage> sendFile(String channelId, String filename, List<int> bytes, {String content = ''}) async {
     final req = http.MultipartRequest('POST', Uri.parse('$_base/channels/$channelId/messages'))
       ..headers.addAll({..._headers}..remove('Content-Type'))
       ..fields['payload_json'] = jsonEncode({
         'content': content,
         'attachments': [
-          {'id': 0, 'filename': filename}
+          {'id': 0, 'filename': filename},
         ],
       })
       ..files.add(http.MultipartFile.fromBytes('files[0]', bytes, filename: filename));
@@ -372,13 +381,15 @@ class DiscordApi {
     final list = await _get('/users/@me/relationships') as List;
     return [
       for (final r in list)
-        if (r['type'] == 1) DiscordUser.fromJson(r['user'] as Map<String, dynamic>)
+        if (r['type'] == 1) DiscordUser.fromJson(r['user'] as Map<String, dynamic>),
     ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   /// Ouvre (ou retrouve) la conversation privée avec un ami.
   Future<String> openDm(String userId) async {
-    final j = await _post('/users/@me/channels', {'recipients': [userId]});
+    final j = await _post('/users/@me/channels', {
+      'recipients': [userId],
+    });
     return (j as Map<String, dynamic>)['id'] as String;
   }
 
@@ -401,8 +412,7 @@ class DiscordApi {
   /// La double authentification est-elle activée sur ce compte ?
   Future<bool> mfaEnabled() async => (await _get('/users/@me') as Map)['mfa_enabled'] == true;
 
-  Future<DiscordUser> me() async =>
-      DiscordUser.fromJson(await _get('/users/@me') as Map<String, dynamic>);
+  Future<DiscordUser> me() async => DiscordUser.fromJson(await _get('/users/@me') as Map<String, dynamic>);
 
   /// Conversations privées, de la plus récente à la plus ancienne.
   Future<List<DiscordDm>> dms() async {
@@ -413,15 +423,15 @@ class DiscordApi {
           () {
             final users = [
               for (final u in (c['recipients'] as List?) ?? const [])
-                DiscordUser.fromJson((u as Map).cast<String, dynamic>())
+                DiscordUser.fromJson((u as Map).cast<String, dynamic>()),
             ];
             return DiscordDm(
               '${c['id']}',
               (c['name'] as String?)?.isNotEmpty == true
                   ? c['name'] as String
                   : users.isEmpty
-                      ? 'Conversation'
-                      : users.map((u) => u.name).join(', '),
+                  ? 'Conversation'
+                  : users.map((u) => u.name).join(', '),
               users,
               c['last_message_id'] as String?,
             );
@@ -442,12 +452,12 @@ class DiscordApi {
 
   /// Ajoute une réaction (❤️ par défaut) à un message.
   Future<void> react(String channelId, String messageId, [String emoji = '❤️']) async {
-    final r = await _send(() => _http.put(
-          Uri.parse(
-            '$_base/channels/$channelId/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}/@me',
-          ),
-          headers: _headers,
-        ));
+    final r = await _send(
+      () => _http.put(
+        Uri.parse('$_base/channels/$channelId/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}/@me'),
+        headers: _headers,
+      ),
+    );
     _check(r);
   }
 

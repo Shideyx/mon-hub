@@ -74,9 +74,7 @@ class MusicModule extends HubModule {
     HubTool(
       name: 'musique_titres_likes',
       description: 'Mes titres likés (Spotify, ou favoris Deezer), les plus récents d\'abord.',
-      run: (_) async => [
-        for (final t in (await player.liked()).take(60)) '${t.artist} - ${t.title}',
-      ],
+      run: (_) async => [for (final t in (await player.liked()).take(60)) '${t.artist} - ${t.title}'],
     ),
     HubTool(
       name: 'musique_playlists',
@@ -139,7 +137,8 @@ class MusicModule extends HubModule {
         try {
           return await _spotifyAction(action, q, a);
         } catch (e) {
-          if (SpotifyApi.isBlocked(e) && const ['chercher_jouer', 'jouer', 'album', 'artiste', 'playlist'].contains(action)) {
+          if (SpotifyApi.isBlocked(e) &&
+              const ['chercher_jouer', 'jouer', 'album', 'artiste', 'playlist'].contains(action)) {
             return openInApp();
           }
           rethrow;
@@ -149,47 +148,45 @@ class MusicModule extends HubModule {
   ];
 
   Future<String> _spotifyAction(String action, String q, Map<String, dynamic> a) async {
-        final String r = switch (action) {
-          'chercher_jouer' || 'jouer' => q.isEmpty ? 'Quel morceau ?' : await spotify.searchPlay(q),
-          'playlist' => q.isEmpty ? 'Quelle playlist ?' : await spotify.playPlaylist(q),
-          'file' => q.isEmpty ? 'Quel morceau ?' : await spotify.queue(q),
-          'album' => q.isEmpty ? 'Quel album ?' : await spotify.searchPlayContext(q, 'album'),
-          'artiste' => q.isEmpty ? 'Quel artiste ?' : await spotify.searchPlayContext(q, 'artist'),
-          'appareil' => q.isEmpty ? 'Quel appareil ?' : await spotify.transferByName(q),
-          'chercher' => q.isEmpty
-              ? 'Quoi chercher ?'
-              : await () async {
-                  final r = await spotify.search(q, limit: 5);
-                  if (r.isEmpty) return 'Rien trouvé pour « $q ».';
-                  return [
-                    if (r.tracks.isNotEmpty)
-                      'Titres : ${r.tracks.map((t) => '${t.title} — ${t.artist}').join(' ; ')}',
-                    if (r.artists.isNotEmpty) 'Artistes : ${r.artists.map((a) => a.name).join(', ')}',
-                    if (r.albums.isNotEmpty) 'Albums : ${r.albums.map((a) => '${a.name} (${a.sub})').join(' ; ')}',
-                    if (r.playlists.isNotEmpty) 'Playlists : ${r.playlists.map((p) => p.name).join(', ')}',
-                  ].join('\n');
-                }(),
-          'volume' => await () async {
-            final v = (a['volume'] as num?)?.toInt() ?? 50;
-            await spotify.volume(v);
-            return 'Volume à $v %.';
-          }(),
-          'aleatoire' => await () async {
-            final on = a['actif'] != false;
-            await spotify.shuffle(on);
-            return on ? 'Lecture aléatoire activée.' : 'Lecture aléatoire désactivée.';
-          }(),
-          'appareils' => await () async {
-            final d = await spotify.devices();
-            if (d.isEmpty) return 'Aucun appareil Spotify ouvert.';
-            return d
-                .map((x) => '${x['name']}${x['is_active'] == true ? ' (actif)' : ''}')
-                .join(', ');
-          }(),
-          _ => 'Action inconnue',
-        };
-        unawaited(Future<void>.delayed(const Duration(seconds: 1), player.refresh));
-        return r;
+    final String r = switch (action) {
+      'chercher_jouer' || 'jouer' => q.isEmpty ? 'Quel morceau ?' : await spotify.searchPlay(q),
+      'playlist' => q.isEmpty ? 'Quelle playlist ?' : await spotify.playPlaylist(q),
+      'file' => q.isEmpty ? 'Quel morceau ?' : await spotify.queue(q),
+      'album' => q.isEmpty ? 'Quel album ?' : await spotify.searchPlayContext(q, 'album'),
+      'artiste' => q.isEmpty ? 'Quel artiste ?' : await spotify.searchPlayContext(q, 'artist'),
+      'appareil' => q.isEmpty ? 'Quel appareil ?' : await spotify.transferByName(q),
+      'chercher' =>
+        q.isEmpty
+            ? 'Quoi chercher ?'
+            : await () async {
+                final r = await spotify.search(q, limit: 5);
+                if (r.isEmpty) return 'Rien trouvé pour « $q ».';
+                return [
+                  if (r.tracks.isNotEmpty) 'Titres : ${r.tracks.map((t) => '${t.title} — ${t.artist}').join(' ; ')}',
+                  if (r.artists.isNotEmpty) 'Artistes : ${r.artists.map((a) => a.name).join(', ')}',
+                  if (r.albums.isNotEmpty) 'Albums : ${r.albums.map((a) => '${a.name} (${a.sub})').join(' ; ')}',
+                  if (r.playlists.isNotEmpty) 'Playlists : ${r.playlists.map((p) => p.name).join(', ')}',
+                ].join('\n');
+              }(),
+      'volume' => await () async {
+        final v = (a['volume'] as num?)?.toInt() ?? 50;
+        await spotify.volume(v);
+        return 'Volume à $v %.';
+      }(),
+      'aleatoire' => await () async {
+        final on = a['actif'] != false;
+        await spotify.shuffle(on);
+        return on ? 'Lecture aléatoire activée.' : 'Lecture aléatoire désactivée.';
+      }(),
+      'appareils' => await () async {
+        final d = await spotify.devices();
+        if (d.isEmpty) return 'Aucun appareil Spotify ouvert.';
+        return d.map((x) => '${x['name']}${x['is_active'] == true ? ' (actif)' : ''}').join(', ');
+      }(),
+      _ => 'Action inconnue',
+    };
+    unawaited(Future<void>.delayed(const Duration(seconds: 1), player.refresh));
+    return r;
   }
 
   @override
@@ -212,6 +209,7 @@ class MusicPlayer extends ChangeNotifier {
   NowPlaying? _win;
   NowPlaying? _spot;
   AlbumInfo? album;
+
   /// Couleur prise sur la pochette : teinte toute la page Musique.
   final accentColor = ValueNotifier<Color>(musicRed);
   Color get accent => accentColor.value;
@@ -320,11 +318,7 @@ class MusicPlayer extends ChangeNotifier {
       if (np.spotifyAlbumId != null && m.spotify.connected) {
         a = await m.spotify.album(np.spotifyAlbumId!);
       } else {
-        a = await m.deezer.findAlbum(
-          np.albumArtist.isEmpty ? np.artist : np.albumArtist,
-          np.album,
-          np.title,
-        );
+        a = await m.deezer.findAlbum(np.albumArtist.isEmpty ? np.artist : np.albumArtist, np.album, np.title);
       }
     } catch (_) {}
     _albums[key] = a;
@@ -429,9 +423,7 @@ class MusicPlayer extends ChangeNotifier {
   }
 
   Future<List<MusicTrack>> playlistTracks(MusicPlaylist p) =>
-      m.spotify.connected && p.uri.isNotEmpty
-      ? m.spotify.playlistTracks(p.id)
-      : m.deezer.playlistTracks(p.id);
+      m.spotify.connected && p.uri.isNotEmpty ? m.spotify.playlistTracks(p.id) : m.deezer.playlistTracks(p.id);
 
   /// Lance un morceau : sur ton Spotify (Premium) ou dans l'appli.
   Future<void> playTrack(BuildContext context, MusicTrack t, {String? context_}) async {
@@ -588,11 +580,7 @@ class _NowPlayingTileState extends State<NowPlayingTile> {
                         children: [
                           Text(
                             formatClock(np.positionNow()).split('').join(' '),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
                           ),
                           const SizedBox(width: 8),
                           // Les petites barres qui dansent, façon Spotify.
@@ -617,11 +605,7 @@ class _NowPlayingTileState extends State<NowPlayingTile> {
                         np.artist.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          letterSpacing: 2.5,
-                          color: Colors.white,
-                        ),
+                        style: const TextStyle(fontSize: 10, letterSpacing: 2.5, color: Colors.white),
                       ),
                       const SizedBox(height: 4),
                       _Controls(p: p, np: np, small: true),
@@ -672,9 +656,7 @@ class _Controls extends StatelessWidget {
           visualDensity: dense,
           color: Colors.white,
           iconSize: s * 1.3,
-          icon: Icon(
-            np.playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
-          ),
+          icon: Icon(np.playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded),
           onPressed: () => _run(context, p.toggle),
         ),
         IconButton(
@@ -789,33 +771,19 @@ class NowPlayingStage extends StatelessWidget {
           (np?.artist ?? '').toUpperCase(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: dark,
-            fontSize: 16,
-            letterSpacing: 7,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(color: dark, fontSize: 16, letterSpacing: 7, fontWeight: FontWeight.w500),
         ),
-        if (album != null &&
-            album.title.isNotEmpty &&
-            album.title.toLowerCase() != title.toLowerCase())
+        if (album != null && album.title.isNotEmpty && album.title.toLowerCase() != title.toLowerCase())
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               '${album.title}${album.year == null || album.year!.isEmpty ? '' : ' · ${album.year}'}',
-              style: TextStyle(
-                color: dark.withValues(alpha: 0.7),
-                fontSize: 13,
-                letterSpacing: 1.5,
-              ),
+              style: TextStyle(color: dark.withValues(alpha: 0.7), fontSize: 13, letterSpacing: 1.5),
             ),
           ),
         const SizedBox(height: 26),
         if (tracks.isEmpty && np != null)
-          Text(
-            'Recherche de la tracklist…',
-            style: TextStyle(color: dark.withValues(alpha: 0.5), letterSpacing: 2),
-          ),
+          Text('Recherche de la tracklist…', style: TextStyle(color: dark.withValues(alpha: 0.5), letterSpacing: 2)),
         for (final (i, t) in tracks.take(wide ? 12 : 30).indexed)
           _TrackRow(
             n: i + 1,
@@ -851,19 +819,13 @@ class NowPlayingStage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Row(
               children: [
-                Text(
-                  formatDuration(np.positionNow()),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
+                Text(formatDuration(np.positionNow()), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
-                      value: (np.positionNow().inMilliseconds / np.duration!.inMilliseconds).clamp(
-                        0.0,
-                        1.0,
-                      ),
+                      value: (np.positionNow().inMilliseconds / np.duration!.inMilliseconds).clamp(0.0, 1.0),
                       minHeight: 3,
                       color: Colors.white,
                       backgroundColor: Colors.white24,
@@ -871,38 +833,24 @@ class NowPlayingStage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  formatDuration(np.duration!),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
+                Text(formatDuration(np.duration!), style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
         _Controls(p: p, np: np),
         if (np.appName.isNotEmpty)
-          Text(
-            'sur ${np.appName}',
-            style: const TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2),
-          ),
+          Text('sur ${np.appName}', style: const TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2)),
       ] else
         const Padding(
           padding: EdgeInsets.all(12),
-          child: Text(
-            'Lance un morceau sur Spotify ou Deezer.',
-            style: TextStyle(color: Colors.white),
-          ),
+          child: Text('Lance un morceau sur Spotify ou Deezer.', style: TextStyle(color: Colors.white)),
         ),
     ],
   );
 }
 
 class _TrackRow extends StatelessWidget {
-  const _TrackRow({
-    required this.n,
-    required this.text,
-    required this.current,
-    required this.color,
-  });
+  const _TrackRow({required this.n, required this.text, required this.current, required this.color});
   final int n;
   final String text;
   final bool current;
@@ -915,10 +863,7 @@ class _TrackRow extends StatelessWidget {
       duration: const Duration(milliseconds: 400),
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: current ? color : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-      ),
+      decoration: BoxDecoration(color: current ? color : Colors.transparent, borderRadius: BorderRadius.circular(4)),
       child: Row(
         children: [
           SizedBox(
@@ -969,9 +914,7 @@ class _MusicPage extends StatelessWidget {
           duration: const Duration(milliseconds: 900),
           data: base.copyWith(
             colorScheme: scheme,
-            appBarTheme: base.appBarTheme.copyWith(
-              backgroundColor: Color.lerp(scheme.surface, accent, 0.18),
-            ),
+            appBarTheme: base.appBarTheme.copyWith(backgroundColor: Color.lerp(scheme.surface, accent, 0.18)),
             tabBarTheme: base.tabBarTheme.copyWith(
               indicatorColor: accent,
               labelColor: base.brightness == Brightness.dark ? Color.lerp(accent, Colors.white, 0.45) : accent,
@@ -1131,9 +1074,7 @@ class _TrackListState extends State<_TrackList> with AutomaticKeepAliveClientMix
               final q = search.text.toLowerCase().trim();
               final list = q.isEmpty
                   ? all
-                  : all
-                        .where((t) => '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q))
-                        .toList();
+                  : all.where((t) => '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q)).toList();
               return ListView.builder(
                 itemCount: list.length + 1,
                 itemBuilder: (context, i) {
@@ -1145,9 +1086,7 @@ class _TrackListState extends State<_TrackList> with AutomaticKeepAliveClientMix
                         decoration: InputDecoration(
                           isDense: true,
                           prefixIcon: const Icon(Icons.search_rounded),
-                          hintText: all.isEmpty
-                              ? widget.empty
-                              : 'Rechercher parmi ${all.length} titres',
+                          hintText: all.isEmpty ? widget.empty : 'Rechercher parmi ${all.length} titres',
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -1181,16 +1120,13 @@ class _TrackListState extends State<_TrackList> with AutomaticKeepAliveClientMix
                           IconButton(
                             tooltip: 'Écouter un extrait (30 s)',
                             icon: Icon(
-                              _previewing == t.id
-                                  ? Icons.stop_circle_rounded
-                                  : Icons.play_circle_outline_rounded,
+                              _previewing == t.id ? Icons.stop_circle_rounded : Icons.play_circle_outline_rounded,
                             ),
                             onPressed: () => _togglePreview(t),
                           ),
                       ],
                     ),
-                    onTap: () =>
-                        widget.module.player.playTrack(context, t, context_: widget.contextUri),
+                    onTap: () => widget.module.player.playTrack(context, t, context_: widget.contextUri),
                   );
                 },
               );
@@ -1406,8 +1342,7 @@ class _MusicSettingsState extends State<_MusicSettings> {
       final name = await m.deezer.userName(id);
       await m.store.setJson('deezer.user', id);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Profil Deezer : $name')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Profil Deezer : $name')));
       }
     } catch (e) {
       setState(() => error = '$e');
@@ -1438,33 +1373,24 @@ class _MusicSettingsState extends State<_MusicSettings> {
               Text('Spotify', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               if (m.spotify.connected)
-                const Text(
-                  'Connecté ✔ (titres likés, playlists, écoutes récentes, j\'aime, commandes vocales).',
-                )
+                const Text('Connecté ✔ (titres likés, playlists, écoutes récentes, j\'aime, commandes vocales).')
               else ...[
-                const Text(
-                  'Spotify oblige chaque appli à avoir son « Client ID » (gratuit, 2 minutes) :',
-                ),
+                const Text('Spotify oblige chaque appli à avoir son « Client ID » (gratuit, 2 minutes) :'),
                 const SizedBox(height: 6),
                 _Step(
                   n: 1,
                   text: 'Ouvre le tableau de bord Spotify et clique « Create app ».',
-                  action: (
-                    'Ouvrir',
-                    () => openLink(context, 'https://developer.spotify.com/dashboard'),
-                  ),
+                  action: ('Ouvrir', () => openLink(context, 'https://developer.spotify.com/dashboard')),
                 ),
                 _Step(
                   n: 2,
-                  text:
-                      'Nom : Mon Hub. Redirect URI : ${SpotifyApi.redirect} (copie-la), coche « Web API », Save.',
+                  text: 'Nom : Mon Hub. Redirect URI : ${SpotifyApi.redirect} (copie-la), coche « Web API », Save.',
                   action: (
                     'Copier',
                     () async {
                       await Clipboard.setData(const ClipboardData(text: SpotifyApi.redirect));
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(content: Text('Adresse copiée')));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Adresse copiée')));
                       }
                     },
                   ),
@@ -1502,10 +1428,7 @@ class _MusicSettingsState extends State<_MusicSettings> {
                       },
                       child: const Text('Déconnecter'),
                     ),
-                  FilledButton(
-                    onPressed: busy ? null : _connect,
-                    child: Text(busy ? 'Connexion…' : 'Se connecter'),
-                  ),
+                  FilledButton(onPressed: busy ? null : _connect, child: Text(busy ? 'Connexion…' : 'Se connecter')),
                 ],
               ),
               const Divider(height: 28),
@@ -1521,15 +1444,11 @@ class _MusicSettingsState extends State<_MusicSettings> {
                 decoration: InputDecoration(
                   labelText: 'Lien du profil Deezer',
                   border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.check_rounded),
-                    onPressed: _saveDeezer,
-                  ),
+                  suffixIcon: IconButton(icon: const Icon(Icons.check_rounded), onPressed: _saveDeezer),
                 ),
                 onSubmitted: (_) => _saveDeezer(),
               ),
-              if (error != null)
-                Padding(padding: const EdgeInsets.only(top: 10), child: ErrorBanner(error!)),
+              if (error != null) Padding(padding: const EdgeInsets.only(top: 10), child: ErrorBanner(error!)),
             ],
           ),
         ),
@@ -1568,7 +1487,6 @@ class _Step extends StatelessWidget {
     ),
   );
 }
-
 
 /// « Choisir » : chercher dans tout Spotify et lancer ce qu'on veut, sur
 /// l'appareil qu'on veut.
@@ -1639,17 +1557,22 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
       if (done != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(done)));
       }
-      unawaited(Future<void>.delayed(const Duration(milliseconds: 800), () {
-        widget.module.player.refresh();
-        if (mounted) setState(() => _queue = api.userQueue());
-      }));
+      unawaited(
+        Future<void>.delayed(const Duration(milliseconds: 800), () {
+          widget.module.player.refresh();
+          if (mounted) setState(() => _queue = api.userQueue());
+        }),
+      );
     } catch (e) {
       if (mounted) showError(context, e);
     }
   }
 
   void _playTracks(MusicTrack t, List<MusicTrack> all) => _act(() async {
-    final uris = [for (final x in all) if (x.uri.isNotEmpty) x.uri];
+    final uris = [
+      for (final x in all)
+        if (x.uri.isNotEmpty) x.uri,
+    ];
     try {
       await api.play(uri: t.uri, uris: uris);
     } catch (e) {
@@ -1741,10 +1664,7 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
                 onChanged: (v) {
                   setState(() => _volume = v);
                   _volumeTimer?.cancel();
-                  _volumeTimer = Timer(
-                    const Duration(milliseconds: 300),
-                    () => _act(() => api.volume(v.round())),
-                  );
+                  _volumeTimer = Timer(const Duration(milliseconds: 300), () => _act(() => api.volume(v.round())));
                 },
               ),
             ),
@@ -1757,7 +1677,11 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
   Widget _trackTile(MusicTrack t, List<MusicTrack> all) => ListTile(
     leading: ClipRRect(
       borderRadius: BorderRadius.circular(4),
-      child: SizedBox(width: 46, height: 46, child: CoverImage(url: t.cover, color: color)),
+      child: SizedBox(
+        width: 46,
+        height: 46,
+        child: CoverImage(url: t.cover, color: color),
+      ),
     ),
     title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
     subtitle: Text(
@@ -1786,48 +1710,58 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
     children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
+        child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
       ),
       child,
     ],
   );
 
-  Widget _cards(List<(String name, String sub, String? image, bool round, VoidCallback onTap)> items) =>
-      SizedBox(
-        height: 196,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: items.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, i) {
-            final (name, sub, image, round, onTap) = items[i];
-            return InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: onTap,
-              child: SizedBox(
-                width: 140,
-                child: Column(
-                  crossAxisAlignment: round ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(round ? 70 : 8),
-                      child: SizedBox(width: 140, height: 140, child: CoverImage(url: image, color: color)),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    if (sub.isNotEmpty)
-                      Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall),
-                  ],
+  Widget _cards(List<(String name, String sub, String? image, bool round, VoidCallback onTap)> items) => SizedBox(
+    height: 196,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 12),
+      itemBuilder: (_, i) {
+        final (name, sub, image, round, onTap) = items[i];
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: SizedBox(
+            width: 140,
+            child: Column(
+              crossAxisAlignment: round ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(round ? 70 : 8),
+                  child: SizedBox(
+                    width: 140,
+                    height: 140,
+                    child: CoverImage(url: image, color: color),
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
-      );
+                const SizedBox(height: 6),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (sub.isNotEmpty)
+                  Text(
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 
   Widget _resultsView(SpotifySearch r) {
     if (r.isEmpty) return const Padding(padding: EdgeInsets.all(32), child: EmptyHint('Rien trouvé'));
@@ -1841,13 +1775,7 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
             'Artistes',
             _cards([
               for (final a in r.artists)
-                (
-                  a.name,
-                  a.sub,
-                  a.image,
-                  true,
-                  () => _openList(a.name, () => api.artistTracks(a.name), playUri: a.uri),
-                ),
+                (a.name, a.sub, a.image, true, () => _openList(a.name, () => api.artistTracks(a.name), playUri: a.uri)),
             ]),
           ),
         if (r.albums.isNotEmpty)
@@ -1860,12 +1788,8 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
                   a.sub,
                   a.image,
                   false,
-                  () => _openList(
-                    a.name,
-                    () async => (await api.album(a.id)).tracks,
-                    contextUri: a.uri,
-                    playUri: a.uri,
-                  ),
+                  () =>
+                      _openList(a.name, () async => (await api.album(a.id)).tracks, contextUri: a.uri, playUri: a.uri),
                 ),
             ]),
           ),
@@ -1879,12 +1803,7 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
                   p.owner,
                   p.cover,
                   false,
-                  () => _openList(
-                    p.name,
-                    () => api.playlistTracks(p.id),
-                    contextUri: p.uri,
-                    playUri: p.uri,
-                  ),
+                  () => _openList(p.name, () => api.playlistTracks(p.id), contextUri: p.uri, playUri: p.uri),
                 ),
             ]),
           ),
@@ -1972,7 +1891,6 @@ class _SpotifyPickerState extends State<_SpotifyPicker> with AutomaticKeepAliveC
     );
   }
 }
-
 
 /// Choisir sa musique **sans** l'API Spotify (pas de compte connecté, ou
 /// Spotify refuse) : recherche Deezer (publique), extrait de 30 s, et le
@@ -2090,7 +2008,11 @@ class _FreeResultsState extends State<_FreeResults> {
             ListTile(
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: SizedBox(width: 46, height: 46, child: CoverImage(url: t.cover, color: widget.module.player.accent)),
+                child: SizedBox(
+                  width: 46,
+                  height: 46,
+                  child: CoverImage(url: t.cover, color: widget.module.player.accent),
+                ),
               ),
               title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text('${t.artist} · ${t.album}', maxLines: 1, overflow: TextOverflow.ellipsis),

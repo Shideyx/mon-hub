@@ -1,4 +1,4 @@
-// Clicky autonome : il regarde la situation, décide tout seul d'une chose
+// Smily autonome : il regarde la situation, décide tout seul d'une chose
 // utile à faire, te la propose (à l'oral et dans sa boîte) et la fait après
 // ton accord. Il apprend de tes réponses.
 
@@ -7,7 +7,7 @@ import 'dart:convert';
 import '../../core/hub_module.dart';
 import 'tutor.dart' show normalize;
 
-/// Une décision de Clicky, en attente de ton accord.
+/// Une décision de Smily, en attente de ton accord.
 class ClickyIdea {
   ClickyIdea({required this.say, required this.tool, this.args = const {}, this.why = '', String? id})
     : id = id ?? '${DateTime.now().microsecondsSinceEpoch}';
@@ -18,7 +18,7 @@ class ClickyIdea {
   final String say;
 
   /// L'action de Mon Hub à lancer, ou 'agent' (une tâche en plusieurs
-  /// étapes confiée au cerveau de Clicky, args['tache']).
+  /// étapes confiée au cerveau de Smily, args['tache']).
   final String tool;
   final Map<String, dynamic> args;
   final String why;
@@ -64,7 +64,9 @@ class Autonomy {
 
   /// Jamais de lui-même, même avec accord : envoyer un message à
   /// quelqu'un, supprimer, lancer une commande, écrire un fichier.
-  static final never = RegExp(r'envoyer|repondre|supprimer|effacer|pc_commande|pc_ecrire|appeler|^mcp_|ranger$|annuler');
+  static final never = RegExp(
+    r'envoyer|repondre|supprimer|effacer|pc_commande|pc_ecrire|appeler|^mcp_|ranger$|annuler',
+  );
 
   static bool usable(String tool, Set<String> available) =>
       !never.hasMatch(tool) && allowed.contains(tool) && (tool == 'agent' || available.contains(tool));
@@ -88,7 +90,7 @@ class Autonomy {
       '- agent : une tâche en plusieurs étapes que tu feras toi-même (chercher des infos, préparer un exposé, organiser…) (paramètres : tache = ce qu\'il faut faire, précisément)',
     ];
     return '''
-Tu es Clicky, l'assistant personnel autonome de $who (un·e lycéen·ne). Il est ${now.hour} h ${now.minute.toString().padLeft(2, '0')}.
+Tu es Smily, l'assistant personnel autonome de $who (un·e lycéen·ne). Il est ${now.hour} h ${now.minute.toString().padLeft(2, '0')}.
 Voici sa situation, préparée par son appli :
 ---
 $situation
@@ -115,7 +117,12 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
   /// Sans IA : quelques décisions évidentes, d'après la situation.
   /// [ctx] : 'controle' (matière, dans ≤ 3 jours, sans fiche), 'cartes'
   /// (à revoir), 'trop' (trop de choses à faire), 'briefing_fait'.
-  static ClickyIdea? rules(Map<String, Object?> ctx, DateTime now, {Set<String> available = const {}, Set<String> skip = const {}}) {
+  static ClickyIdea? rules(
+    Map<String, Object?> ctx,
+    DateTime now, {
+    Set<String> available = const {},
+    Set<String> skip = const {},
+  }) {
     bool can(String t) => usable(t, available) && !skip.contains(t);
     final test = '${ctx['controle'] ?? ''}'.trim();
     if (test.isNotEmpty && can('revision_preparer_controle')) {
@@ -138,17 +145,26 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
     }
     final cards = (ctx['cartes'] as num?)?.toInt() ?? 0;
     if (cards >= 10 && now.hour >= 17 && now.hour < 22 && can('revision_lancer')) {
-      return ClickyIdea(say: 'Tu as $cards cartes à revoir. On en fait quelques-unes ensemble ?', tool: 'revision_lancer', args: {'mode': 'cartes'}, why: 'cartes à revoir');
+      return ClickyIdea(
+        say: 'Tu as $cards cartes à revoir. On en fait quelques-unes ensemble ?',
+        tool: 'revision_lancer',
+        args: {'mode': 'cartes'},
+        why: 'cartes à revoir',
+      );
     }
     return null;
   }
 
-  static final _yes = RegExp(r'^(?:oui|ouais|ok|okay|d accord|dac|vas y|go|fais le|fais la|c est parti|carrement|grave|volontiers|yes|bien sur|allez|banco)(?: (?:vas y|fais le|merci|clicky))*$');
-  static final _no = RegExp(r'^(?:non|nan|non merci|pas maintenant|plus tard|laisse|laisse tomber|pas besoin|ca ira|nope|stop)(?: (?:merci|clicky))*$');
+  static final _yes = RegExp(
+    r'^(?:oui|ouais|ok|okay|d accord|dac|vas y|go|fais le|fais la|c est parti|carrement|grave|volontiers|yes|bien sur|allez|banco)(?: (?:vas y|fais le|merci|clicky|smily|smiley))*$',
+  );
+  static final _no = RegExp(
+    r'^(?:non|nan|non merci|pas maintenant|plus tard|laisse|laisse tomber|pas besoin|ca ira|nope|stop)(?: (?:merci|clicky|smily|smiley))*$',
+  );
 
   /// Réponse à une proposition : true (oui), false (non), null (autre chose).
   static bool? answer(String said) {
-    final n = normalize(said).replaceFirst(RegExp(r'^(?:clicky )'), '').trim();
+    final n = normalize(said).replaceFirst(RegExp(r'^(?:(?:clicky|smily|smiley|simile) )'), '').trim();
     if (_yes.hasMatch(n)) return true;
     if (_no.hasMatch(n)) return false;
     return null;
@@ -159,7 +175,9 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
     if (r == null) return 'C\'est fait.';
     if (r is String) return r.length > 220 ? '${r.substring(0, 220)}…' : r;
     if (r is Map && r['ok'] == true) return 'C\'est fait.';
-    if (r is Map && r['ajoutes'] is num) return 'C\'est fait : ${r['ajoutes']} ajout${(r['ajoutes'] as num) > 1 ? 's' : ''} dans ton agenda.';
+    if (r is Map && r['ajoutes'] is num) {
+      return 'C\'est fait : ${r['ajoutes']} ajout${(r['ajoutes'] as num) > 1 ? 's' : ''} dans ton agenda.';
+    }
     final s = jsonEncode(r);
     return s.length > 200 ? 'C\'est fait.' : 'C\'est fait.';
   }

@@ -42,11 +42,7 @@ void main() {
       expect(r.topoOn('topo-matin'), isFalse);
       await r.remove('topo-soir');
       await r.ensureTopos();
-      expect(
-        r.list.any((x) => x.id == 'topo-soir'),
-        isFalse,
-        reason: 'pas recréé après suppression',
-      );
+      expect(r.list.any((x) => x.id == 'topo-soir'), isFalse, reason: 'pas recréé après suppression');
       expect(r.list.any((x) => x.id.startsWith('_')), isFalse);
     } finally {
       HubFiles.overrideRoot = null;
@@ -76,11 +72,7 @@ void main() {
       expect(File('${dst.path}/hub.exe').readAsStringSync(), 'v1.25');
       expect(File('${dst.path}/data/app.so').readAsStringSync(), 'nouveau');
       expect(File('${dst.path}/garde.txt').readAsStringSync(), 'mes données');
-      final aside = dst
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.contains(Updater.oldSuffix))
-          .toList();
+      final aside = dst.listSync().whereType<File>().where((f) => f.path.contains(Updater.oldSuffix)).toList();
       expect(aside.length, 1, reason: 'ancien hub.exe mis de côté');
       expect(aside.single.readAsStringSync(), 'v1.24');
       // Source vide : erreur, rien n'est touché.

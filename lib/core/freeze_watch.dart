@@ -15,7 +15,7 @@ class FreezeWatch {
   static SendPort? _to;
   static Timer? _beat;
 
-  /// Ce que l'appli est en train de faire (ouvre un module, Clicky réfléchit…).
+  /// Ce que l'appli est en train de faire (ouvre un module, Smily réfléchit…).
   static String doing = 'démarrage';
   static DateTime _since = DateTime.now();
 
@@ -54,7 +54,11 @@ class FreezeWatch {
       try {
         final f = File(path);
         if (f.existsSync() && f.lengthSync() > 512 * 1024) return;
-        f.writeAsStringSync('[${DateTime.now().toIso8601String()}] $who / figé\n$text\n\n', mode: FileMode.append, flush: true);
+        f.writeAsStringSync(
+          '[${DateTime.now().toIso8601String()}] $who / figé\n$text\n\n',
+          mode: FileMode.append,
+          flush: true,
+        );
       } catch (_) {}
     }
 

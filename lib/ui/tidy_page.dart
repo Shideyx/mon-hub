@@ -77,7 +77,9 @@ Future<String> tidyPcFolder(BuildContext context, Directory dir, {bool bySubject
   final keep = await showTidyPreview(
     context,
     title: 'Ranger ${dir.uri.pathSegments.where((s) => s.isNotEmpty).last}',
-    groups: {for (final e in plan.groups.entries) e.key: [for (final m in e.value) m.name]},
+    groups: {
+      for (final e in plan.groups.entries) e.key: [for (final m in e.value) m.name],
+    },
     skipped: plan.skipped,
   );
   if (keep == null) return 'Rangement annulé.';
@@ -148,11 +150,8 @@ class _TidyPageState extends State<TidyPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final google = GoogleAuth.driveAccount;
-    Widget folder(String key, IconData icon, String label) => ActionChip(
-      avatar: Icon(icon, size: 18),
-      label: Text(label),
-      onPressed: busy ? null : () => _pc(key),
-    );
+    Widget folder(String key, IconData icon, String label) =>
+        ActionChip(avatar: Icon(icon, size: 18), label: Text(label), onPressed: busy ? null : () => _pc(key));
     return Scaffold(
       appBar: AppBar(title: const Text('Ranger mon PC et mon Drive')),
       body: ListView(
@@ -170,9 +169,9 @@ class _TidyPageState extends State<TidyPage> {
                 SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    'Clicky range tes fichiers en vrac dans des dossiers (Images, PDF, Programmes, Cours/Maths…). '
+                    'Smily range tes fichiers en vrac dans des dossiers (Images, PDF, Programmes, Cours/Maths…). '
                     'Tu vois tout avant, rien n\'est supprimé, et tu peux annuler. Tu peux aussi lui dire : '
-                    '« Clicky, range mes téléchargements ».',
+                    '« Smily, range mes téléchargements ».',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -221,7 +220,7 @@ class _TidyPageState extends State<TidyPage> {
               spacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('Connecte ton compte Google pour que Clicky range ton Drive.'),
+                const Text('Connecte ton compte Google pour que Smily range ton Drive.'),
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.login_rounded),
                   label: Text(GoogleAuth.available ? 'Connecter Google' : 'Activer la connexion Google'),
@@ -260,7 +259,9 @@ class _TidyPageState extends State<TidyPage> {
                       ? null
                       : () => _run(() async {
                           final n = await DriveTidy.undoLast();
-                          return n == 0 ? 'Rien à annuler.' : '$n fichier${n > 1 ? 's' : ''} remis à la racine du Drive.';
+                          return n == 0
+                              ? 'Rien à annuler.'
+                              : '$n fichier${n > 1 ? 's' : ''} remis à la racine du Drive.';
                         }),
                 ),
               ],

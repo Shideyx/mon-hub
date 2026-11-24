@@ -38,10 +38,7 @@ class UpdateInfo {
     final tag = '${j['tag_name'] ?? ''}';
     final n = Updater.versionNumber(tag);
     if (n == null) return null;
-    final a = ((j['assets'] as List?) ?? const [])
-        .whereType<Map>()
-        .where((x) => x['name'] == asset)
-        .firstOrNull;
+    final a = ((j['assets'] as List?) ?? const []).whereType<Map>().where((x) => x['name'] == asset).firstOrNull;
     if (a == null) return null;
     final digest = '${a['digest'] ?? ''}';
     return UpdateInfo(
@@ -93,7 +90,7 @@ class Updater extends ChangeNotifier {
   String? error;
   bool busy = false;
 
-  /// Appelé juste avant de quitter pour installer (arrêter Clicky partout…).
+  /// Appelé juste avant de quitter pour installer (arrêter Smily partout…).
   Future<void> Function()? beforeInstall;
 
   Timer? _timer;
@@ -147,9 +144,7 @@ class Updater extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 20));
       if (r.statusCode != 200) return null;
-      final info = UpdateInfo.fromRelease(
-        jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>,
-      );
+      final info = UpdateInfo.fromRelease(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>);
       if (info == null || info.number <= (current ?? 1 << 30)) return null;
       available = info;
       if (manual) postponed = false;
@@ -242,9 +237,7 @@ class Updater extends ChangeNotifier {
       // 1. Téléchargement (avec la progression).
       _set(status: 'Téléchargement de ${info.tag}…', progress: 0);
       final client = _client = http.Client();
-      final res = await client.send(
-        http.Request('GET', Uri.parse(info.url))..headers['user-agent'] = 'MonHub-Updater',
-      );
+      final res = await client.send(http.Request('GET', Uri.parse(info.url))..headers['user-agent'] = 'MonHub-Updater');
       if (res.statusCode != 200) throw 'Téléchargement refusé par GitHub (code ${res.statusCode})';
       final total = res.contentLength ?? info.size;
       final sink = zip.openWrite();
@@ -295,7 +288,7 @@ class Updater extends ChangeNotifier {
       _set(status: 'Installation…', progress: null);
       final dst = File(Platform.resolvedExecutable).parent.path;
       await beforeInstall?.call();
-      // Laisse Clicky partout se fermer (il utilise les mêmes fichiers).
+      // Laisse Smily partout se fermer (il utilise les mêmes fichiers).
       await Future<void>.delayed(const Duration(milliseconds: 800));
       await replaceInPlace(src, dst);
       _set(status: 'C\'est installé : Mon Hub redémarre…', progress: null);

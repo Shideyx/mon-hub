@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:win32/win32.dart';
 
 /// Joue du son brut (PCM 16 bits mono) **au fur et à mesure qu'il arrive**,
-/// sans fichier ni attente : c'est ce qui permet à Clicky de répondre « au
+/// sans fichier ni attente : c'est ce qui permet à Smily de répondre « au
 /// tac au tac » avec la voix de Gemini Live. Windows (waveOut), sans
 /// module à installer.
 class PcmPlayer {

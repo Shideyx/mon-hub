@@ -18,7 +18,11 @@ class PcApp {
 
   /// Deux lettres pour son icône.
   String get initials {
-    final words = name.replaceAll(RegExp(r'[^A-Za-zÀ-ÿ0-9 ]'), ' ').split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words = name
+        .replaceAll(RegExp(r'[^A-Za-zÀ-ÿ0-9 ]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
     if (words.isEmpty) return '?';
     if (words.length == 1) return words.first.substring(0, words.first.length.clamp(1, 2)).toUpperCase();
     return (words[0][0] + words[1][0]).toUpperCase();
@@ -179,7 +183,10 @@ Get-StartApps | Select-Object Name, AppID | ConvertTo-Json -Compress
   /// Les plus utilisées (pour l'accueil).
   List<PcApp> frequent({int max = 8}) {
     final u = usage;
-    final l = [for (final a in apps) if ((u[a.id] ?? 0) > 0) a]..sort((a, b) => (u[b.id] ?? 0).compareTo(u[a.id] ?? 0));
+    final l = [
+      for (final a in apps)
+        if ((u[a.id] ?? 0) > 0) a,
+    ]..sort((a, b) => (u[b.id] ?? 0).compareTo(u[a.id] ?? 0));
     return l.take(max).toList();
   }
 
@@ -209,8 +216,7 @@ Get-StartApps | Select-Object Name, AppID | ConvertTo-Json -Compress
 
   List<PcApp> search(String query, {int max = 50}) => match(apps, query, usage: usage, max: max);
 
-  static String _initials(String n) =>
-      n.split(RegExp(r'[\s._-]+')).where((w) => w.isNotEmpty).map((w) => w[0]).join();
+  static String _initials(String n) => n.split(RegExp(r'[\s._-]+')).where((w) => w.isNotEmpty).map((w) => w[0]).join();
 
   static String _plain(String s) {
     const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ';

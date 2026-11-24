@@ -1,4 +1,4 @@
-// **Clicky réagit à ce que tu fais sur le PC** (v1.58), sans IA :
+// **Smily réagit à ce que tu fais sur le PC** (v1.58), sans IA :
 // - le presse-papier malin : tu copies un lien d'arnaque → il te prévient ;
 //   un calcul → le résultat ; une date → « je l'ajoute à ton agenda ? » ; un
 //   numéro de colis → le suivi ; une adresse → le plan ; un texte en anglais
@@ -36,7 +36,7 @@ import 'tutor.dart' show isSensitiveTitle;
 import 'watchers.dart' show Watchers;
 import 'win.dart';
 
-/// Ce que Clicky propose pour ce que tu viens de copier.
+/// Ce que Smily propose pour ce que tu viens de copier.
 class ClipIdea {
   const ClipIdea(this.kind, this.say, {this.tool, this.args = const {}, this.warn = false});
 
@@ -57,7 +57,10 @@ class ClipSmart {
   /// Un mot de passe, une clé, un code : on n'y touche pas.
   static bool looksSecret(String t) {
     final s = t.trim();
-    if (RegExp(r'mot de passe|password|passwd|\bmdp\b|token|api[ _-]?key|secret|private key|\bsk-[a-z0-9]|\bghp_|bearer ', caseSensitive: false).hasMatch(s)) {
+    if (RegExp(
+      r'mot de passe|password|passwd|\bmdp\b|token|api[ _-]?key|secret|private key|\bsk-[a-z0-9]|\bghp_|bearer ',
+      caseSensitive: false,
+    ).hasMatch(s)) {
       return true;
     }
     if (s.contains(RegExp(r'\s')) || s.length < 8 || s.length > 100) return false;
@@ -82,12 +85,15 @@ class ClipSmart {
     final s = t.trim().toUpperCase();
     for (final (name, re) in _carrier) {
       if (re.hasMatch(s)) {
-        return (name, switch (name) {
-          'UPS' => 'https://www.ups.com/track?loc=fr_FR&tracknum=$s',
-          'Colissimo' => 'https://www.laposte.fr/outils/suivre-vos-envois?code=$s',
-          'Chronopost' => 'https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=$s',
-          _ => 'https://www.amazon.fr/gp/css/order-history',
-        });
+        return (
+          name,
+          switch (name) {
+            'UPS' => 'https://www.ups.com/track?loc=fr_FR&tracknum=$s',
+            'Colissimo' => 'https://www.laposte.fr/outils/suivre-vos-envois?code=$s',
+            'Chronopost' => 'https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=$s',
+            _ => 'https://www.amazon.fr/gp/css/order-history',
+          },
+        );
       }
     }
     return null;
@@ -199,7 +205,12 @@ class PcRules {
   /// Un fichier encore en cours de téléchargement.
   static bool partial(String name) {
     final n = name.toLowerCase();
-    return n.endsWith('.crdownload') || n.endsWith('.part') || n.endsWith('.partial') || n.endsWith('.tmp') || n.endsWith('.download') || n.startsWith('~');
+    return n.endsWith('.crdownload') ||
+        n.endsWith('.part') ||
+        n.endsWith('.partial') ||
+        n.endsWith('.tmp') ||
+        n.endsWith('.download') ||
+        n.startsWith('~');
   }
 
   /// La fenêtre ne répond plus (« Chrome (Ne répond pas) »).
@@ -214,7 +225,8 @@ class PcRules {
   /// Des fichiers suspects à la racine d'une clé USB.
   static List<String> suspicious(List<String> names) => [
     for (final n in names)
-      if (RegExp(r'^autorun\.inf$|\.(?:exe|scr|bat|cmd|vbs|js|lnk|pif|com|hta|ps1)$', caseSensitive: false).hasMatch(n)) n,
+      if (RegExp(r'^autorun\.inf$|\.(?:exe|scr|bat|cmd|vbs|js|lnk|pif|com|hta|ps1)$', caseSensitive: false).hasMatch(n))
+        n,
   ];
 
   /// Les nouvelles clés (lettres) entre deux relevés.
@@ -265,10 +277,7 @@ class PcWatch {
   void start() {
     if (!supported) return;
     stop();
-    _clipTimer = Timer.periodic(
-      Perf.slow(const Duration(milliseconds: 1500), factor: 3),
-      (_) => _pollClip(),
-    );
+    _clipTimer = Timer.periodic(Perf.slow(const Duration(milliseconds: 1500), factor: 3), (_) => _pollClip());
     for (final what in ['telechargements', 'screenshots']) {
       final d = what == 'screenshots' ? _screenshots() : PcTidy.folder(what);
       if (d == null || !d.existsSync()) continue;
@@ -291,7 +300,7 @@ class PcWatch {
     _pending.clear();
   }
 
-  /// Clicky écrit lui-même dans le presse-papier : on ne réagit pas.
+  /// Smily écrit lui-même dans le presse-papier : on ne réagit pas.
   void ignoreClipboard([Duration d = const Duration(seconds: 4)]) => _ignoreUntil = DateTime.now().add(d);
 
   static Directory? _screenshots() {
@@ -301,13 +310,13 @@ class PcWatch {
     return d.existsSync() ? d : null;
   }
 
-  /// Clicky partout corrige un texte (Ctrl + Alt + C) : il copie la sélection.
+  /// Smily partout corrige un texte (Ctrl + Alt + C) : il copie la sélection.
   static File? get _clipMarker {
     final d = ClaudeBridge.folder;
     return d == null ? null : File('$d${Platform.pathSeparator}clip-ignore');
   }
 
-  /// À appeler par Clicky partout quand il utilise le presse-papier.
+  /// À appeler par Smily partout quand il utilise le presse-papier.
   static void markClipboardUse() {
     try {
       _clipMarker?.writeAsStringSync('${DateTime.now().millisecondsSinceEpoch}');
@@ -449,7 +458,8 @@ class PcWatch {
       _diskDay = day;
       await ClickySenses.instance.offer(
         ClickyIdea(
-          say: 'Il ne reste que ${diskFreeGb.toStringAsFixed(1).replaceAll('.', ',')} Go sur ton disque. Je regarde ce que je peux ranger dans tes téléchargements ?',
+          say:
+              'Il ne reste que ${diskFreeGb.toStringAsFixed(1).replaceAll('.', ',')} Go sur ton disque. Je regarde ce que je peux ranger dans tes téléchargements ?',
           tool: 'pc_ranger_apercu',
           args: const {'dossier': 'telechargements'},
           why: 'disque plein',
@@ -497,7 +507,11 @@ class PcWatch {
         final action = '${a['action'] ?? ''}'.toLowerCase().startsWith('res') ? 'resumer' : 'traduire';
         final lang = '${a['langue'] ?? ''}'.trim();
         final r = (await AiText.ask(
-          ClipSmart.prompt(action, text.length > 12000 ? text.substring(0, 12000) : text, lang: lang.isEmpty ? 'français' : lang),
+          ClipSmart.prompt(
+            action,
+            text.length > 12000 ? text.substring(0, 12000) : text,
+            lang: lang.isEmpty ? 'français' : lang,
+          ),
         )).trim();
         if (action == 'resumer') return r;
         ignoreClipboard();
@@ -514,7 +528,10 @@ class PcWatch {
         final f = File('${a['chemin'] ?? ''}');
         if (!await f.exists()) return 'Je ne trouve plus cette image.';
         if (await f.length() > 15 * 1024 * 1024) return 'L\'image est trop grosse.';
-        final text = SenseRules.cleanOcr(await ClickyOcr.read(await f.readAsBytes(), name: 'clicky-capture.png'), max: 8000);
+        final text = SenseRules.cleanOcr(
+          await ClickyOcr.read(await f.readAsBytes(), name: 'clicky-capture.png'),
+          max: 8000,
+        );
         if (text.isEmpty) return 'Je ne vois pas de texte sur cette image.';
         ignoreClipboard();
         await Clipboard.setData(ClipboardData(text: text));
@@ -554,7 +571,8 @@ class PcWatch {
     } catch (_) {}
     final bad = PcRules.suspicious(names);
     if (bad.isNotEmpty) {
-      final text = '⚠️ Sur la clé USB ($letter:), il y a « ${bad.take(2).join(' », « ')} ». N\'ouvre pas ça si tu ne sais pas d\'où ça vient.';
+      final text =
+          '⚠️ Sur la clé USB ($letter:), il y a « ${bad.take(2).join(' », « ')} ». N\'ouvre pas ça si tu ne sais pas d\'où ça vient.';
       think?.call(text);
       warn?.call('⚠️ Clé USB à surveiller', text.replaceFirst('⚠️ ', ''));
       return;

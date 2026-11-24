@@ -49,7 +49,12 @@ void main() {
       {'matiere': 'SVT', 'contenu': 'Contrôle', 'pour_le': day(1), 'fait': false, 'controle': true},
     ];
     final todos = [
-      CarnetItem({'id': '1', 'text': 'Rendre le livre au CDI', 'due': DateTime(2026, 11, 14).millisecondsSinceEpoch, 'at': 0}),
+      CarnetItem({
+        'id': '1',
+        'text': 'Rendre le livre au CDI',
+        'due': DateTime(2026, 11, 14).millisecondsSinceEpoch,
+        'at': 0,
+      }),
       CarnetItem({'id': '2', 'text': 'Ranger ma chambre', 'at': DateTime(2026, 11, 16).millisecondsSinceEpoch}),
     ];
     final r = Assistant.rank(hw, todos, now);
@@ -67,14 +72,22 @@ void main() {
       RankedTask('Anglais', 30, 'pour dans 5 jours', minutes: 45),
     ];
     final plan = Assistant.planSlots(['17:00-18:00', '18:30-20:00'], tasks, DateTime(2026, 11, 17));
-    expect([for (final p in plan) '${p['debut']!.substring(11)} ${p['titre']}'],
-        ['17:00 Réviser SVT', '18:30 Maths', '19:10 Anglais']);
+    expect(
+      [for (final p in plan) '${p['debut']!.substring(11)} ${p['titre']}'],
+      ['17:00 Réviser SVT', '18:30 Maths', '19:10 Anglais'],
+    );
   });
 
   test('mémoire : projets, décisions et objectifs repérés dans ce qu\'on dit', () {
-    expect(Assistant.detectMemory('J\'ai décidé de faire du sport le mardi soir.'), ('décision', 'Faire du sport le mardi soir'));
+    expect(Assistant.detectMemory('J\'ai décidé de faire du sport le mardi soir.'), (
+      'décision',
+      'Faire du sport le mardi soir',
+    ));
     expect(Assistant.detectMemory('Mon objectif est d\'avoir 15 en maths'), ('objectif', 'Avoir 15 en maths'));
-    expect(Assistant.detectMemory('Mon projet c\'est de créer une appli de musique'), ('projet', 'Créer une appli de musique'));
+    expect(Assistant.detectMemory('Mon projet c\'est de créer une appli de musique'), (
+      'projet',
+      'Créer une appli de musique',
+    ));
     expect(Assistant.detectMemory('Quelle heure est-il ?'), isNull);
   });
 
@@ -101,12 +114,17 @@ void main() {
 
   test('idées de Gemini : un évènement sans date valide devient une tâche', () {
     final ideas = Assistant.parseIdeas(
-      jsonDecode('[{"titre":"Préparer ton sac","texte":"Sortie demain","action":"tache"},'
-          '{"titre":"Courir 20 min","texte":"Créneau libre","action":"evenement","quand":"2026-11-17T18:00","duree_min":20},'
-          '{"titre":"Vieux","action":"evenement","quand":"2026-11-10T10:00"},{"texte":"sans titre"}]'),
+      jsonDecode(
+        '[{"titre":"Préparer ton sac","texte":"Sortie demain","action":"tache"},'
+        '{"titre":"Courir 20 min","texte":"Créneau libre","action":"evenement","quand":"2026-11-17T18:00","duree_min":20},'
+        '{"titre":"Vieux","action":"evenement","quand":"2026-11-10T10:00"},{"texte":"sans titre"}]',
+      ),
       now,
     );
-    expect([for (final i in ideas) '${i.title}:${i.action}'], ['Préparer ton sac:tache', 'Courir 20 min:evenement', 'Vieux:tache']);
+    expect(
+      [for (final i in ideas) '${i.title}:${i.action}'],
+      ['Préparer ton sac:tache', 'Courir 20 min:evenement', 'Vieux:tache'],
+    );
     expect(ideas[1].minutes, 20);
   });
 
@@ -117,10 +135,23 @@ void main() {
   test('briefing du matin : tout y est, sans IA', () {
     final d = <String, Object?>{
       'date': DateTime(2026, 11, 17, 7, 30),
-      'meteo': {'icone': '🌧️', 'maintenant': '8 °C, pluie', 'min': 6, 'max': 11, 'tenue': 'Prends un manteau.', 'pluie_pourcent': 80},
+      'meteo': {
+        'icone': '🌧️',
+        'maintenant': '8 °C, pluie',
+        'min': 6,
+        'max': 11,
+        'tenue': 'Prends un manteau.',
+        'pluie_pourcent': 80,
+      },
       'cours': <Map>[
         {'titre': 'Maths', 'debut': '2026-11-17T08:00', 'fin': '2026-11-17T09:00', 'source': 'École Directe'},
-        {'titre': 'SVT', 'debut': '2026-11-17T10:00', 'fin': '2026-11-17T11:00', 'source': 'École Directe', 'annule': true},
+        {
+          'titre': 'SVT',
+          'debut': '2026-11-17T10:00',
+          'fin': '2026-11-17T11:00',
+          'source': 'École Directe',
+          'annule': true,
+        },
         {'titre': 'Anglais', 'debut': '2026-11-17T15:00', 'fin': '2026-11-17T16:00', 'source': 'École Directe'},
       ],
       'rdv': <Map>[
@@ -138,7 +169,10 @@ void main() {
       'mails': <Map>[],
       'discord_non_lus': 2,
       'en_retard': [RankedTask('Rendre le livre', 93, 'en retard de 3 jours')],
-      'taches': [RankedTask('Rendre le livre', 93, 'en retard de 3 jours'), RankedTask('Réviser Physique', 71, 'contrôle dans 2 jours')],
+      'taches': [
+        RankedTask('Rendre le livre', 93, 'en retard de 3 jours'),
+        RankedTask('Réviser Physique', 71, 'contrôle dans 2 jours'),
+      ],
       'objectifs': ['Avoir 15 en maths'],
       'cartes': 12,
       'creneaux': ['17:00-18:30'],
@@ -179,7 +213,10 @@ void main() {
           {'titre': 'Anniversaire', 'debut': '2026-11-18T18:30', 'fin': '2026-11-18T20:00', 'source': 'Google Agenda'},
         ],
         'agenda_creneaux_libres' => [
-          {'jour': '2026-11-17', 'libre': ['18:00-21:00']},
+          {
+            'jour': '2026-11-17',
+            'libre': ['18:00-21:00'],
+          },
         ],
         'agenda_ajouter_plan' => added..add(args['plan']),
         'ecole_messages' => [
@@ -189,7 +226,17 @@ void main() {
         _ => null,
       };
       a.notify = (t, b) => said.add(t);
-      a.useTools(call: call, tools: () => {'ecole_devoirs', 'agenda_lire', 'agenda_creneaux_libres', 'agenda_ajouter_plan', 'ecole_messages', 'ecole_message_lire'});
+      a.useTools(
+        call: call,
+        tools: () => {
+          'ecole_devoirs',
+          'agenda_lire',
+          'agenda_creneaux_libres',
+          'agenda_ajouter_plan',
+          'ecole_messages',
+          'ecole_message_lire',
+        },
+      );
       await a.store.setJson('consent', true);
       await a.tick(now: now);
       expect(said, contains('⏰ Pour demain : Maths'));
@@ -215,19 +262,27 @@ void main() {
       a.useTools(
         call: (name, args) async => name == 'ecole_devoirs'
             ? [
-                {'matiere': 'SVT', 'contenu': 'Contrôle', 'pour_le': DateTime.now().add(const Duration(days: 1)).toIso8601String(), 'controle': true},
+                {
+                  'matiere': 'SVT',
+                  'contenu': 'Contrôle',
+                  'pour_le': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+                  'controle': true,
+                },
               ]
             : null,
         tools: () => {'ecole_devoirs'},
       );
       final tools = {for (final t in a.tools) t.name: t};
       final r = await QuickAnswers.answer(
-        'Clicky, par quoi je commence ?',
+        'Smily, par quoi je commence ?',
         tools: tools.keys.toSet(),
         call: (name, args) async => tools[name]?.run(args),
       );
       expect(r?.text, contains('1. Réviser SVT (contrôle demain)'));
-      expect(await QuickAnswers.answer('Pourquoi le ciel est bleu ?', tools: tools.keys.toSet(), call: (_, _) async => null), isNull);
+      expect(
+        await QuickAnswers.answer('Pourquoi le ciel est bleu ?', tools: tools.keys.toSet(), call: (_, _) async => null),
+        isNull,
+      );
     });
 
     test('appli qui ne fige plus : relire un fichier inchangé ne redessine rien', () async {
@@ -250,19 +305,25 @@ void main() {
     testWidgets('les propositions s\'affichent et « Oui » fait l\'action', (tester) async {
       final a = Assistant.instance;
       var done = false;
-      a.propose(Proposal(
-        id: 'test',
-        icon: Icons.event_rounded,
-        color: Colors.teal,
-        title: 'Un rendez-vous dans un mail',
-        body: '« Dentiste » demain à 17 h. Je l\'ajoute à ton agenda ?',
-        accept: 'Ajouter à l\'agenda',
-        onAccept: () async {
-          done = true;
-          return null;
-        },
-      ));
-      await tester.pumpWidget(const MaterialApp(home: AssistantLayer(child: Scaffold(body: Text('Mon Hub')))));
+      a.propose(
+        Proposal(
+          id: 'test',
+          icon: Icons.event_rounded,
+          color: Colors.teal,
+          title: 'Un rendez-vous dans un mail',
+          body: '« Dentiste » demain à 17 h. Je l\'ajoute à ton agenda ?',
+          accept: 'Ajouter à l\'agenda',
+          onAccept: () async {
+            done = true;
+            return null;
+          },
+        ),
+      );
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AssistantLayer(child: Scaffold(body: Text('Mon Hub'))),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Mon Hub'), findsOneWidget);
       expect(find.text('Un rendez-vous dans un mail'), findsOneWidget);

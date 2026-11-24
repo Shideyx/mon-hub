@@ -9,7 +9,7 @@ import 'shot_encode.dart';
 
 /// Gemini Live : la conversation **en direct**, comme le JARVIS « Mark LII »
 /// (Gemini Live API). Le micro part vers Gemini pendant que tu parles, et la
-/// réponse revient directement en voix, morceau par morceau : Clicky répond
+/// réponse revient directement en voix, morceau par morceau : Smily répond
 /// au tac au tac, sans attendre une transcription, une IA, puis une voix.
 ///
 /// Une connexion (WebSocket) reste ouverte entre deux questions : pas de
@@ -29,7 +29,7 @@ class GeminiLive {
   final String? language;
 
   /// true : Gemini repère tout seul quand on commence et finit de parler
-  /// (conversation continue, interprète) ; false : Clicky le lui dit.
+  /// (conversation continue, interprète) ; false : Smily le lui dit.
   final bool autoVad;
 
   final String key;
@@ -110,7 +110,8 @@ class GeminiLive {
     ws.listen(
       (msg) => _onMessage(msg, ready),
       onDone: () {
-        final why = 'connexion fermée${ws.closeReason == null || ws.closeReason!.isEmpty ? '' : ' (${ws.closeReason})'}';
+        final why =
+            'connexion fermée${ws.closeReason == null || ws.closeReason!.isEmpty ? '' : ' (${ws.closeReason})'}';
         if (!ready.isCompleted) ready.completeError(why);
         if (identical(_ws, ws)) {
           _ws = null;
@@ -148,13 +149,10 @@ class GeminiLive {
       if (tools.isNotEmpty || extraDeclarations.isNotEmpty)
         'tools': [
           {
-            'functionDeclarations': [
-              for (final t in tools) declaration(t),
-              ...extraDeclarations,
-            ],
+            'functionDeclarations': [for (final t in tools) declaration(t), ...extraDeclarations],
           },
         ],
-      // Clicky dit lui-même quand tu commences et finis de parler
+      // Smily dit lui-même quand tu commences et finis de parler
       // (Ctrl + Alt, ou silence) : la réponse part dès que tu lâches.
       if (!autoVad)
         'realtimeInputConfig': {
@@ -177,8 +175,7 @@ class GeminiLive {
         'parameters': {
           'type': 'OBJECT',
           'properties': {
-            for (final e in t.params.entries)
-              e.key: {'type': types[e.value.$1] ?? 'STRING', 'description': e.value.$2},
+            for (final e in t.params.entries) e.key: {'type': types[e.value.$1] ?? 'STRING', 'description': e.value.$2},
           },
           if (t.required.isNotEmpty) 'required': t.required,
         },
@@ -330,7 +327,8 @@ class GeminiVision {
                         'inline_data': {'mime_type': imageMime(p), 'data': p},
                       },
                     {
-                      'text': 'Voici l\'écran de la personne. $question\nRéponds en français, précisément et brièvement '
+                      'text':
+                          'Voici l\'écran de la personne. $question\nRéponds en français, précisément et brièvement '
                           '(ce qui est visible, les textes importants, où se trouvent les éléments).',
                     },
                   ],
@@ -344,8 +342,12 @@ class GeminiVision {
         if (res.statusCode == 404) continue;
         final j = jsonDecode(body);
         if (res.statusCode != 200) return 'Je n\'ai pas pu regarder l\'écran (code ${res.statusCode}).';
-        final parts = ((((j as Map)['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
-        return [for (final p in parts ?? const []) if (p is Map && p['text'] != null) '${p['text']}'].join(' ').trim();
+        final parts =
+            ((((j as Map)['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
+        return [
+          for (final p in parts ?? const [])
+            if (p is Map && p['text'] != null) '${p['text']}',
+        ].join(' ').trim();
       }
       return 'Je n\'ai pas pu regarder l\'écran.';
     } finally {

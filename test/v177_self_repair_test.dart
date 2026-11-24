@@ -35,9 +35,13 @@ void main() {
       expect(r.map((x) => x.id), isNot(contains('gels')));
     });
 
-    test('Clicky partout qui n\'arrive pas à tenir', () {
+    test('Smily partout qui n\'arrive pas à tenir', () {
       final r = RepairRules.diagnose(
-        log(["Clicky partout s'est fermé : relancé", "Clicky partout s'est fermé : relancé", "Clicky partout s'est fermé : relancé"]),
+        log([
+          "Smily partout s'est fermé : relancé",
+          "Smily partout s'est fermé : relancé",
+          "Smily partout s'est fermé : relancé",
+        ]),
         now: now,
       );
       expect(r.map((x) => x.id), contains('clicky-partout'));
@@ -50,7 +54,10 @@ void main() {
 
     test('un fichier de données abîmé', () {
       final r = RepairRules.diagnose(
-        log(['FormatException: Unexpected end of input (carnet.json)', 'FormatException: Unexpected character (notes.json)']),
+        log([
+          'FormatException: Unexpected end of input (carnet.json)',
+          'FormatException: Unexpected character (notes.json)',
+        ]),
         now: now,
       );
       expect(r.map((x) => x.id), contains('donnees'));
@@ -87,7 +94,9 @@ void main() {
     });
 
     test('une seule réparation', () {
-      final say = RepairRules.say(const [Repair(id: 'micro', title: 'Ton micro restait bloqué', fixed: 'je l\'ai relancé')]);
+      final say = RepairRules.say(const [
+        Repair(id: 'micro', title: 'Ton micro restait bloqué', fixed: 'je l\'ai relancé'),
+      ]);
       expect(say, 'Ton micro restait bloqué : je l\'ai relancé.');
     });
 

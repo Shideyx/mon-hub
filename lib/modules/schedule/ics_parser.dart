@@ -8,14 +8,12 @@ class CalEvent {
   final DateTime start;
   final DateTime end;
   final String location;
-  bool get allDay =>
-      start.hour == 0 && start.minute == 0 && end.difference(start).inHours >= 24;
+  bool get allDay => start.hour == 0 && start.minute == 0 && end.difference(start).inHours >= 24;
 }
 
 DateTime? _parseDate(String value, Map<String, String> params) {
   final v = value.trim();
-  final m = RegExp(r'^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$')
-      .firstMatch(v);
+  final m = RegExp(r'^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$').firstMatch(v);
   if (m == null) return null;
   int g(int i) => int.parse(m.group(i) ?? '0');
   if (m.group(4) == null) return DateTime(g(1), g(2), g(3));
@@ -70,17 +68,21 @@ List<CalEvent> parseIcs(String ics, DateTime from, DateTime to) {
   return out;
 }
 
-String _unescape(String s) =>
-    s.replaceAll(r'\n', ' ').replaceAll(r'\,', ',').replaceAll(r'\;', ';');
+String _unescape(String s) => s.replaceAll(r'\n', ' ').replaceAll(r'\,', ',').replaceAll(r'\;', ';');
 
-Iterable<CalEvent> _expand(Map<String, (String, Map<String, String>)> ev,
-    List<DateTime> exdates, DateTime from, DateTime to) sync* {
+Iterable<CalEvent> _expand(
+  Map<String, (String, Map<String, String>)> ev,
+  List<DateTime> exdates,
+  DateTime from,
+  DateTime to,
+) sync* {
   final s = ev['DTSTART'];
   if (s == null) return;
   final start = _parseDate(s.$1, s.$2);
   if (start == null) return;
   final e = ev['DTEND'];
-  final end = (e == null ? null : _parseDate(e.$1, e.$2)) ??
+  final end =
+      (e == null ? null : _parseDate(e.$1, e.$2)) ??
       start.add(Duration(days: s.$1.contains('T') ? 0 : 1, hours: s.$1.contains('T') ? 1 : 0));
   final duration = end.difference(start);
   final title = _unescape(ev['SUMMARY']?.$1 ?? '(sans titre)');
@@ -117,7 +119,10 @@ Iterable<CalEvent> _expand(Map<String, (String, Map<String, String>)> ev,
     if (day.isAfter(to)) return;
     bool matches;
     if (freq == 'DAILY') {
-      matches = DateTime(day.year, day.month, day.day).difference(DateTime(start.year, start.month, start.day)).inDays % interval == 0;
+      matches =
+          DateTime(day.year, day.month, day.day).difference(DateTime(start.year, start.month, start.day)).inDays %
+              interval ==
+          0;
     } else {
       final weeks = day.difference(weekStart).inDays ~/ 7;
       matches = weeks % interval == 0 && days.contains(day.weekday);

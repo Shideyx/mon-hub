@@ -65,8 +65,14 @@ class Subscription {
 
 /// Un colis suivi.
 class Parcel {
-  Parcel({required this.carrier, required this.number, required this.status, this.link = '', this.shop = '', DateTime? updated})
-    : updated = updated ?? DateTime.now();
+  Parcel({
+    required this.carrier,
+    required this.number,
+    required this.status,
+    this.link = '',
+    this.shop = '',
+    DateTime? updated,
+  }) : updated = updated ?? DateTime.now();
 
   String carrier;
   String number;
@@ -120,7 +126,10 @@ class MoneyStore extends ChangeNotifier {
   Future<void> load() async {
     if (!await _file.reload() && subs.isNotEmpty) return;
     final v = _file.value;
-    List<Map> list(String k) => [for (final e in (v[k] as List?) ?? const []) if (e is Map) e];
+    List<Map> list(String k) => [
+      for (final e in (v[k] as List?) ?? const [])
+        if (e is Map) e,
+    ];
     subs = list('abonnements').map(Subscription.fromJson).toList();
     parcels = list('colis').map(Parcel.fromJson).toList();
     free = list('gratuits').map(FreeGame.fromJson).toList();
@@ -202,6 +211,8 @@ class MoneyStore extends ChangeNotifier {
   double get monthly => subs.fold(0.0, (t, s) => t + s.perMonth);
 
   /// Les colis pas encore arrivés (ou livrés depuis moins de 3 jours).
-  List<Parcel> activeParcels(DateTime now) =>
-      [for (final p in parcels) if (p.status != 'livre' || now.difference(p.updated).inDays < 3) p];
+  List<Parcel> activeParcels(DateTime now) => [
+    for (final p in parcels)
+      if (p.status != 'livre' || now.difference(p.updated).inDays < 3) p,
+  ];
 }

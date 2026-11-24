@@ -11,7 +11,7 @@ import 'tool_router.dart';
 
 /// Accès direct à Claude (API Anthropic) avec ta propre clé API.
 ///
-/// Sert au compagnon « Clicky » (qui voit l'écran de Mon Hub, répond à voix
+/// Sert au compagnon « Smily » (qui voit l'écran de Mon Hub, répond à voix
 /// haute et montre les boutons) et à la discussion intégrée du module Claude.
 /// La clé se crée sur console.anthropic.com (facturée à l'usage) et reste
 /// chiffrée sur l'appareil.
@@ -125,10 +125,7 @@ class ClaudeApi {
       var stop = '';
       final shown = StringBuffer();
       await for (final line
-          in res.stream
-              .transform(utf8.decoder)
-              .transform(const LineSplitter())
-              .timeout(const Duration(minutes: 3))) {
+          in res.stream.transform(utf8.decoder).transform(const LineSplitter()).timeout(const Duration(minutes: 3))) {
         if (!line.startsWith('data:')) continue;
         final data = line.substring(5).trim();
         if (data.isEmpty) continue;
@@ -203,8 +200,7 @@ class ClaudeApi {
     List<HubTool>? allTools,
   }) async {
     final defs = [
-      for (final t in tools)
-        {'name': t.name, 'description': t.description, 'input_schema': t.toJson()['inputSchema']},
+      for (final t in tools) {'name': t.name, 'description': t.description, 'input_schema': t.toJson()['inputSchema']},
       // Recherche sur internet, faite par Anthropic (version qui trie les
       // résultats elle-même : moins de texte relu).
       if (webSearch)

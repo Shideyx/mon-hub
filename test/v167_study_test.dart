@@ -23,11 +23,13 @@ void main() {
 
   group('Correction de copie', () {
     test('positions remises dans l\'ordre et bornées', () {
-      final r = CopyCheck.parse('```json\n{"note_sur_20": 13.5, "resume": "Bien.", "fautes": ['
-          '{"box_2d": [120, 300, 150, 420], "type": "accord", "faux": "les chat", "correction": "les chats", "explication": "pluriel"},'
-          '{"box_2d": [500, 900, 450, 1200], "type": "orthographe", "faux": "sa", "correction": "ça", "explication": "cela"},'
-          '{"box_2d": [10, 10, 10, 10], "type": "x"},'
-          '{"box_2d": "pas une liste"}], "points_forts": ["Plan clair"], "conseils": ["Relis les accords"]}\n```')!;
+      final r = CopyCheck.parse(
+        '```json\n{"note_sur_20": 13.5, "resume": "Bien.", "fautes": ['
+        '{"box_2d": [120, 300, 150, 420], "type": "accord", "faux": "les chat", "correction": "les chats", "explication": "pluriel"},'
+        '{"box_2d": [500, 900, 450, 1200], "type": "orthographe", "faux": "sa", "correction": "ça", "explication": "cela"},'
+        '{"box_2d": [10, 10, 10, 10], "type": "x"},'
+        '{"box_2d": "pas une liste"}], "points_forts": ["Plan clair"], "conseils": ["Relis les accords"]}\n```',
+      )!;
       expect(r.grade, 13.5);
       expect(r.mistakes, hasLength(2));
       expect(r.mistakes[0].box, [0.12, 0.3, 0.15, 0.42]);
@@ -41,7 +43,8 @@ void main() {
     testWidgets('la page entoure les fautes', (t) async {
       final dir = Directory.systemTemp.createTempSync('copie');
       final f = File('${dir.path}/copie.png')..writeAsBytesSync(img.encodePng(img.Image(width: 400, height: 300)));
-      AiText.override = (p, s) async => '{"note_sur_20": 12, "resume": "Quelques fautes.", "fautes": ['
+      AiText.override = (p, s) async =>
+          '{"note_sur_20": 12, "resume": "Quelques fautes.", "fautes": ['
           '{"box_2d": [100, 100, 200, 400], "type": "accord", "faux": "ils mange", "correction": "ils mangent", "explication": "3e pers. du pluriel"}]}';
       await t.binding.setSurfaceSize(const Size(1200, 800));
       await t.runAsync(() async {
@@ -78,21 +81,24 @@ void main() {
       final c = MockClient((r) async {
         body = jsonDecode(r.body) as Map;
         return http.Response.bytes(
-          utf8.encode(jsonEncode({
-            'candidates': [
-              {
-                'content': {
-                  'parts': [
-                    {
-                      'text': '{"note_sur_20": 14, "resume": "Clair.", "transcription": "Bonjour euh je vais parler du climat. Euh voilà.", '
-                          '"points_forts": ["Voix posée"], "a_ameliorer": ["Annonce ton plan"], "oublis_du_plan": ["Conclusion"], '
-                          '"questions_du_jury": ["Pourquoi ce sujet ?", "Et ensuite ?"]}',
-                    },
-                  ],
+          utf8.encode(
+            jsonEncode({
+              'candidates': [
+                {
+                  'content': {
+                    'parts': [
+                      {
+                        'text':
+                            '{"note_sur_20": 14, "resume": "Clair.", "transcription": "Bonjour euh je vais parler du climat. Euh voilà.", '
+                            '"points_forts": ["Voix posée"], "a_ameliorer": ["Annonce ton plan"], "oublis_du_plan": ["Conclusion"], '
+                            '"questions_du_jury": ["Pourquoi ce sujet ?", "Et ensuite ?"]}',
+                      },
+                    ],
+                  },
                 },
-              },
-            ],
-          })),
+              ],
+            }),
+          ),
           200,
         );
       });
@@ -122,10 +128,12 @@ void main() {
     });
 
     test('fiche lue et vérifiée', () {
-      final s = VideoNotes.parse('{"titre":"La Révolution","resume":"Résumé.","chapitres":['
-          '{"debut":"5:00","titre":"Causes","points":["Crise"]},{"debut":"0:30","titre":"Intro"}],'
-          '"a_retenir":["1789"],"quiz":[{"question":"Quand ?","choix":["1789","1815"],"bonne":0,"explication":"Prise de la Bastille"},'
-          '{"question":"Faux","choix":["a","b"],"bonne":5}]}')!;
+      final s = VideoNotes.parse(
+        '{"titre":"La Révolution","resume":"Résumé.","chapitres":['
+        '{"debut":"5:00","titre":"Causes","points":["Crise"]},{"debut":"0:30","titre":"Intro"}],'
+        '"a_retenir":["1789"],"quiz":[{"question":"Quand ?","choix":["1789","1815"],"bonne":0,"explication":"Prise de la Bastille"},'
+        '{"question":"Faux","choix":["a","b"],"bonne":5}]}',
+      )!;
       expect(s.chapters.map((c) => c.title), ['Intro', 'Causes']);
       expect(s.chapters.first.seconds, 30);
       expect(s.quiz, hasLength(1));
@@ -144,8 +152,18 @@ void main() {
         return http.Response(
           jsonEncode({
             'events': [
-              {'tStartMs': 0, 'segs': [{'utf8': 'Bonjour à tous'}]},
-              {'tStartMs': 65000, 'segs': [{'utf8': 'Deuxième partie'}]},
+              {
+                'tStartMs': 0,
+                'segs': [
+                  {'utf8': 'Bonjour à tous'},
+                ],
+              },
+              {
+                'tStartMs': 65000,
+                'segs': [
+                  {'utf8': 'Deuxième partie'},
+                ],
+              },
             ],
           }),
           200,
@@ -198,7 +216,7 @@ void main() {
     });
   });
 
-  group('Clicky', () {
+  group('Smily', () {
     test('phrases sans IA', () async {
       final calls = <String>[];
       Future<Object?> fake(String name, Map<String, dynamic> a) async {

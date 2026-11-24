@@ -69,11 +69,7 @@ class UpdateScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     const Text(
                       'Mise à jour de Mon Hub',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -134,9 +130,7 @@ class UpdateScreen extends StatelessWidget {
                           FilledButton.icon(
                             icon: const Icon(Icons.download_rounded),
                             label: const Text('Télécharger à la main'),
-                            onPressed: () => Browser.open(
-                              Updater.releasesUrl,
-                            ),
+                            onPressed: () => Browser.open(Updater.releasesUrl),
                           ),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
@@ -167,10 +161,7 @@ class UpdateScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     TextButton(
                       onPressed: u.later,
-                      child: const Text(
-                        'Plus tard (au prochain démarrage)',
-                        style: TextStyle(color: Colors.white38),
-                      ),
+                      child: const Text('Plus tard (au prochain démarrage)', style: TextStyle(color: Colors.white38)),
                     ),
                   ],
                 ),

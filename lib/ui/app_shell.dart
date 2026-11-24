@@ -124,7 +124,10 @@ class _AppShellState extends State<AppShell> {
     if (selected.startsWith('mod:')) {
       final m = modules.where((m) => m.id == selected.substring(4)).firstOrNull;
       if (m != null) {
-        return KeyedSubtree(key: ValueKey(m.id), child: Builder(builder: m.buildPage));
+        return KeyedSubtree(
+          key: ValueKey(m.id),
+          child: Builder(builder: m.buildPage),
+        );
       }
     }
     if (selected.startsWith('space:')) {

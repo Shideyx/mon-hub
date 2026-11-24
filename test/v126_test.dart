@@ -84,7 +84,13 @@ void main() {
         'id': r'\E\1234',
         'isLoaded': true,
         'children': [
-          {'type': 'file', 'libelle': 'cours.pdf', 'id': r'\E\1234\cours.pdf', 'taille': 2048, 'date': '2026-11-10 08:00:00'},
+          {
+            'type': 'file',
+            'libelle': 'cours.pdf',
+            'id': r'\E\1234\cours.pdf',
+            'taille': 2048,
+            'date': '2026-11-10 08:00:00',
+          },
           {'type': 'folder', 'libelle': 'Maths', 'id': r'\E\1234\Maths', 'isLoaded': false, 'children': []},
         ],
       },
@@ -125,7 +131,7 @@ void main() {
         decode: (j) => (j as Map).cast<String, dynamic>(),
         encode: (v) => v,
       );
-      await f.save({'conversation': 'bonjour Clicky'});
+      await f.save({'conversation': 'bonjour Smily'});
       final onDisk = await (await HubFiles.file('test.json'))!.readAsString();
       expect(onDisk, startsWith(Vault.prefix));
       expect(onDisk, isNot(contains('bonjour')));
@@ -135,7 +141,7 @@ void main() {
         decode: (j) => (j as Map).cast<String, dynamic>(),
         encode: (v) => v,
       );
-      expect((await g.load())['conversation'], 'bonjour Clicky');
+      expect((await g.load())['conversation'], 'bonjour Smily');
     });
 
     test('export protégé par mot de passe', () async {

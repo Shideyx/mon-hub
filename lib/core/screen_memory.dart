@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'hub_files.dart';
 
-/// Un moment vu (ou entendu) par Clicky : la fenêtre, et le texte qu'il y
+/// Un moment vu (ou entendu) par Smily : la fenêtre, et le texte qu'il y
 /// a lu (ou ce qui a été dit dans la vidéo).
 class ScreenMoment {
   ScreenMoment({
@@ -68,7 +68,7 @@ class MemoryHit {
   };
 }
 
-/// **La mémoire de l'écran** (« Tu te souviens ? ») : ce que Clicky a vu à
+/// **La mémoire de l'écran** (« Tu te souviens ? ») : ce que Smily a vu à
 /// l'écran (les fenêtres, et le texte lu sur le PC) et entendu (le son des
 /// vidéos), pendant 7 jours. **Seulement sur ce PC**, chiffré, jamais
 /// synchronisé ni envoyé ; jamais tes messageries, ta banque, tes mots de
@@ -153,11 +153,76 @@ class ScreenMemory extends ChangeNotifier {
   // ------------------------------------------------------------ Recherche
 
   static const _stop = {
-    'les', 'des', 'une', 'que', 'qui', 'quoi', 'sur', 'dans', 'avec', 'pour', 'par', 'est', 'etait', 'vu', 'site',
-    'page', 'video', 'truc', 'chose', 'celui', 'celle', 'ceux', 'mon', 'ton', 'son', 'mes', 'tes', 'ses', 'moi', 'toi',
-    'j', 'je', 'tu', 'il', 'elle', 'on', 'ai', 'as', 'avais', 'avait', 'regarde', 'regardais', 'lu', 'lisais', 'ouvert',
-    'parlait', 'parle', 'qu', 'quel', 'quelle', 'cetait', 'cest', 'ca', 'cela', 'ce', 'cet', 'cette', 'souviens',
-    'rappelles', 'hier', 'aujourd', 'hui', 'matin', 'soir', 'midi', 'apres', 'tout', 'heure', 'heures', 'vers',
+    'les',
+    'des',
+    'une',
+    'que',
+    'qui',
+    'quoi',
+    'sur',
+    'dans',
+    'avec',
+    'pour',
+    'par',
+    'est',
+    'etait',
+    'vu',
+    'site',
+    'page',
+    'video',
+    'truc',
+    'chose',
+    'celui',
+    'celle',
+    'ceux',
+    'mon',
+    'ton',
+    'son',
+    'mes',
+    'tes',
+    'ses',
+    'moi',
+    'toi',
+    'j',
+    'je',
+    'tu',
+    'il',
+    'elle',
+    'on',
+    'ai',
+    'as',
+    'avais',
+    'avait',
+    'regarde',
+    'regardais',
+    'lu',
+    'lisais',
+    'ouvert',
+    'parlait',
+    'parle',
+    'qu',
+    'quel',
+    'quelle',
+    'cetait',
+    'cest',
+    'ca',
+    'cela',
+    'ce',
+    'cet',
+    'cette',
+    'souviens',
+    'rappelles',
+    'hier',
+    'aujourd',
+    'hui',
+    'matin',
+    'soir',
+    'midi',
+    'apres',
+    'tout',
+    'heure',
+    'heures',
+    'vers',
   };
 
   /// Minuscules, sans accents ni ponctuation.
@@ -181,7 +246,9 @@ class ScreenMemory extends ChangeNotifier {
   /// Cherche [q] (mots), dans la période [from]–[to] si donnée.
   List<MemoryHit> search(String q, {DateTime? from, DateTime? to, int limit = 8}) {
     // « volcans » retrouve aussi « volcan » (pluriels).
-    final ws = [for (final w in words(q)) w.length > 4 && (w.endsWith('s') || w.endsWith('x')) ? w.substring(0, w.length - 1) : w];
+    final ws = [
+      for (final w in words(q)) w.length > 4 && (w.endsWith('s') || w.endsWith('x')) ? w.substring(0, w.length - 1) : w,
+    ];
     final out = <MemoryHit>[];
     for (final m in moments) {
       if (from != null && m.until.isBefore(from)) continue;
@@ -238,7 +305,13 @@ class ScreenMemory extends ChangeNotifier {
   /// « hier vers 16 h 10 », « aujourd'hui à 9 h », « mardi vers 14 h ».
   static String when(DateTime at, DateTime now) {
     final d = DateTime(now.year, now.month, now.day).difference(DateTime(at.year, at.month, at.day)).inDays;
-    final day = d <= 0 ? 'aujourd\'hui' : d == 1 ? 'hier' : d < 7 ? _days[at.weekday - 1] : 'le ${at.day}/${at.month}';
+    final day = d <= 0
+        ? 'aujourd\'hui'
+        : d == 1
+        ? 'hier'
+        : d < 7
+        ? _days[at.weekday - 1]
+        : 'le ${at.day}/${at.month}';
     return '$day vers ${hm(at)}';
   }
 
@@ -302,12 +375,16 @@ class TimeWindow {
       final spread = d.inMinutes <= 30 ? const Duration(minutes: 10) : const Duration(minutes: 30);
       return TimeWindow(at.subtract(spread), at.add(spread));
     }
-    if (RegExp(r'\btout a l heure\b|\btout a lheure\b').hasMatch(n)) return TimeWindow(now.subtract(const Duration(hours: 3)), now);
+    if (RegExp(r'\btout a l heure\b|\btout a lheure\b').hasMatch(n)) {
+      return TimeWindow(now.subtract(const Duration(hours: 3)), now);
+    }
     if (RegExp(r'\bla semaine derniere\b').hasMatch(n)) {
       final monday = today.subtract(Duration(days: now.weekday - 1));
       return TimeWindow(monday.subtract(const Duration(days: 7)), monday);
     }
-    if (RegExp(r'\bcette semaine\b').hasMatch(n)) return TimeWindow(today.subtract(Duration(days: now.weekday - 1)), now);
+    if (RegExp(r'\bcette semaine\b').hasMatch(n)) {
+      return TimeWindow(today.subtract(Duration(days: now.weekday - 1)), now);
+    }
     // Le jour.
     DateTime? day;
     if (RegExp(r'\bavant hier\b').hasMatch(n)) {

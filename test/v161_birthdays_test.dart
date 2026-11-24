@@ -47,7 +47,10 @@ void main() {
       expect(Birthdays.next(const Birthday('Zoé', 2, 29), DateTime(2027, 1, 1)), DateTime(2027, 2, 28));
       // L'an prochain si c'est passé.
       expect(Birthdays.next(const Birthday('Hugo', 11, 10), now), DateTime(2027, 11, 10));
-      expect(Birthdays.wish(const Birthday('Léa Martin', 11, 19, year: 2011), DateTime(2026, 11, 19)), contains('Léa ! 🎉 15 ans'));
+      expect(
+        Birthdays.wish(const Birthday('Léa Martin', 11, 19, year: 2011), DateTime(2026, 11, 19)),
+        contains('Léa ! 🎉 15 ans'),
+      );
     });
 
     test('phrases sans IA', () async {
@@ -59,8 +62,7 @@ void main() {
           return n == 'anniversaires' && a['nom'] == null ? {'resume': 'liste'} : 'ok';
         },
         tools: const {'anniversaires', 'anniversaire_ajouter'},
-      ))
-          ?.text;
+      ))?.text;
       expect(await ask('L\'anniversaire de Léa c\'est le 12 mars'), 'ok');
       expect(asked['anniversaire_ajouter'], {'nom': 'Léa', 'date': '12/3'});
       expect(await ask('retiens que l\'anniversaire de Mamie est le 05/01/1950'), 'ok');

@@ -1,4 +1,4 @@
-// Ce que Clicky repère tout seul dans tes messages, sans IA : un
+// Ce que Smily repère tout seul dans tes messages, sans IA : un
 // rendez-vous, une date limite, une note…
 
 /// Une date repérée dans un message (« réunion jeudi à 18 h »).
@@ -24,9 +24,27 @@ class DateSpotter {
   DateSpotter._();
 
   static const _months = {
-    'janvier': 1, 'janv': 1, 'fevrier': 2, 'fevr': 2, 'fev': 2, 'mars': 3, 'avril': 4, 'avr': 4,
-    'mai': 5, 'juin': 6, 'juillet': 7, 'juil': 7, 'aout': 8, 'septembre': 9, 'sept': 9,
-    'octobre': 10, 'oct': 10, 'novembre': 11, 'nov': 11, 'decembre': 12, 'dec': 12,
+    'janvier': 1,
+    'janv': 1,
+    'fevrier': 2,
+    'fevr': 2,
+    'fev': 2,
+    'mars': 3,
+    'avril': 4,
+    'avr': 4,
+    'mai': 5,
+    'juin': 6,
+    'juillet': 7,
+    'juil': 7,
+    'aout': 8,
+    'septembre': 9,
+    'sept': 9,
+    'octobre': 10,
+    'oct': 10,
+    'novembre': 11,
+    'nov': 11,
+    'decembre': 12,
+    'dec': 12,
   };
   static const _days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
@@ -74,7 +92,15 @@ class DateSpotter {
       if (day.difference(today).inDays > 60) continue;
       // Un moment précis avec un mot de rendez-vous = rendez-vous ; sinon date limite.
       final kind = rdv != null && (time != null || lim == null) ? 'rdv' : 'limite';
-      out.add(SpottedDate(at, hasTime: time != null, kind: kind, cue: (kind == 'rdv' ? rdv : lim)!.group(1)!, sentence: raw.trim()));
+      out.add(
+        SpottedDate(
+          at,
+          hasTime: time != null,
+          kind: kind,
+          cue: (kind == 'rdv' ? rdv : lim)!.group(1)!,
+          sentence: raw.trim(),
+        ),
+      );
     }
     return out;
   }

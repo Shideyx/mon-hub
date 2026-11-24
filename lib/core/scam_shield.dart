@@ -13,11 +13,12 @@ class ScamVerdict {
   bool get danger => level == ScamLevel.danger;
   bool get suspect => level != ScamLevel.ok;
 
-  /// Ce que Clicky dit.
+  /// Ce que Smily dit.
   String say() => switch (level) {
     ScamLevel.ok => 'Je ne vois rien de suspect.',
     ScamLevel.suspect => 'Méfie-toi : ${reasons.join(' ; ')}.',
-    ScamLevel.danger => 'Attention, ça ressemble à une arnaque : ${reasons.join(' ; ')}. N\'ouvre pas et ne donne rien.',
+    ScamLevel.danger =>
+      'Attention, ça ressemble à une arnaque : ${reasons.join(' ; ')}. N\'ouvre pas et ne donne rien.',
   };
 }
 
@@ -46,28 +47,91 @@ class ScamShield {
 
   /// Les marques que les arnaqueurs imitent le plus (pour repérer les sosies).
   static const _phished = [
-    'discord', 'discordapp', 'roblox', 'steampowered', 'steamcommunity', 'instagram', 'paypal', 'epicgames',
-    'fortnite', 'minecraft', 'ecoledirecte', 'microsoft', 'snapchat', 'netflix', 'spotify', 'youtube', 'google',
+    'discord',
+    'discordapp',
+    'roblox',
+    'steampowered',
+    'steamcommunity',
+    'instagram',
+    'paypal',
+    'epicgames',
+    'fortnite',
+    'minecraft',
+    'ecoledirecte',
+    'microsoft',
+    'snapchat',
+    'netflix',
+    'spotify',
+    'youtube',
+    'google',
   ];
 
   /// Les marques les plus imitées (leur nom dans un faux domaine).
   static const _brands = [
-    'discord', 'nitro', 'roblox', 'robux', 'steam', 'instagram', 'paypal', 'google', 'microsoft', 'xbox', 'epicgames',
-    'fortnite', 'vbucks', 'tiktok', 'snapchat', 'twitch', 'netflix', 'apple', 'minecraft', 'ecoledirecte', 'spotify',
+    'discord',
+    'nitro',
+    'roblox',
+    'robux',
+    'steam',
+    'instagram',
+    'paypal',
+    'google',
+    'microsoft',
+    'xbox',
+    'epicgames',
+    'fortnite',
+    'vbucks',
+    'tiktok',
+    'snapchat',
+    'twitch',
+    'netflix',
+    'apple',
+    'minecraft',
+    'ecoledirecte',
+    'spotify',
   ];
 
   /// Espions d'adresse IP et raccourcisseurs souvent utilisés pour piéger.
-  static const _loggers = ['grabify', 'iplogger', 'blasze', 'ps3cfw', 'yip.su', '2no.co', 'iplis', 'bmwforum', 'leancoding'];
-  static const _shorteners = ['bit.ly', 'tinyurl.com', 'cutt.ly', 'is.gd', 'rb.gy', 't.ly', 'shorturl.at', 'ow.ly', 'tiny.cc', 'rebrand.ly'];
+  static const _loggers = [
+    'grabify',
+    'iplogger',
+    'blasze',
+    'ps3cfw',
+    'yip.su',
+    '2no.co',
+    'iplis',
+    'bmwforum',
+    'leancoding',
+  ];
+  static const _shorteners = [
+    'bit.ly',
+    'tinyurl.com',
+    'cutt.ly',
+    'is.gd',
+    'rb.gy',
+    't.ly',
+    'shorturl.at',
+    'ow.ly',
+    'tiny.cc',
+    'rebrand.ly',
+  ];
 
   /// Fichiers qui lancent un programme.
-  static final _exe = RegExp(r'\.(exe|scr|bat|cmd|msi|vbs|js|jar|ps1|lnk|hta|pif|com|reg|apk)(\b|$)', caseSensitive: false);
+  static final _exe = RegExp(
+    r'\.(exe|scr|bat|cmd|msi|vbs|js|jar|ps1|lnk|hta|pif|com|reg|apk)(\b|$)',
+    caseSensitive: false,
+  );
   static final _archive = RegExp(r'\.(zip|rar|7z)(\b|$)', caseSensitive: false);
 
-  static final _url = RegExp(r'''(?:https?://|www\.)[^\s<>"'\)\]]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:gift|gg|ru|xyz|top|click|link|site|online|shop|store|live|fun|icu|cfd|sbs|lol|pw|tk|ml|ga|cf|gq|cc|io|me|co|com|net|org|fr)\b(?:/[^\s<>"']*)?''', caseSensitive: false);
+  static final _url = RegExp(
+    r'''(?:https?://|www\.)[^\s<>"'\)\]]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:gift|gg|ru|xyz|top|click|link|site|online|shop|store|live|fun|icu|cfd|sbs|lol|pw|tk|ml|ga|cf|gq|cc|io|me|co|com|net|org|fr)\b(?:/[^\s<>"']*)?''',
+    caseSensitive: false,
+  );
 
   /// Les liens d'un texte.
-  static List<String> links(String text) => [for (final m in _url.allMatches(text)) m[0]!.replaceAll(RegExp(r'[.,;:!?]+$'), '')];
+  static List<String> links(String text) => [
+    for (final m in _url.allMatches(text)) m[0]!.replaceAll(RegExp(r'[.,;:!?]+$'), ''),
+  ];
 
   static String _host(String url) {
     var u = url.trim();
@@ -118,11 +182,15 @@ class ScamShield {
     final path = url.toLowerCase();
     if (official.containsKey(reg)) {
       // Un vrai site… sauf une connexion par QR code ou un « cadeau » louche.
-      if (reg.startsWith('discord') && path.contains('/ra/')) bad('lien de connexion à Discord par QR code (vol de compte classique)');
+      if (reg.startsWith('discord') && path.contains('/ra/')) {
+        bad('lien de connexion à Discord par QR code (vol de compte classique)');
+      }
       return ScamVerdict(level, reasons);
     }
     if (_loggers.any(host.contains)) bad('c\'est un espion d\'adresse IP ($reg)');
-    if (RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(host)) bad('adresse en chiffres au lieu d\'un nom de site', danger: false);
+    if (RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(host)) {
+      bad('adresse en chiffres au lieu d\'un nom de site', danger: false);
+    }
     if (host.contains('xn--')) bad('nom de site avec des lettres déguisées');
     if (_shorteners.contains(reg)) bad('lien raccourci : on ne voit pas où il mène', danger: false);
     // Un site qui se fait passer pour une marque (dlscord, steamcommunnity…).
@@ -134,8 +202,10 @@ class ScamShield {
         break;
       }
     }
-    final gift = RegExp(r'free|gratuit|gift|claim|giveaway|reward|airdrop|bonus|nitro|robux|vbucks', caseSensitive: false)
-        .hasMatch(host);
+    final gift = RegExp(
+      r'free|gratuit|gift|claim|giveaway|reward|airdrop|bonus|nitro|robux|vbucks',
+      caseSensitive: false,
+    ).hasMatch(host);
     if (level != ScamLevel.danger) {
       // Le nom de la marque comme un mot du site (« discord-nitro.gift »,
       // « freerobux.xyz »), pas caché dans un autre mot (« pineapple »).
@@ -158,16 +228,64 @@ class ScamShield {
 
   /// Phrases typiques des arnaques (en français et en anglais).
   static final _phrases = <(RegExp, String, bool)>[
-    (RegExp(r'(free|gratuit\w*|offert\w*)\W+(discord\s+)?nitro|nitro\W+(free|gratuit\w*|offert)', caseSensitive: false), 'promesse de Nitro gratuit', true),
-    (RegExp(r'(free|gratuit\w*)\W+robux|robux\W+(free|gratuit\w*|illimit)', caseSensitive: false), 'promesse de Robux gratuits', true),
-    (RegExp(r'(free|gratuit\w*)\W+(v-?bucks|skins?)|steam\W+(gift|cadeau)', caseSensitive: false), 'cadeau de jeu gratuit', true),
-    (RegExp(r'(signal|report)\w*\W+(par erreur|by mistake|accidentally)|(accidentally|par erreur)\W+report', caseSensitive: false), 'faux « je t\'ai signalé par erreur » (arnaque au support)', true),
-    (RegExp(r'(envoie|donne|send|give)\w*\W+(moi\W+)?(le |ton |the |your )?(code|mot de passe|password|2fa|sms)', caseSensitive: false), 'on te demande un code ou un mot de passe', true),
-    (RegExp(r'(scan|scanne)\w*\W+(ce |le |this |the )?qr', caseSensitive: false), 'on te demande de scanner un QR code (vol de compte)', true),
-    (RegExp(r'(test|teste|essaie|try)\w*\W+(mon|my|notre|our)\W+(jeu|game|appli|app|logiciel)', caseSensitive: false), '« teste mon jeu » (souvent un virus)', false),
-    (RegExp(r'(compte|account)\W+(va être|will be|sera)\W+(supprim|banni|bann|desactiv|delet|disabl|suspend)', caseSensitive: false), 'menace de supprimer ton compte', false),
+    (
+      RegExp(
+        r'(free|gratuit\w*|offert\w*)\W+(discord\s+)?nitro|nitro\W+(free|gratuit\w*|offert)',
+        caseSensitive: false,
+      ),
+      'promesse de Nitro gratuit',
+      true,
+    ),
+    (
+      RegExp(r'(free|gratuit\w*)\W+robux|robux\W+(free|gratuit\w*|illimit)', caseSensitive: false),
+      'promesse de Robux gratuits',
+      true,
+    ),
+    (
+      RegExp(r'(free|gratuit\w*)\W+(v-?bucks|skins?)|steam\W+(gift|cadeau)', caseSensitive: false),
+      'cadeau de jeu gratuit',
+      true,
+    ),
+    (
+      RegExp(
+        r'(signal|report)\w*\W+(par erreur|by mistake|accidentally)|(accidentally|par erreur)\W+report',
+        caseSensitive: false,
+      ),
+      'faux « je t\'ai signalé par erreur » (arnaque au support)',
+      true,
+    ),
+    (
+      RegExp(
+        r'(envoie|donne|send|give)\w*\W+(moi\W+)?(le |ton |the |your )?(code|mot de passe|password|2fa|sms)',
+        caseSensitive: false,
+      ),
+      'on te demande un code ou un mot de passe',
+      true,
+    ),
+    (
+      RegExp(r'(scan|scanne)\w*\W+(ce |le |this |the )?qr', caseSensitive: false),
+      'on te demande de scanner un QR code (vol de compte)',
+      true,
+    ),
+    (
+      RegExp(r'(test|teste|essaie|try)\w*\W+(mon|my|notre|our)\W+(jeu|game|appli|app|logiciel)', caseSensitive: false),
+      '« teste mon jeu » (souvent un virus)',
+      false,
+    ),
+    (
+      RegExp(
+        r'(compte|account)\W+(va être|will be|sera)\W+(supprim|banni|bann|desactiv|delet|disabl|suspend)',
+        caseSensitive: false,
+      ),
+      'menace de supprimer ton compte',
+      false,
+    ),
     (RegExp(r'(vote|voter)\W+(pour moi|for me)', caseSensitive: false), '« vote pour moi » avec un lien', false),
-    (RegExp(r'(gagn|won|win)\w*\W+(un |an? )?(iphone|ps5|airpods|carte cadeau|gift card)', caseSensitive: false), 'faux gain d\'un cadeau', false),
+    (
+      RegExp(r'(gagn|won|win)\w*\W+(un |an? )?(iphone|ps5|airpods|carte cadeau|gift card)', caseSensitive: false),
+      'faux gain d\'un cadeau',
+      false,
+    ),
   ];
 
   /// Vérifie un message entier (texte + liens + noms de fichiers joints).
@@ -193,7 +311,9 @@ class ScamShield {
     }
     for (final f in files) {
       if (_exe.hasMatch(f)) add(ScamVerdict(ScamLevel.danger, ['fichier « $f » qui lance un programme']));
-      if (_archive.hasMatch(f) && level != ScamLevel.ok) add(ScamVerdict(ScamLevel.danger, ['archive « $f » envoyée avec un message louche']));
+      if (_archive.hasMatch(f) && level != ScamLevel.ok) {
+        add(ScamVerdict(ScamLevel.danger, ['archive « $f » envoyée avec un message louche']));
+      }
     }
     return ScamVerdict(level, reasons);
   }

@@ -14,17 +14,17 @@ import 'marks.dart';
 import 'senses_page.dart';
 import 'skills.dart';
 
-/// **La visite guidée** de Clicky : montrée à la création du compte et une
+/// **La visite guidée** de Smily : montrée à la création du compte et une
 /// fois après une grosse mise à jour (nouvelle clé [_seenKey]). Chaque page
 /// présente un thème en animation, avec des phrases qu'on peut **essayer
-/// tout de suite** (Clicky répond par-dessus la visite).
+/// tout de suite** (Smily répond par-dessus la visite).
 class ClickyTutorial extends StatefulWidget {
   const ClickyTutorial({super.key, this.onBrain, this.onTry});
 
-  /// « Choisir son cerveau » (réglages de Claude et Clicky).
+  /// « Choisir son cerveau » (réglages de Claude et Smily).
   final VoidCallback? onBrain;
 
-  /// Essayer une phrase (par défaut : Clicky la reçoit).
+  /// Essayer une phrase (par défaut : Smily la reçoit).
   final void Function(String phrase)? onTry;
 
   static const _seenKey = 'tutorial.v159';
@@ -51,14 +51,14 @@ class ClickyTutorial extends StatefulWidget {
   /// Le texte de chaque page (testable).
   static const tour = <TourPage>[
     TourPage(
-      'Salut, moi c\'est Clicky',
+      'Salut, moi c\'est Smily',
       'Ton assistant personnel, façon JARVIS. Je vis à côté de ta souris, sur tout ton PC. Je vois, j\'entends, je parle, '
           'je montre, j\'explique… et je fais des trucs à ta place. Voilà tout ce que je sais faire.',
     ),
     TourPage(
       'Parle-moi',
       'Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris. Ou active le mot d\'activation et dis '
-          'simplement « Clicky ». Après ma réponse, enchaîne : je t\'écoute encore un peu.',
+          'simplement « Smily ». Après ma réponse, enchaîne : je t\'écoute encore un peu.',
       examples: ['Fais le point', 'Qu\'est-ce que j\'ai demain ?'],
     ),
     TourPage(
@@ -123,7 +123,6 @@ class ClickyTutorial extends StatefulWidget {
           'l\'accueil. Mon Hub se met à jour tout seul : tu auras toujours mes nouveautés.',
     ),
   ];
-
 }
 
 /// Une page de la visite.
@@ -188,13 +187,7 @@ class _ClickyTutorialState extends State<ClickyTutorial> {
   };
 
   List<(String, IconData, VoidCallback)> _actions(int i) => switch (i) {
-    5 => [
-      (
-        'Allumer mes yeux et mes oreilles',
-        Icons.visibility_rounded,
-        () => SensesPage.open(context),
-      ),
-    ],
+    5 => [('Allumer mes yeux et mes oreilles', Icons.visibility_rounded, () => SensesPage.open(context))],
     10 => [
       if (widget.onBrain != null)
         (
@@ -299,10 +292,7 @@ class _ClickyTutorialState extends State<ClickyTutorial> {
                           ),
                         const SizedBox(width: 8),
                         FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: hudCyan,
-                            foregroundColor: Colors.black,
-                          ),
+                          style: FilledButton.styleFrom(backgroundColor: hudCyan, foregroundColor: Colors.black),
                           onPressed: () => _go(page + 1),
                           child: Text(page == _count - 1 ? 'C\'est parti' : 'Suivant'),
                         ),
@@ -340,7 +330,10 @@ class _Page extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(color: const Color(0xFFE5487B), borderRadius: BorderRadius.circular(10)),
-              child: Text(page.badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+              child: Text(
+                page.badge,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+              ),
             ),
           Text(
             page.title,
@@ -393,7 +386,12 @@ class _Page extends StatelessWidget {
         ],
       );
       // Sur un petit écran, l'animation se réduit au lieu de déborder.
-      final art = Center(child: FittedBox(fit: BoxFit.scaleDown, child: _Appear(child: visual)));
+      final art = Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: _Appear(child: visual),
+        ),
+      );
       if (wide) {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 56),
@@ -481,11 +479,7 @@ class _RingsPainter extends CustomPainter {
     for (var i = 0; i < 60; i++) {
       final a = i * math.pi / 30 + t * 0.4;
       final r1 = 128.0, r2 = i % 5 == 0 ? 116.0 : 122.0;
-      canvas.drawLine(
-        c + Offset(math.cos(a), math.sin(a)) * r1,
-        c + Offset(math.cos(a), math.sin(a)) * r2,
-        tick,
-      );
+      canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * r1, c + Offset(math.cos(a), math.sin(a)) * r2, tick);
     }
   }
 
@@ -503,10 +497,7 @@ class _Ticker extends StatefulWidget {
 }
 
 class _TickerState extends State<_Ticker> with SingleTickerProviderStateMixin {
-  late final AnimationController _a = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 60),
-  )..repeat();
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(seconds: 60))..repeat();
   final _start = DateTime.now();
 
   @override
@@ -518,8 +509,7 @@ class _TickerState extends State<_Ticker> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _a,
-    builder: (context, _) =>
-        widget.builder(DateTime.now().difference(_start).inMilliseconds / 1000),
+    builder: (context, _) => widget.builder(DateTime.now().difference(_start).inMilliseconds / 1000),
   );
 }
 
@@ -540,18 +530,14 @@ class _KeysVisual extends StatelessWidget {
           color: down ? hudCyan.withValues(alpha: 0.25) : const Color(0xFF12263A),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: hudCyan.withValues(alpha: down ? 1 : 0.4)),
-          boxShadow: down
-              ? [BoxShadow(color: hudCyan.withValues(alpha: 0.5), blurRadius: 18)]
-              : null,
+          boxShadow: down ? [BoxShadow(color: hudCyan.withValues(alpha: 0.5), blurRadius: 18)] : null,
         ),
         child: Text(
           k,
           style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
         ),
       );
-      final levels = [
-        for (var i = 0; i < 9; i++) down ? 0.3 + 0.7 * (0.5 + 0.5 * math.sin(t * 9 + i)) : 0.08,
-      ];
+      final levels = [for (var i = 0; i < 9; i++) down ? 0.3 + 0.7 * (0.5 + 0.5 * math.sin(t * 9 + i)) : 0.08];
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -567,7 +553,7 @@ class _KeysVisual extends StatelessWidget {
           HudReactor(mode: down ? HudMode.listening : HudMode.idle, levels: levels, size: 90),
           const SizedBox(height: 16),
           Text(
-            down ? '« Clicky, explique-moi cet exercice »' : '…',
+            down ? '« Smily, explique-moi cet exercice »' : '…',
             style: const TextStyle(color: hudCyan, fontSize: 16, fontStyle: FontStyle.italic),
           ),
         ],
@@ -576,7 +562,7 @@ class _KeysVisual extends StatelessWidget {
   );
 }
 
-/// Un faux écran : le curseur vole vers le bouton, Clicky entoure et fléche.
+/// Un faux écran : le curseur vole vers le bouton, Smily entoure et fléche.
 class _PointVisual extends StatelessWidget {
   const _PointVisual();
 
@@ -603,30 +589,15 @@ class _PointVisual extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(
-              left: 20,
-              top: 16,
-              child: Container(width: 160, height: 12, color: const Color(0xFFCBD5E1)),
-            ),
-            Positioned(
-              left: 20,
-              top: 44,
-              child: Container(width: 240, height: 10, color: const Color(0xFFE2E8F0)),
-            ),
-            Positioned(
-              left: 20,
-              top: 62,
-              child: Container(width: 200, height: 10, color: const Color(0xFFE2E8F0)),
-            ),
+            Positioned(left: 20, top: 16, child: Container(width: 160, height: 12, color: const Color(0xFFCBD5E1))),
+            Positioned(left: 20, top: 44, child: Container(width: 240, height: 10, color: const Color(0xFFE2E8F0))),
+            Positioned(left: 20, top: 62, child: Container(width: 200, height: 10, color: const Color(0xFFE2E8F0))),
             Positioned(
               left: 290,
               top: 64,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF2563EB), borderRadius: BorderRadius.circular(8)),
                 child: const Text(
                   'Exporter',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
@@ -671,12 +642,9 @@ class _BoardVisual extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: 440,
     height: 420,
-    child: board == null
-        ? const SizedBox.shrink()
-        : ClickyBoardView(board: board!, onClose: () {}, onAsk: (_) {}),
+    child: board == null ? const SizedBox.shrink() : ClickyBoardView(board: board!, onClose: () {}, onAsk: (_) {}),
   );
 }
-
 
 /// Une carte sombre façon fenêtre (pour les nouvelles animations).
 class _Panel extends StatelessWidget {
@@ -705,7 +673,10 @@ class _Panel extends StatelessWidget {
               color: Color(0xFF12263A),
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+            child: Text(
+              title,
+              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
         Padding(padding: const EdgeInsets.all(14), child: child),
       ],
@@ -735,7 +706,13 @@ class _TaskVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Ticker(
     builder: (t) {
-      final steps = ['Je lis le cahier de texte…', 'J\'ouvre le PDF du prof…', 'Je fais les exercices…', 'Je range tout dans un Google Doc…', 'Fini ! ✅'];
+      final steps = [
+        'Je lis le cahier de texte…',
+        'J\'ouvre le PDF du prof…',
+        'Je fais les exercices…',
+        'Je range tout dans un Google Doc…',
+        'Fini ! ✅',
+      ];
       final k = ((t % 10) / 2).floor().clamp(0, steps.length - 1);
       final lines = ((t % 10) * 1.4).floor().clamp(0, 12);
       return Column(
@@ -749,13 +726,21 @@ class _TaskVisual extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (k < steps.length - 1)
-                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     steps[k],
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontFamilyFallback: emojiFonts),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontFamilyFallback: emojiFonts,
+                    ),
                   ),
                 ),
               ],
@@ -768,8 +753,15 @@ class _TaskVisual extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Exercice 3 p. 112', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                for (var i = 0; i < lines; i++) _Line(120.0 + (i * 37) % 180, color: i % 4 == 3 ? hudCyan.withValues(alpha: 0.5) : const Color(0xFF1E3A52)),
+                const Text(
+                  'Exercice 3 p. 112',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                ),
+                for (var i = 0; i < lines; i++)
+                  _Line(
+                    120.0 + (i * 37) % 180,
+                    color: i % 4 == 3 ? hudCyan.withValues(alpha: 0.5) : const Color(0xFF1E3A52),
+                  ),
               ],
             ),
           ),
@@ -802,7 +794,10 @@ class _SensesVisual extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Volcan', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                      Text(
+                        'Volcan',
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                      ),
                       _Line(320),
                       _Line(280),
                       _Line(340),
@@ -817,7 +812,11 @@ class _SensesVisual extends StatelessWidget {
                   top: 40 + scan * 150,
                   child: Container(height: 2, color: hudCyan, child: const SizedBox.shrink()),
                 ),
-                const Positioned(right: 14, top: 8, child: Text('👀', style: TextStyle(fontSize: 22, fontFamilyFallback: emojiFonts))),
+                const Positioned(
+                  right: 14,
+                  top: 8,
+                  child: Text('👀', style: TextStyle(fontSize: 22, fontFamilyFallback: emojiFonts)),
+                ),
               ],
             ),
           ),
@@ -827,7 +826,11 @@ class _SensesVisual extends StatelessWidget {
             duration: const Duration(milliseconds: 400),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(color: hudGlass, borderRadius: BorderRadius.circular(8), border: Border.all(color: hudCyan)),
+              decoration: BoxDecoration(
+                color: hudGlass,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: hudCyan),
+              ),
               child: const Text(
                 '« Oui ! Hier vers 16 h 10, dans Chrome : Volcan — Wikipédia. »',
                 style: TextStyle(color: hudCyan, fontWeight: FontWeight.w600),
@@ -867,7 +870,9 @@ class _IdeaVisual extends StatelessWidget {
                 children: [
                   Text(emoji, style: const TextStyle(fontSize: 26, fontFamilyFallback: emojiFonts)),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4))),
+                  Expanded(
+                    child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4)),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -884,7 +889,10 @@ class _IdeaVisual extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: hudCyan),
                         ),
-                        child: Text(label, style: TextStyle(color: fill ? Colors.black : hudCyan, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          label,
+                          style: TextStyle(color: fill ? Colors.black : hudCyan, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                 ],
@@ -943,7 +951,10 @@ class _WatchVisual extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(alerts[i].$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                            Text(
+                              alerts[i].$2,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                            ),
                             Text(alerts[i].$3, style: const TextStyle(color: Colors.white60)),
                           ],
                         ),
@@ -1002,7 +1013,10 @@ class _LifeGridVisual extends StatelessWidget {
                 children: [
                   Text(tiles[i].$1, style: const TextStyle(fontSize: 30, fontFamilyFallback: emojiFonts)),
                   const SizedBox(height: 6),
-                  Text(tiles[i].$2, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+                  Text(
+                    tiles[i].$2,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
             ),
@@ -1012,7 +1026,7 @@ class _LifeGridVisual extends StatelessWidget {
   );
 }
 
-/// Clicky vivant : le vrai curseur avec ses émojis qui changent.
+/// Smily vivant : le vrai curseur avec ses émojis qui changent.
 class _AliveVisual extends StatefulWidget {
   const _AliveVisual();
 
@@ -1095,12 +1109,15 @@ class _AliveVisualState extends State<_AliveVisual> {
           ),
         ),
       ),
-      Text(says[(_k - 1) % says.length], style: const TextStyle(color: hudCyan, fontSize: 16, fontStyle: FontStyle.italic)),
+      Text(
+        says[(_k - 1) % says.length],
+        style: const TextStyle(color: hudCyan, fontSize: 16, fontStyle: FontStyle.italic),
+      ),
     ],
   );
 }
 
-/// Le curseur bleu de Clicky.
+/// Le curseur bleu de Smily.
 class _CursorPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size s) {

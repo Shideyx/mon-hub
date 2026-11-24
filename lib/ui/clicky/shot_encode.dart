@@ -4,7 +4,7 @@ import 'package:image/image.dart' as img;
 
 /// Une capture d'écran (pixels BGRA de Windows) en **JPEG** : 5 à 10 fois
 /// plus léger qu'un PNG, donc envoyée bien plus vite à l'IA. Fait dans un
-/// Isolate (voir `_captureScreens`) : Clicky continue de bouger pendant ce
+/// Isolate (voir `_captureScreens`) : Smily continue de bouger pendant ce
 /// temps.
 ///
 /// Windows laisse l'opacité à 0 : on la remet à fond (sinon l'encodeur

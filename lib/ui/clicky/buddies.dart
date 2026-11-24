@@ -7,7 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/hub_files.dart';
 import 'routines.dart';
 
-/// Les **compagnons** de Clicky : de petits agents (chacun son nom, sa
+/// Les **compagnons** de Smily : de petits agents (chacun son nom, sa
 /// couleur) qui se proposent d'eux-mêmes pour faire une tâche utile pour
 /// toi — d'après tes réponses à quatre questions, tes cours, tes devoirs…
 /// Tu réponds « Non », « Ajuster » ou « Oui, fais-le » ; ils travaillent en
@@ -113,7 +113,7 @@ class Buddies extends ChangeNotifier {
   Buddies._();
   static final instance = Buddies._();
 
-  /// Fait le travail d'un agent (branché sur Clicky) : renvoie le texte brut.
+  /// Fait le travail d'un agent (branché sur Smily) : renvoie le texte brut.
   Future<String> Function(String prompt)? runner;
 
   /// Prévient (alerte dans la fenêtre + système, voix).
@@ -169,7 +169,10 @@ class Buddies extends ChangeNotifier {
 
   Future<void> remove(Buddy b) async {
     await _file.update((v) {
-      final list = [for (final x in (v['compagnons'] as List?) ?? const []) if (!(x is Map && x['id'] == b.id)) x];
+      final list = [
+        for (final x in (v['compagnons'] as List?) ?? const [])
+          if (!(x is Map && x['id'] == b.id)) x,
+      ];
       return {...v, 'compagnons': list};
     });
     if (b.daily) await Routines.instance.remove('compagnon-${b.id}');
@@ -219,10 +222,12 @@ Les noms : courts, sympas, en français. Au moins un compagnon peut recommencer 
     final run = runner;
     if (run == null || remark.trim().isEmpty) return;
     b.status = 'propose';
-    final raw = await run('''
+    final raw = await run(
+      '''
 Voici un compagnon proposé : ${jsonEncode({'nom': b.name, 'mission': b.mission, 'detail': b.detail, 'chaque_jour': b.daily, 'consignes': b.prompt})}
 La personne demande de l'ajuster : « ${remark.trim()} ».
-Réponds UNIQUEMENT par un tableau JSON d'un seul élément, même format (nom, mission, detail, chaque_jour, consignes).''');
+Réponds UNIQUEMENT par un tableau JSON d'un seul élément, même format (nom, mission, detail, chaque_jour, consignes).''',
+    );
     final next = Buddy.parseProposals(raw).firstOrNull;
     if (next == null) throw 'Je n\'ai pas compris l\'ajustement, reformule.';
     b
@@ -292,7 +297,7 @@ Réponds UNIQUEMENT par un tableau JSON d'un seul élément, même format (nom, 
   }
 
   String _task(Buddy b) =>
-      'Tu es « ${b.name} », un compagnon de Clicky. Ta mission : ${b.mission}\n${b.detail}\n\nConsignes : ${b.prompt}\n\n'
+      'Tu es « ${b.name} », un compagnon de Smily. Ta mission : ${b.mission}\n${b.detail}\n\nConsignes : ${b.prompt}\n\n'
       'Ce que tu sais de la personne :\n$_profileText\n\n'
       'Fais la tâche jusqu\'au bout avec tes outils, puis termine par un compte rendu clair en français '
       '(ce que tu as trouvé ou fait, et la prochaine étape conseillée).';
@@ -355,7 +360,9 @@ class _BlobPainter extends CustomPainter {
       ..addOval(Rect.fromCircle(center: Offset(w * 0.3, h * 0.5), radius: w * 0.26))
       ..addOval(Rect.fromCircle(center: Offset(w * 0.52, h * 0.36), radius: w * 0.3))
       ..addOval(Rect.fromCircle(center: Offset(w * 0.72, h * 0.52), radius: w * 0.24))
-      ..addRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.08, h * 0.45, w * 0.84, h * 0.45), Radius.circular(w * 0.2)));
+      ..addRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.08, h * 0.45, w * 0.84, h * 0.45), Radius.circular(w * 0.2)),
+      );
     canvas.drawShadow(body, color.withValues(alpha: 0.6), 6, false);
     canvas.drawPath(
       body,
@@ -538,7 +545,10 @@ class _BuddiesViewState extends State<BuddiesView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(padding: const EdgeInsets.only(left: 16), child: BuddyBlob(color: x.colour, size: 70)),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: BuddyBlob(color: x.colour, size: 70),
+          ),
           Card(
             margin: EdgeInsets.zero,
             child: Padding(
@@ -673,9 +683,7 @@ class _BuddiesViewState extends State<BuddiesView> {
                   title: Text(x.name),
                   content: SizedBox(
                     width: 520,
-                    child: SingleChildScrollView(
-                      child: SelectableText(x.result.isEmpty ? x.mission : x.result),
-                    ),
+                    child: SingleChildScrollView(child: SelectableText(x.result.isEmpty ? x.mission : x.result)),
                   ),
                   actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Fermer'))],
                 ),
@@ -709,7 +717,9 @@ class _BuddiesViewState extends State<BuddiesView> {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Mes compagnons', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+              Expanded(
+                child: Text('Mes compagnons', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              ),
               TextButton.icon(
                 icon: const Icon(Icons.edit_note_rounded),
                 label: const Text('Mes réponses'),
@@ -724,7 +734,11 @@ class _BuddiesViewState extends State<BuddiesView> {
               ),
             ],
           ),
-          if (b.error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(b.error!, style: const TextStyle(color: Colors.redAccent))),
+          if (b.error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(b.error!, style: const TextStyle(color: Colors.redAccent)),
+            ),
           if (b.proposing && props.isEmpty)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -751,7 +765,10 @@ class _BuddiesViewState extends State<BuddiesView> {
           if (props.isEmpty && active.isEmpty && !b.proposing)
             const Padding(
               padding: EdgeInsets.all(32),
-              child: Text('Touche « De nouvelles idées » : mes compagnons vont se proposer.', textAlign: TextAlign.center),
+              child: Text(
+                'Touche « De nouvelles idées » : mes compagnons vont se proposer.',
+                textAlign: TextAlign.center,
+              ),
             ),
         ],
       );

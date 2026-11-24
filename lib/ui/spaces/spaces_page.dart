@@ -58,7 +58,12 @@ class SpaceActions {
                           onTap: () => set(() => color = c),
                           child: Container(
                             padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(border: Border.all(color: c == color ? HudColors.of(ctx).text : Colors.transparent, width: 2)),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: c == color ? HudColors.of(ctx).text : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
                             child: HudDiamond(Space(id: '', name: '', color: c).colorValue, size: 18),
                           ),
                         ),
@@ -165,9 +170,15 @@ class SpaceActions {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Donne ce code à la personne (elle doit utiliser le même serveur Mon Hub en ligne) :', style: TextStyle(color: c.muted)),
+              Text(
+                'Donne ce code à la personne (elle doit utiliser le même serveur Mon Hub en ligne) :',
+                style: TextStyle(color: c.muted),
+              ),
               const SizedBox(height: 14),
-              SelectableText(s.inviteCode ?? '—', style: hudTitle(ctx, size: 34, color: c.accentText).copyWith(letterSpacing: 4)),
+              SelectableText(
+                s.inviteCode ?? '—',
+                style: hudTitle(ctx, size: 34, color: c.accentText).copyWith(letterSpacing: 4),
+              ),
               const SizedBox(height: 8),
               Text('Elle : Espaces → Rejoindre → ce code.', style: hudLabel(ctx)),
             ],
@@ -222,7 +233,14 @@ class SpacesPage extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text('ESPACES', style: hudTitle(context, size: 34)),
                         const SizedBox(height: 10),
-                        Row(mainAxisSize: MainAxisSize.min, children: [const Hatch(width: 64, height: 7), const SizedBox(width: 12), const Barcode(width: 80, height: 14)]),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Hatch(width: 64, height: 7),
+                            const SizedBox(width: 12),
+                            const Barcode(width: 80, height: 14),
+                          ],
+                        ),
                       ],
                     ),
                     if (s.available)
@@ -231,8 +249,16 @@ class SpacesPage extends StatelessWidget {
                         runSpacing: 6,
                         children: [
                           HudButton(label: 'Rejoindre', onPressed: () => _then(SpaceActions.join(context))),
-                          HudButton(label: 'Message', icon: Icons.chat_bubble_outline_rounded, onPressed: () => _then(SpaceActions.message(context))),
-                          HudButton(label: '+ Espace', primary: true, onPressed: () => _then(SpaceActions.create(context))),
+                          HudButton(
+                            label: 'Message',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            onPressed: () => _then(SpaceActions.message(context)),
+                          ),
+                          HudButton(
+                            label: '+ Espace',
+                            primary: true,
+                            onPressed: () => _then(SpaceActions.create(context)),
+                          ),
                         ],
                       ),
                   ],
@@ -263,7 +289,11 @@ class SpacesPage extends StatelessWidget {
                   child: HudEmpty(
                     'Pas encore d\'espace. Crée-en un pour un exposé, ta classe, ton équipe ou ton entreprise, '
                     'ou rejoins celui d\'un ami avec son code.',
-                    action: HudButton(label: '+ Créer un espace', primary: true, onPressed: () => _then(SpaceActions.create(context))),
+                    action: HudButton(
+                      label: '+ Créer un espace',
+                      primary: true,
+                      onPressed: () => _then(SpaceActions.create(context)),
+                    ),
                   ),
                 )
               else
@@ -283,11 +313,14 @@ class SpacesPage extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-                  child: HudSectionLabel('Discussions privées', trailing: IconButton(
-                    tooltip: 'Nouveau message',
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    onPressed: () => _then(SpaceActions.message(context)),
-                  )),
+                  child: HudSectionLabel(
+                    'Discussions privées',
+                    trailing: IconButton(
+                      tooltip: 'Nouveau message',
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      onPressed: () => _then(SpaceActions.message(context)),
+                    ),
+                  ),
                 ),
               ),
               SliverList.builder(
@@ -320,9 +353,11 @@ class SpacesPage extends StatelessWidget {
     );
   }
 
-  void _then(Future<Space?> f) => unawaited(f.then((s) {
-    if (s != null) onOpen(s);
-  }));
+  void _then(Future<Space?> f) => unawaited(
+    f.then((s) {
+      if (s != null) onOpen(s);
+    }),
+  );
 }
 
 class _SpaceCard extends StatelessWidget {
@@ -347,11 +382,22 @@ class _SpaceCard extends StatelessWidget {
             children: [
               HudDiamond(space.colorValue, size: 9),
               const SizedBox(width: 10),
-              Expanded(child: Text(space.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: hudTitle(context, size: 18))),
+              Expanded(
+                child: Text(
+                  space.name.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: hudTitle(context, size: 18),
+                ),
+              ),
               if (unread > 0) HudTag('$unread', color: c.pink, textColor: Colors.white),
               IconButton(
                 tooltip: pinned ? 'Désépingler du menu' : 'Épingler en haut du menu',
-                icon: Icon(pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, size: 18, color: pinned ? c.accentText : c.dim),
+                icon: Icon(
+                  pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  size: 18,
+                  color: pinned ? c.accentText : c.dim,
+                ),
                 onPressed: () => s.togglePin(space.id),
               ),
             ],
@@ -360,11 +406,18 @@ class _SpaceCard extends StatelessWidget {
           Row(
             children: [
               for (final p in members.take(5))
-                Padding(padding: const EdgeInsets.only(right: 2), child: HexAvatar(p.initial, size: 26, color: HexAvatar.colorFor(p.id))),
+                Padding(
+                  padding: const EdgeInsets.only(right: 2),
+                  child: HexAvatar(p.initial, size: 26, color: HexAvatar.colorFor(p.id)),
+                ),
               const SizedBox(width: 8),
               Text('${members.length} MEMBRE${members.length > 1 ? 'S' : ''}', style: hudLabel(context, size: 10)),
               const Spacer(),
-              if (space.clickyChat) Tooltip(message: 'Les Clicky peuvent se parler ici', child: Icon(Icons.near_me_rounded, size: 16, color: c.accentText)),
+              if (space.clickyChat)
+                Tooltip(
+                  message: 'Les Smily peuvent se parler ici',
+                  child: Icon(Icons.near_me_rounded, size: 16, color: c.accentText),
+                ),
               const SizedBox(width: 8),
             ],
           ),

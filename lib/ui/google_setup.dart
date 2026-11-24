@@ -24,11 +24,7 @@ class GoogleSetupPage extends StatefulWidget {
   static const apis = 'drive.googleapis.com,docs.googleapis.com,calendar-json.googleapis.com,gmail.googleapis.com';
 
   static const steps = [
-    (
-      'Crée le projet',
-      'Nom : « Mon Hub » → Créer.',
-      'https://console.cloud.google.com/projectcreate',
-    ),
+    ('Crée le projet', 'Nom : « Mon Hub » → Créer.', 'https://console.cloud.google.com/projectcreate'),
     (
       'Active les API (un clic)',
       'Vérifie que « Mon Hub » est choisi en haut → Suivant → Activer.',
@@ -107,7 +103,12 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
-        Expanded(child: SelectableText(label, style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Consolas'))),
+        Expanded(
+          child: SelectableText(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Consolas'),
+          ),
+        ),
         TextButton.icon(
           icon: const Icon(Icons.copy_rounded, size: 16),
           label: const Text('Nom'),
@@ -167,7 +168,10 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
                 borderRadius: BorderRadius.circular(18),
                 color: const Color(0xFF23A55A).withValues(alpha: 0.14),
               ),
-              child: Text('✅ $connected est connecté. Dis à Clicky « range mon Drive » !', style: theme.textTheme.titleSmall),
+              child: Text(
+                '✅ $connected est connecté. Dis à Smily « range mon Drive » !',
+                style: theme.textTheme.titleSmall,
+              ),
             )
           else if (builtIn)
             FilledButton.icon(
@@ -213,7 +217,10 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
               Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 child: ListTile(
-                  leading: CircleAvatar(radius: 16, child: Text('${++n}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                  leading: CircleAvatar(
+                    radius: 16,
+                    child: Text('${++n}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
                   title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(text),
                   trailing: FilledButton.tonal(onPressed: () => Browser.open(url), child: const Text('Ouvrir')),
@@ -223,7 +230,11 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
             FilledButton.icon(
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
               icon: busy
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
                   : const Icon(Icons.upload_file_rounded),
               label: Text(busy ? 'Termine dans ton navigateur…' : '6. Choisis le fichier téléchargé et connecte-toi'),
               onPressed: busy ? null : _pickJson,
@@ -238,21 +249,32 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
               tilePadding: EdgeInsets.zero,
               title: const Text('Ou colle l\'ID et le code secret à la main'),
               children: [
-                TextField(controller: id, decoration: const InputDecoration(labelText: 'ID client (…apps.googleusercontent.com)')),
+                TextField(
+                  controller: id,
+                  decoration: const InputDecoration(labelText: 'ID client (…apps.googleusercontent.com)'),
+                ),
                 const SizedBox(height: 10),
-                TextField(controller: secret, decoration: const InputDecoration(labelText: 'Code secret du client')),
+                TextField(
+                  controller: secret,
+                  decoration: const InputDecoration(labelText: 'Code secret du client'),
+                ),
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: FilledButton(onPressed: busy ? null : _connect, child: const Text('Enregistrer et me connecter')),
+                  child: FilledButton(
+                    onPressed: busy ? null : _connect,
+                    child: const Text('Enregistrer et me connecter'),
+                  ),
                 ),
                 const SizedBox(height: 10),
               ],
             ),
             if (GoogleAuth.available) ...[
               const Divider(height: 32),
-              Text('Pour que tout le monde se connecte en un clic',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                'Pour que tout le monde se connecte en un clic',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               const Text(
                 'Ajoute ces deux valeurs dans les secrets GitHub de Mon Hub (une fois) : les prochaines versions '

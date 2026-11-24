@@ -20,12 +20,8 @@ class OnlineCloud implements SyncCloud {
     if (have != want) throw 'Ton compte en ligne est $have, pas $want.';
   }
 
-  static CloudCopy _copy(Map j) => CloudCopy(
-    '${j['name']}',
-    '${j['name']}',
-    '${j['version'] ?? ''}',
-    DateTime.tryParse('${j['updated_at']}'),
-  );
+  static CloudCopy _copy(Map j) =>
+      CloudCopy('${j['name']}', '${j['name']}', '${j['version'] ?? ''}', DateTime.tryParse('${j['updated_at']}'));
 
   @override
   Future<List<CloudCopy>> list() async {

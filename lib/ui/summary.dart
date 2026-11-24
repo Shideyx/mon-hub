@@ -111,7 +111,10 @@ class _Hero extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
-          colors: [c.withValues(alpha: dark ? 0.32 : 0.20), c.withValues(alpha: dark ? 0.10 : 0.05)],
+          colors: [
+            c.withValues(alpha: dark ? 0.32 : 0.20),
+            c.withValues(alpha: dark ? 0.10 : 0.05),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -207,10 +210,7 @@ class _Pill extends StatelessWidget {
     return Container(
       width: 132,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: item.color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: item.color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -373,9 +373,7 @@ class _Bubble extends StatelessWidget {
                     '${item.mine ? 'Toi : ' : ''}${item.preview}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: item.unread ? FontWeight.w600 : null,
-                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: item.unread ? FontWeight.w600 : null),
                   ),
                 ],
               ),
@@ -390,15 +388,7 @@ class _Bubble extends StatelessWidget {
 /// Un visage rond avec le prénom dessous ; [ring] colore le contour
 /// (pas lu, en ligne…), [sub] ajoute une petite ligne (statut).
 class SummaryFace extends StatelessWidget {
-  const SummaryFace({
-    super.key,
-    required this.name,
-    this.url,
-    required this.color,
-    this.ring,
-    this.sub,
-    this.onTap,
-  });
+  const SummaryFace({super.key, required this.name, this.url, required this.color, this.ring, this.sub, this.onTap});
 
   final String name;
   final String? url;
@@ -433,7 +423,10 @@ class SummaryFace extends StatelessWidget {
               ),
               child: Container(
                 padding: const EdgeInsets.all(1.5),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: theme.cardTheme.color ?? theme.colorScheme.surface),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.cardTheme.color ?? theme.colorScheme.surface,
+                ),
                 child: HubAvatar(url: url, label: name, color: color, size: 40),
               ),
             ),
@@ -472,10 +465,7 @@ class StatTile extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
       child: Row(
         children: [
           Icon(icon, size: 18, color: color),

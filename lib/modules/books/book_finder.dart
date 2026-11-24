@@ -79,8 +79,7 @@ class BookFinder {
       _google(t, author, french: false).catchError((_) => <BookMatch>[]),
     ]);
     final all = [for (final r in results) ...r];
-    final scored = [for (final m in all) m.withScore(score(t, author, m))]
-      ..sort((a, b) => b.score.compareTo(a.score));
+    final scored = [for (final m in all) m.withScore(score(t, author, m))]..sort((a, b) => b.score.compareTo(a.score));
     // Un seul exemplaire par livre (même titre + auteur), en gardant la
     // meilleure couverture.
     final seen = <String>{};
@@ -121,8 +120,12 @@ class BookFinder {
           BookMatch(
             title: '${d['title'] ?? ''}',
             author: ((d['author_name'] as List?) ?? const []).take(2).join(', '),
-            coverUrl: d['cover_i'] == null ? null : 'https://covers.openlibrary.org/b/id/${d['cover_i']}-L.jpg?default=false',
-            thumbUrl: d['cover_i'] == null ? null : 'https://covers.openlibrary.org/b/id/${d['cover_i']}-M.jpg?default=false',
+            coverUrl: d['cover_i'] == null
+                ? null
+                : 'https://covers.openlibrary.org/b/id/${d['cover_i']}-L.jpg?default=false',
+            thumbUrl: d['cover_i'] == null
+                ? null
+                : 'https://covers.openlibrary.org/b/id/${d['cover_i']}-M.jpg?default=false',
             pages: (d['number_of_pages_median'] as num?)?.toInt(),
             year: (d['first_publish_year'] as num?)?.toInt(),
             source: 'Open Library',
@@ -132,10 +135,7 @@ class BookFinder {
   }
 
   Future<List<BookMatch>> _google(String title, String author, {required bool french}) async {
-    final q = [
-      'intitle:$title',
-      if (author.trim().isNotEmpty) 'inauthor:${author.trim()}',
-    ].join(' ');
+    final q = ['intitle:$title', if (author.trim().isNotEmpty) 'inauthor:${author.trim()}'].join(' ');
     final j = await _json(
       Uri.https('www.googleapis.com', '/books/v1/volumes', {
         'q': q,
@@ -175,8 +175,29 @@ class BookFinder {
   // ---- Note de ressemblance ----
 
   static const _stop = {
-    'le', 'la', 'les', 'l', 'un', 'une', 'des', 'de', 'du', 'd', 'et', 'a', 'au', 'aux', 'en',
-    'the', 'an', 'of', 'and', 'tome', 'volume', 'vol', 't',
+    'le',
+    'la',
+    'les',
+    'l',
+    'un',
+    'une',
+    'des',
+    'de',
+    'du',
+    'd',
+    'et',
+    'a',
+    'au',
+    'aux',
+    'en',
+    'the',
+    'an',
+    'of',
+    'and',
+    'tome',
+    'volume',
+    'vol',
+    't',
   };
 
   /// Minuscules, sans accents ni ponctuation.
@@ -191,7 +212,10 @@ class BookFinder {
     return '$b'.replaceAll(RegExp(r"[^a-z0-9]+"), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  static List<String> _words(String s) => [for (final w in normalize(s).split(' ')) if (w.isNotEmpty && !_stop.contains(w)) w];
+  static List<String> _words(String s) => [
+    for (final w in normalize(s).split(' '))
+      if (w.isNotEmpty && !_stop.contains(w)) w,
+  ];
 
   /// Ressemblance de deux titres (0 à 1) : mots en commun, en tolérant une
   /// faute de frappe et un sous-titre en plus.

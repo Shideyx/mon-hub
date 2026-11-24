@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 
-/// « Clicky agit » : Clicky prend vraiment la souris et le clavier pour faire
+/// « Smily agit » : Smily prend vraiment la souris et le clavier pour faire
 /// une tâche sur l'ordinateur, pas à pas, en regardant l'écran à chaque fois
 /// (comme une personne) : il vole jusqu'à l'endroit, clique, fait défiler,
 /// écrit, ouvre des applis, passe d'une fenêtre à l'autre…
@@ -19,7 +19,7 @@ class ActStep {
   final String action;
   final Map<String, dynamic> args;
 
-  /// Ce que Clicky pense / va faire (montré à la personne).
+  /// Ce que Smily pense / va faire (montré à la personne).
   final String thought;
 
   num? n(String k) => args[k] is num ? args[k] as num : num.tryParse('${args[k] ?? ''}');
@@ -94,7 +94,7 @@ class ActStep {
   /// Consignes pour l'IA à chaque tour.
   static String guide({required int screens}) =>
       '''
-Tu es Clicky et tu PILOTES l'ordinateur de la personne (Windows) pour atteindre un but, pas à pas, comme un humain : tu regardes l'écran, tu fais UNE action, puis tu regardes de nouveau.
+Tu es Smily et tu PILOTES l'ordinateur de la personne (Windows) pour atteindre un but, pas à pas, comme un humain : tu regardes l'écran, tu fais UNE action, puis tu regardes de nouveau.
 Réponds UNIQUEMENT par un objet JSON (rien avant ni après) :
 {"pense":"ce que je vois et ce que je fais (une phrase courte, en français)","action":"…", …}
 Actions possibles :
@@ -124,6 +124,5 @@ class ActLog {
   final String result;
 
   @override
-  String toString() =>
-      '${step.describe}${step.thought.isEmpty ? '' : ' (${step.thought})'} → $result';
+  String toString() => '${step.describe}${step.thought.isEmpty ? '' : ' (${step.thought})'} → $result';
 }

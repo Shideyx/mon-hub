@@ -18,7 +18,7 @@ class InterpretLine {
 }
 
 /// **Interprète en direct** : tu parles avec quelqu'un dans une autre
-/// langue, Clicky traduit à voix haute dans les deux sens (Gemini Live).
+/// langue, Smily traduit à voix haute dans les deux sens (Gemini Live).
 class Interpreter {
   Interpreter._();
 
@@ -91,7 +91,7 @@ class _InterpreterPageState extends State<InterpreterPage> {
     }
     final key = (await ClaudeApi.store.readSecret('gemini.key') ?? '').trim();
     if (key.isEmpty) {
-      setState(() => _error = 'Il faut ta clé Gemini gratuite (aistudio.google.com) : Réglages de Clicky → Voix.');
+      setState(() => _error = 'Il faut ta clé Gemini gratuite (aistudio.google.com) : Réglages de Smily → Voix.');
       return;
     }
     setState(() {
@@ -145,7 +145,7 @@ class _InterpreterPageState extends State<InterpreterPage> {
       _live = live;
       _mic = stream.listen((chunk) {
         // Pendant que la traduction est lue, le micro se tait : sinon
-        // Clicky se traduirait lui-même.
+        // Smily se traduirait lui-même.
         if (player.playing) return;
         live.sendAudio(chunk);
         final lv = PcmPlayer.rms(chunk);

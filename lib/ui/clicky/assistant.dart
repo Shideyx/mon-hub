@@ -9,6 +9,7 @@ import '../../core/hub_module.dart';
 import '../../core/module_store.dart';
 import '../../modules/carnet/carnet_store.dart';
 import '../widgets.dart';
+import 'patience.dart';
 import 'initiatives.dart';
 import 'quick.dart' show QuickTool;
 import 'tutor.dart' show normalize;
@@ -18,7 +19,13 @@ import '../../core/birthdays.dart';
 
 /// Le texte sans emojis (pour la voix).
 String withoutEmoji(String text) => text
-    .replaceAll(RegExp(r'[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]', unicode: true), '')
+    .replaceAll(
+      RegExp(
+        r'[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]',
+        unicode: true,
+      ),
+      '',
+    )
     .replaceAll(RegExp(r'[ \t]+'), ' ')
     .replaceAll(RegExp(r'^ ', multiLine: true), '');
 
@@ -32,36 +39,91 @@ class AssistantFeature {
   final String text;
 
   static const all = [
-    AssistantFeature('anticipation', Icons.alarm_rounded, Color(0xFFE67E22), 'Anticipation',
-        'Te prévenir d\'un devoir avant sa date limite : la veille, et 3 jours avant un contrôle ou un gros travail.'),
-    AssistantFeature('organisation', Icons.call_split_rounded, Color(0xFFE5484D), 'Organisation',
-        'Repérer quand deux évènements de ton agenda se chevauchent.'),
-    AssistantFeature('surveillance', Icons.visibility_rounded, Color(0xFF0B6FB8), 'Surveillance',
-        'Te dire quand un évènement ou une réunion arrive dans ton agenda, ou qu\'un cours est annulé.'),
-    AssistantFeature('assistance', Icons.event_repeat_rounded, Color(0xFF16A085), 'Assistance',
-        'Proposer de réorganiser ta journée : un conflit, un cours annulé, une soirée chargée.'),
-    AssistantFeature('memoire', Icons.bookmark_rounded, Color(0xFF8E44AD), 'Mémoire',
-        'Se souvenir de tes projets, décisions et objectifs quand tu en parles à Clicky.'),
-    AssistantFeature('automatisation', Icons.playlist_add_check_rounded, Color(0xFF7C5CFF), 'Automatisation',
-        'Proposer d\'ajouter tes nouveaux devoirs à ta liste, et le faire après ton accord.'),
-    AssistantFeature('conseils', Icons.lightbulb_rounded, Color(0xFFF1C40F), 'Conseils',
-        'Repérer que tu accumules trop de tâches et te proposer des priorités.'),
-    AssistantFeature('sac', Icons.backpack_rounded, Color(0xFF2B6CFF), 'Prépare ton sac',
-        'Le soir, d\'après tes cours de demain : les affaires à prendre (tenue de sport, calculatrice…), les devoirs à '
-        'rendre et les contrôles.'),
-    AssistantFeature('anniversaires', Icons.cake_rounded, Color(0xFFE5487B), 'Anniversaires',
-        'La veille au soir et le jour même, les anniversaires de tes proches (Google Agenda et ceux que tu ajoutes), '
-        'avec un petit message tout prêt.'),
-    AssistantFeature('sommeil', Icons.bedtime_rounded, Color(0xFF5B5BD6), 'Sommeil',
-        'Le soir, l\'heure de te coucher d\'après ton premier cours du lendemain (9 h de sommeil, réglable).'),
-    AssistantFeature('initiatives', Icons.rocket_launch_rounded, Color(0xFFD35400), 'Initiatives',
-        'Prendre les devants sur tout le reste : un rendez-vous ou une date limite dans un message, une mauvaise '
-        'note à rattraper, ta série de révisions à sauver, un message qui attend ta réponse, la pluie demain, '
-        'un objectif oublié… et les idées de Gemini (si tu as la clé).'),
+    AssistantFeature(
+      'anticipation',
+      Icons.alarm_rounded,
+      Color(0xFFE67E22),
+      'Anticipation',
+      'Te prévenir d\'un devoir avant sa date limite : la veille, et 3 jours avant un contrôle ou un gros travail.',
+    ),
+    AssistantFeature(
+      'organisation',
+      Icons.call_split_rounded,
+      Color(0xFFE5484D),
+      'Organisation',
+      'Repérer quand deux évènements de ton agenda se chevauchent.',
+    ),
+    AssistantFeature(
+      'surveillance',
+      Icons.visibility_rounded,
+      Color(0xFF0B6FB8),
+      'Surveillance',
+      'Te dire quand un évènement ou une réunion arrive dans ton agenda, ou qu\'un cours est annulé.',
+    ),
+    AssistantFeature(
+      'assistance',
+      Icons.event_repeat_rounded,
+      Color(0xFF16A085),
+      'Assistance',
+      'Proposer de réorganiser ta journée : un conflit, un cours annulé, une soirée chargée.',
+    ),
+    AssistantFeature(
+      'memoire',
+      Icons.bookmark_rounded,
+      Color(0xFF8E44AD),
+      'Mémoire',
+      'Se souvenir de tes projets, décisions et objectifs quand tu en parles à Smily.',
+    ),
+    AssistantFeature(
+      'automatisation',
+      Icons.playlist_add_check_rounded,
+      Color(0xFF7C5CFF),
+      'Automatisation',
+      'Proposer d\'ajouter tes nouveaux devoirs à ta liste, et le faire après ton accord.',
+    ),
+    AssistantFeature(
+      'conseils',
+      Icons.lightbulb_rounded,
+      Color(0xFFF1C40F),
+      'Conseils',
+      'Repérer que tu accumules trop de tâches et te proposer des priorités.',
+    ),
+    AssistantFeature(
+      'sac',
+      Icons.backpack_rounded,
+      Color(0xFF2B6CFF),
+      'Prépare ton sac',
+      'Le soir, d\'après tes cours de demain : les affaires à prendre (tenue de sport, calculatrice…), les devoirs à '
+          'rendre et les contrôles.',
+    ),
+    AssistantFeature(
+      'anniversaires',
+      Icons.cake_rounded,
+      Color(0xFFE5487B),
+      'Anniversaires',
+      'La veille au soir et le jour même, les anniversaires de tes proches (Google Agenda et ceux que tu ajoutes), '
+          'avec un petit message tout prêt.',
+    ),
+    AssistantFeature(
+      'sommeil',
+      Icons.bedtime_rounded,
+      Color(0xFF5B5BD6),
+      'Sommeil',
+      'Le soir, l\'heure de te coucher d\'après ton premier cours du lendemain (9 h de sommeil, réglable).',
+    ),
+    AssistantFeature(
+      'initiatives',
+      Icons.rocket_launch_rounded,
+      Color(0xFFD35400),
+      'Initiatives',
+      'Prendre les devants sur tout le reste : un rendez-vous ou une date limite dans un message, une mauvaise '
+          'note à rattraper, ta série de révisions à sauver, un message qui attend ta réponse, la pluie demain, '
+          'un objectif oublié… et les idées de Gemini (si tu as la clé).',
+    ),
   ];
 }
 
-/// Une proposition de Clicky, à accepter ou non.
+/// Une proposition de Smily, à accepter ou non.
 class Proposal {
   Proposal({
     required this.id,
@@ -99,7 +161,7 @@ class RankedTask {
   final bool isTest;
 }
 
-/// L'assistant personnel : Clicky qui prend les devants (si tu le veux).
+/// L'assistant personnel : Smily qui prend les devants (si tu le veux).
 /// Tout est calculé par Mon Hub, sans IA, à partir de ton agenda, de ton
 /// cahier de texte, de ta liste et de tes messages.
 class Assistant extends ChangeNotifier {
@@ -115,7 +177,7 @@ class Assistant extends ChangeNotifier {
   /// Alerte (bandeau + notification de Windows).
   void Function(String title, String body)? notify;
 
-  /// Afficher un texte en grand chez Clicky (briefing).
+  /// Afficher un texte en grand chez Smily (briefing).
   Future<void> Function(String title, String text)? present;
 
   Timer? _timer;
@@ -164,7 +226,8 @@ class Assistant extends ChangeNotifier {
             icon: Icons.auto_awesome_rounded,
             color: const Color(0xFF7C5CFF),
             title: 'Je peux devenir ton assistant personnel',
-            body: 'Te prévenir avant tes devoirs, repérer les conflits dans ton agenda, surveiller les nouveaux '
+            body:
+                'Te prévenir avant tes devoirs, repérer les conflits dans ton agenda, surveiller les nouveaux '
                 'évènements, réorganiser ta journée, retenir tes projets, ajouter tes devoirs à ta liste '
                 '(avec ton accord) et te conseiller des priorités. Tout reste sur ton PC.',
             accept: 'Oui, vas-y',
@@ -191,7 +254,7 @@ class Assistant extends ChangeNotifier {
   /// Les actions de Mon Hub sont branchées (assistant démarré).
   bool get ready => _call != null;
 
-  /// Donne les actions sans démarrer l'assistant (briefing demandé à Clicky
+  /// Donne les actions sans démarrer l'assistant (briefing demandé à Smily
   /// partout, par exemple).
   void useTools({required QuickTool call, required Set<String> Function() tools}) {
     _call ??= call;
@@ -207,9 +270,15 @@ class Assistant extends ChangeNotifier {
     proposals.clear();
   }
 
+  /// Le sujet d'une proposition (« note|maths » → « note ») : c'est là-dessus
+  /// que la personne dit oui ou non, pas sur la proposition précise.
+  static String subjectOf(String id) => id.split(RegExp(r'[|:]')).first;
 
   void propose(Proposal p) {
     if (proposals.any((x) => x.id == p.id)) return;
+    // Sujet déjà refusé plusieurs fois : Smily n'insiste plus (sauf le
+    // consentement, qui est la question de départ).
+    if (p.id != 'consent' && !Patience.instance.mayTalk('assistant:${subjectOf(p.id)}')) return;
     proposals.add(p);
     notifyListeners();
   }
@@ -218,6 +287,9 @@ class Assistant extends ChangeNotifier {
   Future<String?> answer(Proposal p, bool yes) async {
     proposals.remove(p);
     notifyListeners();
+    if (p.id != 'consent') {
+      unawaited(Patience.instance.answered('assistant:${subjectOf(p.id)}', yes ? Answer.yes : Answer.no));
+    }
     try {
       if (yes) return await p.onAccept?.call();
       await p.onDecline?.call();
@@ -245,9 +317,8 @@ class Assistant extends ChangeNotifier {
   static DateTime? _date(Object? v) => v is DateTime ? v : DateTime.tryParse('$v');
 
   // Ce qui a déjà été dit (pour ne jamais répéter une alerte).
-  Map<String, int> get _seenMap => (store.getJson<Map<String, dynamic>>('seen') ?? const {}).map(
-    (k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0),
-  );
+  Map<String, int> get _seenMap =>
+      (store.getJson<Map<String, dynamic>>('seen') ?? const {}).map((k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0));
 
   bool seen(String key) => _seenMap.containsKey(key);
 
@@ -269,10 +340,12 @@ class Assistant extends ChangeNotifier {
     final n = now ?? DateTime.now();
     try {
       final hw = _list(await _get('ecole_devoirs'));
-      final events = _list(await _get('agenda_lire', {
-        'debut': DateTime(n.year, n.month, n.day).toIso8601String().substring(0, 10),
-        'jours': 14,
-      }));
+      final events = _list(
+        await _get('agenda_lire', {
+          'debut': DateTime(n.year, n.month, n.day).toIso8601String().substring(0, 10),
+          'jours': 14,
+        }),
+      );
       if (on('anticipation')) await _anticipate(hw, n);
       final clash = on('organisation') ? await _conflicts(events, n) : <String>[];
       final changes = on('surveillance') ? await _watch(events, n) : <String>[];
@@ -314,8 +387,8 @@ class Assistant extends ChangeNotifier {
   Future<String?> bedtimeTonight({List<Map>? events}) async {
     final n = DateTime.now();
     final tomorrow = DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
-    final ev = events ??
-        _list(await _get('agenda_lire', {'debut': tomorrow.toIso8601String().substring(0, 10), 'jours': 1}));
+    final ev =
+        events ?? _list(await _get('agenda_lire', {'debut': tomorrow.toIso8601String().substring(0, 10), 'jours': 1}));
     final first = firstLesson(ev, tomorrow);
     return first == null ? null : Sleep.say(first, hours: sleepHours, prep: sleepPrep);
   }
@@ -339,8 +412,14 @@ class Assistant extends ChangeNotifier {
   Future<List<Birthday>> allBirthdays({List<Map>? events, int days = 31}) async {
     await Birthdays.instance.load();
     final n = DateTime.now();
-    final ev = events ??
-        _list(await _get('agenda_lire', {'debut': DateTime(n.year, n.month, n.day).toIso8601String().substring(0, 10), 'jours': days}));
+    final ev =
+        events ??
+        _list(
+          await _get('agenda_lire', {
+            'debut': DateTime(n.year, n.month, n.day).toIso8601String().substring(0, 10),
+            'jours': days,
+          }),
+        );
     return [...Birthdays.instance.saved, ...Birthdays.fromEvents(ev)];
   }
 
@@ -351,7 +430,8 @@ class Assistant extends ChangeNotifier {
       final isToday = d == today;
       // Le jour même à partir de 8 h ; la veille à partir de 19 h.
       if (isToday ? n.hour < 8 : n.hour < 19) continue;
-      final key = 'anniv|${Birthdays.key(b.name)}|${d.toIso8601String().substring(0, 10)}|${isToday ? 'jour' : 'veille'}';
+      final key =
+          'anniv|${Birthdays.key(b.name)}|${d.toIso8601String().substring(0, 10)}|${isToday ? 'jour' : 'veille'}';
       if (seen(key)) continue;
       await mark(key, n);
       final age = Birthdays.age(b, d);
@@ -385,8 +465,14 @@ class Assistant extends ChangeNotifier {
 
   /// Le sac pour [day] (texte à dire), ou null s'il n'y a pas cours.
   Future<String?> bagFor(DateTime day, {List<Map>? events, List<Map>? homework, String? word}) async {
-    final ev = events ??
-        _list(await _get('agenda_lire', {'debut': DateTime(day.year, day.month, day.day).toIso8601String().substring(0, 10), 'jours': 1}));
+    final ev =
+        events ??
+        _list(
+          await _get('agenda_lire', {
+            'debut': DateTime(day.year, day.month, day.day).toIso8601String().substring(0, 10),
+            'jours': 1,
+          }),
+        );
     final hw = homework ?? _list(await _get('ecole_devoirs'));
     final p = SchoolBag.plan(events: ev, homework: hw, day: day, custom: bagItems);
     if (p == null) return null;
@@ -410,7 +496,10 @@ class Assistant extends ChangeNotifier {
 
   // Anticipation ------------------------------------------------------------
 
-  static final _bigWork = RegExp(r'expos|dm\b|devoir maison|projet|r[ée]daction|dissertation|oral|dossier|commentaire', caseSensitive: false);
+  static final _bigWork = RegExp(
+    r'expos|dm\b|devoir maison|projet|r[ée]daction|dissertation|oral|dossier|commentaire',
+    caseSensitive: false,
+  );
 
   /// Les alertes de devoirs à donner maintenant : (clé, titre, texte).
   static List<(String, String, String)> homeworkAlerts(List<Map> hw, DateTime now) {
@@ -478,7 +567,8 @@ class Assistant extends ChangeNotifier {
     return out;
   }
 
-  static String _hour(DateTime d) => d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
+  static String _hour(DateTime d) =>
+      d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
 
   static String _day(DateTime d, DateTime now) {
     final diff = DateTime(d.year, d.month, d.day).difference(DateTime(now.year, now.month, now.day)).inDays;
@@ -522,7 +612,10 @@ class Assistant extends ChangeNotifier {
       for (final e in personal.where((e) => !before.contains(eventKey(e)))) {
         final at = _date(e['debut'])!;
         if (!at.isAfter(n)) continue;
-        final meeting = RegExp(r'r[ée]union|meeting|rdv|rendez|conseil|parents', caseSensitive: false).hasMatch('${e['titre']}');
+        final meeting = RegExp(
+          r'r[ée]union|meeting|rdv|rendez|conseil|parents',
+          caseSensitive: false,
+        ).hasMatch('${e['titre']}');
         notify?.call(
           meeting ? '📅 Réunion ajoutée à ton agenda' : '📅 Nouveau dans ton agenda',
           '« ${e['titre']} » ${_day(at, n)} à ${_hour(at)}${'${e['lieu'] ?? ''}'.isEmpty ? '' : ' (${e['lieu']})'}.',
@@ -611,14 +704,18 @@ class Assistant extends ChangeNotifier {
       var score = 70.0 - days * 12;
       if (test) score += 25;
       if (_bigWork.hasMatch(c)) score += 10;
-      out.add(RankedTask(
-        test ? 'Réviser ${h['matiere']}' : '${h['matiere']} : ${c.length > 50 ? '${c.substring(0, 50)}…' : c}',
-        score,
-        test ? 'contrôle ${days == 1 ? 'demain' : 'dans $days jours'}' : (days <= 1 ? 'pour ${days == 0 ? 'aujourd\'hui' : 'demain'}' : 'pour dans $days jours'),
-        due: due,
-        minutes: test ? 45 : (_bigWork.hasMatch(c) ? 45 : 30),
-        isTest: test,
-      ));
+      out.add(
+        RankedTask(
+          test ? 'Réviser ${h['matiere']}' : '${h['matiere']} : ${c.length > 50 ? '${c.substring(0, 50)}…' : c}',
+          score,
+          test
+              ? 'contrôle ${days == 1 ? 'demain' : 'dans $days jours'}'
+              : (days <= 1 ? 'pour ${days == 0 ? 'aujourd\'hui' : 'demain'}' : 'pour dans $days jours'),
+          due: due,
+          minutes: test ? 45 : (_bigWork.hasMatch(c) ? 45 : 30),
+          isTest: test,
+        ),
+      );
     }
     for (final t in todos) {
       if (t.done) continue;
@@ -648,8 +745,7 @@ class Assistant extends ChangeNotifier {
   }
 
   /// Trop de choses à faire ?
-  static bool overloaded(List<RankedTask> tasks) =>
-      tasks.length >= 8 || tasks.where((t) => t.score >= 55).length >= 4;
+  static bool overloaded(List<RankedTask> tasks) => tasks.length >= 8 || tasks.where((t) => t.score >= 55).length >= 4;
 
   Future<bool> _advise(List<Map> hw, DateTime n) async {
     final c = Carnet.instance;
@@ -699,7 +795,7 @@ class Assistant extends ChangeNotifier {
           rest.add(task);
           continue;
         }
-        plan.add({'titre': task.text, 'debut': fmt(t), 'fin': fmt(stop), 'note': 'Placé par Clicky (${task.reason})'});
+        plan.add({'titre': task.text, 'debut': fmt(t), 'fin': fmt(stop), 'note': 'Placé par Smily (${task.reason})'});
         // 10 minutes de pause entre deux choses.
         t = stop.add(const Duration(minutes: 10));
       }
@@ -715,13 +811,15 @@ class Assistant extends ChangeNotifier {
     if (list.isEmpty) return const [];
     final start = math.max(n.hour + 1, n.weekday >= 6 ? 10 : 17);
     if (start >= 21) return const [];
-    final free = _list(await _get('agenda_creneaux_libres', {
-      'debut': n.toIso8601String().substring(0, 10),
-      'jours': 1,
-      'de': start,
-      'a': 21,
-      'minimum': 30,
-    }));
+    final free = _list(
+      await _get('agenda_creneaux_libres', {
+        'debut': n.toIso8601String().substring(0, 10),
+        'jours': 1,
+        'de': start,
+        'a': 21,
+        'minimum': 30,
+      }),
+    );
     final slots = [for (final s in (free.firstOrNull?['libre'] as List?) ?? const []) '$s'];
     return planSlots(slots, list, n);
   }
@@ -743,7 +841,9 @@ class Assistant extends ChangeNotifier {
           _ => 'Ta soirée est chargée : je te propose un plan',
         },
         body: 'Je le mets dans ton agenda ?',
-        details: [for (final p in plan) '${p['debut']!.substring(11, 16)}–${p['fin']!.substring(11, 16)} ${p['titre']}'],
+        details: [
+          for (final p in plan) '${p['debut']!.substring(11, 16)}–${p['fin']!.substring(11, 16)} ${p['titre']}',
+        ],
         accept: 'Mettre dans l\'agenda',
         onAccept: () async {
           await _get('agenda_ajouter_plan', {'plan': jsonEncode(plan)});
@@ -786,7 +886,14 @@ class Assistant extends ChangeNotifier {
 
   /// Propose d'ajouter un rendez-vous ou une date limite trouvés dans un
   /// message.
-  void offerSpotted(String key, SpottedDate d, DateTime n, {required String source, String subject = '', String who = ''}) {
+  void offerSpotted(
+    String key,
+    SpottedDate d,
+    DateTime n, {
+    required String source,
+    String subject = '',
+    String who = '',
+  }) {
     if (proposals.where((p) => p.id.startsWith('spot|')).length >= 3) return;
     final title = spotTitle(d, subject: subject, who: who);
     final when = '${_day(d.at, n)}${d.hasTime ? ' à ${_hour(d.at)}' : ''}';
@@ -807,7 +914,7 @@ class Assistant extends ChangeNotifier {
               'titre': title,
               'debut': iso(d.at),
               'fin': iso(d.at.add(const Duration(hours: 1))),
-              'note': 'Repéré par Clicky dans $source',
+              'note': 'Repéré par Smily dans $source',
             });
             return 'C\'est dans ton agenda : $title, $when.';
           }
@@ -830,9 +937,12 @@ class Assistant extends ChangeNotifier {
       reads++;
       await mark(key, n);
       final body = await _get('ecole_message_lire', {'id': m['id']});
-      final text = '${m['objet'] ?? ''}. ${body is Map ? (body['texte'] ?? body['contenu'] ?? body['text'] ?? '') : (body ?? '')}';
+      final text =
+          '${m['objet'] ?? ''}. ${body is Map ? (body['texte'] ?? body['contenu'] ?? body['text'] ?? '') : (body ?? '')}';
       final found = DateSpotter.find(text, n).firstOrNull;
-      if (found != null) offerSpotted(key, found, n, source: 'un message École Directe', subject: '${m['objet'] ?? ''}');
+      if (found != null) {
+        offerSpotted(key, found, n, source: 'un message École Directe', subject: '${m['objet'] ?? ''}');
+      }
     }
     for (final m in _list(await _get('mails_lister', {'nombre': 15}))) {
       if (m['lu'] != false || _promo.hasMatch('${m['de']} ${m['objet']}')) continue;
@@ -843,9 +953,7 @@ class Assistant extends ChangeNotifier {
       if (found != null) offerSpotted(key, found, n, source: 'un mail', subject: '${m['objet'] ?? ''}');
     }
     // (Instagram n'est jamais lu en arrière-plan : il l'interdit.)
-    final dms = [
-      ..._list(await _get('discord_conversations')).map((d) => ('Discord', d)),
-    ];
+    final dms = [..._list(await _get('discord_conversations')).map((d) => ('Discord', d))];
     for (final (app, d) in dms) {
       if (d['non_lu'] != true || '${d['dernier'] ?? ''}'.isEmpty) continue;
       final key = 'msg|$app|${d['id']}|${'${d['dernier']}'.hashCode}';
@@ -860,13 +968,15 @@ class Assistant extends ChangeNotifier {
   /// Le premier créneau libre (aujourd'hui puis les jours suivants) pour
   /// une tâche.
   Future<Map<String, String>?> _nextSlot(RankedTask task, DateTime n, {int days = 3}) async {
-    final free = _list(await _get('agenda_creneaux_libres', {
-      'debut': n.toIso8601String().substring(0, 10),
-      'jours': days,
-      'de': 17,
-      'a': 21,
-      'minimum': task.minutes,
-    }));
+    final free = _list(
+      await _get('agenda_creneaux_libres', {
+        'debut': n.toIso8601String().substring(0, 10),
+        'jours': days,
+        'de': 17,
+        'a': 21,
+        'minimum': task.minutes,
+      }),
+    );
     for (final d in free) {
       final day = DateTime.tryParse('${d['jour']}');
       if (day == null) continue;
@@ -896,9 +1006,16 @@ class Assistant extends ChangeNotifier {
       if (v == null) continue;
       final subject = '${g['matiere']}';
       if (v >= 16) {
-        notify?.call('🎉 Bravo pour ton ${g['note']} en $subject !', 'Continue comme ça${'${g['devoir']}'.isEmpty ? '' : ' (« ${g['devoir']} »)'}.');
+        notify?.call(
+          '🎉 Bravo pour ton ${g['note']} en $subject !',
+          'Continue comme ça${'${g['devoir']}'.isEmpty ? '' : ' (« ${g['devoir']} »)'}.',
+        );
       } else if (v < 10) {
-        final task = RankedTask('Revoir $subject${'${g['devoir']}'.isEmpty ? '' : ' : ${g['devoir']}'}', 80, 'note de ${g['note']}');
+        final task = RankedTask(
+          'Revoir $subject${'${g['devoir']}'.isEmpty ? '' : ' : ${g['devoir']}'}',
+          80,
+          'note de ${g['note']}',
+        );
         final slot = await _nextSlot(task, n);
         propose(
           Proposal(
@@ -913,7 +1030,9 @@ class Assistant extends ChangeNotifier {
             onAccept: slot == null
                 ? null
                 : () async {
-                    await _get('agenda_ajouter_plan', {'plan': jsonEncode([slot])});
+                    await _get('agenda_ajouter_plan', {
+                      'plan': jsonEncode([slot]),
+                    });
                     return 'C\'est réservé dans ton agenda.';
                   },
           ),
@@ -933,16 +1052,19 @@ class Assistant extends ChangeNotifier {
     final due = (r['a_revoir_aujourdhui'] as num?)?.toInt() ?? 0;
     if (serie < 2 || done > 0 || due == 0) return;
     await mark(key, n);
-    notify?.call('🔥 Ta série de $serie jours de révision', 'Elle s\'arrête ce soir si tu ne révises pas : 5 minutes de cartes suffisent ($due à revoir).');
+    notify?.call(
+      '🔥 Ta série de $serie jours de révision',
+      'Elle s\'arrête ce soir si tu ne révises pas : 5 minutes de cartes suffisent ($due à revoir).',
+    );
   }
 
   Future<void> _unanswered(DateTime n) async {
     if (n.hour < 10 || n.hour >= 21) return;
-    final waiting = (store.getJson<Map<String, dynamic>>('waiting') ?? const {}).map((k, v) => MapEntry(k, (v as num).toInt()));
+    final waiting = (store.getJson<Map<String, dynamic>>('waiting') ?? const {}).map(
+      (k, v) => MapEntry(k, (v as num).toInt()),
+    );
     final now = <String, int>{};
-    final list = [
-      ..._list(await _get('discord_conversations')).map((d) => ('Discord', d)),
-    ];
+    final list = [..._list(await _get('discord_conversations')).map((d) => ('Discord', d))];
     for (final (app, d) in list) {
       if (d['non_lu'] != true) continue;
       final key = 'attente|$app|${d['id']}|${'${d['dernier']}'.hashCode}';
@@ -952,7 +1074,10 @@ class Assistant extends ChangeNotifier {
       if (hours < 12 || seen(key)) continue;
       await mark(key, n);
       final last = '${d['dernier'] ?? ''}'.replaceFirst(RegExp(r'^[^:]{1,40} : '), '');
-      notify?.call('💬 ${d['nom']} attend ta réponse', 'Message sur $app depuis $hours h${last.isEmpty ? '' : ' : « ${last.length > 80 ? '${last.substring(0, 80)}…' : last} »'}');
+      notify?.call(
+        '💬 ${d['nom']} attend ta réponse',
+        'Message sur $app depuis $hours h${last.isEmpty ? '' : ' : « ${last.length > 80 ? '${last.substring(0, 80)}…' : last} »'}',
+      );
     }
     await store.setJson('waiting', now);
   }
@@ -965,7 +1090,9 @@ class Assistant extends ChangeNotifier {
     final w = await _get('carnet_meteo');
     if (w is! Map) return;
     final rain = (w['pluie_demain_pourcent'] as num?)?.toInt() ?? 0;
-    if (rain >= 60) notify?.call('☔ Demain, $rain % de risque de pluie', 'Pense à ton parapluie (demain : ${w['demain']}).');
+    if (rain >= 60) {
+      notify?.call('☔ Demain, $rain % de risque de pluie', 'Pense à ton parapluie (demain : ${w['demain']}).');
+    }
   }
 
   Future<void> _bedtime(List<Map> hw, DateTime n) async {
@@ -979,7 +1106,10 @@ class Assistant extends ChangeNotifier {
     final key = 'dodo|${day.toIso8601String().substring(0, 10)}';
     if (seen(key)) return;
     await mark(key, n);
-    notify?.call('😴 Contrôle de ${test['matiere']} demain', 'Il est tard : une bonne nuit t\'aidera plus qu\'une heure de révision en plus.');
+    notify?.call(
+      '😴 Contrôle de ${test['matiere']} demain',
+      'Il est tard : une bonne nuit t\'aidera plus qu\'une heure de révision en plus.',
+    );
   }
 
   Future<void> _goals(DateTime n) async {
@@ -1003,12 +1133,15 @@ class Assistant extends ChangeNotifier {
           icon: Icons.flag_rounded,
           color: const Color(0xFFD35400),
           title: 'Un petit pas pour ton objectif ?',
-          body: '« ${g.text} »${slot == null ? '' : ' : je te réserve 30 minutes ${_day(DateTime.parse(slot['debut']!), n)} à ${_hour(DateTime.parse(slot['debut']!))} ?'}',
+          body:
+              '« ${g.text} »${slot == null ? '' : ' : je te réserve 30 minutes ${_day(DateTime.parse(slot['debut']!), n)} à ${_hour(DateTime.parse(slot['debut']!))} ?'}',
           accept: slot == null ? 'Bonne idée' : 'Réserver',
           onAccept: slot == null
               ? null
               : () async {
-                  await _get('agenda_ajouter_plan', {'plan': jsonEncode([slot])});
+                  await _get('agenda_ajouter_plan', {
+                    'plan': jsonEncode([slot]),
+                  });
                   return 'Réservé dans ton agenda. Courage !';
                 },
         ),
@@ -1031,7 +1164,7 @@ class Assistant extends ChangeNotifier {
       'initiatives VRAIMENT utiles en plus (préparer quelque chose à l\'avance, profiter d\'un créneau libre, un '
       'message important à traiter, la santé, un objectif…). Rien d\'utile : réponds []. Réponds seulement en JSON : '
       '[{"titre":"court","texte":"une phrase","action":"tache|evenement|aucune","quand":"AAAA-MM-JJTHH:MM","duree_min":30}]',
-      system: 'Tu es Clicky, l\'assistant personnel proactif d\'un lycéen français. Tu es concret et bref.',
+      system: 'Tu es Smily, l\'assistant personnel proactif d\'un lycéen français. Tu es concret et bref.',
       geminiOnly: true,
     );
     for (final (i, idea) in parseIdeas(AiText.json(r), n).take(2).indexed) {
@@ -1054,7 +1187,7 @@ class Assistant extends ChangeNotifier {
                 'titre': idea.title,
                 'debut': at.toIso8601String().substring(0, 16),
                 'fin': at.add(Duration(minutes: idea.minutes)).toIso8601String().substring(0, 16),
-                'note': 'Idée de Clicky',
+                'note': 'Idée de Smily',
               });
               return 'C\'est dans ton agenda.';
             },
@@ -1072,7 +1205,10 @@ class Assistant extends ChangeNotifier {
   }
 
   /// Les idées renvoyées par l'IA (en ignorant ce qui est mal formé).
-  static List<({String title, String text, String action, DateTime? when, int minutes})> parseIdeas(Object? json, DateTime now) => [
+  static List<({String title, String text, String action, DateTime? when, int minutes})> parseIdeas(
+    Object? json,
+    DateTime now,
+  ) => [
     for (final x in (json is List ? json : const []))
       if (x is Map && '${x['titre'] ?? ''}'.trim().isNotEmpty)
         if (('${x['action']}', DateTime.tryParse('${x['quand'] ?? ''}')) case (final a, final w))
@@ -1080,13 +1216,15 @@ class Assistant extends ChangeNotifier {
             title: '${x['titre']}'.trim(),
             text: '${x['texte'] ?? ''}'.trim(),
             // Un évènement sans date valide (ou passée) devient une tâche.
-            action: a == 'evenement' ? (w != null && w.isAfter(now) ? 'evenement' : 'tache') : (a == 'tache' ? 'tache' : 'aucune'),
+            action: a == 'evenement'
+                ? (w != null && w.isAfter(now) ? 'evenement' : 'tache')
+                : (a == 'tache' ? 'tache' : 'aucune'),
             when: w,
             minutes: ((x['duree_min'] as num?)?.toInt() ?? 30).clamp(10, 240),
           ),
   ];
 
-  // Outils (pour Clicky et Claude) ------------------------------------------
+  // Outils (pour Smily et Claude) ------------------------------------------
 
   List<HubTool> get tools => [
     HubTool(
@@ -1104,21 +1242,31 @@ class Assistant extends ChangeNotifier {
         final all = await allBirthdays(days: name.isEmpty ? 31 : 366);
         if (name.isNotEmpty) {
           final k = Birthdays.key(name);
-          final b = all.where((b) => Birthdays.key(b.name) == k).firstOrNull ??
-              all.where((b) => Birthdays.key(b.name).split(' ').contains(k) || Birthdays.key(b.name).startsWith(k)).firstOrNull;
-          if (b == null) return 'Je ne connais pas l\'anniversaire de $name. Dis-moi : « l\'anniversaire de $name c\'est le 12 mars ».';
+          final b =
+              all.where((b) => Birthdays.key(b.name) == k).firstOrNull ??
+              all
+                  .where((b) => Birthdays.key(b.name).split(' ').contains(k) || Birthdays.key(b.name).startsWith(k))
+                  .firstOrNull;
+          if (b == null) {
+            return 'Je ne connais pas l\'anniversaire de $name. Dis-moi : « l\'anniversaire de $name c\'est le 12 mars ».';
+          }
           final d = Birthdays.next(b, n);
           final left = d.difference(DateTime(n.year, n.month, n.day)).inDays;
           final age = Birthdays.age(b, d);
           return 'L\'anniversaire de ${b.name} : le ${Birthdays.dateText(Birthday(b.name, b.month, b.day))}'
-              '${left == 0 ? ', c\'est aujourd\'hui ! 🎂' : left == 1 ? ', c\'est demain !' : ' (dans $left jours)'}'
+              '${left == 0
+                  ? ', c\'est aujourd\'hui ! 🎂'
+                  : left == 1
+                  ? ', c\'est demain !'
+                  : ' (dans $left jours)'}'
               '${age == null ? '' : ' — $age ans'}.';
         }
         final up = Birthdays.upcoming(all, n, days: (a['jours'] as num?)?.toInt() ?? 30);
         return {
           'resume': Birthdays.say(up, n),
           'liste': [
-            for (final (b, d) in up) {'nom': b.name, 'date': d.toIso8601String().substring(0, 10), 'age': ?Birthdays.age(b, d)},
+            for (final (b, d) in up)
+              {'nom': b.name, 'date': d.toIso8601String().substring(0, 10), 'age': ?Birthdays.age(b, d)},
           ],
         };
       },
@@ -1134,7 +1282,9 @@ class Assistant extends ChangeNotifier {
       run: (a) async {
         final name = '${a['nom'] ?? ''}'.trim();
         final d = Birthdays.parseDate('${a['date'] ?? ''}');
-        if (name.isEmpty || d == null) return 'Je n\'ai pas compris la date (par exemple : « 12 mars » ou « 12/03/2011 »).';
+        if (name.isEmpty || d == null) {
+          return 'Je n\'ai pas compris la date (par exemple : « 12 mars » ou « 12/03/2011 »).';
+        }
         final (m, day, y) = d;
         final b = Birthday(name[0].toUpperCase() + name.substring(1), m, day, year: y);
         await Birthdays.instance.add(b);
@@ -1157,18 +1307,21 @@ class Assistant extends ChangeNotifier {
     ),
     HubTool(
       name: 'assistant_sac',
-      description: 'Prépare ton sac : les affaires à prendre pour les cours de demain (ou d\'un autre jour), les devoirs '
+      description:
+          'Prépare ton sac : les affaires à prendre pour les cours de demain (ou d\'un autre jour), les devoirs '
           'à rendre et les contrôles.',
       params: {'jour': ('string', 'AAAA-MM-JJ (défaut : demain)')},
       run: (a) async {
         final n = DateTime.now();
-        final day = DateTime.tryParse('${a['jour'] ?? ''}') ?? DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
+        final day =
+            DateTime.tryParse('${a['jour'] ?? ''}') ?? DateTime(n.year, n.month, n.day).add(const Duration(days: 1));
         return await bagFor(day) ?? 'Pas cours ce jour-là : rien à préparer.';
       },
     ),
     HubTool(
       name: 'assistant_priorites',
-      description: 'Assistant personnel : tout ce que j\'ai à faire (devoirs, contrôles, ma liste), classé du plus '
+      description:
+          'Assistant personnel : tout ce que j\'ai à faire (devoirs, contrôles, ma liste), classé du plus '
           'important au moins important, avec la raison. Pour « par quoi je commence ? », « mes priorités ».',
       run: (_) async {
         final n = DateTime.now();
@@ -1177,13 +1330,16 @@ class Assistant extends ChangeNotifier {
         final tasks = rank(_list(await _get('ecole_devoirs')), c.list('todos'), n);
         return {
           'trop_de_choses': overloaded(tasks),
-          'priorites': [for (final t in tasks.take(10)) {'tache': t.text, 'pourquoi': t.reason}],
+          'priorites': [
+            for (final t in tasks.take(10)) {'tache': t.text, 'pourquoi': t.reason},
+          ],
         };
       },
     ),
     HubTool(
       name: 'assistant_planifier_journee',
-      description: 'Assistant personnel : propose un plan pour aujourd\'hui (après les cours), dans mes créneaux '
+      description:
+          'Assistant personnel : propose un plan pour aujourd\'hui (après les cours), dans mes créneaux '
           'libres, avec mes tâches les plus importantes. Montre une proposition à accepter (rien n\'est ajouté sans '
           'mon accord).',
       run: (_) async {
@@ -1198,7 +1354,9 @@ class Assistant extends ChangeNotifier {
             color: const Color(0xFF16A085),
             title: 'Mon plan pour ta journée',
             body: 'Je le mets dans ton agenda ?',
-            details: [for (final p in plan) '${p['debut']!.substring(11, 16)}–${p['fin']!.substring(11, 16)} ${p['titre']}'],
+            details: [
+              for (final p in plan) '${p['debut']!.substring(11, 16)}–${p['fin']!.substring(11, 16)} ${p['titre']}',
+            ],
             accept: 'Mettre dans l\'agenda',
             onAccept: () async {
               await _get('agenda_ajouter_plan', {'plan': jsonEncode(plan)});
@@ -1211,7 +1369,8 @@ class Assistant extends ChangeNotifier {
     ),
     HubTool(
       name: 'assistant_ajouter_plan_journee',
-      description: 'Assistant personnel : prépare le plan de la journée (tâches importantes dans les créneaux libres '
+      description:
+          'Assistant personnel : prépare le plan de la journée (tâches importantes dans les créneaux libres '
           'après les cours) et l\'ajoute directement à l\'agenda. Seulement quand la personne a dit oui.',
       run: (_) async {
         final plan = await planDay(DateTime.now());
@@ -1247,12 +1406,15 @@ class Assistant extends ChangeNotifier {
             if (g == null) return 'Objectif introuvable';
             await c.remove('goals', g.id);
         }
-        return [for (final g in c.list('goals')) {'objectif': g.text, 'atteint': g.done}];
+        return [
+          for (final g in c.list('goals')) {'objectif': g.text, 'atteint': g.done},
+        ];
       },
     ),
     HubTool(
       name: 'assistant_briefing',
-      description: 'Le briefing du jour (emploi du temps, devoirs, rendez-vous, messages importants, retards, '
+      description:
+          'Le briefing du jour (emploi du temps, devoirs, rendez-vous, messages importants, retards, '
           'objectifs, conseils), préparé par Mon Hub.',
       run: (_) => morningBriefing(),
     ),
@@ -1275,12 +1437,19 @@ class Assistant extends ChangeNotifier {
       final t = tail(RegExp(r"(?:décidé|decide|décide|décidé,)\s*(?:de |d'|que |qu')?(.+)$", caseSensitive: false));
       if (t.length > 4) return ('décision', t);
     }
-    if (RegExp(r'^(?:mon|notre) (?:projet|nouveau projet)|^je (?:lance|commence|monte|prepare) (?:un|mon) projet').hasMatch(n)) {
+    if (RegExp(r'^(?:mon|notre) (?:projet|nouveau projet)|^je (?:lance|commence|monte|prepare) (?:un|mon) projet')
+        .hasMatch(n)) {
       final t = tail(RegExp(r"projet\s*(?:,|:|c.est|est)?\s*(?:de |d'|d’)?(.+)$", caseSensitive: false));
       if (t.length > 4) return ('projet', t);
     }
-    if (RegExp(r'^(?:mon (?:objectif|but)|cette annee je veux|je me fixe comme objectif|mon objectif cette)').hasMatch(n)) {
-      final t = tail(RegExp(r"(?:objectif|but|je veux)\s*(?:,|:|c.est|est|de|d'|cette année|ce trimestre)?\s*(?:de |d'|que )?(.+)$", caseSensitive: false));
+    if (RegExp(r'^(?:mon (?:objectif|but)|cette annee je veux|je me fixe comme objectif|mon objectif cette)')
+        .hasMatch(n)) {
+      final t = tail(
+        RegExp(
+          r"(?:objectif|but|je veux)\s*(?:,|:|c.est|est|de|d'|cette année|ce trimestre)?\s*(?:de |d'|que )?(.+)$",
+          caseSensitive: false,
+        ),
+      );
       if (t.length > 4) return ('objectif', t);
     }
     return null;
@@ -1307,7 +1476,10 @@ class Assistant extends ChangeNotifier {
 
   // Briefing du matin -------------------------------------------------------
 
-  static final _promo = RegExp(r'no-?reply|newsletter|promo|marketing|notification|offre|soldes|%|unsubscribe|publicit', caseSensitive: false);
+  static final _promo = RegExp(
+    r'no-?reply|newsletter|promo|marketing|notification|offre|soldes|%|unsubscribe|publicit',
+    caseSensitive: false,
+  );
 
   /// Les données du jour, rassemblées (sans IA).
   Future<Map<String, Object?>> collect(DateTime n) async {
@@ -1324,35 +1496,66 @@ class Assistant extends ChangeNotifier {
     final mails = _list(await _get('mails_lister', {'nombre': 20}));
     final discord = _list(await _get('discord_conversations'));
     final rev = await _get('revision_paquets');
-    final free = _list(await _get('agenda_creneaux_libres', {'debut': day, 'jours': 1, 'de': n.weekday >= 6 ? 10 : 16, 'a': 21, 'minimum': 45}));
+    final free = _list(
+      await _get('agenda_creneaux_libres', {
+        'debut': day,
+        'jours': 1,
+        'de': n.weekday >= 6 ? 10 : 16,
+        'a': 21,
+        'minimum': 45,
+      }),
+    );
     bool isToday(Map e) {
       final d = _date(e['debut']);
       return d != null && d.year == today.year && d.month == today.month && d.day == today.day;
     }
+
     return {
       'date': n,
       'meteo': weather,
-      'cours': [for (final e in events) if (isToday(e) && '${e['source']}'.contains('cole')) e],
+      'cours': [
+        for (final e in events)
+          if (isToday(e) && '${e['source']}'.contains('cole')) e,
+      ],
       'rdv': [
         for (final e in events)
-          if (!'${e['source']}'.contains('cole') && e['annule'] != true && (_date(e['debut'])?.isAfter(n.subtract(const Duration(hours: 1))) ?? false)) e,
+          if (!'${e['source']}'.contains('cole') &&
+              e['annule'] != true &&
+              (_date(e['debut'])?.isAfter(n.subtract(const Duration(hours: 1))) ?? false))
+            e,
       ],
       'devoirs': [
         for (final h in hw)
           if (h['fait'] != true)
-            if (_date(h['pour_le']) case final d? when d.difference(today).inDays >= 0 && d.difference(today).inDays <= 2) h,
+            if (_date(h['pour_le']) case final d?
+                when d.difference(today).inDays >= 0 && d.difference(today).inDays <= 2)
+              h,
       ],
       'controles': [
         for (final h in hw)
           if (h['controle'] == true)
-            if (_date(h['pour_le']) case final d? when d.difference(today).inDays >= 0 && d.difference(today).inDays <= 7) h,
+            if (_date(h['pour_le']) case final d?
+                when d.difference(today).inDays >= 0 && d.difference(today).inDays <= 7)
+              h,
       ],
-      'messages_ecole': [for (final m in ed) if (m['lu'] == false) m],
-      'mails': [for (final m in mails) if (m['lu'] == false && !_promo.hasMatch('${m['de']} ${m['objet']}')) m],
+      'messages_ecole': [
+        for (final m in ed)
+          if (m['lu'] == false) m,
+      ],
+      'mails': [
+        for (final m in mails)
+          if (m['lu'] == false && !_promo.hasMatch('${m['de']} ${m['objet']}')) m,
+      ],
       'discord_non_lus': discord.where((d) => d['non_lu'] == true).length,
-      'en_retard': [for (final t in tasks) if (t.reason.startsWith('en retard') || t.reason.startsWith('attend')) t],
+      'en_retard': [
+        for (final t in tasks)
+          if (t.reason.startsWith('en retard') || t.reason.startsWith('attend')) t,
+      ],
       'taches': tasks,
-      'objectifs': [for (final g in c.list('goals')) if (!g.done) g.text],
+      'objectifs': [
+        for (final g in c.list('goals'))
+          if (!g.done) g.text,
+      ],
       'cartes': rev is Map ? rev['a_revoir_aujourdhui'] : null,
       'creneaux': [for (final s in (free.firstOrNull?['libre'] as List?) ?? const []) '$s'],
     };
@@ -1365,27 +1568,35 @@ class Assistant extends ChangeNotifier {
     final tests = (d['controles'] as List).cast<Map>();
     if (tests.isNotEmpty) {
       final t = tests.first;
-      out.add('Révise ${t['matiere']} un peu chaque jour : contrôle ${_day(_date(t['pour_le'])!, now)}. Ta fiche et tes cartes sont dans Révisions.');
+      out.add(
+        'Révise ${t['matiere']} un peu chaque jour : contrôle ${_day(_date(t['pour_le'])!, now)}. Ta fiche et tes cartes sont dans Révisions.',
+      );
     }
     final tasks = (d['taches'] as List).cast<RankedTask>();
     final slots = (d['creneaux'] as List).cast<String>();
     if (tasks.isNotEmpty) {
       final first = tasks.first;
-      out.add(slots.isNotEmpty
-          ? 'Ton meilleur créneau : ${slots.first.replaceAll('-', ' – ')}. Commence par « ${first.text} » (${first.reason}).'
-          : 'Commence par « ${first.text} » (${first.reason}).');
+      out.add(
+        slots.isNotEmpty
+            ? 'Ton meilleur créneau : ${slots.first.replaceAll('-', ' – ')}. Commence par « ${first.text} » (${first.reason}).'
+            : 'Commence par « ${first.text} » (${first.reason}).',
+      );
     }
     final late = (d['en_retard'] as List).cast<RankedTask>();
     if (late.isNotEmpty && (tasks.isEmpty || late.first.text != tasks.first.text)) {
       out.add('Débarrasse-toi de « ${late.first.text} » : ${late.first.reason}.');
     }
-    if (overloaded(tasks)) out.add('Tu as beaucoup de choses : concentre-toi sur les 3 premières, le reste peut attendre.');
+    if (overloaded(tasks)) {
+      out.add('Tu as beaucoup de choses : concentre-toi sur les 3 premières, le reste peut attendre.');
+    }
     final cards = d['cartes'];
     if (cards is num && cards > 0) out.add('$cards carte${cards > 1 ? 's' : ''} à revoir : 10 minutes suffisent.');
     final w = d['meteo'];
     if (w is Map && (w['pluie_pourcent'] as num? ?? 0) >= 60) out.add('Prends un parapluie, il va pleuvoir.');
     final goals = (d['objectifs'] as List).cast<String>();
-    if (goals.isNotEmpty) out.add('Pour ton objectif « ${goals[now.day % goals.length]} », fais un petit pas aujourd\'hui.');
+    if (goals.isNotEmpty) {
+      out.add('Pour ton objectif « ${goals[now.day % goals.length]} », fais un petit pas aujourd\'hui.');
+    }
     final lessons = (d['cours'] as List).length;
     if (lessons >= 7) out.add('Grosse journée de cours : garde un moment pour souffler ce soir.');
     return out.take(4).toList();
@@ -1396,18 +1607,32 @@ class Assistant extends ChangeNotifier {
     final now = d['date'] as DateTime;
     final b = StringBuffer();
     final hello = now.hour < 18 ? 'Bonjour' : 'Bonsoir';
-    b.writeln('☀️ $hello${name.isEmpty ? '' : ' $name'} ! Nous sommes ${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}.');
+    b.writeln(
+      '☀️ $hello${name.isEmpty ? '' : ' $name'} ! Nous sommes ${frDays[now.weekday - 1]} ${now.day} ${frMonths[now.month - 1]}.',
+    );
     final w = d['meteo'];
-    if (w is Map) b.writeln('${w['icone'] ?? '🌤️'} ${w['maintenant']}, entre ${w['min']} et ${w['max']} °C. ${w['tenue'] ?? ''}'.trim());
+    if (w is Map) {
+      b.writeln(
+        '${w['icone'] ?? '🌤️'} ${w['maintenant']}, entre ${w['min']} et ${w['max']} °C. ${w['tenue'] ?? ''}'.trim(),
+      );
+    }
     final lessons = (d['cours'] as List).cast<Map>();
     b.writeln();
     if (lessons.isEmpty) {
       b.writeln('📚 Pas de cours aujourd\'hui.');
     } else {
-      final cancelled = [for (final l in lessons) if (l['annule'] == true) l];
-      final on = [for (final l in lessons) if (l['annule'] != true) l]..sort((a, c) => _date(a['debut'])!.compareTo(_date(c['debut'])!));
-      b.writeln('📚 Emploi du temps : ${[for (final l in on) '${_hour(_date(l['debut'])!)} ${l['titre']}'].join(', ')}'
-          '${on.isEmpty ? '' : '. Tu finis à ${_hour(_date(on.last['fin'])!)}'}.');
+      final cancelled = [
+        for (final l in lessons)
+          if (l['annule'] == true) l,
+      ];
+      final on = [
+        for (final l in lessons)
+          if (l['annule'] != true) l,
+      ]..sort((a, c) => _date(a['debut'])!.compareTo(_date(c['debut'])!));
+      b.writeln(
+        '📚 Emploi du temps : ${[for (final l in on) '${_hour(_date(l['debut'])!)} ${l['titre']}'].join(', ')}'
+        '${on.isEmpty ? '' : '. Tu finis à ${_hour(_date(on.last['fin'])!)}'}.',
+      );
       for (final c in cancelled) {
         b.writeln('🎉 Annulé : ${c['titre']} à ${_hour(_date(c['debut'])!)}.');
       }
@@ -1421,7 +1646,9 @@ class Assistant extends ChangeNotifier {
       }
       for (final h in hw.where((h) => h['controle'] != true).take(6)) {
         final c = '${h['contenu'] ?? ''}'.replaceAll(RegExp(r'\s+'), ' ').trim();
-        b.writeln('✏️ ${h['matiere']} pour ${_day(_date(h['pour_le'])!, now)} : ${c.length > 70 ? '${c.substring(0, 70)}…' : c}');
+        b.writeln(
+          '✏️ ${h['matiere']} pour ${_day(_date(h['pour_le'])!, now)} : ${c.length > 70 ? '${c.substring(0, 70)}…' : c}',
+        );
       }
     }
     final rdv = (d['rdv'] as List).cast<Map>();
@@ -1429,7 +1656,9 @@ class Assistant extends ChangeNotifier {
       b.writeln();
       for (final e in rdv.take(4)) {
         final at = _date(e['debut'])!;
-        b.writeln('📅 ${e['titre']} ${_day(at, now)} à ${_hour(at)}${'${e['lieu'] ?? ''}'.isEmpty ? '' : ' (${e['lieu']})'}.');
+        b.writeln(
+          '📅 ${e['titre']} ${_day(at, now)} à ${_hour(at)}${'${e['lieu'] ?? ''}'.isEmpty ? '' : ' (${e['lieu']})'}.',
+        );
       }
     }
     final edm = (d['messages_ecole'] as List).cast<Map>();
@@ -1481,7 +1710,7 @@ class Assistant extends ChangeNotifier {
         'Réécris-le de façon naturelle et chaleureuse, comme un assistant personnel (JARVIS), sans rien inventer et '
         'sans rien oublier d\'important : garde les mêmes rubriques avec leurs emojis, des phrases courtes, et termine '
         'par 3 recommandations concrètes et réalistes pour la journée.',
-        system: 'Tu es Clicky, l\'assistant personnel d\'un lycéen français. Tu écris en français, simplement.',
+        system: 'Tu es Smily, l\'assistant personnel d\'un lycéen français. Tu écris en français, simplement.',
         geminiOnly: true,
       );
       return r.trim().isEmpty ? text : r.trim();

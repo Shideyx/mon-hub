@@ -22,7 +22,9 @@ void main() {
 
   test('certificats : message clair pour Spotify', () {
     final m = TrustedCertificates.explain(
-      const HandshakeException('Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate)'),
+      const HandshakeException(
+        'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate)',
+      ),
     );
     expect(m, contains('antivirus'));
     expect(TrustedCertificates.explain('autre erreur'), isNull);

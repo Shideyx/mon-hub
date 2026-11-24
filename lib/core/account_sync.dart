@@ -46,8 +46,7 @@ class AccountSync extends ChangeNotifier {
   /// (« monhub:adresse ») ou le Google Drive (adresse Google).
   static SyncCloud Function(String email) cloudFor = defaultCloud;
 
-  static SyncCloud defaultCloud(String email) =>
-      Online.isSyncMail(email) ? OnlineCloud(email) : DriveFolder(email);
+  static SyncCloud defaultCloud(String email) => Online.isSyncMail(email) ? OnlineCloud(email) : DriveFolder(email);
 
   /// La copie est-elle dans Mon Hub en ligne (et pas dans le Drive) ?
   bool get online => Online.isSyncMail(email);
@@ -125,7 +124,7 @@ class AccountSync extends ChangeNotifier {
 
   // ---------- Marche / arrêt ----------
 
-  /// Compte ouvert (Mon Hub, pas les widgets ni Clicky partout) : synchro
+  /// Compte ouvert (Mon Hub, pas les widgets ni Smily partout) : synchro
   /// maintenant puis toutes les [every], et réponse aux demandes des autres
   /// appareils toutes les [watchEvery].
   void start() {
@@ -199,13 +198,7 @@ class AccountSync extends ChangeNotifier {
     }
   }
 
-  Future<void> _sync(
-    HubAccount acc,
-    String mail,
-    SyncKey key, {
-    bool remoteWins = false,
-    bool replace = false,
-  }) async {
+  Future<void> _sync(HubAccount acc, String mail, SyncKey key, {bool remoteWins = false, bool replace = false}) async {
     final gen = _gen;
     final profile = ModuleStore.profile;
     bool still() => gen == _gen && ModuleStore.profile == profile;
@@ -247,8 +240,8 @@ class AccountSync extends ChangeNotifier {
     if (!still()) return;
     final changed = await _apply(merged, stamped, still);
     if (!still()) return;
-    final upload = copy == null ||
-        (remote == null ? !SyncMerge.sameAsStamps(merged, base) : !SyncMerge.same(merged, remote));
+    final upload =
+        copy == null || (remote == null ? !SyncMerge.sameAsStamps(merged, base) : !SyncMerge.same(merged, remote));
     var version = copy?.version;
     if (upload) {
       final text = await SyncBox.seal(login: acc.login, account: acc, key: key, entries: merged);
@@ -385,7 +378,10 @@ class AccountSync extends ChangeNotifier {
     for (final mail in GoogleAuth.accounts.where(GoogleAuth.canWriteDrive)) {
       try {
         final cloud = cloudFor(mail);
-        final asks = [for (final c in await cloud.list()) if (c.name == requestName(acc.login)) c];
+        final asks = [
+          for (final c in await cloud.list())
+            if (c.name == requestName(acc.login)) c,
+        ];
         if (asks.isEmpty) continue;
         final was = enabled;
         if (!was) {
@@ -547,8 +543,10 @@ class AccountSync extends ChangeNotifier {
   }
 
   /// Les comptes Mon Hub gardés dans le Drive de [mail].
-  static Future<List<CloudCopy>> copies(String mail) async =>
-      [for (final c in await cloudFor(mail).list()) if (c.login != null) c];
+  static Future<List<CloudCopy>> copies(String mail) async => [
+    for (final c in await cloudFor(mail).list())
+      if (c.login != null) c,
+  ];
 
   /// Récupère le compte [copy] (gardé dans le Drive de [mail]) sur cet
   /// appareil, puis l'ouvre.
@@ -607,7 +605,7 @@ class AccountSync extends ChangeNotifier {
       name != 'sauvegarde.json' &&
       // Le temps d'écran est propre à ce PC.
       name != 'temps-ecran.json' &&
-      // Ce que Clicky a vu et entendu reste sur ce PC (jamais envoyé).
+      // Ce que Smily a vu et entendu reste sur ce PC (jamais envoyé).
       name != 'memoire-ecran.json' &&
       name != 'sens-recent.json' &&
       // Les guetteurs tournent sur ce PC (sinon : deux alertes).
@@ -886,8 +884,11 @@ class SyncKey {
     final s = salt ?? List.generate(16, (_) => _rnd.nextInt(256));
     final it = iterations ?? defaultIterations;
     Future<List<int>> run() async {
-      final k = await Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: it, bits: 256)
-          .deriveKeyFromPassword(password: secret, nonce: s);
+      final k = await Pbkdf2(
+        macAlgorithm: Hmac.sha256(),
+        iterations: it,
+        bits: 256,
+      ).deriveKeyFromPassword(password: secret, nonce: s);
       return k.extractBytes();
     }
 
@@ -1106,9 +1107,7 @@ class DriveFolder implements SyncCloud {
   /// Dossiers trouvés, par compte Google.
   static final _folders = <String, List<String>>{};
 
-  Future<Map<String, String>> _auth() async => {
-    'Authorization': 'Bearer ${await GoogleAuth.accessToken(email)}',
-  };
+  Future<Map<String, String>> _auth() async => {'Authorization': 'Bearer ${await GoogleAuth.accessToken(email)}'};
 
   static CloudCopy _copy(Map j) => CloudCopy(
     '${j['id']}',
@@ -1131,9 +1130,8 @@ class DriveFolder implements SyncCloud {
 
   Future<List<Map<dynamic, dynamic>>> _query(String q, String fields) async {
     final r = await http.get(
-      Uri.parse(_files).replace(
-        queryParameters: {'q': q, 'pageSize': '100', 'fields': 'files($fields)', 'spaces': 'drive'},
-      ),
+      Uri.parse(_files)
+          .replace(queryParameters: {'q': q, 'pageSize': '100', 'fields': 'files($fields)', 'spaces': 'drive'}),
       headers: await _auth(),
     );
     if (r.statusCode >= 400) throw _error(r);
@@ -1158,7 +1156,8 @@ class DriveFolder implements SyncCloud {
         body: jsonEncode({
           'name': folderName,
           'mimeType': _folderMime,
-          'description': 'Copie chiffrée de ton compte Mon Hub, pour le retrouver sur tes autres appareils. '
+          'description':
+              'Copie chiffrée de ton compte Mon Hub, pour le retrouver sur tes autres appareils. '
               'Illisible sans ton mot de passe Mon Hub. Ne pas supprimer.',
         }),
       );

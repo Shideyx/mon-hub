@@ -141,9 +141,7 @@ class WindowsMediaSession {
         duration: dur > 0 ? Duration(milliseconds: (dur * 1000).round()) : null,
         playing: m['status'] == 'Playing',
         app: '${m['app'] ?? ''}',
-        at: m['upd'] is num
-            ? DateTime.fromMillisecondsSinceEpoch((m['upd'] as num).toInt())
-            : DateTime.now(),
+        at: m['upd'] is num ? DateTime.fromMillisecondsSinceEpoch((m['upd'] as num).toInt()) : DateTime.now(),
         trackNumber: (m['track'] as num?)?.toInt() ?? 0,
       ),
     );

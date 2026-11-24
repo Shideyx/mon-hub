@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/powershell.dart';
 
-/// Mot d'activation (Windows) : dis « Clicky » et il
+/// Mot d'activation (Windows) : dis « Smily » et il
 /// t'écoute, sans toucher au clavier.
 ///
 /// La reconnaissance vocale de Windows ne cherche que ces quelques mots
 /// (liste fermée), sur le PC : rien n'est envoyé tant que le mot n'a pas été
-/// entendu. Elle se met en pause pendant que Clicky écoute ta question.
+/// entendu. Elle se met en pause pendant que Smily écoute ta question.
 class WakeWord {
   WakeWord(this.onWake);
   final void Function() onWake;
@@ -26,12 +26,18 @@ class WakeWord {
 
   /// Ce qui le réveille.
   static const phrases = [
+    'smily',
+    // La reconnaissance de Windows entend souvent « smiley » ou « similé ».
+    'smiley',
+    'similé',
+    'hey smily',
+    'ok smily',
+    'dis smily',
+    'hé smily',
+    'salut smily',
+    // L'ancien nom marche encore, le temps de prendre l'habitude.
     'clicky',
     'hey clicky',
-    'ok clicky',
-    'dis clicky',
-    'hé clicky',
-    'salut clicky',
   ];
 
   Future<void> start() async {
@@ -73,7 +79,7 @@ class WakeWord {
     } catch (_) {}
   }
 
-  /// Pendant que Clicky écoute ou parle.
+  /// Pendant que Smily écoute ou parle.
   void pause() {
     if (_proc == null || _paused) return;
     _paused = true;
@@ -101,7 +107,7 @@ class WakeWord {
 
   @visibleForTesting
   static const script = r'''
-param([string]$Words = 'clicky')
+param([string]$Words = 'smily')
 $ErrorActionPreference = 'Stop'
 $out = New-Object System.IO.StreamWriter([Console]::OpenStandardOutput())
 $out.AutoFlush = $true

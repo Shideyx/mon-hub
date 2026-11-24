@@ -11,11 +11,8 @@ class QuizQuestion {
   final List<String> wrong;
 
   Map<String, dynamic> toJson() => {'q': question, 'a': answer, 'w': wrong};
-  factory QuizQuestion.fromJson(Map j) => QuizQuestion(
-    '${j['q'] ?? ''}',
-    '${j['a'] ?? ''}',
-    [for (final w in (j['w'] as List?) ?? const []) '$w'],
-  );
+  factory QuizQuestion.fromJson(Map j) =>
+      QuizQuestion('${j['q'] ?? ''}', '${j['a'] ?? ''}', [for (final w in (j['w'] as List?) ?? const []) '$w']);
 }
 
 /// Un paquet de cartes (une matière, un chapitre…).
@@ -41,7 +38,7 @@ class Deck {
   final DateTime created;
   final List<StudyCard> cards;
 
-  /// La fiche de révision (Markdown), préparée par Clicky.
+  /// La fiche de révision (Markdown), préparée par Smily.
   String? sheet;
 
   /// Le quiz préparé (QCM avec de vrais pièges).
@@ -135,7 +132,16 @@ class RevisionsStore extends ChangeNotifier {
   RevisionsStore._();
   static final instance = RevisionsStore._();
 
-  static const palette = [0xFF7C5CFF, 0xFFE0457B, 0xFF0B6FB8, 0xFF16A085, 0xFFE67E22, 0xFF8E44AD, 0xFFC0392B, 0xFF2B579A];
+  static const palette = [
+    0xFF7C5CFF,
+    0xFFE0457B,
+    0xFF0B6FB8,
+    0xFF16A085,
+    0xFFE67E22,
+    0xFF8E44AD,
+    0xFFC0392B,
+    0xFF2B579A,
+  ];
 
   final _file = JsonFile<RevisionsData>(
     'revisions.json',

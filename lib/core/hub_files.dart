@@ -11,10 +11,10 @@ import 'module_store.dart';
 import 'vault.dart';
 
 /// Fichiers de données du compte Mon Hub connecté (historiques des chats,
-/// journal de Clicky, routines…), chiffrés sur le disque (voir [Vault]).
+/// journal de Smily, routines…), chiffrés sur le disque (voir [Vault]).
 ///
 /// Sur PC, ils vivent dans le dossier de Mon Hub (`%APPDATA%\MonHub\data`),
-/// que « Clicky partout » lit et écrit aussi : les deux programmes voient
+/// que « Smily partout » lit et écrit aussi : les deux programmes voient
 /// le même historique. Sur téléphone : le dossier privé de l'appli.
 class HubFiles {
   HubFiles._();

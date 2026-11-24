@@ -122,9 +122,7 @@ class SpotifyApi {
           'Vérifie le Client ID et l\'adresse de retour $redirect dans ton appli Spotify.';
     }
     _access = j['access_token'] as String;
-    _expires = DateTime.now().add(
-      Duration(seconds: ((j['expires_in'] as num?) ?? 3600).toInt() - 60),
-    );
+    _expires = DateTime.now().add(Duration(seconds: ((j['expires_in'] as num?) ?? 3600).toInt() - 60));
     final refresh = j['refresh_token'] as String?;
     if (refresh != null) await store.writeSecret('spotify.refresh', refresh);
   }
@@ -239,13 +237,10 @@ class SpotifyApi {
     final album = (t['album'] as Map?) ?? const {};
     return MusicTrack(
       title: '${t['name'] ?? ''}',
-      artist: [for (final a in (t['artists'] as List?) ?? const []) '${(a as Map)['name']}']
-          .join(', '),
+      artist: [for (final a in (t['artists'] as List?) ?? const []) '${(a as Map)['name']}'].join(', '),
       album: '${album['name'] ?? ''}',
       cover: _img(album['images']),
-      duration: t['duration_ms'] is num
-          ? Duration(milliseconds: (t['duration_ms'] as num).toInt())
-          : null,
+      duration: t['duration_ms'] is num ? Duration(milliseconds: (t['duration_ms'] as num).toInt()) : null,
       id: '${t['id'] ?? ''}',
       uri: '${t['uri'] ?? ''}',
       link: (t['external_urls'] as Map?)?['spotify'] as String?,
@@ -265,9 +260,7 @@ class SpotifyApi {
       title: tr.title,
       artist: tr.artist,
       album: tr.album,
-      albumArtist: [
-        for (final a in (album['artists'] as List?) ?? const []) '${(a as Map)['name']}',
-      ].join(', '),
+      albumArtist: [for (final a in (album['artists'] as List?) ?? const []) '${(a as Map)['name']}'].join(', '),
       coverUrl: tr.cover,
       position: Duration(milliseconds: ((j['progress_ms'] as num?) ?? 0).toInt()),
       duration: tr.duration,
@@ -294,8 +287,7 @@ class SpotifyApi {
     }
     return AlbumInfo(
       title: '${j['name'] ?? ''}',
-      artist: [for (final a in (j['artists'] as List?) ?? const []) '${(a as Map)['name']}']
-          .join(', '),
+      artist: [for (final a in (j['artists'] as List?) ?? const []) '${(a as Map)['name']}'].join(', '),
       cover: _img(j['images']),
       tracks: tracks,
       year: '${j['release_date'] ?? ''}'.split('-').first,
@@ -353,10 +345,7 @@ class SpotifyApi {
     return [
       for (final it in (j['items'] as List?) ?? const [])
         if (it is Map && (it['track'] ?? it['item']) is Map)
-          track(
-            (it['track'] ?? it['item']) as Map,
-            addedAt: DateTime.tryParse('${it['added_at']}'),
-          ),
+          track((it['track'] ?? it['item']) as Map, addedAt: DateTime.tryParse('${it['added_at']}')),
     ];
   }
 
@@ -403,13 +392,12 @@ class SpotifyApi {
 
   /// Recherche dans tout Spotify : titres, artistes, albums, playlists.
   Future<SpotifySearch> search(String query, {int limit = 10}) async {
-    final j = await _get(
-      '/search?q=${Uri.encodeQueryComponent(query)}&type=track,artist,album,playlist&limit=$limit',
-    );
-    List<Map> items(String k) =>
-        (((j[k] as Map?)?['items'] as List?) ?? const []).whereType<Map>().toList();
-    String names(Object? artists) =>
-        [for (final a in (artists as List?) ?? const []) if (a is Map) '${a['name']}'].join(', ');
+    final j = await _get('/search?q=${Uri.encodeQueryComponent(query)}&type=track,artist,album,playlist&limit=$limit');
+    List<Map> items(String k) => (((j[k] as Map?)?['items'] as List?) ?? const []).whereType<Map>().toList();
+    String names(Object? artists) => [
+      for (final a in (artists as List?) ?? const [])
+        if (a is Map) '${a['name']}',
+    ].join(', ');
     return SpotifySearch(
       tracks: [for (final t in items('tracks')) track(t)],
       artists: [
@@ -429,9 +417,10 @@ class SpotifyApi {
             kind: 'album',
             id: '${a['id']}',
             name: '${a['name'] ?? ''}',
-            sub: [names(a['artists']), '${a['release_date'] ?? ''}'.split('-').first]
-                .where((x) => x.isNotEmpty)
-                .join(' · '),
+            sub: [
+              names(a['artists']),
+              '${a['release_date'] ?? ''}'.split('-').first,
+            ].where((x) => x.isNotEmpty).join(' · '),
             image: _img(a['images']),
             uri: '${a['uri'] ?? ''}',
           ),
@@ -454,9 +443,7 @@ class SpotifyApi {
   /// Des titres d'un artiste (l'adresse « meilleurs titres » a été retirée
   /// par Spotify en 2026 : on passe par la recherche).
   Future<List<MusicTrack>> artistTracks(String name) async {
-    final j = await _get(
-      '/search?q=${Uri.encodeQueryComponent('artist:"$name"')}&type=track&limit=10',
-    );
+    final j = await _get('/search?q=${Uri.encodeQueryComponent('artist:"$name"')}&type=track&limit=10');
     return [
       for (final t in ((j['tracks'] as Map?)?['items'] as List?) ?? const [])
         if (t is Map) track(t),
@@ -473,8 +460,7 @@ class SpotifyApi {
   }
 
   /// Ajoute un titre précis à la file.
-  Future<void> addToQueue(String uri) =>
-      _player('POST', '/me/player/queue?uri=${Uri.encodeQueryComponent(uri)}');
+  Future<void> addToQueue(String uri) => _player('POST', '/me/player/queue?uri=${Uri.encodeQueryComponent(uri)}');
 
   /// Joue l'album ou l'artiste trouvé par une recherche.
   Future<String> searchPlayContext(String query, String type) async {
@@ -517,8 +503,7 @@ class SpotifyApi {
     if (list.isEmpty) {
       throw 'Aucun appareil Spotify ouvert : lance l\'appli Spotify (PC ou téléphone) puis réessaie';
     }
-    final pc =
-        list.where((d) => '${d['type']}'.toLowerCase() == 'computer').firstOrNull ?? list.first;
+    final pc = list.where((d) => '${d['type']}'.toLowerCase() == 'computer').firstOrNull ?? list.first;
     await _req(
       'PUT',
       '/me/player',
@@ -547,8 +532,7 @@ class SpotifyApi {
     final items = ((j['${type}s'] as Map?)?['items'] as List?) ?? const [];
     final it = items.whereType<Map>().firstOrNull;
     if (it == null) return null;
-    final who = [for (final a in (it['artists'] as List?) ?? const []) '${(a as Map)['name']}']
-        .join(', ');
+    final who = [for (final a in (it['artists'] as List?) ?? const []) '${(a as Map)['name']}'].join(', ');
     return ('${it['uri']}', who.isEmpty ? '${it['name']}' : '${it['name']} — $who');
   }
 
@@ -593,8 +577,7 @@ class SpotifyApi {
     return 'Ajouté à la file : ${hit.$2}';
   }
 
-  Future<void> volume(int percent) =>
-      _player('PUT', '/me/player/volume?volume_percent=${percent.clamp(0, 100)}');
+  Future<void> volume(int percent) => _player('PUT', '/me/player/volume?volume_percent=${percent.clamp(0, 100)}');
 
   Future<void> shuffle(bool on) => _player('PUT', '/me/player/shuffle?state=$on');
 
@@ -696,9 +679,7 @@ class DeezerApi {
     preview: (t['preview'] as String?)?.isNotEmpty == true ? t['preview'] as String : null,
     link: t['link'] as String?,
     number: (t['track_position'] as num?)?.toInt() ?? 0,
-    addedAt: t['time_add'] is num
-        ? DateTime.fromMillisecondsSinceEpoch((t['time_add'] as num).toInt() * 1000)
-        : null,
+    addedAt: t['time_add'] is num ? DateTime.fromMillisecondsSinceEpoch((t['time_add'] as num).toInt() * 1000) : null,
   );
 
   /// Trouve l'album d'un morceau (pochette HD + liste des titres).
@@ -713,9 +694,7 @@ class DeezerApi {
     }
     if (hit == null) {
       // Sans album (navigateur, single…) : on passe par le morceau.
-      final j = await _get(
-        '/search/track?q=${Uri.encodeQueryComponent('artist:"$a" track:"$title"')}&limit=5',
-      );
+      final j = await _get('/search/track?q=${Uri.encodeQueryComponent('artist:"$a" track:"$title"')}&limit=5');
       final t = ((j['data'] as List?) ?? const []).whereType<Map>().firstOrNull;
       final id = (t?['album'] as Map?)?['id'];
       if (id == null) return null;
@@ -750,8 +729,7 @@ class DeezerApi {
   }
 
   /// Identifiant d'un profil Deezer (lien deezer.com/fr/profile/123… ou nombre).
-  static String? profileId(String input) =>
-      RegExp(r'(?:profile/)?(\d{3,})').firstMatch(input.trim())?.group(1);
+  static String? profileId(String input) => RegExp(r'(?:profile/)?(\d{3,})').firstMatch(input.trim())?.group(1);
 
   Future<List<MusicTrack>> favorites(String userId) async {
     final out = <MusicTrack>[];

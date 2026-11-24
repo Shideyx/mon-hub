@@ -75,7 +75,11 @@ void main() {
       ..to = [const MailAddress('Moi', 'moi@exemple.fr')]
       ..subject = 'Le sujet'
       ..addTextPlain('Bonjour, voici le sujet.');
-    b.addBinary(utf8.encode('%PDF-1.4 faux pdf'), MediaType.fromSubtype(MediaSubtype.applicationPdf), filename: 'sujet.pdf');
+    b.addBinary(
+      utf8.encode('%PDF-1.4 faux pdf'),
+      MediaType.fromSubtype(MediaSubtype.applicationPdf),
+      filename: 'sujet.pdf',
+    );
     final m = MimeMessage.parseFromText(b.buildMimeMessage().renderMessage());
     final files = MailModule.attachmentsOf(m);
     expect(files.map((f) => f.name), ['sujet.pdf']);
@@ -120,7 +124,7 @@ void main() {
 
     test('« écoute le cours » et « arrête le cours » sans IA', () async {
       calls.clear();
-      expect(await ask('Clicky, écoute le cours'), contains('SVT'));
+      expect(await ask('Smily, écoute le cours'), contains('SVT'));
       expect(await ask('prends le cours en notes'), contains('jusqu\'à 11 h 00'));
       expect(await ask('fais-moi un compte rendu du cours'), isNotNull);
       expect(await ask('arrête le cours'), contains('compte rendu'));
@@ -142,7 +146,7 @@ void main() {
       await ModuleStore.init();
     });
 
-    testWidgets('réglages de Clicky : l\'essentiel, les rubriques, la recherche', (tester) async {
+    testWidgets('réglages de Smily : l\'essentiel, les rubriques, la recherche', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

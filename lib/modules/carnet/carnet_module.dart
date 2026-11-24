@@ -11,9 +11,9 @@ import 'carnet_store.dart';
 import '../../core/browser.dart';
 
 /// Carnet : les plugins de ton JARVIS, dans Mon Hub (tâches, notes, idées en
-/// vrac, mémoire de Clicky, budget, sport, jeux, poèmes, météo + tenue,
+/// vrac, mémoire de Smily, budget, sport, jeux, poèmes, météo + tenue,
 /// bilan du soir, protocoles, presse-papier, notification téléphone).
-/// Clicky s'en sert à la voix (« note que… », « j'ai dépensé 12 € »,
+/// Smily s'en sert à la voix (« note que… », « j'ai dépensé 12 € »,
 /// « protocole travail »…).
 class CarnetModule extends HubModule {
   @override
@@ -21,8 +21,7 @@ class CarnetModule extends HubModule {
   @override
   String get name => 'Carnet';
   @override
-  String get description =>
-      'Tâches, notes, idées, mémoire de Clicky, budget, sport, jeux, poèmes, météo, protocoles';
+  String get description => 'Tâches, notes, idées, mémoire de Smily, budget, sport, jeux, poèmes, météo, protocoles';
   @override
   IconData get icon => Icons.auto_stories_rounded;
   @override
@@ -32,7 +31,7 @@ class CarnetModule extends HubModule {
 
   final c = Carnet.instance;
 
-  /// Branché par Clicky : dire une phrase, appeler un outil de Mon Hub.
+  /// Branché par Smily : dire une phrase, appeler un outil de Mon Hub.
   static Future<void> Function(String text)? say;
   static Future<Object?> Function(String tool, Map<String, dynamic> args)? callTool;
 
@@ -65,11 +64,9 @@ class CarnetModule extends HubModule {
           case 'dire':
             await say?.call(v);
           case 'notifier':
-            await PhoneNotify.send(ntfy, 'Clicky', v);
+            await PhoneNotify.send(ntfy, 'Smily', v);
           case 'attendre':
-            await Future<void>.delayed(
-              Duration(milliseconds: ((double.tryParse(v) ?? 1) * 1000).round()),
-            );
+            await Future<void>.delayed(Duration(milliseconds: ((double.tryParse(v) ?? 1) * 1000).round()));
           case 'spotify':
             await callTool?.call('spotify', {'action': v, 'requete': '${s['requete'] ?? ''}'});
           case 'musique':
@@ -90,12 +87,9 @@ class CarnetModule extends HubModule {
     HubTool(
       name: 'carnet_memoire',
       description:
-          'Ma mémoire à long terme (ce que Clicky doit retenir sur moi) : action=retenir + texte '
+          'Ma mémoire à long terme (ce que Smily doit retenir sur moi) : action=retenir + texte '
           '(« retiens que je suis allergique aux noix »), action=oublier + texte, action=liste.',
-      params: {
-        'action': ('string', 'retenir, oublier ou liste'),
-        'texte': ('string', 'le souvenir'),
-      },
+      params: {'action': ('string', 'retenir, oublier ou liste'), 'texte': ('string', 'le souvenir')},
       required: ['action'],
       run: (a) async {
         await c.load();
@@ -170,10 +164,7 @@ class CarnetModule extends HubModule {
           case 'cocher':
             final e = c.find('todos', t);
             if (e == null) return 'Tâche introuvable.';
-            await c.change('todos', e.id, {
-              'done': true,
-              'doneAt': DateTime.now().millisecondsSinceEpoch,
-            });
+            await c.change('todos', e.id, {'done': true, 'doneAt': DateTime.now().millisecondsSinceEpoch});
             return 'Bravo, « ${e.text} » est faite.';
           case 'effacer':
             final e = c.find('todos', t) ?? c.find('notes', t);
@@ -221,11 +212,7 @@ class CarnetModule extends HubModule {
             });
             return 'Dépense de ${m.abs().toStringAsFixed(2)} € notée.';
           case 'revenu':
-            await c.add('money', {
-              'amount': m.abs(),
-              'category': 'revenu',
-              'text': '${a['note'] ?? ''}',
-            });
+            await c.add('money', {'amount': m.abs(), 'category': 'revenu', 'text': '${a['note'] ?? ''}'});
             return 'Revenu de ${m.abs().toStringAsFixed(2)} € noté.';
           case 'liste':
             return [
@@ -240,12 +227,7 @@ class CarnetModule extends HubModule {
               _ => DateTime(now.year, now.month),
             };
             final (spent, earned, cats) = c.money(from);
-            return {
-              'depenses': spent,
-              'revenus': earned,
-              'solde': earned - spent,
-              'par_categorie': cats,
-            };
+            return {'depenses': spent, 'revenus': earned, 'solde': earned - spent, 'par_categorie': cats};
         }
       },
     ),
@@ -336,17 +318,11 @@ class CarnetModule extends HubModule {
         await c.load();
         switch ('${a['action']}') {
           case 'enregistrer':
-            await c.add('poems', {
-              'title': '${a['titre'] ?? 'Sans titre'}',
-              'text': '${a['texte'] ?? ''}',
-            });
+            await c.add('poems', {'title': '${a['titre'] ?? 'Sans titre'}', 'text': '${a['texte'] ?? ''}'});
             return 'Poème enregistré.';
           case 'lire':
             final q = '${a['titre'] ?? ''}'.toLowerCase();
-            final p = c
-                .list('poems')
-                .where((e) => '${e.data['title']}'.toLowerCase().contains(q))
-                .lastOrNull;
+            final p = c.list('poems').where((e) => '${e.data['title']}'.toLowerCase().contains(q)).lastOrNull;
             return p == null ? 'Poème introuvable.' : {'titre': p.data['title'], 'texte': p.text};
           default:
             return [for (final e in c.list('poems')) '${e.data['title']}'];
@@ -379,8 +355,7 @@ class CarnetModule extends HubModule {
         final z = '${a['zone'] ?? 'tout'}'.toLowerCase();
         final zones = z == 'tout' ? const ['france', 'monde'] : [z];
         return {
-          for (final zone in zones)
-            zone: [for (final i in await News.latest(zone, max: n)) i.toJson()],
+          for (final zone in zones) zone: [for (final i in await News.latest(zone, max: n)) i.toJson()],
         };
       },
     ),
@@ -397,7 +372,7 @@ class CarnetModule extends HubModule {
     HubTool(
       name: 'carnet_protocole',
       description:
-          'Protocoles (« Clicky, protocole travail ») : une suite d\'actions préparées (ouvrir des '
+          'Protocoles (« Smily, protocole travail ») : une suite d\'actions préparées (ouvrir des '
           'applis, lancer une playlist, mettre en pause, prévenir le téléphone…). action=lancer + nom, '
           'action=liste.',
       params: {'action': ('string', 'lancer ou liste'), 'nom': ('string', 'nom du protocole')},
@@ -422,9 +397,7 @@ class CarnetModule extends HubModule {
           return 'Rien : l\'historique du presse-papier est désactivé ou vide (Carnet → Réglages).';
         }
         final q = '${a['requete'] ?? ''}'.toLowerCase();
-        final hits = '${a['action']}' == 'chercher'
-            ? l.where((e) => e.text.toLowerCase().contains(q))
-            : l;
+        final hits = '${a['action']}' == 'chercher' ? l.where((e) => e.text.toLowerCase().contains(q)) : l;
         return [
           for (final e in hits.take(15)) {'texte': e.text, 'copie_le': e.at},
         ];
@@ -435,20 +408,11 @@ class CarnetModule extends HubModule {
       description:
           'Envoie une notification sur mon téléphone (appli ntfy), quand je demande d\'être prévenu '
           'sur mon tel ou pour une alerte importante.',
-      params: {
-        'titre': ('string', 'titre'),
-        'message': ('string', 'message'),
-        'urgent': ('boolean', 'urgent'),
-      },
+      params: {'titre': ('string', 'titre'), 'message': ('string', 'message'), 'urgent': ('boolean', 'urgent')},
       required: ['message'],
       run: (a) async {
         await c.load();
-        await PhoneNotify.send(
-          ntfy,
-          '${a['titre'] ?? 'Clicky'}',
-          '${a['message']}',
-          urgent: a['urgent'] == true,
-        );
+        await PhoneNotify.send(ntfy, '${a['titre'] ?? 'Smily'}', '${a['message']}', urgent: a['urgent'] == true);
         return 'Notification envoyée sur ton téléphone.';
       },
     ),
@@ -481,10 +445,12 @@ class CarnetModule extends HubModule {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(colors: [
-                            const Color(0xFF4FC3F7).withValues(alpha: 0.25),
-                            const Color(0xFF7C5CFF).withValues(alpha: 0.12),
-                          ]),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF4FC3F7).withValues(alpha: 0.25),
+                              const Color(0xFF7C5CFF).withValues(alpha: 0.12),
+                            ],
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -494,14 +460,18 @@ class CarnetModule extends HubModule {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('${snap.data!['maintenant']}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-                                  Text('${snap.data!['tenue']}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.labelSmall),
+                                  Text(
+                                    '${snap.data!['maintenant']}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    '${snap.data!['tenue']}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall,
+                                  ),
                                 ],
                               ),
                             ),
@@ -512,8 +482,11 @@ class CarnetModule extends HubModule {
             Expanded(
               child: todos.isEmpty
                   ? Center(
-                      child: Text('Rien à faire 🎉\nDis à Clicky « ajoute … à ma liste ».',
-                          textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+                      child: Text(
+                        'Rien à faire 🎉\nDis à Smily « ajoute … à ma liste ».',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall,
+                      ),
                     )
                   : SingleChildScrollView(
                       physics: const NeverScrollableScrollPhysics(),
@@ -536,8 +509,12 @@ class CarnetModule extends HubModule {
                                   Icon(Icons.radio_button_unchecked_rounded, size: 14, color: color),
                                   const SizedBox(width: 5),
                                   Flexible(
-                                    child: Text(t,
-                                        maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                                    child: Text(
+                                      t,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -622,9 +599,9 @@ class _CarnetPage extends StatelessWidget {
               m: module,
               list: 'inbox',
               hint: 'Une pensée, une idée, un truc à pas oublier…',
-              empty: 'Boîte vide. Dis à Clicky « note ça : … », il range plus tard.',
+              empty: 'Boîte vide. Dis à Smily « note ça : … », il range plus tard.',
               action: (
-                'Demander à Clicky de trier',
+                'Demander à Smily de trier',
                 () => ClaudeModule.askClicky(
                   'Trie mes idées en vrac du carnet : range chacune au bon endroit (tâche, note, budget, agenda…) puis retire-la de la boîte.',
                 ),
@@ -634,8 +611,8 @@ class _CarnetPage extends StatelessWidget {
             _TextList(
               m: module,
               list: 'memory',
-              hint: 'Quelque chose que Clicky doit savoir sur toi',
-              empty: 'Clicky ne sait encore rien de toi. Dis-lui « retiens que … ».',
+              hint: 'Quelque chose que Smily doit savoir sur toi',
+              empty: 'Smily ne sait encore rien de toi. Dis-lui « retiens que … ».',
             ),
             _BudgetTab(m: module),
             _SportTab(m: module),
@@ -705,24 +682,20 @@ class _TodoTab extends StatelessWidget {
     return ListView(
       children: [
         _AddBar(hint: 'Nouvelle tâche', onAdd: (v) => m.c.add('todos', {'text': v})),
-        if (l.isEmpty)
-          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Rien à faire 🎉')),
+        if (l.isEmpty) const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Rien à faire 🎉')),
         for (final t in todo)
           CheckboxListTile(
             value: false,
             title: Text(t.text),
             subtitle: Text(timeAgo(t.at)),
-            onChanged: (_) => m.c.change('todos', t.id, {
-              'done': true,
-              'doneAt': DateTime.now().millisecondsSinceEpoch,
-            }),
+            onChanged: (_) =>
+                m.c.change('todos', t.id, {'done': true, 'doneAt': DateTime.now().millisecondsSinceEpoch}),
             secondary: IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
               onPressed: () => m.c.remove('todos', t.id),
             ),
           ),
-        if (done.isNotEmpty)
-          const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Fait')),
+        if (done.isNotEmpty) const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Fait')),
         for (final t in done.take(30))
           CheckboxListTile(
             value: true,
@@ -739,13 +712,7 @@ class _TodoTab extends StatelessWidget {
 }
 
 class _TextList extends StatelessWidget {
-  const _TextList({
-    required this.m,
-    required this.list,
-    required this.hint,
-    required this.empty,
-    this.action,
-  });
+  const _TextList({required this.m, required this.list, required this.hint, required this.empty, this.action});
   final CarnetModule m;
   final String list;
   final String hint;
@@ -793,9 +760,7 @@ class _BudgetTab extends StatelessWidget {
     final r = await askFields(
       context,
       title: income ? 'Argent reçu' : 'Dépense',
-      labels: income
-          ? const ['Montant (€)', 'Note']
-          : const ['Montant (€)', 'Catégorie (repas, jeux…)', 'Note'],
+      labels: income ? const ['Montant (€)', 'Note'] : const ['Montant (€)', 'Catégorie (repas, jeux…)', 'Note'],
     );
     if (r == null) return;
     final v = double.tryParse(r[0].replaceAll(',', '.'));
@@ -825,12 +790,9 @@ class _BudgetTab extends StatelessWidget {
                 Text('Ce mois-ci', style: Theme.of(context).textTheme.labelLarge),
                 Text(
                   '${(earned - spent).toStringAsFixed(2)} €',
-                  style: Theme.of(context).textTheme.headlineMedium
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                Text(
-                  '${spent.toStringAsFixed(2)} € dépensés · ${earned.toStringAsFixed(2)} € reçus',
-                ),
+                Text('${spent.toStringAsFixed(2)} € dépensés · ${earned.toStringAsFixed(2)} € reçus'),
                 const SizedBox(height: 8),
                 for (final e in sorted.take(6))
                   Padding(
@@ -845,13 +807,7 @@ class _BudgetTab extends StatelessWidget {
                             color: m.color,
                           ),
                         ),
-                        SizedBox(
-                          width: 70,
-                          child: Text(
-                            '${e.value.toStringAsFixed(0)} €',
-                            textAlign: TextAlign.right,
-                          ),
-                        ),
+                        SizedBox(width: 70, child: Text('${e.value.toStringAsFixed(0)} €', textAlign: TextAlign.right)),
                       ],
                     ),
                   ),
@@ -880,9 +836,7 @@ class _BudgetTab extends StatelessWidget {
               e.amount < 0 ? Icons.south_east_rounded : Icons.north_east_rounded,
               color: e.amount < 0 ? Colors.redAccent : Colors.green,
             ),
-            title: Text(
-              '${e.amount.toStringAsFixed(2)} € · ${e.category.isEmpty ? 'autre' : e.category}',
-            ),
+            title: Text('${e.amount.toStringAsFixed(2)} € · ${e.category.isEmpty ? 'autre' : e.category}'),
             subtitle: Text([if (e.text.isNotEmpty) e.text, dayLabel(e.at)].join(' · ')),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
@@ -942,16 +896,11 @@ class _SportTab extends StatelessWidget {
           ),
         ],
         if (l.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: EmptyHint('Dis à Clicky « 80 kg au squat pour 5 ».'),
-          ),
+          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Smily « 80 kg au squat pour 5 ».')),
         for (final e in l.take(80))
           ListTile(
             leading: const Icon(Icons.fitness_center_rounded),
-            title: Text(
-              '${e.data['exercise']} · ${e.data['weight'] ?? '?'} kg × ${e.data['reps'] ?? '?'}',
-            ),
+            title: Text('${e.data['exercise']} · ${e.data['weight'] ?? '?'} kg × ${e.data['reps'] ?? '?'}'),
             subtitle: Text([if (e.text.isNotEmpty) e.text, dayLabel(e.at)].join(' · ')),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
@@ -984,20 +933,13 @@ class _GamesTab extends StatelessWidget {
           icon: const Icon(Icons.add_rounded),
           label: const Text('Noter une session'),
           onPressed: () async {
-            final r = await askFields(
-              context,
-              title: 'Session de jeu',
-              labels: const ['Jeu', 'Minutes'],
-            );
+            final r = await askFields(context, title: 'Session de jeu', labels: const ['Jeu', 'Minutes']);
             if (r == null || r[0].trim().isEmpty) return;
             await m.c.add('games', {'game': r[0].trim(), 'minutes': int.tryParse(r[1]) ?? 0});
           },
         ),
         if (games.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: EmptyHint('Dis à Clicky « j\'ai joué 2 h à Roblox ».'),
-          ),
+          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Smily « j\'ai joué 2 h à Roblox ».')),
         for (final g in games)
           ListTile(
             leading: const Icon(Icons.sports_esports_rounded),
@@ -1050,23 +992,14 @@ class _PoemsTab extends StatelessWidget {
                         controller: body,
                         minLines: 6,
                         maxLines: 14,
-                        decoration: const InputDecoration(
-                          labelText: 'Poème',
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(labelText: 'Poème', border: OutlineInputBorder()),
                       ),
                     ],
                   ),
                 ),
                 actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(c, false),
-                    child: const Text('Annuler'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Garder'),
-                  ),
+                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+                  FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Garder')),
                 ],
               ),
             );
@@ -1078,8 +1011,7 @@ class _PoemsTab extends StatelessWidget {
             }
           },
         ),
-        if (l.isEmpty)
-          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Tes poèmes, gardés ici.')),
+        if (l.isEmpty) const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Tes poèmes, gardés ici.')),
         for (final p in l)
           Card(
             child: ExpansionTile(
@@ -1089,16 +1021,13 @@ class _PoemsTab extends StatelessWidget {
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               expandedCrossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SelectableText(
-                  p.text,
-                  style: const TextStyle(height: 1.6, fontStyle: FontStyle.italic),
-                ),
+                SelectableText(p.text, style: const TextStyle(height: 1.6, fontStyle: FontStyle.italic)),
                 Wrap(
                   spacing: 8,
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.auto_awesome_rounded),
-                      label: const Text('Avis de Clicky'),
+                      label: const Text('Avis de Smily'),
                       onPressed: () => ClaudeModule.askClicky(
                         'Donne-moi un retour bienveillant et précis sur mon poème « ${p.data['title']} » (images, rythme, rimes, ce qui marche, une piste d\'amélioration) :\n${p.text}',
                       ),
@@ -1123,7 +1052,7 @@ class _ProtocolsTab extends StatelessWidget {
   final CarnetModule m;
 
   static const kinds = {
-    'dire': 'Clicky dit',
+    'dire': 'Smily dit',
     'site': 'Ouvrir le site',
     'appli': 'Ouvrir l\'appli',
     'spotify': 'Spotify (playlist / chercher_jouer)',
@@ -1139,8 +1068,7 @@ class _ProtocolsTab extends StatelessWidget {
     final n = TextEditingController(text: name ?? '');
     final lines = TextEditingController(
       text: [
-        for (final s in steps)
-          '${s['type']}: ${s['valeur'] ?? ''}${s['requete'] == null ? '' : ' | ${s['requete']}'}',
+        for (final s in steps) '${s['type']}: ${s['valeur'] ?? ''}${s['requete'] == null ? '' : ' | ${s['requete']}'}',
       ].join('\n'),
     );
     final ok = await showDialog<bool>(
@@ -1155,17 +1083,14 @@ class _ProtocolsTab extends StatelessWidget {
             children: [
               TextField(
                 controller: n,
-                decoration: const InputDecoration(labelText: 'Nom (« Clicky, protocole … »)'),
+                decoration: const InputDecoration(labelText: 'Nom (« Smily, protocole … »)'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: lines,
                 minLines: 5,
                 maxLines: 10,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Étapes, une par ligne',
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Étapes, une par ligne'),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -1208,7 +1133,7 @@ class _ProtocolsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Dis « Clicky, protocole travail » : il enchaîne toutes les étapes.'),
+        const Text('Dis « Smily, protocole travail » : il enchaîne toutes les étapes.'),
         const SizedBox(height: 8),
         FilledButton.icon(
           icon: const Icon(Icons.add_rounded),
@@ -1266,18 +1191,14 @@ class _ClipboardTabState extends State<_ClipboardTab> {
     final c = widget.m.c;
     final on = c.setting<bool>('clipboard', false);
     final s = q.text.toLowerCase();
-    final l = c
-        .list('clipboard')
-        .reversed
-        .where((e) => s.isEmpty || e.text.toLowerCase().contains(s))
-        .toList();
+    final l = c.list('clipboard').reversed.where((e) => s.isEmpty || e.text.toLowerCase().contains(s)).toList();
     return ListView(
       children: [
         SwitchListTile(
           title: const Text('Garder l\'historique du presse-papier'),
           subtitle: const Text(
             'Ce que tu copies est gardé sur ce PC (pas les textes qui ressemblent à des mots de passe, '
-            'ni ceux copiés dans une fenêtre sensible). Clicky peut le retrouver : « retrouve le lien que j\'ai copié ».',
+            'ni ceux copiés dans une fenêtre sensible). Smily peut le retrouver : « retrouve le lien que j\'ai copié ».',
           ),
           value: on,
           onChanged: (v) => c.setSetting('clipboard', v),
@@ -1298,10 +1219,7 @@ class _ClipboardTabState extends State<_ClipboardTab> {
         if (l.isNotEmpty)
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => c.clear('clipboard'),
-              child: const Text('Tout effacer'),
-            ),
+            child: TextButton(onPressed: () => c.clear('clipboard'), child: const Text('Tout effacer')),
           ),
         for (final e in l.take(200))
           ListTile(
@@ -1346,9 +1264,7 @@ class _SettingsTabState extends State<_SettingsTab> {
               await widget.m.c.setSetting('city', city.text.trim());
               try {
                 final w = await Weather.forCity(city.text.trim());
-                setState(
-                  () => info = '${w['icone']} ${w['ville']} : ${w['maintenant']}. ${w['tenue']}',
-                );
+                setState(() => info = '${w['icone']} ${w['ville']} : ${w['maintenant']}. ${w['tenue']}');
               } catch (e) {
                 setState(() => info = '$e');
               }
@@ -1369,11 +1285,7 @@ class _SettingsTabState extends State<_SettingsTab> {
             onPressed: () async {
               await widget.m.c.setSetting('ntfy', topic.text.trim());
               try {
-                await PhoneNotify.send(
-                  topic.text.trim(),
-                  'Clicky',
-                  'Test : les notifications arrivent bien ✔',
-                );
+                await PhoneNotify.send(topic.text.trim(), 'Smily', 'Test : les notifications arrivent bien ✔');
                 setState(() => info = 'Notification de test envoyée.');
               } catch (e) {
                 setState(() => info = '$e');

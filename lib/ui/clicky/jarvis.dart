@@ -9,7 +9,7 @@ import 'package:win32/win32.dart';
 import '../../core/hub_feed.dart';
 import '../../core/hub_files.dart';
 
-/// Les fonctions « façon JARVIS » de Clicky, **sans IA** : l'état du PC, le
+/// Les fonctions « façon JARVIS » de Smily, **sans IA** : l'état du PC, le
 /// mode concentration, les rappels « quand j'ouvre telle appli », et le
 /// point de situation donné à l'IA pour qu'elle réponde juste du premier
 /// coup.
@@ -191,8 +191,20 @@ class SystemStatus {
   /// programme.
   static List<(String, int)> topMemory(String csv, {int take = 4}) {
     const system = {
-      'system', 'registry', 'memory compression', 'svchost.exe', 'csrss.exe', 'dwm.exe', 'smss.exe', 'lsass.exe',
-      'services.exe', 'wininit.exe', 'winlogon.exe', 'fontdrvhost.exe', 'system idle process', 'msmpeng.exe',
+      'system',
+      'registry',
+      'memory compression',
+      'svchost.exe',
+      'csrss.exe',
+      'dwm.exe',
+      'smss.exe',
+      'lsass.exe',
+      'services.exe',
+      'wininit.exe',
+      'winlogon.exe',
+      'fontdrvhost.exe',
+      'system idle process',
+      'msmpeng.exe',
     };
     final byApp = <String, int>{};
     for (final line in csv.split(RegExp(r'\r?\n'))) {
@@ -213,10 +225,23 @@ class SystemStatus {
   static String prettyApp(String exe) {
     final base = exe.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
     const names = {
-      'msedge': 'Edge', 'msedgewebview2': 'Edge (pages intégrées)', 'chrome': 'Chrome', 'firefox': 'Firefox',
-      'discord': 'Discord', 'spotify': 'Spotify', 'code': 'VS Code', 'hub': 'Mon Hub', 'explorer': 'l\'Explorateur',
-      'robloxplayerbeta': 'Roblox', 'robloxstudiobeta': 'Roblox Studio', 'teams': 'Teams', 'winword': 'Word',
-      'excel': 'Excel', 'powerpnt': 'PowerPoint', 'steam': 'Steam', 'steamwebhelper': 'Steam',
+      'msedge': 'Edge',
+      'msedgewebview2': 'Edge (pages intégrées)',
+      'chrome': 'Chrome',
+      'firefox': 'Firefox',
+      'discord': 'Discord',
+      'spotify': 'Spotify',
+      'code': 'VS Code',
+      'hub': 'Mon Hub',
+      'explorer': 'l\'Explorateur',
+      'robloxplayerbeta': 'Roblox',
+      'robloxstudiobeta': 'Roblox Studio',
+      'teams': 'Teams',
+      'winword': 'Word',
+      'excel': 'Excel',
+      'powerpnt': 'PowerPoint',
+      'steam': 'Steam',
+      'steamwebhelper': 'Steam',
     };
     final k = base.toLowerCase();
     if (names[k] case final n?) return n;
@@ -240,7 +265,7 @@ class SystemStatus {
     if (online == false) 'pas d\'internet',
   ];
 
-  /// Ce que Clicky dit (à voix haute).
+  /// Ce que Smily dit (à voix haute).
   String say({bool why = false}) {
     final parts = <String>[
       if (battery != null) 'batterie à $battery %${charging ? ', en charge' : ''}',
@@ -283,10 +308,10 @@ class SystemStatus {
 
 // ======================================================== Concentration
 
-/// **Mode concentration** : pendant la séance, Clicky ne dit plus rien de
+/// **Mode concentration** : pendant la séance, Smily ne dit plus rien de
 /// lui-même (idées, remarques, rappels), les notifications de Mon Hub sont
 /// gardées pour la fin (sauf les appels), et il annonce la fin avec le
-/// bilan. Gardé dans un fichier partagé : Mon Hub et Clicky partout le
+/// bilan. Gardé dans un fichier partagé : Mon Hub et Smily partout le
 /// voient tous les deux.
 class FocusMode extends ChangeNotifier {
   FocusMode._();
@@ -382,7 +407,9 @@ class FocusMode extends ChangeNotifier {
 
   static String summary(Duration d, int held) {
     final m = d.inMinutes;
-    final time = m >= 60 ? '${m ~/ 60} h${m % 60 == 0 ? '' : ' ${(m % 60).toString().padLeft(2, '0')}'}' : '$m minute${m > 1 ? 's' : ''}';
+    final time = m >= 60
+        ? '${m ~/ 60} h${m % 60 == 0 ? '' : ' ${(m % 60).toString().padLeft(2, '0')}'}'
+        : '$m minute${m > 1 ? 's' : ''}';
     final pause = m >= 80 ? 20 : (m >= 40 ? 10 : 5);
     return 'Séance terminée : $time de concentration, bravo. Fais une pause de $pause minutes.'
         '${held == 0 ? '' : ' Pendant ce temps, $held notification${held > 1 ? 's sont arrivées' : ' est arrivée'} : elles t\'attendent dans Mon Hub.'}';
@@ -411,8 +438,8 @@ class AppReminder {
   );
 }
 
-/// Les rappels liés à une appli : dits par Clicky la prochaine fois qu'elle
-/// passe au premier plan (fichier partagé entre Mon Hub et Clicky partout).
+/// Les rappels liés à une appli : dits par Smily la prochaine fois qu'elle
+/// passe au premier plan (fichier partagé entre Mon Hub et Smily partout).
 class AppReminders {
   AppReminders._();
   static final instance = AppReminders._();
@@ -435,11 +462,23 @@ class AppReminders {
   /// « discord », « VS Code » → « visual studio code »).
   static String appKey(String raw) {
     var a = raw.toLowerCase().trim();
-    a = a.replaceFirst(RegExp(r'^(?:mon |ma |le |la |l |les |sur |dans )+'), '').replaceAll(RegExp(r'[.!?,]+$'), '').trim();
+    a = a
+        .replaceFirst(RegExp(r'^(?:mon |ma |le |la |l |les |sur |dans )+'), '')
+        .replaceAll(RegExp(r'[.!?,]+$'), '')
+        .trim();
     const aliases = {
-      'vs code': 'visual studio code', 'vscode': 'visual studio code', 'insta': 'instagram', 'word': 'word',
-      'roblox studio': 'roblox studio', 'ecole directe': 'ecole', 'école directe': 'ecole', 'yt': 'youtube',
-      'le navigateur': 'chrome', 'navigateur': 'chrome', 'mes mails': 'mail', 'gmail': 'gmail',
+      'vs code': 'visual studio code',
+      'vscode': 'visual studio code',
+      'insta': 'instagram',
+      'word': 'word',
+      'roblox studio': 'roblox studio',
+      'ecole directe': 'ecole',
+      'école directe': 'ecole',
+      'yt': 'youtube',
+      'le navigateur': 'chrome',
+      'navigateur': 'chrome',
+      'mes mails': 'mail',
+      'gmail': 'gmail',
     };
     return aliases[a] ?? a;
   }
@@ -460,7 +499,10 @@ class AppReminders {
     var removed = false;
     await _file.update((l) {
       final before = l.length;
-      final out = [for (final r in l) if (r.id != idOrApp && r.app != k) r];
+      final out = [
+        for (final r in l)
+          if (r.id != idOrApp && r.app != k) r,
+      ];
       removed = out.length != before;
       return out;
     });
@@ -487,7 +529,12 @@ class AppReminders {
     }
     final r = match(_file.value, title, exe);
     if (r == null) return null;
-    await _file.update((l) => [for (final x in l) if (x.id != r.id) x]);
+    await _file.update(
+      (l) => [
+        for (final x in l)
+          if (x.id != r.id) x,
+      ],
+    );
     return r;
   }
 }
@@ -511,14 +558,18 @@ class ClickySituation {
       for (final i in feed.take(6)) '- ${i.title}${i.detail.isEmpty ? '' : ' — ${i.detail}'}',
       if (music != null && music['en_lecture'] == true && '${music['titre'] ?? ''}'.isNotEmpty)
         '- Musique en cours : ${music['titre']}${'${music['artiste'] ?? ''}'.isEmpty ? '' : ' de ${music['artiste']}'}',
-      if (focus) '- Mode concentration en cours (encore ${focusLeft.inMinutes} min) : réponses brèves, pas de distraction.',
+      if (focus)
+        '- Mode concentration en cours (encore ${focusLeft.inMinutes} min) : réponses brèves, pas de distraction.',
       for (final w in warnings) '- PC : $w',
     ];
     return lines.join('\n');
   }
 
   /// Lit les modules et fabrique le texte.
-  static Future<String> build(Future<Object?> Function(String tool, Map<String, dynamic> args) call, Set<String> tools) async {
+  static Future<String> build(
+    Future<Object?> Function(String tool, Map<String, dynamic> args) call,
+    Set<String> tools,
+  ) async {
     Future<Object?> get(String t, [Map<String, dynamic> a = const {}]) async {
       if (!tools.contains(t)) return null;
       try {

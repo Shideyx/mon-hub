@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'clicky.dart';
 import 'life_view.dart' show emojiFonts;
 
-/// Une chose que Clicky sait faire. [tryIt] : la phrase à lui dire pour
+/// Une chose que Smily sait faire. [tryIt] : la phrase à lui dire pour
 /// essayer (null : pas d'essai direct, par exemple un raccourci clavier).
 class Skill {
   const Skill(this.text, {this.tryIt});
@@ -23,34 +23,46 @@ class SkillGroup {
   final bool isNew;
 }
 
-/// **Tout ce que Clicky sait faire**, par thème, avec des phrases à essayer.
+/// **Tout ce que Smily sait faire**, par thème, avec des phrases à essayer.
 class ClickySkills {
   ClickySkills._();
 
   static const groups = <SkillGroup>[
     SkillGroup('🗣️', 'Lui parler', Color(0xFF2B6CFF), [
       Skill('Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris.'),
-      Skill('Dis « Clicky » (mot d\'activation, dans Réglages de Clicky → Écoute et micro) : mains libres.'),
+      Skill('Dis « Smily » (mot d\'activation, dans Réglages de Smily → Écoute et micro) : mains libres.'),
       Skill('Après sa réponse, enchaîne directement : il t\'écoute encore quelques secondes.'),
-      Skill('« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile', tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?'),
+      Skill(
+        '« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile',
+        tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?',
+      ),
       Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
     ]),
     SkillGroup('🌐', 'Espaces partagés et discussions', Color(0xFF7C5CFF), isNew: true, [
-      Skill('Crée un espace (exposé, classe, équipe, entreprise) et invite tes amis avec un code : tableau de tâches et discussion en direct.'),
+      Skill(
+        'Crée un espace (exposé, classe, équipe, entreprise) et invite tes amis avec un code : tableau de tâches et discussion en direct.',
+      ),
       Skill('Épingle tes espaces : ils restent en haut du menu, sur tous tes appareils.'),
-      Skill('Écris « @clicky résume la discussion » dans un espace : ton Clicky répond pour tout le monde.'),
-      Skill('Allume « Mon Clicky peut parler avec les Clicky des autres » (Réglages → Compte en ligne) : vos Clicky se répondent.'),
+      Skill('Écris « @clicky résume la discussion » dans un espace : ton Smily répond pour tout le monde.'),
+      Skill(
+        'Allume « Mon Smily peut parler avec les Smily des autres » (Réglages → Compte en ligne) : vos Smily se répondent.',
+      ),
       Skill('Même compte partout : sur un autre PC, un Android ou un iPhone, « Mon compte en ligne » et tout revient.'),
     ]),
     SkillGroup('🚀', 'Toutes tes applis', Color(0xFF0EA5E9), isNew: true, [
-      Skill('Tape le nom d\'une appli dans la console de l\'accueil (ou Ctrl + K) : Entrée l\'ouvre, plus besoin de la touche Windows.'),
+      Skill(
+        'Tape le nom d\'une appli dans la console de l\'accueil (ou Ctrl + K) : Entrée l\'ouvre, plus besoin de la touche Windows.',
+      ),
       Skill('Partout sur le PC : Ctrl + Alt + Espace, puis le nom de l\'appli.'),
       Skill('« Mes applis » dans le menu : tout le menu Démarrer ; clic droit pour épingler sur l\'accueil.'),
       Skill('Accueil à ta façon : « Personnaliser » pour déplacer les blocs, changer leur taille, en ajouter.'),
     ]),
     SkillGroup('👀', 'Ses yeux et ses oreilles', Color(0xFF0EA5E9), isNew: true, [
       Skill('Il voit ton écran et entend le son du PC en continu, sur le PC (à allumer une fois dans ses réglages).'),
-      Skill('« Tu te souviens du site sur les volcans que j\'ai vu hier ? »', tryIt: 'Tu te souviens du site sur les volcans que j\'ai vu hier ?'),
+      Skill(
+        '« Tu te souviens du site sur les volcans que j\'ai vu hier ? »',
+        tryIt: 'Tu te souviens du site sur les volcans que j\'ai vu hier ?',
+      ),
       Skill('« Qu\'est-ce que je faisais mardi vers 16 h ? »', tryIt: 'Qu\'est-ce que je faisais mardi vers 16 h ?'),
       Skill('« Qu\'est-ce qu\'il a dit ? » (dans ta vidéo)', tryIt: 'Qu\'est-ce qu\'il a dit ?'),
       Skill('Il remarque une erreur à l\'écran, une date limite, une vidéo en anglais, les « à retenir » d\'un cours.'),
@@ -64,6 +76,11 @@ class ClickySkills {
       Skill('« Qu\'est-ce que tu surveilles ? »', tryIt: 'Qu\'est-ce que tu surveilles ?'),
     ]),
     SkillGroup('💡', 'Il prend les devants', Color(0xFF7C5CFF), isNew: true, [
+      Skill(
+        'Tu dis « non » ou « j\'ai pas envie » : il arrête d\'insister sur ce sujet, et au 3ᵉ refus il laisse tomber',
+      ),
+      Skill('« Arrête de me le répéter » : il n\'en reparle plus de lui-même', tryIt: 'Arrête de me le répéter'),
+      Skill('« Tu peux me reparler de tout » : il oublie tous tes refus', tryIt: 'Tu peux me reparler de tout'),
       Skill('Il te propose des idées utiles (préparer un contrôle, organiser ta soirée…) avec Oui / Non.'),
       Skill('Le soir, devoir pour demain et 40 min de YouTube : « on fait 25 minutes ? »'),
       Skill('Tu copies un lien d\'arnaque, un calcul, une date, de l\'anglais, un colis : il propose la bonne action.'),
@@ -72,9 +89,15 @@ class ClickySkills {
       Skill('« Mes habitudes » : ce qu\'il a remarqué sur toi', tryIt: 'Mes habitudes'),
       Skill('« Briefing » : le topo du matin, quand tu veux', tryIt: 'Briefing'),
     ]),
-    SkillGroup('🎒', 'École', Color(0xFFE5484D), [
+    SkillGroup('🎒', 'École', Color(0xFFE5484D), isNew: true, [
       Skill('« Qu\'est-ce que j\'ai comme devoirs ? »', tryIt: 'Qu\'est-ce que j\'ai comme devoirs ?'),
-      Skill('« Fais mes devoirs de maths » : il lit le cahier de texte et les fichiers du prof, et fait tout dans un Google Doc'),
+      Skill(
+        'Il fait tes devoirs pendant ton absence : un nouveau devoir arrive, tu n\'es pas là, il s\'y met et '
+        'te montre le travail à ton retour (à activer dans ses réglages, « Ce qu\'il fait pour toi »)',
+      ),
+      Skill(
+        '« Fais mes devoirs de maths » : il lit le cahier de texte et les fichiers du prof, et fait tout dans un Google Doc',
+      ),
       Skill('« Fais cet exercice » (à l\'écran) : la solution détaillée, avec « comment j\'ai fait »'),
       Skill('« Écoute le cours » : notes en direct dans un Google Doc, puis le compte rendu'),
       Skill('« Il me faut combien en maths pour avoir 14 ? »', tryIt: 'Il me faut combien en maths pour avoir 14 ?'),
@@ -97,11 +120,20 @@ class ClickySkills {
       Skill('Il demande toujours avant d\'envoyer, publier, payer ou supprimer.'),
     ]),
     SkillGroup('🖱️', 'À l\'écran', Color(0xFF0EA5E9), [
-      Skill('« Où est le bouton pour mettre en gras ? » : il vole dessus et te montre', tryIt: 'Où est le bouton pour mettre en gras ?'),
-      Skill('« Explique-moi ce qu\'il y a à l\'écran » : avec un tableau ou des dessins', tryIt: 'Explique-moi ce qu\'il y a à mon écran'),
+      Skill(
+        '« Où est le bouton pour mettre en gras ? » : il vole dessus et te montre',
+        tryIt: 'Où est le bouton pour mettre en gras ?',
+      ),
+      Skill(
+        '« Explique-moi ce qu\'il y a à l\'écran » : avec un tableau ou des dessins',
+        tryIt: 'Explique-moi ce qu\'il y a à mon écran',
+      ),
     ]),
     SkillGroup('💬', 'Ce que tu as raté', Color(0xFF7C5CFF), [
-      Skill('« Qu\'est-ce que j\'ai raté ? » : Discord, mails importants (sans les pubs), École Directe', tryIt: 'Qu\'est-ce que j\'ai raté ?'),
+      Skill(
+        '« Qu\'est-ce que j\'ai raté ? » : Discord, mails importants (sans les pubs), École Directe',
+        tryIt: 'Qu\'est-ce que j\'ai raté ?',
+      ),
       Skill('Quand tu reviens devant le PC, il te le dit tout seul.'),
     ]),
     SkillGroup('🔎', 'Retrouver n\'importe quoi', Color(0xFF0EA5E9), [
@@ -112,10 +144,16 @@ class ClickySkills {
       Skill('Surligne un texte n\'importe où, puis Ctrl + Alt + C : il le corrige à sa place.'),
       Skill('« Traduis la sélection en anglais », « Reformule mon texte »'),
       Skill('« Interprète anglais » : il traduit à voix haute dans les deux sens'),
-      Skill('« Mets les sous-titres » : tout ce qui passe sur ton PC, traduit en bas de l\'écran', tryIt: 'Mets les sous-titres'),
+      Skill(
+        '« Mets les sous-titres » : tout ce qui passe sur ton PC, traduit en bas de l\'écran',
+        tryIt: 'Mets les sous-titres',
+      ),
     ]),
     SkillGroup('⏰', 'Rappels', Color(0xFFF59E0B), [
-      Skill('« Rappelle-moi dans 20 minutes de sortir le linge »', tryIt: 'Rappelle-moi dans 20 minutes de sortir le linge'),
+      Skill(
+        '« Rappelle-moi dans 20 minutes de sortir le linge »',
+        tryIt: 'Rappelle-moi dans 20 minutes de sortir le linge',
+      ),
       Skill('« Rappelle-moi de répondre à Léo quand j\'ouvre Discord »'),
       Skill('« Retiens que mon oral d\'anglais est jeudi » : il prendra des nouvelles après'),
     ]),
@@ -138,10 +176,16 @@ class ClickySkills {
     SkillGroup('🛡️', 'Sécurité', Color(0xFF16A34A), [
       Skill('Bouclier anti-arnaque : faux Nitro/Robux, faux sites, « teste mon jeu » avec un .exe'),
       Skill('« Ce lien est sûr ? » (après l\'avoir copié)', tryIt: 'Ce lien est sûr ?'),
-      Skill('« Bilan de sécurité » : antivirus, pare-feu, mises à jour, double authentification', tryIt: 'Bilan de sécurité'),
+      Skill(
+        '« Bilan de sécurité » : antivirus, pare-feu, mises à jour, double authentification',
+        tryIt: 'Bilan de sécurité',
+      ),
       Skill('« Répare-toi » : il relit son journal d\'erreurs et corrige ce qu\'il peut', tryIt: 'Répare-toi'),
       Skill('« Coupe ma caméra » : plus aucune appli ne peut filmer, même une appli piratée', tryIt: 'Coupe ma caméra'),
-      Skill('« Qui utilise ma caméra ? » — et il te prévient dès qu\'une appli l\'allume', tryIt: 'Qui utilise ma caméra ?'),
+      Skill(
+        '« Qui utilise ma caméra ? » — et il te prévient dès qu\'une appli l\'allume',
+        tryIt: 'Qui utilise ma caméra ?',
+      ),
     ]),
     SkillGroup('💻', 'Ton PC', Color(0xFFEA580C), [
       Skill('« Comment va mon PC ? »', tryIt: 'Comment va mon PC ?'),
@@ -162,10 +206,12 @@ class ClickySkills {
       Skill('« L\'anniversaire de Léa c\'est le 12 mars » : rappel la veille et le jour même, avec un message prêt'),
       Skill('« Les prochains anniversaires »', tryIt: 'Les prochains anniversaires'),
     ]),
-    SkillGroup('🐾', 'Clicky vivant', Color(0xFF7C5CFF), isNew: true, [
+    SkillGroup('🐾', 'Smily vivant', Color(0xFF7C5CFF), isNew: true, [
       Skill('Il garde son look de curseur et vit avec des émojis : 💤 il dort quand tu pars, 🥱 il bâille le soir.'),
       Skill('Il porte un accessoire selon la vraie météo et les fêtes : 🧣 ☂️ 😎 🎅 ☕'),
-      Skill('🎵 Il danse sur ta musique, 😵‍💫 la tête lui tourne si tu secoues la souris, 🪑 il s\'assoit sur ta fenêtre.'),
+      Skill(
+        '🎵 Il danse sur ta musique, 😵‍💫 la tête lui tourne si tu secoues la souris, 🪑 il s\'assoit sur ta fenêtre.',
+      ),
       Skill('« T\'as rêvé de quoi ? »', tryIt: 'T\'as rêvé de quoi ?'),
       Skill('« Pourquoi t\'as une écharpe ? », « Tu dors ? »', tryIt: 'Tu dors ?'),
       Skill('« J\'habite à Lyon » : pour sa vraie météo'),
@@ -194,7 +240,10 @@ class ClickySkills {
         out.add(g);
         continue;
       }
-      final items = [for (final i in g.items) if (words.every((w) => _plain('${g.title} ${i.text}').contains(w))) i];
+      final items = [
+        for (final i in g.items)
+          if (words.every((w) => _plain('${g.title} ${i.text}').contains(w))) i,
+      ];
       if (items.isNotEmpty) out.add(SkillGroup(g.emoji, g.title, g.color, items, isNew: g.isNew));
     }
     return out;
@@ -204,12 +253,12 @@ class ClickySkills {
   static int get count => groups.fold<int>(0, (a, g) => a + g.items.length);
 }
 
-/// **Ce que Clicky sait faire** : tout le catalogue, par thème, avec une
+/// **Ce que Smily sait faire** : tout le catalogue, par thème, avec une
 /// recherche ; une phrase avec ▶ se touche pour l'essayer tout de suite.
 class ClickySkillsPage extends StatefulWidget {
   const ClickySkillsPage({super.key, this.onTry});
 
-  /// Essayer une phrase (par défaut : Clicky la reçoit).
+  /// Essayer une phrase (par défaut : Smily la reçoit).
   final void Function(String phrase)? onTry;
 
   static Future<void> open(BuildContext context) =>
@@ -238,7 +287,7 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
       ClickyController.instance.askAnywhere(phrase);
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('C\'est demandé à Clicky : « $phrase »'), duration: const Duration(seconds: 2)),
+      SnackBar(content: Text('C\'est demandé à Smily : « $phrase »'), duration: const Duration(seconds: 2)),
     );
   }
 
@@ -247,7 +296,7 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
     final theme = Theme.of(context);
     final found = ClickySkills.search(q).where((g) => only == null || g.title == only).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Ce que Clicky sait faire')),
+      appBar: AppBar(title: const Text('Ce que Smily sait faire')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -270,7 +319,10 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
                         children: [
                           Text(
                             'Plus de ${ClickySkills.count ~/ 10 * 10} choses à lui demander',
-                            style: theme.textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           const Text(
@@ -311,7 +363,11 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(label: const Text('Tout'), selected: only == null, onSelected: (_) => setState(() => only = null)),
+                      child: ChoiceChip(
+                        label: const Text('Tout'),
+                        selected: only == null,
+                        onSelected: (_) => setState(() => only = null),
+                      ),
                     ),
                     for (final g in ClickySkills.groups)
                       Padding(
@@ -327,7 +383,10 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
               ),
               const SizedBox(height: 6),
               if (found.isEmpty)
-                const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Rien trouvé : essaie un autre mot.'))),
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('Rien trouvé : essaie un autre mot.')),
+                ),
               for (final g in found) _GroupCard(group: g, onTry: _try),
             ],
           ),
@@ -367,7 +426,10 @@ class _GroupCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(color: g.color, borderRadius: BorderRadius.circular(10)),
-                    child: const Text('Nouveau', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                    child: const Text(
+                      'Nouveau',
+                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ],
               ],
@@ -382,9 +444,15 @@ class _GroupCard extends StatelessWidget {
                         children: [
                           Padding(
                             padding: const EdgeInsets.only(top: 7, right: 10, left: 4),
-                            child: Container(width: 6, height: 6, decoration: BoxDecoration(color: g.color, shape: BoxShape.circle)),
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(color: g.color, shape: BoxShape.circle),
+                            ),
                           ),
-                          Expanded(child: Text(i.text, style: const TextStyle(fontFamilyFallback: emojiFonts))),
+                          Expanded(
+                            child: Text(i.text, style: const TextStyle(fontFamilyFallback: emojiFonts)),
+                          ),
                         ],
                       ),
                     )
@@ -398,7 +466,12 @@ class _GroupCard extends StatelessWidget {
                           children: [
                             Icon(Icons.play_circle_fill_rounded, size: 20, color: g.color),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(i.text, style: TextStyle(fontWeight: FontWeight.w600, fontFamilyFallback: emojiFonts))),
+                            Expanded(
+                              child: Text(
+                                i.text,
+                                style: TextStyle(fontWeight: FontWeight.w600, fontFamilyFallback: emojiFonts),
+                              ),
+                            ),
                           ],
                         ),
                       ),

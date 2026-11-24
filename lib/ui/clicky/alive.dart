@@ -3,11 +3,11 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Ce que fait Clicky (pour choisir son animation).
+/// Ce que fait Smily (pour choisir son animation).
 enum AliveMood { idle, listening, thinking, speaking, pointing }
 
-/// Donne de la vie au curseur de Clicky, **sans animation qui tourne en
-/// boucle pour rien** (fluidité, et Clicky partout reste sur l'écran toute
+/// Donne de la vie au curseur de Smily, **sans animation qui tourne en
+/// boucle pour rien** (fluidité, et Smily partout reste sur l'écran toute
 /// la journée) :
 /// * à chaque changement d'état : un petit rebond (écrasé puis étiré) ;
 /// * quand il commence à parler : un saut de joie ;
@@ -16,7 +16,13 @@ enum AliveMood { idle, listening, thinking, speaking, pointing }
 /// * pendant qu'il écoute : une onde qui s'élargit ;
 /// * au repos : de temps en temps, un petit coucou (penché), puis plus rien.
 class ClickyBounce extends StatefulWidget {
-  const ClickyBounce({super.key, required this.mood, required this.child, this.color = const Color(0xFF3B82F6), this.size = 26});
+  const ClickyBounce({
+    super.key,
+    required this.mood,
+    required this.child,
+    this.color = const Color(0xFF3B82F6),
+    this.size = 26,
+  });
 
   final AliveMood mood;
   final Widget child;
@@ -111,10 +117,7 @@ class _ClickyBounceState extends State<ClickyBounce> with TickerProviderStateMix
                   left: -9,
                   top: -9,
                   child: IgnorePointer(
-                    child: CustomPaint(
-                      size: Size(s + 18, s + 18),
-                      painter: _HaloPainter(_loop.value, widget.color),
-                    ),
+                    child: CustomPaint(size: Size(s + 18, s + 18), painter: _HaloPainter(_loop.value, widget.color)),
                   ),
                 ),
               if (mood == AliveMood.listening)
@@ -164,7 +167,7 @@ class _ClickyBounceState extends State<ClickyBounce> with TickerProviderStateMix
   }
 }
 
-/// Le halo qui tourne pendant que Clicky réfléchit (un arc dégradé).
+/// Le halo qui tourne pendant que Smily réfléchit (un arc dégradé).
 class _HaloPainter extends CustomPainter {
   _HaloPainter(this.t, this.color);
   final double t;

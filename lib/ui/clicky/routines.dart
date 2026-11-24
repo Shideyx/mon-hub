@@ -20,7 +20,7 @@ class RoutineRun {
   );
 }
 
-/// Une tâche que Clicky fait tout seul, régulièrement (« briefing du matin
+/// Une tâche que Smily fait tout seul, régulièrement (« briefing du matin
 /// à 7 h 15 », « devoirs pour demain à 18 h »…), avec tes modules.
 class Routine {
   Routine({
@@ -58,7 +58,7 @@ class Routine {
   /// du matin se fait à l'allumage, jusqu'à midi).
   int catchUp;
 
-  /// Topo du matin / du soir (affiché en grand par Clicky).
+  /// Topo du matin / du soir (affiché en grand par Smily).
   bool get isTopo => id.startsWith('topo-');
   DateTime? lastRun;
   final List<RoutineRun> runs;
@@ -128,9 +128,7 @@ class Routine {
     enabled: j['on'] != false,
     speak: j['speak'] != false,
     catchUp: (j['catch'] as num?)?.toInt() ?? 3,
-    lastRun: j['last'] == null
-        ? null
-        : DateTime.fromMillisecondsSinceEpoch((j['last'] as num).toInt()),
+    lastRun: j['last'] == null ? null : DateTime.fromMillisecondsSinceEpoch((j['last'] as num).toInt()),
     runs: [
       for (final r in (j['runs'] as List?) ?? const [])
         if (r is Map) RoutineRun.fromJson(r),
@@ -148,14 +146,8 @@ class Routine {
     prompt: topoMorningPrompt,
   );
 
-  static Routine topoEvening() => Routine(
-    id: 'topo-soir',
-    name: 'Topo du soir',
-    every: 'daily',
-    hour: 20,
-    minute: 30,
-    prompt: topoEveningPrompt,
-  );
+  static Routine topoEvening() =>
+      Routine(id: 'topo-soir', name: 'Topo du soir', every: 'daily', hour: 20, minute: 30, prompt: topoEveningPrompt);
 
   static const topoMorningPrompt =
       'Fais mon TOPO DU MATIN, comme JARVIS, parlé et sans markdown, 10 à 18 phrases courtes, dans cet ordre : '
@@ -249,7 +241,7 @@ class Routines extends ChangeNotifier {
   Timer? _timer;
   final _busy = <String>{};
 
-  /// Fait le travail (l'agent de Clicky) : renvoie le compte rendu.
+  /// Fait le travail (l'agent de Smily) : renvoie le compte rendu.
   Future<String> Function(String prompt)? runner;
 
   /// Prévient (alerte + voix).
@@ -394,10 +386,7 @@ class _RoutinesViewState extends State<RoutinesView> {
                 children: [
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(
-                      labelText: 'Nom',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Nom', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -405,20 +394,16 @@ class _RoutinesViewState extends State<RoutinesView> {
                     minLines: 3,
                     maxLines: 6,
                     decoration: const InputDecoration(
-                      labelText: 'Ce que Clicky doit faire',
+                      labelText: 'Ce que Smily doit faire',
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     initialValue: every,
-                    decoration: const InputDecoration(
-                      labelText: 'Quand',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Quand', border: OutlineInputBorder()),
                     items: [
-                      for (final e in Routine.labels.entries)
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
+                      for (final e in Routine.labels.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
                     ],
                     onChanged: (v) => set(() => every = v ?? every),
                   ),
@@ -426,13 +411,9 @@ class _RoutinesViewState extends State<RoutinesView> {
                     const SizedBox(height: 10),
                     DropdownButtonFormField<int>(
                       initialValue: weekday,
-                      decoration: const InputDecoration(
-                        labelText: 'Jour',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Jour', border: OutlineInputBorder()),
                       items: [
-                        for (var i = 1; i <= 7; i++)
-                          DropdownMenuItem(value: i, child: Text(Routine.days[i - 1])),
+                        for (var i = 1; i <= 7; i++) DropdownMenuItem(value: i, child: Text(Routine.days[i - 1])),
                       ],
                       onChanged: (v) => set(() => weekday = v ?? weekday),
                     ),
@@ -490,7 +471,7 @@ class _RoutinesViewState extends State<RoutinesView> {
         padding: const EdgeInsets.all(12),
         children: [
           Text(
-            'Clicky fait ces tâches tout seul, avec tes modules, tant que Mon Hub est ouvert, '
+            'Smily fait ces tâches tout seul, avec tes modules, tant que Mon Hub est ouvert, '
             'et te prévient quand c\'est prêt.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -524,19 +505,10 @@ class _RoutinesViewState extends State<RoutinesView> {
               child: ExpansionTile(
                 shape: const Border(),
                 leading: r.running(x.id)
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.event_repeat_rounded,
-                        color: x.enabled ? widget.color : Colors.grey,
-                      ),
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.event_repeat_rounded, color: x.enabled ? widget.color : Colors.grey),
                 title: Text(x.name),
-                subtitle: Text(
-                  '${x.when}${x.lastRun == null ? '' : ' · dernière fois ${timeAgo(x.lastRun!)}'}',
-                ),
+                subtitle: Text('${x.when}${x.lastRun == null ? '' : ' · dernière fois ${timeAgo(x.lastRun!)}'}'),
                 trailing: Switch(
                   value: x.enabled,
                   onChanged: (v) {

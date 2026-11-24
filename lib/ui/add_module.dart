@@ -155,7 +155,7 @@ class _AddModuleSheetState extends State<AddModuleSheet> with SingleTickerProvid
             Text('Ajouter un module', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(
-              'Il apparaît sur ton accueil, comme les autres (et Clicky sait l\'ouvrir).',
+              'Il apparaît sur ton accueil, comme les autres (et Smily sait l\'ouvrir).',
               style: theme.textTheme.bodySmall,
             ),
             TabBar(
@@ -167,7 +167,10 @@ class _AddModuleSheetState extends State<AddModuleSheet> with SingleTickerProvid
               ],
             ),
             Expanded(
-              child: TabBarView(controller: tabs, children: [_catalog(context), _own(context, links: false), _own(context, links: true)]),
+              child: TabBarView(
+                controller: tabs,
+                children: [_catalog(context), _own(context, links: false), _own(context, links: true)],
+              ),
             ),
           ],
         ),

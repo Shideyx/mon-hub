@@ -66,17 +66,17 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 
 | **Claude** | Carte Claude → **Ouvrir Claude** → connecte-toi comme sur claude.ai (si « Continuer avec Google » refuse dans l'appli, choisis « Continuer avec l'e-mail »). |
 
-## 3 ter. Clicky, ton compagnon à côté du curseur
+## 3 ter. Smily, ton compagnon à côté du curseur
 
-1. Carte **Claude** → **Configurer Clicky** → choisis son cerveau :
-   - **Claude Pro** (conseillé si tu as un abonnement Claude Pro / Max) : Clicky utilise ton abonnement via **Claude Code**, l'outil officiel d'Anthropic. Dans les réglages : **Installer Claude Code** (une fenêtre s'ouvre et l'installe), puis **Se connecter** (la page officielle de Claude s'ouvre dans ton navigateur), puis ↻. Mon Hub ne voit jamais ta connexion ; les questions comptent dans les limites de ton abonnement.
+1. Carte **Claude** → **Configurer Smily** → choisis son cerveau :
+   - **Claude Pro** (conseillé si tu as un abonnement Claude Pro / Max) : Smily utilise ton abonnement via **Claude Code**, l'outil officiel d'Anthropic. Dans les réglages : **Installer Claude Code** (une fenêtre s'ouvre et l'installe), puis **Se connecter** (la page officielle de Claude s'ouvre dans ton navigateur), puis ↻. Mon Hub ne voit jamais ta connexion ; les questions comptent dans les limites de ton abonnement.
    - **Clé API** : crée une clé sur https://console.anthropic.com/settings/keys (payée à l'usage, quelques centimes par question) et colle-la.
    - **Local gratuit (Ollama)** : sans clé ni compte, rien ne sort du PC. Installe https://ollama.com/download puis, dans un terminal : `ollama pull qwen2.5vl`. Il faut un PC assez puissant.
 2. **Maintiens Ctrl + Alt et parle**, relâche pour envoyer (appui court = écrire). Sur téléphone : touche la bulle bleue.
-3. Sur Windows, **Clicky partout** (activé par défaut) : Clicky suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
-4. **Clicky prof** : dis « je comprends pas », « apprends-moi un truc », « montre-moi en schéma » ou « teste-moi » : il dessine un tableau (schéma, étapes, frise, quiz…).
-5. **Micro** : Réglages → Clicky → **Tester le micro**. Sur Windows, s'il ne t'entend pas : Paramètres → Confidentialité et sécurité → **Microphone** (activer « Autoriser les applications de bureau ») et → **Voix** (activer « Reconnaissance vocale en ligne »). Clicky affiche directement le bouton du bon réglage. En secours : bouton « Dictée Windows (Win + H) ».
-6. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Clicky te prévient quand c'est fini.
+3. Sur Windows, **Smily partout** (activé par défaut) : Smily suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
+4. **Smily prof** : dis « je comprends pas », « apprends-moi un truc », « montre-moi en schéma » ou « teste-moi » : il dessine un tableau (schéma, étapes, frise, quiz…).
+5. **Micro** : Réglages → Smily → **Tester le micro**. Sur Windows, s'il ne t'entend pas : Paramètres → Confidentialité et sécurité → **Microphone** (activer « Autoriser les applications de bureau ») et → **Voix** (activer « Reconnaissance vocale en ligne »). Smily affiche directement le bouton du bon réglage. En secours : bouton « Dictée Windows (Win + H) ».
+6. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Smily te prévient quand c'est fini.
 
 Le micro de Windows doit comprendre le français : *Paramètres → Heure et langue → Voix* (installe le pack français si besoin).
 

@@ -9,7 +9,7 @@ import 'freeze_watch.dart';
 import 'perf.dart';
 
 /// Journal des erreurs, **sur ton PC seulement** (rien n'est envoyé) :
-/// %APPDATA%\MonHub\journal-erreurs.log. Quand Clicky ou Mon Hub plante,
+/// %APPDATA%\MonHub\journal-erreurs.log. Quand Smily ou Mon Hub plante,
 /// on y voit exactement quoi et où, pour le corriger.
 ///
 /// Les garde-fous installés ici évitent aussi qu'une erreur ne casse tout :
@@ -78,7 +78,10 @@ class ErrorLog {
       .replaceAll(RegExp(r'GOCSPX-[A-Za-z0-9_-]{10,}'), 'GOCSPX-•••')
       .replaceAll(RegExp(r'ya29\.[A-Za-z0-9._-]{20,}'), 'ya29.•••')
       .replaceAll(RegExp(r'\b[MNO][A-Za-z\d_-]{23,27}\.[\w-]{6}\.[\w-]{27,40}\b'), '(jeton Discord masqué)')
-      .replaceAll(RegExp(r'"(password|motdepasse|mdp|token|apiKey|key)"\s*:\s*"[^"]*"', caseSensitive: false), '"•••":"•••"');
+      .replaceAll(
+        RegExp(r'"(password|motdepasse|mdp|token|apiKey|key)"\s*:\s*"[^"]*"', caseSensitive: false),
+        '"•••":"•••"',
+      );
 
   /// Installe les garde-fous (au démarrage de chaque programme).
   static void install(String who) {

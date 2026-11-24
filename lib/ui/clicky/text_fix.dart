@@ -1,5 +1,5 @@
 /// Corriger (ou reformuler, traduire) **le texte surligné dans n'importe
-/// quelle appli** : Clicky le copie, l'IA le corrige, et il le recolle à la
+/// quelle appli** : Smily le copie, l'IA le corrige, et il le recolle à la
 /// place. Ici : les consignes de l'IA et le nettoyage de sa réponse.
 class TextFix {
   TextFix._();

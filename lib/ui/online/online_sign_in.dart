@@ -102,7 +102,10 @@ class _OnlineSignInViewState extends State<OnlineSignInView> {
               const SizedBox(height: 10),
               TextField(
                 controller: _code,
-                decoration: const InputDecoration(labelText: 'Code du serveur', prefixIcon: Icon(Icons.vpn_key_rounded)),
+                decoration: const InputDecoration(
+                  labelText: 'Code du serveur',
+                  prefixIcon: Icon(Icons.vpn_key_rounded),
+                ),
                 onSubmitted: (_) => _server(),
               ),
               const SizedBox(height: 12),
@@ -113,7 +116,10 @@ class _OnlineSignInViewState extends State<OnlineSignInView> {
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Adresse mail', prefixIcon: Icon(Icons.alternate_email_rounded)),
+                decoration: const InputDecoration(
+                  labelText: 'Adresse mail',
+                  prefixIcon: Icon(Icons.alternate_email_rounded),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -141,10 +147,17 @@ class _OnlineSignInViewState extends State<OnlineSignInView> {
               ),
               if (_canCreate) ...[
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: _busy ? null : _create, child: const Text('Créer mon compte avec cette adresse')),
+                OutlinedButton(
+                  onPressed: _busy ? null : _create,
+                  child: const Text('Créer mon compte avec cette adresse'),
+                ),
               ],
             ],
-            if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(color: c.bad))),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_error!, style: TextStyle(color: c.bad)),
+              ),
             const SizedBox(height: 8),
             TextButton(onPressed: _busy ? null : widget.onBack, child: const Text('Retour')),
             Text(

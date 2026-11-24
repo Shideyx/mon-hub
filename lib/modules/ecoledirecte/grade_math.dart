@@ -32,7 +32,10 @@ class GradeMath {
     final dated = [...all]..sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
     final p = dated.where((g) => g.period.isNotEmpty).firstOrNull?.period;
     if (p == null) return all;
-    return [for (final g in all) if (g.period == p) g];
+    return [
+      for (final g in all)
+        if (g.period == p) g,
+    ];
   }
 
   /// Moyenne pondérée sur 20 (null s'il n'y a aucune note qui compte).
@@ -68,13 +71,38 @@ class GradeMath {
   }
 
   static const _aliases = {
-    'maths': 'mathematiques', 'math': 'mathematiques', 'svt': 'vie terre', 'sciences de la vie': 'vie terre',
-    'physique': 'physique', 'pc': 'physique', 'chimie': 'physique', 'physique chimie': 'physique',
-    'histoire': 'histoire', 'geo': 'histoire', 'geographie': 'histoire', 'hg': 'histoire', 'histoire geo': 'histoire',
-    'eps': 'sport', 'sport': 'sport', 'ses': 'econo', 'eco': 'econo', 'philo': 'philo', 'emc': 'moral',
-    'francais': 'francais', 'anglais': 'anglais', 'espagnol': 'espagnol', 'allemand': 'allemand',
-    'italien': 'italien', 'latin': 'latin', 'nsi': 'numerique', 'snt': 'numerique', 'techno': 'techno',
-    'musique': 'musique', 'arts plastiques': 'arts', 'arts': 'arts', 'sciences': 'sciences',
+    'maths': 'mathematiques',
+    'math': 'mathematiques',
+    'svt': 'vie terre',
+    'sciences de la vie': 'vie terre',
+    'physique': 'physique',
+    'pc': 'physique',
+    'chimie': 'physique',
+    'physique chimie': 'physique',
+    'histoire': 'histoire',
+    'geo': 'histoire',
+    'geographie': 'histoire',
+    'hg': 'histoire',
+    'histoire geo': 'histoire',
+    'eps': 'sport',
+    'sport': 'sport',
+    'ses': 'econo',
+    'eco': 'econo',
+    'philo': 'philo',
+    'emc': 'moral',
+    'francais': 'francais',
+    'anglais': 'anglais',
+    'espagnol': 'espagnol',
+    'allemand': 'allemand',
+    'italien': 'italien',
+    'latin': 'latin',
+    'nsi': 'numerique',
+    'snt': 'numerique',
+    'techno': 'techno',
+    'musique': 'musique',
+    'arts plastiques': 'arts',
+    'arts': 'arts',
+    'sciences': 'sciences',
   };
 
   /// Retrouve une matière d'École Directe à partir de ce qui est dit
@@ -117,7 +145,7 @@ class GradeMath {
     return r == r.roundToDouble() ? '${r.round()}' : r.toStringAsFixed(1).replaceAll('.', ',');
   }
 
-  /// Ce que Clicky dit pour « il me faut combien en maths pour avoir 14 ? ».
+  /// Ce que Smily dit pour « il me faut combien en maths pour avoir 14 ? ».
   static String sayNeeded(String subject, List<EdGrade> grades, double target, {double coef = 1, double outOf = 20}) {
     final avg = average(grades);
     final n = needed(grades, target, coef: coef, outOf: outOf);
@@ -137,15 +165,30 @@ class GradeMath {
   static String? weekReport(List<EdGrade> all, DateTime now, {int days = 7}) {
     final period = currentPeriod(all);
     final since = now.subtract(Duration(days: days));
-    final fresh = [for (final g in period) if (g.date != null && g.date!.isAfter(since) && on20(g) != null) g];
+    final fresh = [
+      for (final g in period)
+        if (g.date != null && g.date!.isAfter(since) && on20(g) != null) g,
+    ];
     if (fresh.isEmpty) return null;
-    final before = [for (final g in period) if (!fresh.contains(g)) g];
+    final before = [
+      for (final g in period)
+        if (!fresh.contains(g)) g,
+    ];
     final lines = <String>[];
     final subjects = {for (final g in fresh) g.subject}.toList()..sort();
     for (final s in subjects) {
-      final mine = [for (final g in fresh) if (g.subject == s) g];
-      final a = average([for (final g in before) if (g.subject == s) g]);
-      final b = average([for (final g in period) if (g.subject == s) g]);
+      final mine = [
+        for (final g in fresh)
+          if (g.subject == s) g,
+      ];
+      final a = average([
+        for (final g in before)
+          if (g.subject == s) g,
+      ]);
+      final b = average([
+        for (final g in period)
+          if (g.subject == s) g,
+      ]);
       final notes = mine.map((g) => '${g.value}/${g.outOf}').join(', ');
       final trend = a == null || b == null
           ? (b == null ? '' : ' (moyenne ${fmt(b)})')

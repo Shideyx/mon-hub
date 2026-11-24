@@ -8,7 +8,7 @@ import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import 'shot_encode.dart';
 
-/// Cerveau « Claude Pro » de Clicky : ton propre Claude Code, connecté à ton
+/// Cerveau « Claude Pro » de Smily : ton propre Claude Code, connecté à ton
 /// abonnement Claude (Pro, Max…).
 ///
 /// Mon Hub ne voit **jamais** ta connexion : tu te connectes toi-même dans
@@ -18,18 +18,17 @@ import 'shot_encode.dart';
 /// comptent dans les limites de ton abonnement.
 ///
 /// Claude Code reçoit la capture d'écran et peut utiliser les actions de
-/// Mon Hub (agenda, notes, messages…) et celles de Clicky (contrôle du PC,
+/// Mon Hub (agenda, notes, messages…) et celles de Smily (contrôle du PC,
 /// avec ta permission) via le pont local (`/mcp`), mais aucun de ses propres
 /// outils de programmation.
 class ClaudeCode {
   ClaudeCode._();
 
-  static bool get supported =>
-      !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+  static bool get supported => !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
   static const models = {
     '': 'Celui de ton abonnement (par défaut)',
-    // Conseillé : Clicky n'appelle plus Claude que pour les demandes
+    // Conseillé : Smily n'appelle plus Claude que pour les demandes
     // difficiles, autant qu'elles aient le meilleur.
     'claude-opus-5-5': 'Claude Opus 5.5 (conseillé)',
     'sonnet': 'Sonnet (rapide)',
@@ -110,10 +109,7 @@ class ClaudeCode {
     try {
       final p = await _start(path, ['auth', 'status']);
       await p.stdin.close();
-      final out = await p.stdout
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 20));
+      final out = await p.stdout.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
       final j = jsonDecode(out.substring(out.indexOf('{'))) as Map;
       final method = '${j['authMethod'] ?? 'none'}';
       final who = j['email'] ?? j['account']?['email'] ?? '';
@@ -121,10 +117,7 @@ class ClaudeCode {
         return (false, 'Claude Code est installé, mais pas encore connecté à ton compte.');
       }
       final plan = '${j['subscriptionType'] ?? j['plan'] ?? ''}'.trim();
-      return (
-        true,
-        'Connecté${who == '' ? '' : ' : $who'}${plan.isEmpty || plan == 'null' ? '' : ' ($plan)'}',
-      );
+      return (true, 'Connecté${who == '' ? '' : ' : $who'}${plan.isEmpty || plan == 'null' ? '' : ' ($plan)'}');
     } catch (_) {
       return (false, 'Claude Code est installé, mais sa connexion n\'a pas pu être vérifiée.');
     }
@@ -183,13 +176,12 @@ class ClaudeCode {
     final dir = ClaudeBridge.folder;
     if (dir == null) return null;
     try {
-      final info =
-          jsonDecode(File('$dir${Platform.pathSeparator}bridge.json').readAsStringSync()) as Map;
+      final info = jsonDecode(File('$dir${Platform.pathSeparator}bridge.json').readAsStringSync()) as Map;
       return {
         'mcpServers': {
           'monhub': {
             'type': 'http',
-            // Clicky économe : seulement les actions utiles à la question.
+            // Smily économe : seulement les actions utiles à la question.
             'url':
                 'http://127.0.0.1:${info['port']}/mcp'
                 '${groups == null || groups.isEmpty ? '' : '?groupes=${Uri.encodeQueryComponent(groups.join(','))}'}',
@@ -247,7 +239,10 @@ class ClaudeCode {
       if (mcp != null) ...['--mcp-config', mcpFile.path],
       if (mcp != null || web) ...[
         '--allowedTools',
-        [if (mcp != null) 'mcp__monhub', if (web) ...['WebSearch', 'WebFetch']].join(','),
+        [
+          if (mcp != null) 'mcp__monhub',
+          if (web) ...['WebSearch', 'WebFetch'],
+        ].join(','),
       ],
       if (model.isNotEmpty) ...['--model', model],
       if (effort != null) ...['--effort', effort],
@@ -291,10 +286,7 @@ class ClaudeCode {
     var failed = false;
     try {
       await for (final line
-          in p.stdout
-              .transform(utf8.decoder)
-              .transform(const LineSplitter())
-              .timeout(const Duration(minutes: 4))) {
+          in p.stdout.transform(utf8.decoder).transform(const LineSplitter()).timeout(const Duration(minutes: 4))) {
         if (!line.startsWith('{')) continue;
         final Map e;
         try {
@@ -366,10 +358,7 @@ class ClaudeCode {
   /// Message d'erreur compréhensible.
   static String _explain(String raw) {
     final r = raw.toLowerCase();
-    if (r.contains('login') ||
-        r.contains('log in') ||
-        r.contains('authenticat') ||
-        r.contains('api key')) {
+    if (r.contains('login') || r.contains('log in') || r.contains('authenticat') || r.contains('api key')) {
       return 'Claude Code n\'est pas connecté à ton compte : module Claude → Réglages → « Se connecter ».';
     }
     if (r.contains('usage limit') || r.contains('limit reached') || r.contains('rate limit')) {

@@ -24,9 +24,44 @@ class WorkBackup extends ChangeNotifier {
   /// Les types de fichiers sauvegardés (documents, présentations, tableurs,
   /// code, projets Scratch…). Pas les photos ni les vidéos (trop lourdes).
   static const extensions = {
-    'doc', 'docx', 'odt', 'rtf', 'txt', 'md', 'pdf', 'ppt', 'pptx', 'odp', 'xls', 'xlsx', 'ods', 'csv', 'pages',
-    'key', 'numbers', 'tex', 'py', 'java', 'c', 'cpp', 'h', 'js', 'ts', 'html', 'css', 'json', 'sb3', 'ipynb', 'lua',
-    'rbxl', 'rbxm', 'ggb', 'drawio', 'xcf', 'kra', 'mscz',
+    'doc',
+    'docx',
+    'odt',
+    'rtf',
+    'txt',
+    'md',
+    'pdf',
+    'ppt',
+    'pptx',
+    'odp',
+    'xls',
+    'xlsx',
+    'ods',
+    'csv',
+    'pages',
+    'key',
+    'numbers',
+    'tex',
+    'py',
+    'java',
+    'c',
+    'cpp',
+    'h',
+    'js',
+    'ts',
+    'html',
+    'css',
+    'json',
+    'sb3',
+    'ipynb',
+    'lua',
+    'rbxl',
+    'rbxm',
+    'ggb',
+    'drawio',
+    'xcf',
+    'kra',
+    'mscz',
   };
 
   static const maxBytes = 50 * 1024 * 1024;
@@ -102,9 +137,11 @@ class WorkBackup extends ChangeNotifier {
     if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) return;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(minutes: 30), (_) => unawaited(runNow()));
-    unawaited(_state.load().then((_) {
-      if (on) Timer(const Duration(minutes: 5), () => unawaited(runNow()));
-    }));
+    unawaited(
+      _state.load().then((_) {
+        if (on) Timer(const Duration(minutes: 5), () => unawaited(runNow()));
+      }),
+    );
   }
 
   void stop() => _timer?.cancel();
@@ -180,12 +217,15 @@ class WorkBackup extends ChangeNotifier {
     final parent = parts.length == 1 ? null : await _folder(account, parts.sublist(0, parts.length - 1).join('/'), ids);
     final name = parts.last;
     final esc = name.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
-    final q = "mimeType='$_folderMime' and name='$esc' and trashed=false and "
+    final q =
+        "mimeType='$_folderMime' and name='$esc' and trashed=false and "
         "${parent == null ? "'root' in parents" : "'$parent' in parents"}";
     final found = await GoogleAuth.api(
       account,
       'GET',
-      Uri.parse(_files).replace(queryParameters: {'q': q, 'fields': 'files(id,webViewLink)', 'pageSize': '1'}).toString(),
+      Uri.parse(_files)
+          .replace(queryParameters: {'q': q, 'fields': 'files(id,webViewLink)', 'pageSize': '1'})
+          .toString(),
     );
     final list = found['files'];
     String id;
@@ -193,11 +233,16 @@ class WorkBackup extends ChangeNotifier {
       id = '${(list.first as Map)['id']}';
       if (parent == null) ids['@lien'] = (list.first as Map)['webViewLink'];
     } else {
-      final made = await GoogleAuth.api(account, 'POST', '$_files?fields=id,webViewLink', body: {
-        'name': name,
-        'mimeType': _folderMime,
-        'parents': ?parent == null ? null : [parent],
-      });
+      final made = await GoogleAuth.api(
+        account,
+        'POST',
+        '$_files?fields=id,webViewLink',
+        body: {
+          'name': name,
+          'mimeType': _folderMime,
+          'parents': ?parent == null ? null : [parent],
+        },
+      );
       id = '${made['id']}';
       if (parent == null) ids['@lien'] = made['webViewLink'];
     }
@@ -248,7 +293,13 @@ class WorkBackup extends ChangeNotifier {
           } catch (_) {
             if (id == null) rethrow;
             // Fichier supprimé du Drive entre-temps : on le recrée.
-            r = await GoogleAuth.upload(account, name: rel.split('/').last, data: data, mime: 'application/octet-stream', parent: parent);
+            r = await GoogleAuth.upload(
+              account,
+              name: rel.split('/').last,
+              data: data,
+              mime: 'application/octet-stream',
+              parent: parent,
+            );
           }
           saved[rel] = {'id': r['id'], 'taille': size, 'modif': modified.millisecondsSinceEpoch};
           count++;

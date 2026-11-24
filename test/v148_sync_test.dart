@@ -75,11 +75,7 @@ void main() {
   group('Fusion réglage par réglage', () {
     test('le plus récent gagne, les suppressions suivent', () {
       final base = SyncMerge.readStamps(
-        SyncMerge.toStamps({
-          'p:a': SyncEntry('1', 10),
-          'p:b': SyncEntry('x', 10),
-          'p:c': SyncEntry('vieux', 10),
-        }),
+        SyncMerge.toStamps({'p:a': SyncEntry('1', 10), 'p:b': SyncEntry('x', 10), 'p:c': SyncEntry('vieux', 10)}),
       );
       // Ici : a inchangé, b changé, c supprimé.
       final mine = SyncMerge.stamp({'p:a': '1', 'p:b': 'y'}, base, 100);
@@ -181,8 +177,7 @@ void main() {
       await tmp.delete(recursive: true);
     });
 
-    _Device device(String name, int key) =>
-        _Device(Directory('${tmp.path}/$name')..createSync(), List.filled(32, key));
+    _Device device(String name, int key) => _Device(Directory('${tmp.path}/$name')..createSync(), List.filled(32, key));
 
     test('activé sur le PC, retrouvé sur un autre sans export, puis tout suit', () async {
       final pc = device('pc', 1);

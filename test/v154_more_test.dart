@@ -16,8 +16,18 @@ void main() {
     expect(d.title, '🔔 3 notifications : 2 Discord · 1 École Directe');
     expect(d.body.split('\n').first, '• 📝 Nouvelle note en Maths — 15/20');
     expect(d.moduleId, isEmpty); // le résumé lui-même passe tout de suite
-    expect(NotificationCenter.urgent(HubNotification(id: 'discord-appel-1', title: 'Appel', body: '', moduleId: 'discord')), isTrue);
-    expect(NotificationCenter.urgent(items.first), isFalse);
+    expect(
+      NotificationCenter.urgent(HubNotification(id: 'discord-appel-1', title: 'Appel', body: '', moduleId: 'discord')),
+      isTrue,
+    );
+    // v1.61 : un message, une note, un devoir ne sont plus retenus par le
+    // résumé (ils arrivaient jusqu'à une demi-heure trop tard).
+    expect(NotificationCenter.urgent(items.first), isTrue);
+    expect(NotificationCenter.urgent(items.last), isTrue);
+    expect(
+      NotificationCenter.urgent(HubNotification(id: 'abo:spotify', title: 'Spotify', body: '', moduleId: 'argent')),
+      isFalse,
+    );
     expect(NotificationCenter.urgent(HubNotification(id: 'x', title: 'Rappel', body: '')), isTrue);
   });
 
@@ -27,7 +37,10 @@ void main() {
     expect(WorkBackup.wanted(r'C:\Users\Moi\Documents\~$DM.docx', 300), isFalse); // fichier de Word ouvert
     expect(WorkBackup.wanted(r'C:\Users\Moi\Documents\vacances.jpg', 3000000), isFalse);
     expect(WorkBackup.wanted(r'C:\Users\Moi\Documents\film.pdf', 80 * 1024 * 1024), isFalse);
-    expect(WorkBackup.relative(r'C:\Users\Moi\Documents', r'C:\Users\Moi\Documents\Maths\DM 3.docx'), 'Documents/Maths/DM 3.docx');
+    expect(
+      WorkBackup.relative(r'C:\Users\Moi\Documents', r'C:\Users\Moi\Documents\Maths\DM 3.docx'),
+      'Documents/Maths/DM 3.docx',
+    );
     final at = DateTime(2026, 11, 18, 10);
     final saved = <String, dynamic>{
       'Documents/DM.docx': {'id': 'x', 'taille': 100, 'modif': at.millisecondsSinceEpoch},
@@ -56,7 +69,10 @@ void main() {
       final p = e.gradePrompt(answers);
       expect(p, contains('Question 2 (4.0 points)'));
       expect(p, isNot(contains('Question 1 ')));
-      final (marks, advice) = e.mark(answers, '{"questions": [{"numero": 2, "points": 2.5, "commentaire": "Il manque le CO2."}], "conseil": "Revois les réactifs."}');
+      final (marks, advice) = e.mark(
+        answers,
+        '{"questions": [{"numero": 2, "points": 2.5, "commentaire": "Il manque le CO2."}], "conseil": "Revois les réactifs."}',
+      );
       expect(marks.map((m) => m.got), [2, 2.5]);
       expect(marks.last.comment, 'Il manque le CO2.');
       expect(advice, 'Revois les réactifs.');

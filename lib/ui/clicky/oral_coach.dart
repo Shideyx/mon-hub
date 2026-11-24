@@ -50,7 +50,20 @@ class OralReport {
 class OralCoach {
   OralCoach._();
 
-  static const _fillers = ['euh', 'heu', 'hum', 'bah', 'ben', 'du coup', 'en fait', 'genre', 'voila', 'tu vois', 'en gros', 'quoi'];
+  static const _fillers = [
+    'euh',
+    'heu',
+    'hum',
+    'bah',
+    'ben',
+    'du coup',
+    'en fait',
+    'genre',
+    'voila',
+    'tu vois',
+    'en gros',
+    'quoi',
+  ];
 
   static String _fold(String s) {
     const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
@@ -90,7 +103,13 @@ class OralCoach {
       ? 'Trop rapide ($wpm mots/min) : ralentis et respire entre les parties.'
       : 'Bon rythme ($wpm mots/min).';
 
-  static String prompt({required String subject, required String plan, required Duration length, required Duration target, required String transcript}) =>
+  static String prompt({
+    required String subject,
+    required String plan,
+    required Duration length,
+    required Duration target,
+    required String transcript,
+  }) =>
       'Tu es un jury bienveillant du Grand oral du bac (et un coach d\'oral). Un lycéen vient de répéter sa présentation.\n'
       'Sujet : ${subject.isEmpty ? '(non précisé)' : subject}\n'
       '${plan.trim().isEmpty ? '' : 'Son plan prévu :\n$plan\n'}'
@@ -114,8 +133,10 @@ class OralCoach {
       if (j is Map) d = j;
     } catch (_) {}
     if (d == null) return null;
-    List<String> strs(Object? v, [int max = 8]) =>
-        [for (final e in (v is List ? v : const [])) if ('$e'.trim().isNotEmpty) '$e'.trim()].take(max).toList();
+    List<String> strs(Object? v, [int max = 8]) => [
+      for (final e in (v is List ? v : const []))
+        if ('$e'.trim().isNotEmpty) '$e'.trim(),
+    ].take(max).toList();
     final said = transcript.isNotEmpty ? transcript : '${d['transcription'] ?? ''}'.trim();
     final f = fillers(said);
     final g = d['note_sur_20'];
@@ -167,8 +188,12 @@ class OralCoach {
         }
         if (r.statusCode != 200) throw 'Gemini : erreur ${r.statusCode}';
         final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
-        final parts = ((((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?) ?? const [];
-        return [for (final p in parts) if (p is Map && p['text'] != null && p['thought'] != true) '${p['text']}'].join();
+        final parts =
+            ((((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?) ?? const [];
+        return [
+          for (final p in parts)
+            if (p is Map && p['text'] != null && p['thought'] != true) '${p['text']}',
+        ].join();
       }
       throw last ?? 'Gemini indisponible';
     } finally {
@@ -177,7 +202,7 @@ class OralCoach {
   }
 
   /// Analyse une répétition : Gemini écoute l'audio (meilleur), sinon
-  /// transcription (Whisper) puis le cerveau de Clicky lit le texte.
+  /// transcription (Whisper) puis le cerveau de Smily lit le texte.
   static Future<OralReport> analyze({
     required String wav,
     required String subject,
@@ -189,7 +214,11 @@ class OralCoach {
     final key = await _geminiKey();
     if (key.isNotEmpty && await File(wav).length() < 19 * 1024 * 1024) {
       try {
-        final answer = await listen(wav, prompt(subject: subject, plan: plan, length: length, target: target, transcript: ''), key);
+        final answer = await listen(
+          wav,
+          prompt(subject: subject, plan: plan, length: length, target: target, transcript: ''),
+          key,
+        );
         final r = parse(answer, transcript: '', length: length, pauses: pauses);
         if (r != null) return r;
       } catch (_) {}
@@ -399,7 +428,10 @@ class _OralCoachPageState extends State<OralCoachPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
             children: [
-              TextField(controller: _subject, decoration: const InputDecoration(labelText: 'Ton sujet (ex. « Pourquoi le ciel est bleu ? »)')),
+              TextField(
+                controller: _subject,
+                decoration: const InputDecoration(labelText: 'Ton sujet (ex. « Pourquoi le ciel est bleu ? »)'),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _plan,
@@ -414,7 +446,9 @@ class _OralCoachPageState extends State<OralCoachPage> {
                   const SizedBox(width: 8),
                   DropdownButton<int>(
                     value: _minutes,
-                    items: [for (final m in const [2, 3, 5, 8, 10]) DropdownMenuItem(value: m, child: Text('$m min'))],
+                    items: [
+                      for (final m in const [2, 3, 5, 8, 10]) DropdownMenuItem(value: m, child: Text('$m min')),
+                    ],
                     onChanged: _recording ? null : (v) => setState(() => _minutes = v ?? 5),
                   ),
                   const SizedBox(width: 8),
@@ -436,7 +470,11 @@ class _OralCoachPageState extends State<OralCoachPage> {
                       const SizedBox(height: 6),
                       SizedBox(width: 220, child: LinearProgressIndicator(value: _level, minHeight: 6)),
                       const SizedBox(height: 4),
-                      Text(over ? 'Temps dépassé : conclus !' : 'Je t\'écoute… (${_pauses > 0 ? '$_pauses blanc${_pauses > 1 ? 's' : ''}' : 'parle normalement'})'),
+                      Text(
+                        over
+                            ? 'Temps dépassé : conclus !'
+                            : 'Je t\'écoute… (${_pauses > 0 ? '$_pauses blanc${_pauses > 1 ? 's' : ''}' : 'parle normalement'})',
+                      ),
                     ],
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -446,19 +484,38 @@ class _OralCoachPageState extends State<OralCoachPage> {
                       ),
                       onPressed: _busy || (_recording && _question >= 0) ? null : _toggle,
                       icon: Icon(_recording && _question < 0 ? Icons.stop_rounded : Icons.mic_rounded),
-                      label: Text(_recording && _question < 0 ? 'J\'ai fini' : (r == null ? 'Commencer la répétition' : 'Recommencer')),
+                      label: Text(
+                        _recording && _question < 0
+                            ? 'J\'ai fini'
+                            : (r == null ? 'Commencer la répétition' : 'Recommencer'),
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (_busy) const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('Le jury délibère… ⏳'))),
-              if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: TextStyle(color: theme.colorScheme.error))),
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: Text('Le jury délibère… ⏳')),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                ),
               if (r != null) ...[
                 const SizedBox(height: 16),
                 Card(
                   child: ListTile(
-                    leading: CircleAvatar(radius: 26, child: Text(r.grade == null ? '?' : r.grade!.toStringAsFixed(r.grade! % 1 == 0 ? 0 : 1))),
-                    title: Text(r.grade == null ? 'Ton bilan' : 'Note estimée : ${r.grade!.toStringAsFixed(1).replaceAll('.0', '')} / 20'),
+                    leading: CircleAvatar(
+                      radius: 26,
+                      child: Text(r.grade == null ? '?' : r.grade!.toStringAsFixed(r.grade! % 1 == 0 ? 0 : 1)),
+                    ),
+                    title: Text(
+                      r.grade == null
+                          ? 'Ton bilan'
+                          : 'Note estimée : ${r.grade!.toStringAsFixed(1).replaceAll('.0', '')} / 20',
+                    ),
                     subtitle: Text(r.summary),
                   ),
                 ),
@@ -466,13 +523,22 @@ class _OralCoachPageState extends State<OralCoachPage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    Chip(avatar: const Icon(Icons.timer_rounded, size: 18), label: Text('Durée ${_clockText(_elapsed)} / $_minutes min')),
-                    Chip(avatar: const Icon(Icons.speed_rounded, size: 18), label: Text(r.wpm == 0 ? 'Débit ?' : '${r.wpm} mots/min')),
+                    Chip(
+                      avatar: const Icon(Icons.timer_rounded, size: 18),
+                      label: Text('Durée ${_clockText(_elapsed)} / $_minutes min'),
+                    ),
+                    Chip(
+                      avatar: const Icon(Icons.speed_rounded, size: 18),
+                      label: Text(r.wpm == 0 ? 'Débit ?' : '${r.wpm} mots/min'),
+                    ),
                     Chip(
                       avatar: const Icon(Icons.record_voice_over_rounded, size: 18),
                       label: Text('${r.fillers} tic${r.fillers > 1 ? 's' : ''} de langage'),
                     ),
-                    Chip(avatar: const Icon(Icons.pause_circle_rounded, size: 18), label: Text('${r.pauses} blanc${r.pauses > 1 ? 's' : ''} > 3 s')),
+                    Chip(
+                      avatar: const Icon(Icons.pause_circle_rounded, size: 18),
+                      label: Text('${r.pauses} blanc${r.pauses > 1 ? 's' : ''} > 3 s'),
+                    ),
                   ],
                 ),
                 if (r.fillerWords.isNotEmpty)
@@ -497,7 +563,7 @@ class _OralCoachPageState extends State<OralCoachPage> {
                 if (r.questions.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text('🧑‍⚖️ Les questions du jury', style: theme.textTheme.titleMedium),
-                  const Text('Clicky lit la question, tu réponds à voix haute, il te dit ce qu\'il en pense.'),
+                  const Text('Smily lit la question, tu réponds à voix haute, il te dit ce qu\'il en pense.'),
                   for (var i = 0; i < r.questions.length; i++)
                     Card(
                       color: _question == i ? theme.colorScheme.primaryContainer : null,
@@ -509,10 +575,16 @@ class _OralCoachPageState extends State<OralCoachPage> {
                                 icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
                                 label: Text(_recording ? 'J\'ai répondu' : 'Répondre'),
                               )
-                            : TextButton(onPressed: _busy || _recording ? null : () => _ask(i), child: const Text('Poser')),
+                            : TextButton(
+                                onPressed: _busy || _recording ? null : () => _ask(i),
+                                child: const Text('Poser'),
+                              ),
                       ),
                     ),
-                  if (_answerFeedback != null) Card(child: Padding(padding: const EdgeInsets.all(14), child: Text(_answerFeedback!))),
+                  if (_answerFeedback != null)
+                    Card(
+                      child: Padding(padding: const EdgeInsets.all(14), child: Text(_answerFeedback!)),
+                    ),
                 ],
                 if (r.transcript.isNotEmpty)
                   ExpansionTile(

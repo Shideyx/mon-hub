@@ -67,10 +67,7 @@ Future<String?> pickSyncGoogle(BuildContext context) async {
                   ),
                 SimpleDialogOption(
                   onPressed: () => Navigator.pop(c, ''),
-                  child: const ListTile(
-                    leading: Icon(Icons.add_rounded),
-                    title: Text('Un autre compte Google'),
-                  ),
+                  child: const ListTile(leading: Icon(Icons.add_rounded), title: Text('Un autre compte Google')),
                 ),
               ],
             ),
@@ -125,9 +122,7 @@ class AccountSyncSection extends StatelessWidget {
       if (mail == null || !context.mounted) return;
       await AccountSync.instance.enable(mail: mail);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ton compte est synchronisé avec $mail ✅')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ton compte est synchronisé avec $mail ✅')));
       }
     } catch (e) {
       if (context.mounted) showError(context, e);
@@ -137,7 +132,8 @@ class AccountSyncSection extends StatelessWidget {
   static Future<void> _unlock(BuildContext context) async {
     final pass = await askMonHubPassword(
       context,
-      message: 'La copie de ton compte a été chiffrée avec ton mot de passe sur un autre appareil : '
+      message:
+          'La copie de ton compte a été chiffrée avec ton mot de passe sur un autre appareil : '
           'tape-le pour reprendre la synchro.',
     );
     if (pass == null || !context.mounted) return;
@@ -176,9 +172,8 @@ class AccountSyncSection extends StatelessWidget {
     try {
       await AccountSync.instance.mergeFrom(pass);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tes données sont récupérées et restent synchronisées ✅')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Tes données sont récupérées et restent synchronisées ✅')));
       }
     } catch (e) {
       if (context.mounted) showError(context, e);
@@ -495,10 +490,7 @@ class _JoinAccountViewState extends State<JoinAccountView> {
           style: muted,
         ),
         const SizedBox(height: 20),
-        if (!GoogleAuth.available) ...[
-          PasteGoogleCode(onDone: () => setState(() {})),
-          const SizedBox(height: 12),
-        ],
+        if (!GoogleAuth.available) ...[PasteGoogleCode(onDone: () => setState(() {})), const SizedBox(height: 12)],
         FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           icon: _busy ? _spinner : const Icon(Icons.account_circle_rounded),
@@ -642,7 +634,11 @@ class _JoinAccountViewState extends State<JoinAccountView> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: cs.error)),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.error),
+            ),
           ),
         const SizedBox(height: 8),
         TextButton(onPressed: _busy ? null : widget.onBack, child: const Text('Retour')),

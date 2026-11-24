@@ -12,7 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   group('état du PC', () {
     test('les applis qui prennent le plus de mémoire (tasklist), regroupées', () {
-      const csv = '"System Idle Process","0","Services","0","8 Ko"\r\n'
+      const csv =
+          '"System Idle Process","0","Services","0","8 Ko"\r\n'
           '"chrome.exe","1200","Console","1","812 344 Ko"\r\n'
           '"chrome.exe","1201","Console","1","1 210 000 Ko"\r\n'
           '"Discord.exe","300","Console","1","402 100 Ko"\r\n'
@@ -25,7 +26,17 @@ void main() {
     });
 
     test('tout va bien / soucis signalés', () {
-      const ok = SystemStatus(battery: 80, charging: true, memLoad: 45, memTotalGb: 16, memFreeGb: 8, diskFreeGb: 120, diskTotalGb: 476, cpu: 12, online: true);
+      const ok = SystemStatus(
+        battery: 80,
+        charging: true,
+        memLoad: 45,
+        memTotalGb: 16,
+        memFreeGb: 8,
+        diskFreeGb: 120,
+        diskTotalGb: 476,
+        cpu: 12,
+        online: true,
+      );
       expect(ok.say(), startsWith('Tous les systèmes sont opérationnels.'));
       expect(ok.say(), contains('Batterie à 80 %, en charge'));
       const bad = SystemStatus(
@@ -140,7 +151,9 @@ void main() {
             if (args['applis'] == true) 'applis_gourmandes': ['Chrome (2,1 Go)', 'Discord (400 Mo)'],
           };
         case 'clicky_concentration':
-          return args['arreter'] == true ? {'ok': true, 'bilan': 'Séance terminée : 30 minutes.'} : {'ok': true, 'fin': '17 h 15'};
+          return args['arreter'] == true
+              ? {'ok': true, 'bilan': 'Séance terminée : 30 minutes.'}
+              : {'ok': true, 'fin': '17 h 15'};
         case 'clicky_situation':
           return '- Maths demain à 8 h\n- 2 devoirs pour demain';
         case 'pc_fenetres':
@@ -155,7 +168,7 @@ void main() {
 
     test('mode concentration', () async {
       calls.clear();
-      expect(await ask('Clicky, mode concentration'), contains('45 minutes'));
+      expect(await ask('Smily, mode concentration'), contains('45 minutes'));
       expect(await ask('mode focus 30 minutes'), contains('30 minutes, jusqu\'à 17 h 15'));
       expect(await ask('je dois travailler pendant une heure'), contains('1 heure'));
       expect(await ask('arrête le mode concentration'), 'Séance terminée : 30 minutes.');
@@ -222,7 +235,7 @@ void main() {
       await ModuleStore.init();
     });
 
-    testWidgets('ce que Clicky sait faire', (tester) async {
+    testWidgets('ce que Smily sait faire', (tester) async {
       tester.view.physicalSize = const Size(1000, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -241,7 +254,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(const MaterialApp(home: ClickySettingsPage()));
       await tester.pump();
-      expect(find.text('Ce que Clicky sait faire'), findsOneWidget);
+      expect(find.text('Ce que Smily sait faire'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'conversation');
       await tester.pump();
       expect(find.text('Conversation continue'), findsOneWidget);

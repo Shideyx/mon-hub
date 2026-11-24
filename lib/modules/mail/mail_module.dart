@@ -24,8 +24,7 @@ class MailFile {
 }
 
 class MailSummary {
-  MailSummary(this.account, this.uid, this.from, this.fromEmail, this.subject, this.date,
-      this.seen, this.header);
+  MailSummary(this.account, this.uid, this.from, this.fromEmail, this.subject, this.date, this.seen, this.header);
   final String account;
   final int? uid;
   final String from;
@@ -49,20 +48,19 @@ String imapHostFor(String email) {
     'free.fr' => 'imap.free.fr',
     'sfr.fr' => 'imap.sfr.fr',
     'laposte.net' => 'imap.laposte.net',
-    'outlook.com' || 'hotmail.com' || 'hotmail.fr' || 'live.fr' || 'live.com' =>
-      'outlook.office365.com',
+    'outlook.com' || 'hotmail.com' || 'hotmail.fr' || 'live.fr' || 'live.com' => 'outlook.office365.com',
     _ => 'imap.$domain',
   };
 }
 
 /// Serveur d'envoi (SMTP) et port, déduits du serveur IMAP.
 (String, int) smtpFor(String imapHost) => switch (imapHost) {
-      'imap.gmail.com' => ('smtp.gmail.com', 465),
-      'imap.mail.yahoo.com' => ('smtp.mail.yahoo.com', 465),
-      'imap.mail.me.com' => ('smtp.mail.me.com', 587),
-      'outlook.office365.com' => ('smtp.office365.com', 587),
-      _ => (imapHost.replaceFirst('imap.', 'smtp.'), 465),
-    };
+  'imap.gmail.com' => ('smtp.gmail.com', 465),
+  'imap.mail.yahoo.com' => ('smtp.mail.yahoo.com', 465),
+  'imap.mail.me.com' => ('smtp.mail.me.com', 587),
+  'outlook.office365.com' => ('smtp.office365.com', 587),
+  _ => (imapHost.replaceFirst('imap.', 'smtp.'), 465),
+};
 
 /// Boîte(s) mail complète(s) : lire, répondre, écrire, via IMAP/SMTP
 /// (les protocoles standard du mail, utilisés par Outlook, Thunderbird…).
@@ -84,8 +82,7 @@ class MailModule extends HubModule {
   @override
   ApiAccess get access => ApiAccess.official;
 
-  List<String> get accounts =>
-      (store.getJson<List<dynamic>>('accounts') ?? const []).cast<String>();
+  List<String> get accounts => (store.getJson<List<dynamic>>('accounts') ?? const []).cast<String>();
 
   String hostOf(String email) => store.getJson<String>('host.$email') ?? imapHostFor(email);
 
@@ -115,26 +112,23 @@ class MailModule extends HubModule {
   }
 
   Future<List<MailSummary>> _fetch(String email) => _withImap(email, (client) async {
-        final r = await client.fetchRecentMessages(
-            messageCount: 30, criteria: '(UID FLAGS BODY.PEEK[HEADER])');
-        return [
-          for (final m in r.messages.reversed)
-            MailSummary(
-              email,
-              m.uid,
-              m.from?.isNotEmpty == true
-                  ? (m.from!.first.personalName?.isNotEmpty == true
-                      ? m.from!.first.personalName!
-                      : m.from!.first.email)
-                  : '?',
-              m.from?.firstOrNull?.email ?? '',
-              m.decodeSubject() ?? '(sans objet)',
-              m.decodeDate(),
-              m.isSeen,
-              m,
-            )
-        ];
-      });
+    final r = await client.fetchRecentMessages(messageCount: 30, criteria: '(UID FLAGS BODY.PEEK[HEADER])');
+    return [
+      for (final m in r.messages.reversed)
+        MailSummary(
+          email,
+          m.uid,
+          m.from?.isNotEmpty == true
+              ? (m.from!.first.personalName?.isNotEmpty == true ? m.from!.first.personalName! : m.from!.first.email)
+              : '?',
+          m.from?.firstOrNull?.email ?? '',
+          m.decodeSubject() ?? '(sans objet)',
+          m.decodeDate(),
+          m.isSeen,
+          m,
+        ),
+    ];
+  });
 
   /// Contenu complet d'un mail (texte seulement).
   Future<String> readBody(MailSummary s) async => (await readMail(s)).text;
@@ -142,16 +136,16 @@ class MailModule extends HubModule {
   /// Contenu complet d'un mail, avec ses pièces jointes (et le marque comme
   /// lu).
   Future<MailContent> readMail(MailSummary s) => _withImap(s.account, (client) async {
-        final uid = s.uid;
-        if (uid == null) return const MailContent('', []);
-        final r = await client.uidFetchMessage(uid, 'BODY.PEEK[]');
-        await client.uidMarkSeen(MessageSequence.fromId(uid, isUid: true));
-        s.seen = true;
-        badge.value = _cache.where((m) => !m.seen).length;
-        final m = r.messages.firstOrNull;
-        if (m == null) return const MailContent('', []);
-        return MailContent(_textOf(m), attachmentsOf(m));
-      });
+    final uid = s.uid;
+    if (uid == null) return const MailContent('', []);
+    final r = await client.uidFetchMessage(uid, 'BODY.PEEK[]');
+    await client.uidMarkSeen(MessageSequence.fromId(uid, isUid: true));
+    s.seen = true;
+    badge.value = _cache.where((m) => !m.seen).length;
+    final m = r.messages.firstOrNull;
+    if (m == null) return const MailContent('', []);
+    return MailContent(_textOf(m), attachmentsOf(m));
+  });
 
   /// Les pièces jointes d'un mail (fichiers joints, et images ou documents
   /// « en ligne » qui ont un nom de fichier).
@@ -183,21 +177,21 @@ class MailModule extends HubModule {
   }
 
   static String _textOf(MimeMessage m) {
-        final text = m.decodeTextPlainPart();
-        if (text != null && text.trim().isNotEmpty) return text.trim();
-        final html = m.decodeTextHtmlPart() ?? '';
-        return html
-            .replaceAll(RegExp(r'<(style|script)[^>]*>.*?</\1>', dotAll: true), '')
-            .replaceAll(RegExp(r'<br\s*/?>|</p>|</div>|</tr>', caseSensitive: false), '\n')
-            .replaceAll(RegExp(r'<[^>]+>'), '')
-            .replaceAll('&nbsp;', ' ')
-            .replaceAll('&amp;', '&')
-            .replaceAll('&lt;', '<')
-            .replaceAll('&gt;', '>')
-            .replaceAll('&#39;', "'")
-            .replaceAll('&quot;', '"')
-            .replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n')
-            .trim();
+    final text = m.decodeTextPlainPart();
+    if (text != null && text.trim().isNotEmpty) return text.trim();
+    final html = m.decodeTextHtmlPart() ?? '';
+    return html
+        .replaceAll(RegExp(r'<(style|script)[^>]*>.*?</\1>', dotAll: true), '')
+        .replaceAll(RegExp(r'<br\s*/?>|</p>|</div>|</tr>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll(RegExp(r'\n\s*\n\s*\n+'), '\n\n')
+        .trim();
   }
 
   /// Envoie un mail (nouveau ou réponse).
@@ -232,8 +226,7 @@ class MailModule extends HubModule {
         await client.startTls();
         await client.ehlo();
       }
-      await client.authenticate(
-          from, pass, google ? AuthMechanism.xoauth2 : AuthMechanism.login);
+      await client.authenticate(from, pass, google ? AuthMechanism.xoauth2 : AuthMechanism.login);
       await client.sendMessage(message);
     } finally {
       try {
@@ -247,13 +240,15 @@ class MailModule extends HubModule {
     return _loading = () async {
       errors.clear();
       final all = <MailSummary>[];
-      await Future.wait(accounts.map((a) async {
-        try {
-          all.addAll(await _fetch(a));
-        } catch (e) {
-          errors[a] = '$e';
-        }
-      }));
+      await Future.wait(
+        accounts.map((a) async {
+          try {
+            all.addAll(await _fetch(a));
+          } catch (e) {
+            errors[a] = '$e';
+          }
+        }),
+      );
       all.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
       badge.value = all.where((m) => !m.seen).length;
       return _cache = all;
@@ -262,64 +257,65 @@ class MailModule extends HubModule {
 
   @override
   List<HubTool> get tools => [
-        HubTool(
-          name: 'mails_lister',
-          description: 'Derniers mails reçus (toutes les boîtes connectées).',
-          params: {'nombre': ('integer', 'Combien (défaut 15)')},
-          run: (a) async {
-            final list = await load();
-            return [
-              for (final m in list.take((a['nombre'] as num?)?.toInt() ?? 15))
-                {
-                  'boite': m.account,
-                  'uid': m.uid,
-                  'de': '${m.from} <${m.fromEmail}>',
-                  'objet': m.subject,
-                  'date': m.date,
-                  'lu': m.seen,
-                },
-            ];
-          },
-        ),
-        HubTool(
-          name: 'mail_lire',
-          description: 'Texte complet d\'un mail (uid et boîte donnés par mails_lister).',
-          params: {'boite': ('string', 'Adresse de la boîte'), 'uid': ('integer', 'uid du mail')},
-          required: ['boite', 'uid'],
-          run: (a) async {
-            final m = (await load()).where((x) =>
-                x.account == a['boite'] && x.uid == (a['uid'] as num).toInt()).firstOrNull;
-            if (m == null) throw 'Mail introuvable';
-            final c = await readMail(m);
-            if (c.files.isEmpty) return c.text;
-            return {
-              'texte': c.text,
-              'pieces_jointes': [for (final f in c.files) f.name],
-            };
-          },
-        ),
-        HubTool(
-          name: 'mail_envoyer',
-          description: 'Envoie un mail depuis une des boîtes connectées.',
-          params: {
-            'a': ('string', 'Destinataire(s), séparés par des virgules'),
-            'objet': ('string', 'Objet'),
-            'texte': ('string', 'Contenu'),
-            'de': ('string', 'Boîte d\'envoi (défaut : la première)'),
-          },
-          required: ['a', 'objet', 'texte'],
-          run: (a) async {
-            if (accounts.isEmpty) throw 'Aucune boîte mail connectée';
-            await send(
-              from: a['de'] as String? ?? accounts.first,
-              to: a['a'] as String,
-              subject: a['objet'] as String,
-              body: a['texte'] as String,
-            );
-            return {'ok': true};
-          },
-        ),
-      ];
+    HubTool(
+      name: 'mails_lister',
+      description: 'Derniers mails reçus (toutes les boîtes connectées).',
+      params: {'nombre': ('integer', 'Combien (défaut 15)')},
+      run: (a) async {
+        final list = await load();
+        return [
+          for (final m in list.take((a['nombre'] as num?)?.toInt() ?? 15))
+            {
+              'boite': m.account,
+              'uid': m.uid,
+              'de': '${m.from} <${m.fromEmail}>',
+              'objet': m.subject,
+              'date': m.date,
+              'lu': m.seen,
+            },
+        ];
+      },
+    ),
+    HubTool(
+      name: 'mail_lire',
+      description: 'Texte complet d\'un mail (uid et boîte donnés par mails_lister).',
+      params: {'boite': ('string', 'Adresse de la boîte'), 'uid': ('integer', 'uid du mail')},
+      required: ['boite', 'uid'],
+      run: (a) async {
+        final m = (await load())
+            .where((x) => x.account == a['boite'] && x.uid == (a['uid'] as num).toInt())
+            .firstOrNull;
+        if (m == null) throw 'Mail introuvable';
+        final c = await readMail(m);
+        if (c.files.isEmpty) return c.text;
+        return {
+          'texte': c.text,
+          'pieces_jointes': [for (final f in c.files) f.name],
+        };
+      },
+    ),
+    HubTool(
+      name: 'mail_envoyer',
+      description: 'Envoie un mail depuis une des boîtes connectées.',
+      params: {
+        'a': ('string', 'Destinataire(s), séparés par des virgules'),
+        'objet': ('string', 'Objet'),
+        'texte': ('string', 'Contenu'),
+        'de': ('string', 'Boîte d\'envoi (défaut : la première)'),
+      },
+      required: ['a', 'objet', 'texte'],
+      run: (a) async {
+        if (accounts.isEmpty) throw 'Aucune boîte mail connectée';
+        await send(
+          from: a['de'] as String? ?? accounts.first,
+          to: a['a'] as String,
+          subject: a['objet'] as String,
+          body: a['texte'] as String,
+        );
+        return {'ok': true};
+      },
+    ),
+  ];
 
   @override
   Future<List<HubNotification>> poll() async {
@@ -399,34 +395,33 @@ class MailModule extends HubModule {
   }
 
   Future<void> _addOther(BuildContext context, {bool gmailHelp = true}) async {
-    final open = !gmailHelp ? false : await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Boîte Gmail ?'),
-        content: const Text(
-            'Pour Gmail, Google demande un « mot de passe d\'application » (16 lettres) '
-            'au lieu de ton vrai mot de passe. Je t\'ouvre la page qui le crée : '
-            'donne-lui le nom « Mon Hub », copie le code, puis reviens ici.\n\n'
-            '(La validation en 2 étapes doit être activée sur ton compte Google.)'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Pas Gmail')),
-          FilledButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('Ouvrir la page Google')),
-        ],
-      ),
-    );
+    final open = !gmailHelp
+        ? false
+        : await showDialog<bool>(
+            context: context,
+            builder: (c) => AlertDialog(
+              title: const Text('Boîte Gmail ?'),
+              content: const Text(
+                'Pour Gmail, Google demande un « mot de passe d\'application » (16 lettres) '
+                'au lieu de ton vrai mot de passe. Je t\'ouvre la page qui le crée : '
+                'donne-lui le nom « Mon Hub », copie le code, puis reviens ici.\n\n'
+                '(La validation en 2 étapes doit être activée sur ton compte Google.)',
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Pas Gmail')),
+                FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ouvrir la page Google')),
+              ],
+            ),
+          );
     if (!context.mounted) return;
     if (open == true) await openLink(context, 'https://myaccount.google.com/apppasswords');
     if (!context.mounted) return;
-    final r = await askFields(context,
-        title: 'Ajouter une boîte mail',
-        labels: [
-          'Adresse mail',
-          'Mot de passe (d\'application pour Gmail)',
-          'Serveur IMAP (laisser vide = auto)',
-        ],
-        obscure: {1});
+    final r = await askFields(
+      context,
+      title: 'Ajouter une boîte mail',
+      labels: ['Adresse mail', 'Mot de passe (d\'application pour Gmail)', 'Serveur IMAP (laisser vide = auto)'],
+      obscure: {1},
+    );
     if (r == null || r[0].isEmpty || r[1].isEmpty) return;
     await store.writeSecret('pw.${r[0]}', r[1]);
     if (r[2].isNotEmpty) await store.setJson('host.${r[0]}', r[2]);
@@ -436,133 +431,151 @@ class MailModule extends HubModule {
   }
 
   Widget _tile(BuildContext context, MailSummary m, {bool dense = false}) => ListTile(
-        dense: dense,
-        visualDensity: dense ? VisualDensity.compact : null,
-        leading: HubAvatar(label: m.from, color: m.seen ? Colors.blueGrey : color, size: dense ? 30 : 40),
-        title: Text(m.from,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontWeight: m.seen ? FontWeight.w500 : FontWeight.w800)),
-        subtitle: Text(m.subject,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: m.seen ? null : const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (m.date != null)
-              Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
-            if (!m.seen) ...[const SizedBox(height: 4), Dot(color: color)],
-          ],
+    dense: dense,
+    visualDensity: dense ? VisualDensity.compact : null,
+    leading: HubAvatar(label: m.from, color: m.seen ? Colors.blueGrey : color, size: dense ? 30 : 40),
+    title: Text(
+      m.from,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontWeight: m.seen ? FontWeight.w500 : FontWeight.w800),
+    ),
+    subtitle: Text(
+      m.subject,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: m.seen ? null : const TextStyle(fontWeight: FontWeight.w600),
+    ),
+    trailing: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (m.date != null) Text(timeAgo(m.date!), style: Theme.of(context).textTheme.labelSmall),
+        if (!m.seen) ...[const SizedBox(height: 4), Dot(color: color)],
+      ],
+    ),
+    onTap: () async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _MailReadPage(module: this, mail: m),
         ),
-        onTap: () async {
-          await Navigator.push(context,
-              MaterialPageRoute(builder: (_) => _MailReadPage(module: this, mail: m)));
-          store.changed();
-        },
       );
+      store.changed();
+    },
+  );
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) {
-          if (accounts.isEmpty) {
-            return EmptyHint('Connecte ta boîte mail',
-                icon: Icons.mail_outline_rounded,
-                action: ('Ajouter', () => _addAccount(context)));
+    listenable: store,
+    builder: (context, _) {
+      if (accounts.isEmpty) {
+        return EmptyHint(
+          'Connecte ta boîte mail',
+          icon: Icons.mail_outline_rounded,
+          action: ('Ajouter', () => _addAccount(context)),
+        );
+      }
+      return FutureBuilder(
+        future: load(),
+        initialData: _cache,
+        builder: (context, snap) {
+          final list = snap.data ?? [];
+          if (list.isEmpty && snap.connectionState == ConnectionState.waiting) {
+            return const LoadingHint();
           }
-          return FutureBuilder(
-            future: load(),
-            initialData: _cache,
-            builder: (context, snap) {
-              final list = snap.data ?? [];
-              if (list.isEmpty && snap.connectionState == ConnectionState.waiting) {
-                return const LoadingHint();
-              }
-              if (list.isEmpty) return EmptyHint(errors.values.firstOrNull ?? 'Aucun mail');
-              return ChatsSummary(
-                color: color,
-                items: [
-                  for (final m in list.take(8))
-                    ChatItem(
-                      name: m.from,
-                      preview: m.subject,
-                      unread: !m.seen,
-                      at: m.date,
-                      onTap: () async {
-                        await Navigator.push(
-                            context, MaterialPageRoute(builder: (_) => _MailReadPage(module: this, mail: m)));
-                        store.changed();
-                      },
-                    ),
-                ],
-              );
-            },
+          if (list.isEmpty) return EmptyHint(errors.values.firstOrNull ?? 'Aucun mail');
+          return ChatsSummary(
+            color: color,
+            items: [
+              for (final m in list.take(8))
+                ChatItem(
+                  name: m.from,
+                  preview: m.subject,
+                  unread: !m.seen,
+                  at: m.date,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => _MailReadPage(module: this, mail: m),
+                      ),
+                    );
+                    store.changed();
+                  },
+                ),
+            ],
           );
         },
       );
+    },
+  );
 
   @override
   Widget buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(name), actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => load(force: true).then((_) => store.changed()),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.manage_accounts_rounded),
-            tooltip: 'Comptes',
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: '+', child: Text('Ajouter une boîte mail')),
-              for (final a in accounts) PopupMenuItem(value: a, child: Text('Retirer $a')),
-            ],
-            onSelected: (v) async {
-              if (v == '+') return _addAccount(context);
-              await store.writeSecret('pw.$v', null);
-              await store.setJson('google.$v', null);
-              await store.setJson('accounts', accounts.where((x) => x != v).toList());
-              await load(force: true);
-              store.changed();
-            },
-          ),
-        ]),
-        floatingActionButton: Builder(
-          builder: (context) => FloatingActionButton.extended(
-            icon: const Icon(Icons.edit_rounded),
-            label: const Text('Écrire'),
-            onPressed: accounts.isEmpty
-                ? () => _addAccount(context)
-                : () => Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => MailComposePage(module: this))),
-          ),
+    appBar: AppBar(
+      title: Text(name),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: () => load(force: true).then((_) => store.changed()),
         ),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) {
-            if (accounts.isEmpty) {
-              return EmptyHint('Ajoute ta boîte mail pour lire et envoyer tes mails ici.',
-                  icon: icon, action: ('Ajouter une boîte mail', () => _addAccount(context)));
-            }
-            return FutureBuilder(
-              future: load(),
-              initialData: _cache,
-              builder: (context, snap) => RefreshIndicator(
-                onRefresh: () => load(force: true).then((_) => store.changed()),
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 90),
-                  children: [
-                    for (final e in errors.entries) ErrorBanner('${e.key} : ${e.value}'),
-                    if (snap.connectionState == ConnectionState.waiting && _cache.isEmpty)
-                      const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
-                    for (final m in snap.data ?? <MailSummary>[]) _tile(context, m),
-                  ],
-                ),
-              ),
-            );
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.manage_accounts_rounded),
+          tooltip: 'Comptes',
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: '+', child: Text('Ajouter une boîte mail')),
+            for (final a in accounts) PopupMenuItem(value: a, child: Text('Retirer $a')),
+          ],
+          onSelected: (v) async {
+            if (v == '+') return _addAccount(context);
+            await store.writeSecret('pw.$v', null);
+            await store.setJson('google.$v', null);
+            await store.setJson('accounts', accounts.where((x) => x != v).toList());
+            await load(force: true);
+            store.changed();
           },
         ),
-      );
+      ],
+    ),
+    floatingActionButton: Builder(
+      builder: (context) => FloatingActionButton.extended(
+        icon: const Icon(Icons.edit_rounded),
+        label: const Text('Écrire'),
+        onPressed: accounts.isEmpty
+            ? () => _addAccount(context)
+            : () => Navigator.push(context, MaterialPageRoute(builder: (_) => MailComposePage(module: this))),
+      ),
+    ),
+    body: ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        if (accounts.isEmpty) {
+          return EmptyHint(
+            'Ajoute ta boîte mail pour lire et envoyer tes mails ici.',
+            icon: icon,
+            action: ('Ajouter une boîte mail', () => _addAccount(context)),
+          );
+        }
+        return FutureBuilder(
+          future: load(),
+          initialData: _cache,
+          builder: (context, snap) => RefreshIndicator(
+            onRefresh: () => load(force: true).then((_) => store.changed()),
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 90),
+              children: [
+                for (final e in errors.entries) ErrorBanner('${e.key} : ${e.value}'),
+                if (snap.connectionState == ConnectionState.waiting && _cache.isEmpty)
+                  const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
+                for (final m in snap.data ?? <MailSummary>[]) _tile(context, m),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _MailReadPage extends StatefulWidget {
@@ -597,9 +610,7 @@ class _MailReadPageState extends State<_MailReadPage> {
               module: module,
               from: mail.account,
               to: mail.fromEmail,
-              subject: mail.subject.toLowerCase().startsWith('re:')
-                  ? mail.subject
-                  : 'Re: ${mail.subject}',
+              subject: mail.subject.toLowerCase().startsWith('re:') ? mail.subject : 'Re: ${mail.subject}',
               replyTo: mail.header,
             ),
           ),
@@ -611,22 +622,25 @@ class _MailReadPageState extends State<_MailReadPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
             children: [
-              Text(mail.subject,
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(mail.subject, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 16),
-              Row(children: [
-                HubAvatar(label: mail.from, color: module.color),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(mail.from, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(mail.fromEmail, style: theme.textTheme.bodySmall),
-                  ]),
-                ),
-                if (mail.date != null)
-                  Text('${dayLabel(mail.date!)} ${hhmm(mail.date!)}',
-                      style: theme.textTheme.labelMedium),
-              ]),
+              Row(
+                children: [
+                  HubAvatar(label: mail.from, color: module.color),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(mail.from, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        Text(mail.fromEmail, style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  if (mail.date != null)
+                    Text('${dayLabel(mail.date!)} ${hhmm(mail.date!)}', style: theme.textTheme.labelMedium),
+                ],
+              ),
               const Divider(height: 32),
               FutureBuilder(
                 future: _content,
@@ -661,8 +675,10 @@ class _MailReadPageState extends State<_MailReadPage> {
                         ),
                         const Divider(height: 28),
                       ],
-                      SelectableText(d.text.isEmpty ? '(mail vide)' : d.text,
-                          style: theme.textTheme.bodyLarge?.copyWith(height: 1.5)),
+                      SelectableText(
+                        d.text.isEmpty ? '(mail vide)' : d.text,
+                        style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+                      ),
                     ],
                   );
                 },
@@ -676,14 +692,7 @@ class _MailReadPageState extends State<_MailReadPage> {
 }
 
 class MailComposePage extends StatefulWidget {
-  const MailComposePage({
-    super.key,
-    required this.module,
-    this.from,
-    this.to = '',
-    this.subject = '',
-    this.replyTo,
-  });
+  const MailComposePage({super.key, required this.module, this.from, this.to = '', this.subject = '', this.replyTo});
 
   final MailModule module;
   final String? from;
@@ -717,8 +726,7 @@ class _MailComposePageState extends State<MailComposePage> {
         replyTo: widget.replyTo,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Mail envoyé ✉️')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mail envoyé ✉️')));
       Navigator.pop(context);
     } catch (e) {
       if (mounted) showError(context, 'Envoi impossible : $e');
@@ -739,7 +747,8 @@ class _MailComposePageState extends State<MailComposePage> {
               icon: sending
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
                   : const Icon(Icons.send_rounded),
               label: const Text('Envoyer'),
               onPressed: sending ? null : _send,
@@ -757,10 +766,7 @@ class _MailComposePageState extends State<MailComposePage> {
                 DropdownButtonFormField<String>(
                   initialValue: from,
                   decoration: const InputDecoration(labelText: 'De'),
-                  items: [
-                    for (final a in widget.module.accounts)
-                      DropdownMenuItem(value: a, child: Text(a)),
-                  ],
+                  items: [for (final a in widget.module.accounts) DropdownMenuItem(value: a, child: Text(a))],
                   onChanged: (v) => setState(() => from = v ?? from),
                 )
               else
@@ -771,11 +777,15 @@ class _MailComposePageState extends State<MailComposePage> {
                 ),
               const SizedBox(height: 10),
               TextField(
-                  controller: to,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'À (séparer par des virgules)')),
+                controller: to,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'À (séparer par des virgules)'),
+              ),
               const SizedBox(height: 10),
-              TextField(controller: subject, decoration: const InputDecoration(labelText: 'Objet')),
+              TextField(
+                controller: subject,
+                decoration: const InputDecoration(labelText: 'Objet'),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: body,

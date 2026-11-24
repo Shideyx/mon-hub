@@ -20,7 +20,7 @@ void main() {
   group('la visite guidée', () {
     test('elle montre tout, nouveautés comprises', () {
       final titles = [for (final p in ClickyTutorial.tour) p.title];
-      expect(titles.first, 'Salut, moi c\'est Clicky');
+      expect(titles.first, 'Salut, moi c\'est Smily');
       expect(titles.last, 'Prêt ?');
       for (final t in [
         'Parle-moi',
@@ -35,7 +35,7 @@ void main() {
         expect(titles, contains(t));
       }
       expect(ClickyTutorial.tour.where((p) => p.badge == 'Nouveau'), hasLength(4));
-      // Les phrases à essayer sont comprises par Clicky.
+      // Les phrases à essayer sont comprises par Smily.
       expect(ClickyTutorial.tour.expand((p) => p.examples), contains('Préviens-moi quand j\'ai ma note de maths'));
     });
 
@@ -52,7 +52,7 @@ void main() {
       final tried = <String>[];
       await tester.pumpWidget(MaterialApp(home: ClickyTutorial(onTry: tried.add)));
       await tester.pump(const Duration(milliseconds: 800));
-      expect(find.text('Salut, moi c\'est Clicky'), findsOneWidget);
+      expect(find.text('Salut, moi c\'est Smily'), findsOneWidget);
       expect(find.text('1 / ${ClickyTutorial.tour.length}'), findsOneWidget);
       Future<void> next() async {
         await tester.tap(find.text('Suivant'));
@@ -103,31 +103,51 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
-  group('ce que Clicky sait faire', () {
+  group('ce que Smily sait faire', () {
     test('tout le catalogue, avec les nouveautés', () {
       expect(ClickySkills.count, greaterThan(80));
       final titles = [for (final g in ClickySkills.groups) g.title];
-      for (final t in ['Lui parler', 'Ses yeux et ses oreilles', 'Préviens-moi quand…', 'Il prend les devants', 'Clicky vivant', 'École']) {
+      for (final t in [
+        'Lui parler',
+        'Ses yeux et ses oreilles',
+        'Préviens-moi quand…',
+        'Il prend les devants',
+        'Smily vivant',
+        'École',
+      ]) {
         expect(titles, contains(t));
       }
       expect(ClickySkills.search('arnaque').map((g) => g.title), contains('Sécurité'));
-      expect(ClickySkills.search('écharpe').single.title, 'Clicky vivant');
+      expect(ClickySkills.search('écharpe').single.title, 'Smily vivant');
       expect(ClickySkills.search('zzzzzz'), isEmpty);
     });
 
     test('les phrases « essayer » partent bien quelque part', () async {
       // Celles qu'un algorithme sait faire passent par les réponses sans IA.
       const tools = {
-        'clicky_situation', 'agenda_lire', 'guetteur_creer', 'guetteur_liste', 'clicky_habitudes', 'memoire_ecran',
-        'sens_regler', 'temps_ecran', 'ecole_devoirs', 'clicky_concentration',
+        'clicky_situation',
+        'agenda_lire',
+        'guetteur_creer',
+        'guetteur_liste',
+        'clicky_habitudes',
+        'memoire_ecran',
+        'sens_regler',
+        'temps_ecran',
+        'ecole_devoirs',
+        'clicky_concentration',
       };
       final asked = <String>[];
       Future<Object?> call(String name, Map<String, dynamic> a) async {
         asked.add(name);
-        return name == 'guetteur_creer' ? 'D\'accord : je te préviens dès que j\'ai ta note de maths.' : {'resume': 'ok'};
+        return name == 'guetteur_creer'
+            ? 'D\'accord : je te préviens dès que j\'ai ta note de maths.'
+            : {'resume': 'ok'};
       }
 
-      expect(await QuickAnswers.answer('Préviens-moi quand j\'ai ma note de maths', call: call, tools: tools), isNotNull);
+      expect(
+        await QuickAnswers.answer('Préviens-moi quand j\'ai ma note de maths', call: call, tools: tools),
+        isNotNull,
+      );
       expect(await QuickAnswers.answer('Mes habitudes', call: call, tools: tools), isNotNull);
       expect(await QuickAnswers.answer('Mode concentration 45 minutes', call: call, tools: tools), isNotNull);
       expect(asked, containsAll(['guetteur_creer', 'clicky_habitudes', 'clicky_concentration']));
@@ -162,15 +182,19 @@ void main() {
       expect(SettingsCategory.clickyMatches('téléphone'), isFalse);
     });
 
-    testWidgets('Réglages : Clicky en tête, puis des rubriques claires', (tester) async {
+    testWidgets('Réglages : Smily en tête, puis des rubriques claires', (tester) async {
       tester.view.physicalSize = const Size(1000, 2200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final hub = HubController(buildModules());
       final n = NotificationCenter(hub);
-      await tester.pumpWidget(MaterialApp(home: SettingsPage(controller: hub, notifications: n)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsPage(controller: hub, notifications: n),
+        ),
+      );
       await tester.pump();
-      expect(find.text('Réglages de Clicky'), findsOneWidget);
+      expect(find.text('Réglages de Smily'), findsOneWidget);
       expect(find.text('Revoir la visite guidée'), findsOneWidget);
       for (final k in SettingsCategory.all.where((k) => k.id != 'demarrage')) {
         expect(find.text(k.title), findsOneWidget);
@@ -196,13 +220,19 @@ void main() {
       n.dispose();
     });
 
-    testWidgets('Réglages de Clicky : rangés par thème', (tester) async {
+    testWidgets('Réglages de Smily : rangés par thème', (tester) async {
       tester.view.physicalSize = const Size(1000, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(const MaterialApp(home: ClickySettingsPage()));
       await tester.pump();
-      for (final t in ['BIEN DÉMARRER', 'LUI PARLER', 'CE QU\'IL FAIT POUR TOI', 'SA PERSONNALITÉ', 'VIE PRIVÉE ET AVANCÉ']) {
+      for (final t in [
+        'BIEN DÉMARRER',
+        'LUI PARLER',
+        'CE QU\'IL FAIT POUR TOI',
+        'SA PERSONNALITÉ',
+        'VIE PRIVÉE ET AVANCÉ',
+      ]) {
         expect(find.text(t), findsOneWidget);
       }
       expect(find.text('Ses yeux et ses oreilles'), findsOneWidget);

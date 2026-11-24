@@ -89,7 +89,7 @@ class DocStore extends ChangeNotifier {
 
   HubDoc? byId(String id) => _index.value.where((d) => d.id == id).firstOrNull;
 
-  /// Retrouve un document par son titre (pour Clicky : « mon exposé »).
+  /// Retrouve un document par son titre (pour Smily : « mon exposé »).
   HubDoc? find(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return null;
@@ -103,7 +103,14 @@ class DocStore extends ChangeNotifier {
   Future<HubDoc> create({String title = 'Sans titre', List<dynamic>? ops, String? googleId}) async {
     final now = DateTime.now();
     final d = HubDoc(id: '${now.microsecondsSinceEpoch}', title: title, created: now, updated: now, googleId: googleId);
-    await write(d.id, ops ?? [{'insert': '\n'}], doc: d);
+    await write(
+      d.id,
+      ops ??
+          [
+            {'insert': '\n'},
+          ],
+      doc: d,
+    );
     return d;
   }
 

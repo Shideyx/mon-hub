@@ -11,13 +11,34 @@ void main() {
     switch (name) {
       case 'ecole_devoirs':
         return [
-          {'pour_le': DateTime(2026, 11, 18), 'matiere': 'Mathématiques', 'contenu': 'Exercices 3 et 4 page 52', 'fait': false},
-          {'pour_le': DateTime(2026, 11, 18), 'matiere': 'Anglais', 'contenu': 'Apprendre le vocabulaire', 'fait': true},
-          {'pour_le': DateTime(2026, 11, 19), 'matiere': 'SVT', 'contenu': 'Chapitre 3 : la génétique', 'fait': false, 'controle': true},
+          {
+            'pour_le': DateTime(2026, 11, 18),
+            'matiere': 'Mathématiques',
+            'contenu': 'Exercices 3 et 4 page 52',
+            'fait': false,
+          },
+          {
+            'pour_le': DateTime(2026, 11, 18),
+            'matiere': 'Anglais',
+            'contenu': 'Apprendre le vocabulaire',
+            'fait': true,
+          },
+          {
+            'pour_le': DateTime(2026, 11, 19),
+            'matiere': 'SVT',
+            'contenu': 'Chapitre 3 : la génétique',
+            'fait': false,
+            'controle': true,
+          },
         ];
       case 'agenda_lire':
         return [
-          {'titre': 'Mathématiques', 'debut': DateTime(2026, 11, 18, 8), 'fin': DateTime(2026, 11, 18, 9), 'lieu': 'B12'},
+          {
+            'titre': 'Mathématiques',
+            'debut': DateTime(2026, 11, 18, 8),
+            'fin': DateTime(2026, 11, 18, 9),
+            'lieu': 'B12',
+          },
           {'titre': 'Anglais', 'debut': DateTime(2026, 11, 18, 9), 'fin': DateTime(2026, 11, 18, 10)},
           {'titre': 'Sport', 'debut': DateTime(2026, 11, 18, 14), 'fin': DateTime(2026, 11, 18, 16)},
         ];
@@ -27,7 +48,15 @@ void main() {
           {'matiere': 'Français', 'note': '12/20'},
         ];
       case 'carnet_meteo':
-        return {'ville': 'Lyon', 'maintenant': '9 °C, nuageux', 'icone': '☁️', 'min': 6, 'max': 12, 'pluie_pourcent': 30, 'tenue': 'Prends une veste.'};
+        return {
+          'ville': 'Lyon',
+          'maintenant': '9 °C, nuageux',
+          'icone': '☁️',
+          'min': 6,
+          'max': 12,
+          'pluie_pourcent': 30,
+          'tenue': 'Prends une veste.',
+        };
       case 'musique_en_cours':
         return {'titre': 'Blinding Lights', 'artiste': 'The Weeknd'};
       case 'pc_ranger_apercu':
@@ -41,16 +70,28 @@ void main() {
   }
 
   const tools = {
-    'ecole_devoirs', 'agenda_lire', 'ecole_notes', 'carnet_meteo', 'musique_commande', 'musique_en_cours',
-    'pc_ranger', 'pc_ranger_apercu', 'pc_ranger_annuler', 'youtube_lire', 'doc_nouveau', 'carnet_taches_notes',
-    'pc_ouvrir', 'revision_lancer', 'revision_paquets',
+    'ecole_devoirs',
+    'agenda_lire',
+    'ecole_notes',
+    'carnet_meteo',
+    'musique_commande',
+    'musique_en_cours',
+    'pc_ranger',
+    'pc_ranger_apercu',
+    'pc_ranger_annuler',
+    'youtube_lire',
+    'doc_nouveau',
+    'carnet_taches_notes',
+    'pc_ouvrir',
+    'revision_lancer',
+    'revision_paquets',
   };
 
   Future<String?> ask(String q) async => (await QuickAnswers.answer(q, call: fake, tools: tools, now: now))?.text;
 
   test('heure, date, politesse', () async {
     expect(await ask('Quelle heure est-il ?'), 'Il est 18 h 05.');
-    expect(await ask('Clicky, on est quel jour aujourd\'hui ?'), 'Nous sommes mardi 17 novembre 2026.');
+    expect(await ask('Smily, on est quel jour aujourd\'hui ?'), 'Nous sommes mardi 17 novembre 2026.');
     expect(await ask('merci !'), 'Avec plaisir !');
   });
 
@@ -68,7 +109,12 @@ void main() {
   test('minuteur et rappel', () async {
     final r = await QuickAnswers.answer('mets un minuteur de 10 minutes', call: fake, tools: tools, now: now);
     expect(r!.timer, const Duration(minutes: 10));
-    final r2 = await QuickAnswers.answer('rappelle-moi dans 2 heures de sortir le chien', call: fake, tools: tools, now: now);
+    final r2 = await QuickAnswers.answer(
+      'rappelle-moi dans 2 heures de sortir le chien',
+      call: fake,
+      tools: tools,
+      now: now,
+    );
     expect(r2!.timer, const Duration(hours: 2));
     expect(r2.timerLabel, 'sortir le chien');
   });
@@ -84,11 +130,17 @@ void main() {
 
   test('devoirs, contrôle, emploi du temps, notes, météo', () async {
     expect(await ask('mes devoirs pour demain'), 'Pour demain (1) : Mathématiques : Exercices 3 et 4 page 52.');
-    expect(await ask('c\'est quand mon prochain contrôle ?'), 'Ton prochain contrôle : SVT jeudi 19 novembre (Chapitre 3 : la génétique).');
+    expect(
+      await ask('c\'est quand mon prochain contrôle ?'),
+      'Ton prochain contrôle : SVT jeudi 19 novembre (Chapitre 3 : la génétique).',
+    );
     expect(await ask('j\'ai quoi demain'), 'Demain : 8 h Mathématiques, 9 h Anglais, 14 h Sport. Tu finis à 16 h.');
     expect(await ask('mon prochain cours'), 'Ton prochain cours : Mathématiques, demain à 8 h (salle B12).');
     expect(await ask('mes notes'), 'Tes dernières notes : Physique 15/20, Français 12/20.');
-    expect(await ask('quel temps fait-il ?'), '☁️ 9 °C, nuageux à Lyon. Entre 6 et 12 °C, 30 % de risque de pluie. Prends une veste.');
+    expect(
+      await ask('quel temps fait-il ?'),
+      '☁️ 9 °C, nuageux à Lyon. Entre 6 et 12 °C, 30 % de risque de pluie. Prends une veste.',
+    );
   });
 
   test('actions : ranger, YouTube, document, liste, ouvrir, révisions', () async {

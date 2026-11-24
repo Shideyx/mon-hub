@@ -29,7 +29,13 @@ class QuizQuestion {
 
 /// La fiche d'une vidéo de cours.
 class VideoSheet {
-  const VideoSheet({this.title = '', this.summary = '', this.chapters = const [], this.keyPoints = const [], this.quiz = const []});
+  const VideoSheet({
+    this.title = '',
+    this.summary = '',
+    this.chapters = const [],
+    this.keyPoints = const [],
+    this.quiz = const [],
+  });
   final String title;
   final String summary;
   final List<VideoChapter> chapters;
@@ -54,7 +60,7 @@ class VideoSheet {
 
 /// **Vidéo de cours → fiche** : résumé, chapitres cliquables (on saute au
 /// bon moment) et quiz. Gemini regarde la vidéo lui-même (vidéos publiques) ;
-/// sinon on lit les sous-titres et le cerveau de Clicky résume.
+/// sinon on lit les sous-titres et le cerveau de Smily résume.
 class VideoNotes {
   VideoNotes._();
 
@@ -99,11 +105,14 @@ class VideoNotes {
       if (j is Map) d = j;
     } catch (_) {}
     if (d == null) return null;
-    List<String> strs(Object? v, [int max = 12]) =>
-        [for (final e in (v is List ? v : const [])) if ('$e'.trim().isNotEmpty) '$e'.trim()].take(max).toList();
+    List<String> strs(Object? v, [int max = 12]) => [
+      for (final e in (v is List ? v : const []))
+        if ('$e'.trim().isNotEmpty) '$e'.trim(),
+    ].take(max).toList();
     final chapters = <VideoChapter>[
       for (final c in (d['chapitres'] is List ? d['chapitres'] as List : const []))
-        if (c is Map && '${c['titre'] ?? ''}'.trim().isNotEmpty) VideoChapter(seconds(c['debut']), '${c['titre']}'.trim(), strs(c['points'], 6)),
+        if (c is Map && '${c['titre'] ?? ''}'.trim().isNotEmpty)
+          VideoChapter(seconds(c['debut']), '${c['titre']}'.trim(), strs(c['points'], 6)),
     ]..sort((x, y) => x.seconds.compareTo(y.seconds));
     final quiz = <QuizQuestion>[
       for (final q in (d['quiz'] is List ? d['quiz'] as List : const []))
@@ -151,8 +160,12 @@ class VideoNotes {
         }
         if (r.statusCode != 200) throw 'Gemini : erreur ${r.statusCode}';
         final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
-        final parts = ((((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?) ?? const [];
-        return [for (final p in parts) if (p is Map && p['text'] != null && p['thought'] != true) '${p['text']}'].join();
+        final parts =
+            ((((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?) ?? const [];
+        return [
+          for (final p in parts)
+            if (p is Map && p['text'] != null && p['thought'] != true) '${p['text']}',
+        ].join();
       }
       throw last ?? 'Gemini indisponible';
     } finally {
@@ -178,7 +191,8 @@ class VideoNotes {
       if (m == null) return null;
       final tracks = jsonDecode(m[1]!) as List;
       Map? pick(bool Function(Map) ok) => tracks.whereType<Map>().where(ok).firstOrNull;
-      final t = pick((t) => '${t['languageCode']}'.startsWith('fr') && t['kind'] != 'asr') ??
+      final t =
+          pick((t) => '${t['languageCode']}'.startsWith('fr') && t['kind'] != 'asr') ??
           pick((t) => '${t['languageCode']}'.startsWith('fr')) ??
           pick((t) => true);
       if (t == null) return null;
@@ -219,8 +233,8 @@ class VideoNotes {
     final subs = await captions(id);
     if (subs == null) {
       throw key.isEmpty
-          ? 'Cette vidéo n\'a pas de sous-titres que je peux lire. Avec ta clé Gemini gratuite (Réglages de Clicky → Voix), '
-              'je regarde la vidéo moi-même.'
+          ? 'Cette vidéo n\'a pas de sous-titres que je peux lire. Avec ta clé Gemini gratuite (Réglages de Smily → Voix), '
+                'je regarde la vidéo moi-même.'
           : 'Je n\'arrive pas à lire cette vidéo (privée, trop longue ou sans sous-titres).';
     }
     final text = subs.length > 120000 ? subs.substring(0, 120000) : subs;
@@ -325,7 +339,10 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                   Expanded(
                     child: TextField(
                       controller: _link,
-                      decoration: const InputDecoration(hintText: 'Lien de la vidéo YouTube', prefixIcon: Icon(Icons.smart_display_rounded)),
+                      decoration: const InputDecoration(
+                        hintText: 'Lien de la vidéo YouTube',
+                        prefixIcon: Icon(Icons.smart_display_rounded),
+                      ),
                       onSubmitted: (_) => _go(),
                     ),
                   ),
@@ -333,8 +350,16 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                   FilledButton(onPressed: _busy ? null : _go, child: const Text('Faire la fiche')),
                 ],
               ),
-              if (_busy) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Je regarde la vidéo et je prends des notes… ⏳'))),
-              if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: TextStyle(color: theme.colorScheme.error))),
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('Je regarde la vidéo et je prends des notes… ⏳')),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                ),
               if (s != null) ...[
                 const SizedBox(height: 12),
                 Text(s.title, style: theme.textTheme.headlineSmall),
@@ -345,12 +370,19 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                   spacing: 8,
                   children: [
                     FilledButton.tonalIcon(
-                      onPressed: () => _tool('doc_creer', {'titre': 'Fiche — ${s.title}', 'contenu': s.markdown(url)}, 'Google Doc créé ✓'),
+                      onPressed: () => _tool('doc_creer', {
+                        'titre': 'Fiche — ${s.title}',
+                        'contenu': s.markdown(url),
+                      }, 'Google Doc créé ✓'),
                       icon: const Icon(Icons.description_rounded),
                       label: const Text('En faire un Google Doc'),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: () => _tool('revision_generer', {'paquet': '🎬 ${s.title}', 'texte': s.markdown(url), 'nombre': 15}, 'Cartes ajoutées dans Révisions ✓'),
+                      onPressed: () => _tool('revision_generer', {
+                        'paquet': '🎬 ${s.title}',
+                        'texte': s.markdown(url),
+                        'nombre': 15,
+                      }, 'Cartes ajoutées dans Révisions ✓'),
                       icon: const Icon(Icons.style_rounded),
                       label: const Text('Faire des cartes'),
                     ),
@@ -362,7 +394,10 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                   for (final c in s.chapters)
                     Card(
                       child: ListTile(
-                        leading: ActionChip(label: Text(VideoNotes.clock(c.seconds)), onPressed: () => _jump(c.seconds)),
+                        leading: ActionChip(
+                          label: Text(VideoNotes.clock(c.seconds)),
+                          onPressed: () => _jump(c.seconds),
+                        ),
                         title: Text(c.title),
                         subtitle: c.points.isEmpty ? null : Text(c.points.map((p) => '• $p').join('\n')),
                         onTap: () => _jump(c.seconds),
@@ -404,7 +439,9 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                                 title: Text(
                                   s.quiz[i].choices[j],
                                   style: TextStyle(
-                                    fontWeight: _picked.containsKey(i) && j == s.quiz[i].answer ? FontWeight.w700 : null,
+                                    fontWeight: _picked.containsKey(i) && j == s.quiz[i].answer
+                                        ? FontWeight.w700
+                                        : null,
                                   ),
                                 ),
                                 onTap: _picked.containsKey(i) ? null : () => setState(() => _picked[i] = j),
@@ -420,7 +457,8 @@ class _VideoNotesPageState extends State<VideoNotesPage> {
                     ),
                   if (_picked.length == s.quiz.length)
                     Text(
-                      'Score : ${[for (final e in _picked.entries) if (e.value == s.quiz[e.key].answer) 1].length} / ${s.quiz.length}',
+                      'Score : ${[for (final e in _picked.entries)
+                        if (e.value == s.quiz[e.key].answer) 1].length} / ${s.quiz.length}',
                       style: theme.textTheme.titleLarge,
                     ),
                 ],

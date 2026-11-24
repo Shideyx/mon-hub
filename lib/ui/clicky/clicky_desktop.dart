@@ -25,7 +25,7 @@ import 'flight.dart';
 import 'shot_encode.dart';
 import 'win.dart';
 
-/// « Clicky partout » (Windows) : Clicky sort de la fenêtre de Mon Hub.
+/// « Smily partout » (Windows) : Smily sort de la fenêtre de Mon Hub.
 ///
 /// Mon Hub lance une seconde fois son propre programme avec `--clicky`.
 /// Ce second programme n'affiche qu'une petite fenêtre transparente, toujours
@@ -36,18 +36,14 @@ import 'win.dart';
 class ClickyDesktop {
   ClickyDesktop._();
 
-  /// Port local qui sert de verrou (un seul Clicky) et de télécommande.
+  /// Port local qui sert de verrou (un seul Smily) et de télécommande.
   static const port = 47613;
 
   static bool get supported => !kIsWeb && Platform.isWindows;
 
   static Future<bool> running() async {
     try {
-      final s = await Socket.connect(
-        InternetAddress.loopbackIPv4,
-        port,
-        timeout: const Duration(milliseconds: 400),
-      );
+      final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 400));
       s.destroy();
       return true;
     } catch (_) {
@@ -55,37 +51,30 @@ class ClickyDesktop {
     }
   }
 
-  /// Démarre Clicky partout (s'il n'est pas déjà lancé).
+  /// Démarre Smily partout (s'il n'est pas déjà lancé).
   static Future<void> launch() async {
     _paused = false;
     final c = ClickyController.instance;
-    // Mode léger (PC modeste) : Clicky reste dans la fenêtre de Mon Hub.
+    // Mode léger (PC modeste) : Smily reste dans la fenêtre de Mon Hub.
     // Ce second programme est ce qui ralentissait le plus les petits PC.
     if (!Perf.everywhere) return;
     // Pas de cerveau configuré : on ne lance rien du tout.
     if (!supported || !c.everywhere || !await c.refreshReady() || !c.enabled) return;
     if (await running()) return;
     try {
-      await Process.start(Platform.resolvedExecutable, [
-        '--clicky',
-      ], mode: ProcessStartMode.detached);
+      await Process.start(Platform.resolvedExecutable, ['--clicky'], mode: ProcessStartMode.detached);
     } catch (e) {
-      debugPrint('Clicky partout : $e');
+      debugPrint('Smily partout : $e');
     }
   }
 
-  /// Pose une question à Clicky partout (il s'ouvre et répond).
-  static Future<bool> ask(String question) =>
-      send('ask ${question.replaceAll(RegExp(r'[\r\n]+'), ' ')}');
+  /// Pose une question à Smily partout (il s'ouvre et répond).
+  static Future<bool> ask(String question) => send('ask ${question.replaceAll(RegExp(r'[\r\n]+'), ' ')}');
 
-  /// Envoie un ordre à Clicky partout ('open', 'quit', 'ask …').
+  /// Envoie un ordre à Smily partout ('open', 'quit', 'ask …').
   static Future<bool> send(String command) async {
     try {
-      final s = await Socket.connect(
-        InternetAddress.loopbackIPv4,
-        port,
-        timeout: const Duration(milliseconds: 400),
-      );
+      final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 400));
       s.write('$command\n');
       await s.flush();
       s.destroy();
@@ -105,7 +94,7 @@ class ClickyDesktop {
   static bool _paused = false;
   static final _restarts = <DateTime>[];
 
-  /// Surveille Clicky partout : s'il a planté, il est relancé (au plus 5
+  /// Surveille Smily partout : s'il a planté, il est relancé (au plus 5
   /// fois en 10 minutes, pour ne pas tourner en boucle).
   static void watch() {
     if (!supported) return;
@@ -118,16 +107,16 @@ class ClickyDesktop {
       _restarts.removeWhere((t) => now.difference(t) > const Duration(minutes: 10));
       if (_restarts.length >= 5) return;
       _restarts.add(now);
-      ErrorLog.record('Clicky partout s\'est fermé : relancé', null, where: 'surveillance');
+      ErrorLog.record('Smily partout s\'est fermé : relancé', null, where: 'surveillance');
       await launch();
     });
   }
 
-  /// Relance Clicky partout (compte changé, cerveau ou modèle modifié…).
+  /// Relance Smily partout (compte changé, cerveau ou modèle modifié…).
   static Future<void> restart() async {
     if (!supported) return;
     if (await send('quit')) {
-      // Attend que l'ancien Clicky soit bien parti (3 s au plus).
+      // Attend que l'ancien Smily soit bien parti (3 s au plus).
       for (var i = 0; i < 15 && await running(); i++) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       }
@@ -139,7 +128,7 @@ class ClickyDesktop {
 /// Point d'entrée de `hub.exe --clicky`.
 Future<void> runClickyDesktop() async {
   WidgetsFlutterBinding.ensureInitialized();
-  ErrorLog.install('Clicky partout');
+  ErrorLog.install('Smily partout');
   await TrustedCertificates.install();
   final ServerSocket lock;
   try {
@@ -175,14 +164,14 @@ Future<void> runClickyDesktop() async {
           unawaited(c.presentTopo('${j['t']}', '${j['x']}', speakIt: j['v'] != false));
         } catch (_) {}
       }
-      // « Clicky agit » demandé depuis Mon Hub : c'est Clicky partout (au-
+      // « Smily agit » demandé depuis Mon Hub : c'est Smily partout (au-
       // dessus de tout l'écran) qui prend la souris.
       if (cmd.startsWith('act64 ')) {
         try {
           unawaited(c.act(utf8.decode(base64Decode(cmd.substring(6)))));
         } catch (_) {}
       }
-      // Une idée décidée par Mon Hub : c'est Clicky partout qui la propose.
+      // Une idée décidée par Mon Hub : c'est Smily partout qui la propose.
       if (cmd.startsWith('idea64 ')) {
         try {
           final i = ClickyIdea.fromJson(jsonDecode(utf8.decode(base64Decode(cmd.substring(7)))));
@@ -199,7 +188,7 @@ Future<void> runClickyDesktop() async {
           unawaited(c.feel('${j['e']}', text: t is String ? t : null));
         } catch (_) {}
       }
-      // Une pensée de Clicky (rappel de l'assistant…) envoyée par Mon Hub.
+      // Une pensée de Smily (rappel de l'assistant…) envoyée par Mon Hub.
       if (cmd.startsWith('think64 ')) {
         try {
           unawaited(c.think(utf8.decode(base64Decode(cmd.substring(8)))));
@@ -216,7 +205,7 @@ Future<void> runClickyDesktop() async {
   runApp(const _ClickyDesktopApp());
 }
 
-/// Là où Clicky peut aller regarder tout seul (pixels de l'écran) : la barre
+/// Là où Smily peut aller regarder tout seul (pixels de l'écran) : la barre
 /// de titre et le milieu de ta fenêtre, l'horloge, l'autre écran.
 List<Offset> _lookSpots() {
   final out = <Offset>[];
@@ -242,11 +231,11 @@ List<Offset> _lookSpots() {
 }
 
 /// Captures de chaque écran, **rapides** :
-/// - Clicky reste à l'écran : Windows le retire seulement de la photo (avant,
+/// - Smily reste à l'écran : Windows le retire seulement de la photo (avant,
 ///   il disparaissait 80 ms à chaque capture) ;
 /// - Windows réduit l'image pendant la copie (1280 px au plus) ;
 /// - l'image devient un JPEG à côté (Isolate), bien plus léger qu'un PNG à
-///   envoyer à l'IA, pendant que Clicky continue de bouger.
+///   envoyer à l'IA, pendant que Smily continue de bouger.
 Future<List<ClickyShot>> _captureScreens() async {
   final hwnd = _DesktopState.hwnd;
   final excluded = hwnd != null && Win.excludeFromCapture(hwnd, true);
@@ -278,8 +267,7 @@ Future<List<ClickyShot>> _captureScreens() async {
     }
   }
   final jpegs = await Future.wait([
-    for (final r in raw)
-      Isolate.run(() => encodeShot(r.$2, r.$6, r.$7)).catchError((Object _) => Uint8List(0)),
+    for (final r in raw) Isolate.run(() => encodeShot(r.$2, r.$6, r.$7)).catchError((Object _) => Uint8List(0)),
   ]);
   return [
     for (var k = 0; k < raw.length; k++)
@@ -305,8 +293,7 @@ class _BridgeTools {
     final dir = ClaudeBridge.folder;
     if (dir == null) return null;
     try {
-      return jsonDecode(File('$dir${Platform.pathSeparator}bridge.json').readAsStringSync())
-          as Map<String, dynamic>;
+      return jsonDecode(File('$dir${Platform.pathSeparator}bridge.json').readAsStringSync()) as Map<String, dynamic>;
     } catch (_) {
       return null;
     }
@@ -319,7 +306,7 @@ class _BridgeTools {
     try {
       final req = await client.openUrl(method, Uri.parse('http://127.0.0.1:${info['port']}$path'));
       req.headers.set('authorization', 'Bearer ${info['key']}');
-      // Clicky partout a déjà demandé ton accord dans sa propre bulle : Mon
+      // Smily partout a déjà demandé ton accord dans sa propre bulle : Mon
       // Hub ne redemande pas une deuxième fois.
       req.headers.set('x-monhub-client', 'clicky');
       req.headers.contentType = ContentType.json;
@@ -357,10 +344,7 @@ class _BridgeTools {
               description: '${m['description'] ?? ''}',
               params: {
                 for (final e in props.entries)
-                  '${e.key}': (
-                    '${(e.value as Map)['type'] ?? 'string'}',
-                    '${e.value['description'] ?? ''}',
-                  ),
+                  '${e.key}': ('${(e.value as Map)['type'] ?? 'string'}', '${e.value['description'] ?? ''}'),
               },
               required: [for (final r in (schema['required'] as List?) ?? const []) '$r'],
               run: (args) async {
@@ -381,7 +365,7 @@ class _ClickyDesktopApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Clicky',
+    title: 'Smily',
     debugShowCheckedModeBanner: false,
     navigatorKey: hubNavigatorKey,
     themeMode: AppSession.instance.themeMode,
@@ -431,6 +415,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   bool _pinned = false;
   Offset? _dragFrom;
   Offset? _dragPos;
+
   /// Le vol en cours (vers une cible, un regard, ou retour à la souris).
   ClickyFlight? _flight;
   Offset? _flightTo;
@@ -530,7 +515,12 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
       _flight = null;
       return;
     }
-    _flight = ClickyFlight(from, to == null ? dest + const Offset(16, 14) : dest + const Offset(1, 1), DateTime.now(), dpr: _dpr);
+    _flight = ClickyFlight(
+      from,
+      to == null ? dest + const Offset(16, 14) : dest + const Offset(1, 1),
+      DateTime.now(),
+      dpr: _dpr,
+    );
     if (!_frames.isActive) unawaited(_frames.start());
   }
 
@@ -580,7 +570,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     ClaudeApi.forget(); // clé ajoutée / retirée dans Mon Hub
     await c.refreshReady();
     if (!c.active || !c.everywhere) exit(0);
-    // Mon Hub fermé depuis un moment : Clicky s'en va aussi.
+    // Mon Hub fermé depuis un moment : Smily s'en va aussi.
     if (await _BridgeTools.alive()) {
       _deadChecks = 0;
     } else if (++_deadChecks >= 5) {
@@ -602,7 +592,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
 
   (Offset, Rect)? _perchSpot() {
     final t = Win.foregroundTitle();
-    if (t.trim().isEmpty || t == 'Clicky' || t == 'Program Manager' || _fullscreen) return null;
+    if (t.trim().isEmpty || t == 'Smily' || t == 'Program Manager' || _fullscreen) return null;
     final f = Win.foregroundRect();
     if (f == null) return null;
     final (x, y, w, h) = f;
@@ -661,9 +651,15 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    // Un jeu ou une vidéo en plein écran : Clicky disparaît tant qu'on ne
+    // Un jeu ou une vidéo en plein écran : Smily disparaît tant qu'on ne
     // l'appelle pas (rien par-dessus le jeu, aucun ralentissement).
-    final quiet = _fullscreen && c.state == ClickyState.idle && !c.boxOpen && c.board == null && c.holo == null && c.target == null;
+    final quiet =
+        _fullscreen &&
+        c.state == ClickyState.idle &&
+        !c.boxOpen &&
+        c.board == null &&
+        c.holo == null &&
+        c.target == null;
     final visible = c.active && !quiet && (c.buddyVisible || c.boxOpen || c.board != null);
     if (_pinned && !c.boxOpen && c.board == null && c.holo == null) {
       _pinned = false;
@@ -681,7 +677,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final cur = c.cursor;
     if (cur == null) return;
     // Il suit simplement la souris : c'est Windows qui déplace la fenêtre,
-    // à chaque mouvement (fluide, même quand Clicky réfléchit ou capture).
+    // à chaque mouvement (fluide, même quand Smily réfléchit ou capture).
     final follow = _flightTo == null && _flight == null && !_interactive && !_pinned && c.marks.isEmpty;
     if (follow) {
       if (_frames.isActive) _frames.stop();
@@ -821,9 +817,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
             c: c,
             interactive: _interactive,
             pointerAt: c.marks.isEmpty ? Offset.zero : _inside,
-            marks: c.marks.isEmpty
-                ? const []
-                : [for (final m in c.marks) m.map((p) => (p - _frame) / dpr, 1 / dpr)],
+            marks: c.marks.isEmpty ? const [] : [for (final m in c.marks) m.map((p) => (p - _frame) / dpr, 1 / dpr)],
           );
         },
       ),

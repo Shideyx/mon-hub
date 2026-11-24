@@ -247,10 +247,17 @@ class _ShimmerLinesState extends State<ShimmerLines> with SingleTickerProviderSt
               children: [
                 Row(
                   children: [
-                    Container(width: 40, height: 40, decoration: BoxDecoration(color: base, shape: BoxShape.circle)),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: base, shape: BoxShape.circle),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Container(height: 14, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(7))),
+                      child: Container(
+                        height: 14,
+                        decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(7)),
+                      ),
                     ),
                   ],
                 ),
@@ -258,7 +265,10 @@ class _ShimmerLinesState extends State<ShimmerLines> with SingleTickerProviderSt
                   const SizedBox(height: 12),
                   FractionallySizedBox(
                     widthFactor: i.isOdd ? 0.85 : 0.6,
-                    child: Container(height: 12, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(6))),
+                    child: Container(
+                      height: 12,
+                      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(6)),
+                    ),
                   ),
                 ],
               ],

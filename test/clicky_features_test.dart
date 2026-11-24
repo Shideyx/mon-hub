@@ -25,19 +25,14 @@ import 'package:hub/ui/clicky/tutor.dart';
 import 'package:hub/ui/clicky/voice.dart';
 
 void main() {
-  group('Clicky : dessins et étapes', () {
+  group('Smily : dessins et étapes', () {
     test('annotations lues et retirées du texte', () {
       final (text, marks) = ClickyMark.extract(
         'Regarde ici [ARROW:10,20->110,220:le menu] puis là [CIRCLE:50,60,30:Fichier] '
         '[UNDERLINE:5,90,200] [LABEL:300,40:Titre:screen2] fin.',
       );
       expect(text, 'Regarde ici puis là fin.');
-      expect(marks.map((m) => m.kind), [
-        MarkKind.arrow,
-        MarkKind.circle,
-        MarkKind.underline,
-        MarkKind.label,
-      ]);
+      expect(marks.map((m) => m.kind), [MarkKind.arrow, MarkKind.circle, MarkKind.underline, MarkKind.label]);
       expect(marks[0].a, const Offset(10, 20));
       expect(marks[0].b, const Offset(110, 220));
       expect(marks[0].text, 'le menu');
@@ -52,24 +47,20 @@ void main() {
     });
 
     test('leçon découpée en étapes, balises retirées pendant l\'écriture', () {
-      final steps = splitSteps(
-        'Ouvre Fichier. [POINT:1,2:Fichier][ETAPE] Clique sur Exporter.[ÉTAPE]Fini !',
-      );
+      final steps = splitSteps('Ouvre Fichier. [POINT:1,2:Fichier][ETAPE] Clique sur Exporter.[ÉTAPE]Fini !');
       expect(steps, ['Ouvre Fichier. [POINT:1,2:Fichier]', 'Clique sur Exporter.', 'Fini !']);
       expect(splitSteps('Une seule réponse.'), ['Une seule réponse.']);
       expect(
-        stripClickyTags(
-          'Voilà [POINT:1,2:x] [CIRCLE:1,2,3] [ACTIONS]{"etapes":[]}[/ACTIONS] et [POI',
-        ),
+        stripClickyTags('Voilà [POINT:1,2:x] [CIRCLE:1,2,3] [ACTIONS]{"etapes":[]}[/ACTIONS] et [POI'),
         'Voilà et',
       );
     });
   });
 
-  group('Clicky : commandes vocales', () {
+  group('Smily : commandes vocales', () {
     test('commandes reconnues', () {
       expect(parseCommand('Suivant')?.$1, ClickyCommand.next);
-      expect(parseCommand('Clicky, continue')?.$1, ClickyCommand.next);
+      expect(parseCommand('Smily, continue')?.$1, ClickyCommand.next);
       expect(parseCommand('répète')?.$1, ClickyCommand.repeat);
       expect(parseCommand('Stop !')?.$1, ClickyCommand.stop);
       expect(parseCommand('Qu\'est-ce qu\'on a vu aujourd\'hui ?')?.$1, ClickyCommand.today);
@@ -102,7 +93,7 @@ void main() {
         VoiceSkill('ouvre youtube', 'url', 'https://youtube.com'),
         VoiceSkill('mode revision', 'ask', 'Quiz'),
       ];
-      expect(VoiceSkill.match('Clicky, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
+      expect(VoiceSkill.match('Smily, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
       expect(VoiceSkill.match('Mode révision maths', list)?.$2, 'maths');
       expect(VoiceSkill.match('ouvre la porte', list), isNull);
     });
@@ -114,10 +105,7 @@ void main() {
     expect(Journal.schedule(5, true, now).$1, 6);
     expect(Journal.schedule(6, true, now), (6, now.add(const Duration(days: 120))));
     expect(Journal.schedule(4, false, now), (0, now.add(const Duration(days: 1))));
-    expect(
-      Journal.worthKeeping('merci', 'De rien, avec plaisir de t\'aider aujourd\'hui !'),
-      isFalse,
-    );
+    expect(Journal.worthKeeping('merci', 'De rien, avec plaisir de t\'aider aujourd\'hui !'), isFalse);
     expect(
       Journal.worthKeeping(
         'Comment marche la photosynthèse ?',
@@ -125,21 +113,11 @@ void main() {
       ),
       isTrue,
     );
-    expect(
-      Journal.topicOf('Comment calculer une moyenne pondérée en maths ?', 'Moyenne pondérée'),
-      'Moyenne pondérée',
-    );
+    expect(Journal.topicOf('Comment calculer une moyenne pondérée en maths ?', 'Moyenne pondérée'), 'Moyenne pondérée');
   });
 
   test('routines : l\'heure venue, une seule fois', () {
-    final r = Routine(
-      id: '1',
-      name: 'Briefing',
-      prompt: 'x',
-      every: 'weekdays',
-      hour: 7,
-      minute: 10,
-    );
+    final r = Routine(id: '1', name: 'Briefing', prompt: 'x', every: 'weekdays', hour: 7, minute: 10);
     final monday = DateTime(2026, 11, 16, 7, 12);
     expect(r.due(DateTime(2026, 11, 16, 7, 0)), isFalse);
     expect(r.due(monday), isTrue);
@@ -209,14 +187,9 @@ void main() {
   });
 
   test('MCP : réponse JSON ou flux SSE', () {
-    expect(McpClient.parseResponse('{"jsonrpc":"2.0","id":3,"result":{"ok":1}}', 3)?['result'], {
-      'ok': 1,
-    });
+    expect(McpClient.parseResponse('{"jsonrpc":"2.0","id":3,"result":{"ok":1}}', 3)?['result'], {'ok': 1});
     expect(
-      McpClient.parseResponse(
-        'event: message\ndata: {"jsonrpc":"2.0","id":4,"result":{"tools":[]}}\n\n',
-        4,
-      )?['result'],
+      McpClient.parseResponse('event: message\ndata: {"jsonrpc":"2.0","id":4,"result":{"tools":[]}}\n\n', 4)?['result'],
       {'tools': []},
     );
     expect(McpServer.validUrl('https://exemple.fr/mcp'), isTrue);
@@ -253,13 +226,13 @@ void main() {
     expect(historySection(DateTime(2026, 9, 1), DateTime(2026, 11, 16)), 'Plus ancien');
   });
 
-  test('voix : bip de Clicky et salutation', () {
+  test('voix : bip de Smily et salutation', () {
     final wav = ClickyChime.wav();
     expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
     expect(clickyGreeting('Erik', DateTime(2026, 11, 16, 8)), startsWith('Bonjour Erik.'));
     expect(clickyGreeting('', DateTime(2026, 11, 16, 20)), startsWith('Bonsoir.'));
     expect(clickyPersona('Erik'), contains('« Erik »'));
-    expect(clickyPersona('Erik'), contains('Clicky'));
+    expect(clickyPersona('Erik'), contains('Smily'));
   });
 
   group('messages vocaux et likes', () {
@@ -408,9 +381,7 @@ void main() {
 
   test('micro Windows : lancement sans fichier et erreur lisible', () {
     final bytes = base64Decode(WindowsEars.encodedScript());
-    final code = String.fromCharCodes([
-      for (var i = 0; i + 1 < bytes.length; i += 2) bytes[i] | (bytes[i + 1] << 8),
-    ]);
+    final code = String.fromCharCodes([for (var i = 0; i + 1 < bytes.length; i += 2) bytes[i] | (bytes[i + 1] << 8)]);
     expect(code, startsWith("\$Lang = 'fr-FR'"));
     expect(code, isNot(contains('param([string]')));
     expect(code.length, lessThan(16000), reason: 'tient dans une ligne de commande Windows');

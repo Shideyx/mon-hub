@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Pointage précis en deux passes : après une première réponse, Clicky
+/// Pointage précis en deux passes : après une première réponse, Smily
 /// zoome autour du point proposé, pose une grille 6 × 6 numérotée, et
 /// redemande à l'IA dans quelle case est exactement l'élément. Le curseur
 /// tombe ainsi pile sur le bouton, même petit.

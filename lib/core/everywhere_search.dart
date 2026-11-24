@@ -66,14 +66,48 @@ class EverywhereSearch {
   }
 
   static const _stop = {
-    'le', 'la', 'les', 'de', 'du', 'des', 'un', 'une', 'et', 'ou', 'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'sur', 'pour',
-    'a', 'au', 'aux', 'en', 'dans', 'avec', 'l', 'd', 'j', 'qu', 'que', 'qui', 'ce', 'cet', 'cette',
+    'le',
+    'la',
+    'les',
+    'de',
+    'du',
+    'des',
+    'un',
+    'une',
+    'et',
+    'ou',
+    'mon',
+    'ma',
+    'mes',
+    'ton',
+    'ta',
+    'tes',
+    'sur',
+    'pour',
+    'a',
+    'au',
+    'aux',
+    'en',
+    'dans',
+    'avec',
+    'l',
+    'd',
+    'j',
+    'qu',
+    'que',
+    'qui',
+    'ce',
+    'cet',
+    'cette',
   };
 
   /// Les mots cherchés (sans les petits mots).
   static List<String> words(String query) {
     final all = norm(query).split(RegExp(r'[^a-z0-9+#@.-]+')).where((w) => w.isNotEmpty).toList();
-    final kept = [for (final w in all) if (!_stop.contains(w)) w];
+    final kept = [
+      for (final w in all)
+        if (!_stop.contains(w)) w,
+    ];
     return kept.isEmpty ? all : kept;
   }
 
@@ -131,31 +165,54 @@ class EverywhereSearch {
   /// Transforme ce que renvoie un outil de lecture en résultats.
   static List<SearchHit> fromTool(String tool, Object? r, List<String> w) {
     final out = <SearchHit>[];
-    void add(String source, String title, String detail, {Object? date, String? link, String? module, bool trusted = false}) {
+    void add(
+      String source,
+      String title,
+      String detail, {
+      Object? date,
+      String? link,
+      String? module,
+      bool trusted = false,
+    }) {
       final s = score(w, title, detail);
       // Les outils qui ont déjà cherché eux-mêmes (Drive, Docs) : gardés.
       if (s <= 0 && !trusted) return;
-      out.add(SearchHit(
-        source: source,
-        title: title.trim().isEmpty ? '(sans titre)' : _short(title, 90),
-        detail: around(detail, w),
-        date: _date(date),
-        link: link,
-        moduleId: module,
-        score: s <= 0 ? 0.5 : s,
-      ));
+      out.add(
+        SearchHit(
+          source: source,
+          title: title.trim().isEmpty ? '(sans titre)' : _short(title, 90),
+          detail: around(detail, w),
+          date: _date(date),
+          link: link,
+          moduleId: module,
+          score: s <= 0 ? 0.5 : s,
+        ),
+      );
     }
 
     switch (tool) {
       case 'drive_chercher':
         for (final f in _maps(r)) {
-          add('Drive', '${f['nom'] ?? ''}', '${f['type'] ?? ''}'.split('.').last, date: f['modifie'], link: f['lien'] as String?, trusted: true);
+          add(
+            'Drive',
+            '${f['nom'] ?? ''}',
+            '${f['type'] ?? ''}'.split('.').last,
+            date: f['modifie'],
+            link: f['lien'] as String?,
+            trusted: true,
+          );
         }
       case 'doc_lister':
         for (final f in _maps(r)) {
           final id = '${f['id'] ?? ''}';
-          add('Google Docs', '${f['titre'] ?? ''}', '', date: f['modifie'],
-              link: id.isEmpty ? null : 'https://docs.google.com/document/d/$id/edit', trusted: true);
+          add(
+            'Google Docs',
+            '${f['titre'] ?? ''}',
+            '',
+            date: f['modifie'],
+            link: id.isEmpty ? null : 'https://docs.google.com/document/d/$id/edit',
+            trusted: true,
+          );
         }
       case 'mails_lister':
         for (final m in _maps(r)) {
@@ -171,9 +228,13 @@ class EverywhereSearch {
         }
       case 'ecole_devoirs':
         for (final h in _maps(r)) {
-          add('Devoirs', '${h['matiere'] ?? ''}',
-              '${h['contenu'] ?? ''} ${(h['fichiers_joints'] as List?)?.join(' ') ?? ''} ${h['fait_en_classe'] ?? ''}',
-              date: h['pour_le'], module: 'ecoledirecte');
+          add(
+            'Devoirs',
+            '${h['matiere'] ?? ''}',
+            '${h['contenu'] ?? ''} ${(h['fichiers_joints'] as List?)?.join(' ') ?? ''} ${h['fait_en_classe'] ?? ''}',
+            date: h['pour_le'],
+            module: 'ecoledirecte',
+          );
         }
       case 'carnet_taches_notes':
         if (r is Map) {
@@ -201,7 +262,13 @@ class EverywhereSearch {
             add('Révisions', '${d['nom'] ?? ''}', '${d['cartes'] ?? 0} cartes', module: 'revisions');
           }
           for (final t in _maps(r['controles'])) {
-            add('Révisions', 'Contrôle de ${t['matiere'] ?? ''}', '${t['contenu'] ?? ''}', date: t['date'], module: 'revisions');
+            add(
+              'Révisions',
+              'Contrôle de ${t['matiere'] ?? ''}',
+              '${t['contenu'] ?? ''}',
+              date: t['date'],
+              module: 'revisions',
+            );
           }
         }
       case 'livres_lister':
@@ -305,10 +372,10 @@ ConvertTo-Json -InputObject @($out) -Compress
       if (pc) pcFiles(query, w).then(got),
       for (final e in toolsFor(query).entries)
         if (tools.contains(e.key))
-          call(e.key, e.value)
-              .timeout(const Duration(seconds: 12))
-              .then((r) => got(fromTool(e.key, r, w)))
-              .catchError((Object _) {}),
+          call(
+            e.key,
+            e.value,
+          ).timeout(const Duration(seconds: 12)).then((r) => got(fromTool(e.key, r, w))).catchError((Object _) {}),
     ]);
     return sorted(all);
   }
@@ -321,7 +388,7 @@ ConvertTo-Json -InputObject @($out) -Compress
       return (b.date ?? DateTime(2000)).compareTo(a.date ?? DateTime(2000));
     });
 
-  /// Ce que Clicky dit.
+  /// Ce que Smily dit.
   static String say(String query, List<SearchHit> hits) {
     if (hits.isEmpty) return 'Je n\'ai rien trouvé pour « $query ».';
     final by = <String, int>{};

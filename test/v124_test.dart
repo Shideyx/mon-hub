@@ -14,9 +14,7 @@ import 'package:hub/ui/clicky/tutor.dart';
 
 void main() {
   test('scripts PowerShell sans fichier : paramètres et encodage', () {
-    final s = PowerShell.withParams("param([string]\$Path)\nWrite-Output \$Path\n", {
-      'Path': "C:\\l'eau\\x.png",
-    });
+    final s = PowerShell.withParams("param([string]\$Path)\nWrite-Output \$Path\n", {'Path': "C:\\l'eau\\x.png"});
     expect(s, startsWith("\$Path = 'C:\\l''eau\\x.png'"));
     expect(s, isNot(contains('param(')));
     final bytes = base64Decode(PowerShell.encode('é'));
@@ -60,13 +58,13 @@ void main() {
     expect(HoloScene.strip('a [HOLO]{"titre"'), 'a');
   });
 
-  test('Clicky vivant : petits mouvements bornés', () {
+  test('Smily vivant : petits mouvements bornés', () {
     for (var t = 0.0; t < 30; t += 0.37) {
       final o = aliveOffset(t);
       expect(o.dx.abs(), lessThan(20));
       expect(o.dy.abs(), lessThan(20));
     }
-    expect(parseCommand('Clicky, protocole travail'), (ClickyCommand.protocol, 'travail'));
+    expect(parseCommand('Smily, protocole travail'), (ClickyCommand.protocol, 'travail'));
     expect(Routine.templates().map((r) => r.name), contains('Bilan du soir'));
   });
 
@@ -90,10 +88,7 @@ void main() {
       expect(n, 2);
       expect(last!.data['reps'], 3);
       final t = await c.add('todos', {'text': 'Réviser maths'});
-      await c.change('todos', t.id, {
-        'done': true,
-        'doneAt': DateTime.now().millisecondsSinceEpoch,
-      });
+      await c.change('todos', t.id, {'done': true, 'doneAt': DateTime.now().millisecondsSinceEpoch});
       await c.add('memory', {'text': 'allergique aux noix'});
       expect(c.facts, ['allergique aux noix']);
       final recap = c.eveningRecap();

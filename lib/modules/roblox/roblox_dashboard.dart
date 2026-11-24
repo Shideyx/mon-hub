@@ -75,9 +75,7 @@ class GameSummary extends StatelessWidget {
                       )
                     : LineChart(
                         points: [
-                          for (final x in h.where(
-                            (x) => DateTime.now().difference(x.at).inHours < 24,
-                          ))
+                          for (final x in h.where((x) => DateTime.now().difference(x.at).inHours < 24))
                             (x.at, x.playing.toDouble()),
                         ],
                         color: module.color,
@@ -97,10 +95,7 @@ class GameSummary extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (live) ...[
-              const Icon(Icons.circle, size: 8, color: Colors.green),
-              const SizedBox(width: 4),
-            ],
+            if (live) ...[const Icon(Icons.circle, size: 8, color: Colors.green), const SizedBox(width: 4)],
             Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           ],
         ),
@@ -158,7 +153,8 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
     final r = await askFields(
       context,
       title: 'Ajouter ton jeu',
-      message: 'Colle le lien de ton jeu (roblox.com/games/…), le lien du Creator Hub, '
+      message:
+          'Colle le lien de ton jeu (roblox.com/games/…), le lien du Creator Hub, '
           'ou son ID.',
       labels: ['Lien ou ID du jeu'],
     );
@@ -261,10 +257,7 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
                   underline: const SizedBox.shrink(),
                   items: [
                     for (final id in ids)
-                      DropdownMenuItem(
-                        value: id,
-                        child: Text(m.game(id).name.isEmpty ? 'Jeu $id' : m.game(id).name),
-                      ),
+                      DropdownMenuItem(value: id, child: Text(m.game(id).name.isEmpty ? 'Jeu $id' : m.game(id).name)),
                   ],
                   onChanged: (v) => v == null ? null : m.selectGame(v),
                 ),
@@ -276,11 +269,7 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
           )
         else if (g.fetchedAt != null)
           Text('à ${fmtWhen(g.fetchedAt!, withDay: false)}', style: Theme.of(context).textTheme.labelSmall),
-        IconButton(
-          tooltip: 'Actualiser',
-          icon: const Icon(Icons.refresh_rounded),
-          onPressed: () => _load(force: true),
-        ),
+        IconButton(tooltip: 'Actualiser', icon: const Icon(Icons.refresh_rounded), onPressed: () => _load(force: true)),
         PopupMenuButton<String>(
           onSelected: (v) async {
             if (v == 'add') await _add();
@@ -406,21 +395,47 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
         : g.servers.map((s) => s.maxPlayers == 0 ? 0.0 : s.playing / s.maxPlayers).reduce((a, b) => a + b) /
               g.servers.length;
     final tiles = [
-      _Kpi('Joueurs en ligne', fmtInt(g.playing), Icons.circle,
-          sub: 'pic enregistré : ${fmtInt(peak)}', live: g.playing > 0),
-      _Kpi('Visites', fmtShort(g.visits), Icons.visibility_rounded,
-          sub: delta(g.visits, day?.visits) ?? fmtInt(g.visits)),
-      _Kpi('Favoris', fmtShort(g.favorites), Icons.star_rounded,
-          sub: delta(g.favorites, day?.favorites) ??
-              (g.visits == 0 ? null : '${(g.favorites / g.visits * 100).toStringAsFixed(2).replaceAll('.', ',')} % des visites')),
-      _Kpi('J\'aime', like == null ? '—' : '${(like * 100).round()} %', Icons.thumb_up_alt_rounded,
-          sub: '👍 ${fmtShort(g.upVotes)} · 👎 ${fmtShort(g.downVotes)}'),
-      _Kpi('Serveurs actifs', '${g.servers.length}${g.serversTruncated ? '+' : ''}', Icons.dns_rounded,
-          sub: fill == null ? '${g.maxPlayers} places par serveur' : 'remplis à ${(fill * 100).round()} %'),
-      _Kpi('Badges', '${g.badges.length}', Icons.military_tech_rounded,
-          sub: g.badges.isEmpty
-              ? null
-              : '${fmtShort(g.badges.fold<int>(0, (a, b) => a + b.pastDay))} obtenus en 24 h'),
+      _Kpi(
+        'Joueurs en ligne',
+        fmtInt(g.playing),
+        Icons.circle,
+        sub: 'pic enregistré : ${fmtInt(peak)}',
+        live: g.playing > 0,
+      ),
+      _Kpi(
+        'Visites',
+        fmtShort(g.visits),
+        Icons.visibility_rounded,
+        sub: delta(g.visits, day?.visits) ?? fmtInt(g.visits),
+      ),
+      _Kpi(
+        'Favoris',
+        fmtShort(g.favorites),
+        Icons.star_rounded,
+        sub:
+            delta(g.favorites, day?.favorites) ??
+            (g.visits == 0
+                ? null
+                : '${(g.favorites / g.visits * 100).toStringAsFixed(2).replaceAll('.', ',')} % des visites'),
+      ),
+      _Kpi(
+        'J\'aime',
+        like == null ? '—' : '${(like * 100).round()} %',
+        Icons.thumb_up_alt_rounded,
+        sub: '👍 ${fmtShort(g.upVotes)} · 👎 ${fmtShort(g.downVotes)}',
+      ),
+      _Kpi(
+        'Serveurs actifs',
+        '${g.servers.length}${g.serversTruncated ? '+' : ''}',
+        Icons.dns_rounded,
+        sub: fill == null ? '${g.maxPlayers} places par serveur' : 'remplis à ${(fill * 100).round()} %',
+      ),
+      _Kpi(
+        'Badges',
+        '${g.badges.length}',
+        Icons.military_tech_rounded,
+        sub: g.badges.isEmpty ? null : '${fmtShort(g.badges.fold<int>(0, (a, b) => a + b.pastDay))} obtenus en 24 h',
+      ),
     ];
     return LayoutBuilder(
       builder: (context, box) {
@@ -440,30 +455,26 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
     return d.inHours >= 23 ? 'en 24 h' : 'en ${d.inHours} h';
   }
 
-  Widget _section(BuildContext context, String title, Widget child, {Widget? trailing, String? note}) =>
-      Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _section(BuildContext context, String title, Widget child, {Widget? trailing, String? note}) => Card(
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
-                  ?trailing,
-                ],
-              ),
-              const SizedBox(height: 12),
-              child,
-              if (note != null) ...[
-                const SizedBox(height: 8),
-                Text(note, style: Theme.of(context).textTheme.labelSmall),
-              ],
+              Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+              ?trailing,
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          child,
+          if (note != null) ...[const SizedBox(height: 8), Text(note, style: Theme.of(context).textTheme.labelSmall)],
+        ],
+      ),
+    ),
+  );
 
   Widget _rangePicker() => SegmentedButton<_Range>(
     showSelectedIcon: false,
@@ -546,8 +557,10 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
                       children: [
                         SizedBox(
                           width: 76,
-                          child: Text('${s.playing}/${s.maxPlayers}',
-                              style: const TextStyle(fontWeight: FontWeight.w600)),
+                          child: Text(
+                            '${s.playing}/${s.maxPlayers}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                         Expanded(
                           child: ClipRRect(
@@ -577,8 +590,10 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
                 if (list.length > 12)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('… et ${list.length - 12} autres serveurs',
-                        style: Theme.of(context).textTheme.labelSmall),
+                    child: Text(
+                      '… et ${list.length - 12} autres serveurs',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
                   ),
               ],
             ),
@@ -600,9 +615,7 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
                     contentPadding: EdgeInsets.zero,
                     leading: _Img(url: b.icon, size: 36, radius: 18),
                     title: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      '${fmtInt(b.awarded)} obtenus · +${fmtInt(b.pastDay)} en 24 h',
-                    ),
+                    subtitle: Text('${fmtInt(b.awarded)} obtenus · +${fmtInt(b.pastDay)} en 24 h'),
                     trailing: Text(
                       '${b.winRate.toStringAsFixed(1).replaceAll('.', ',')} %',
                       style: const TextStyle(fontWeight: FontWeight.w600),
@@ -663,8 +676,12 @@ class _GameDashboardState extends State<GameDashboard> with AutomaticKeepAliveCl
                       padding: const EdgeInsets.only(right: 8),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(t, height: 110, fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const SizedBox()),
+                        child: Image.network(
+                          t,
+                          height: 110,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox(),
+                        ),
                       ),
                     ),
                 ],
@@ -711,8 +728,11 @@ class _Kpi extends StatelessWidget {
                 Icon(icon, size: live ? 10 : 16, color: live ? Colors.green : scheme.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(label,
-                      style: TextStyle(color: scheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    label,
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

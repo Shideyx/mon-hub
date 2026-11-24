@@ -24,20 +24,20 @@ class EarsProblem {
   String toString() => message;
 }
 
-/// Résultat d'une réparation du micro par Clicky.
+/// Résultat d'une réparation du micro par Smily.
 class EarsRepair {
   const EarsRepair({required this.problem, required this.steps});
 
   /// Le souci qui reste (null : le micro marche).
   final EarsProblem? problem;
 
-  /// Ce que Clicky a essayé, dans l'ordre (pour l'afficher ou l'expliquer).
+  /// Ce que Smily a essayé, dans l'ordre (pour l'afficher ou l'expliquer).
   final List<String> steps;
 
   bool get ok => problem == null;
 }
 
-/// Les pannes de lancement que Clicky répare tout seul en essayant une
+/// Les pannes de lancement que Smily répare tout seul en essayant une
 /// autre façon de démarrer PowerShell (les autres demandent un réglage).
 bool isLaunchProblem(EarsProblem p) =>
     p.code == 'launch' || p.code == 'died' || p.code == 'timeout' || p.code == 'start-timeout';
@@ -61,25 +61,25 @@ enum EarsLaunch {
   bool get detached => this != EarsLaunch.normal;
 }
 
-/// Ce que Clicky envoie à l'IA quand il n'a pas pu réparer le micro tout
+/// Ce que Smily envoie à l'IA quand il n'a pas pu réparer le micro tout
 /// seul : la panne, ce qu'il a déjà essayé, et ce qu'on attend de lui.
 String micRepairPrompt(EarsProblem problem, EarsRepair repair, {String system = ''}) {
   final tried = repair.steps.isEmpty
       ? ''
       : ' Tu as déjà essayé tout seul (inutile de relancer clicky_reparer_micro) : ${repair.steps.join(' ; ')}.';
-  return 'Mon micro ne marche pas avec toi (Clicky, dans Mon Hub${system.isEmpty ? '' : ' sur $system'}). '
+  return 'Mon micro ne marche pas avec toi (Smily, dans Mon Hub${system.isEmpty ? '' : ' sur $system'}). '
       'Erreur affichée : « ${problem.message} »${problem.code.isEmpty ? '' : ' (code ${problem.code})'}.$tried '
       'Explique-moi simplement ce qui bloque et comment le régler, étape par étape '
       '(quel réglage ouvrir, quoi cocher). Rappelle-moi qu\'en attendant je peux écrire, '
       'ou utiliser la dictée de Windows (Win + H).';
 }
 
-/// Les « oreilles » de Clicky : transforment ce que tu dis en texte.
+/// Les « oreilles » de Smily : transforment ce que tu dis en texte.
 ///
 /// * Windows : la reconnaissance vocale moderne de Windows (la même que la
 ///   dictée Win + H), en français, via un petit script PowerShell gardé
 ///   ouvert en arrière-plan. L'ancien module (speech_to_text_windows)
-///   n'écoutait qu'en anglais et perdait les événements du micro : Clicky
+///   n'écoutait qu'en anglais et perdait les événements du micro : Smily
 ///   n'entendait rien.
 /// * Android, iPhone, Mac : le module speech_to_text.
 abstract class ClickyEars {
@@ -149,7 +149,7 @@ class WindowsEars extends ClickyEars {
 
   /// Façon de lancer PowerShell. Par défaut sans fichier de script
   /// (-EncodedCommand), car certains PC bloquent les fichiers .ps1 ; si ça
-  /// ne marche pas, Clicky passe tout seul à la suivante.
+  /// ne marche pas, Smily passe tout seul à la suivante.
   EarsLaunch _launch = EarsLaunch.encoded;
 
   /// Façon de lancer utilisée en ce moment.
@@ -160,10 +160,7 @@ class WindowsEars extends ClickyEars {
   /// Le script en paramètre de PowerShell (UTF-16 en base64), sans fichier :
   /// marche même quand Windows bloque les fichiers .ps1.
   static String encodedScript() {
-    final code = windowsScript.replaceFirst(
-      RegExp(r"^\s*param\(\[string\]\$Lang = 'fr-FR'\)"),
-      "\$Lang = 'fr-FR'",
-    );
+    final code = windowsScript.replaceFirst(RegExp(r"^\s*param\(\[string\]\$Lang = 'fr-FR'\)"), "\$Lang = 'fr-FR'");
     final units = code.codeUnits;
     final bytes = Uint8List(units.length * 2);
     for (var i = 0; i < units.length; i++) {
@@ -276,10 +273,7 @@ class WindowsEars extends ClickyEars {
         _boot = null;
         if (!boot.isCompleted) {
           boot.complete(
-            EarsProblem(
-              'Impossible de lancer la reconnaissance vocale de Windows (PowerShell) : $e',
-              code: 'launch',
-            ),
+            EarsProblem('Impossible de lancer la reconnaissance vocale de Windows (PowerShell) : $e', code: 'launch'),
           );
         }
       }
@@ -309,7 +303,9 @@ class WindowsEars extends ClickyEars {
       Future<void>.delayed(const Duration(milliseconds: 400), () {
         if (boot.isCompleted) return;
         final detail = errorDetail('$_errors');
-        final code = _exit == null ? '' : ' (code ${_exit! < 0 ? '0x${(_exit! & 0xFFFFFFFF).toRadixString(16).toUpperCase()}' : _exit})';
+        final code = _exit == null
+            ? ''
+            : ' (code ${_exit! < 0 ? '0x${(_exit! & 0xFFFFFFFF).toRadixString(16).toUpperCase()}' : _exit})';
         boot.complete(
           EarsProblem(
             'La reconnaissance vocale de Windows s\'est arrêtée tout de suite$code'
@@ -429,10 +425,8 @@ class WindowsEars extends ClickyEars {
     _send('start');
     final p = await starting.future.timeout(
       const Duration(seconds: 6),
-      onTimeout: () => const EarsProblem(
-        'Le micro ne répond pas. Vérifie qu\'il est bien branché.',
-        code: 'start-timeout',
-      ),
+      onTimeout: () =>
+          const EarsProblem('Le micro ne répond pas. Vérifie qu\'il est bien branché.', code: 'start-timeout'),
     );
     if (p != null) {
       _listening = false;
@@ -491,10 +485,8 @@ class WindowsEars extends ClickyEars {
     _send('start');
     final p = await starting.future.timeout(
       const Duration(seconds: 6),
-      onTimeout: () => const EarsProblem(
-        'Le micro ne répond pas. Vérifie qu\'il est bien branché.',
-        code: 'start-timeout',
-      ),
+      onTimeout: () =>
+          const EarsProblem('Le micro ne répond pas. Vérifie qu\'il est bien branché.', code: 'start-timeout'),
     );
     if (p != null) {
       log.add('Le micro ne s\'ouvre pas : ${p.message}');
@@ -687,10 +679,7 @@ EarsProblem windowsProblem(String code, String detail) {
       code: code,
     );
   }
-  if (c == 'MICROPHONEUNAVAILABLE' ||
-      c.contains('8004503F') ||
-      c.contains('80070490') ||
-      c.contains('80045055')) {
+  if (c == 'MICROPHONEUNAVAILABLE' || c.contains('8004503F') || c.contains('80070490') || c.contains('80045055')) {
     return EarsProblem(
       'Je ne trouve pas de micro (ou une autre appli l\'utilise). Branche-le et choisis-le comme '
       'micro par défaut dans les réglages du son.',
@@ -792,10 +781,7 @@ class PluginEars extends ClickyEars {
       'La reconnaissance vocale a besoin d\'internet. Vérifie ta connexion.',
       code: 'network',
     ),
-    'error_busy' => const EarsProblem(
-      'Le micro est déjà utilisé. Réessaie dans un instant.',
-      code: 'busy',
-    ),
+    'error_busy' => const EarsProblem('Le micro est déjà utilisé. Réessaie dans un instant.', code: 'busy'),
     _ => EarsProblem('Souci de micro ($msg). Réessaie.', code: msg),
   };
 
@@ -843,10 +829,7 @@ class PluginEars extends ClickyEars {
       await _stt.stop();
     } catch (_) {}
     // Laisse le temps au dernier mot d'arriver.
-    await (_done?.future ?? Future<void>.value()).timeout(
-      const Duration(milliseconds: 1200),
-      onTimeout: () {},
-    );
+    await (_done?.future ?? Future<void>.value()).timeout(const Duration(milliseconds: 1200), onTimeout: () {});
     _listening = false;
     return _text;
   }

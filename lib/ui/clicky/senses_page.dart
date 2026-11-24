@@ -10,7 +10,7 @@ import 'interests.dart';
 import 'watchers.dart' show Replies;
 import 'whisper.dart' show Whisper;
 
-/// Réglages de Clicky → **Ses yeux et ses oreilles** : voir l'écran et
+/// Réglages de Smily → **Ses yeux et ses oreilles** : voir l'écran et
 /// entendre le son du PC en continu (tout reste sur le PC), ce qu'il voit et
 /// entend en ce moment, et sa mémoire de l'écran (chercher, oublier).
 class SensesPage extends StatefulWidget {
@@ -33,12 +33,16 @@ class _SensesPageState extends State<SensesPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(mem.load().then((_) {
-      if (mounted) setState(() {});
-    }));
-    unawaited(Whisper.ready.then((v) {
-      if (mounted) setState(() => whisper = v);
-    }));
+    unawaited(
+      mem.load().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
+    unawaited(
+      Whisper.ready.then((v) {
+        if (mounted) setState(() => whisper = v);
+      }),
+    );
   }
 
   @override
@@ -52,7 +56,7 @@ class _SensesPageState extends State<SensesPage> {
         context: context,
         builder: (c) => AlertDialog(
           icon: const Text('👀', style: TextStyle(fontSize: 34)),
-          title: Text('Clicky $what en continu ?'),
+          title: Text('Smily $what en continu ?'),
           content: const Text(
             'Tout se passe sur ton PC : le texte de l\'écran est lu par Windows et le son est transcrit par Whisper, '
             'sans internet. Ce qu\'il a vu et entendu reste 7 jours sur ce PC, chiffré, jamais synchronisé ni envoyé.\n\n'
@@ -74,7 +78,7 @@ class _SensesPageState extends State<SensesPage> {
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Tout oublier ?'),
-          content: const Text('Clicky effacera tout ce qu\'il a vu et entendu sur ce PC.'),
+          content: const Text('Smily effacera tout ce qu\'il a vu et entendu sur ce PC.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Tout oublier')),
@@ -157,9 +161,12 @@ class _SensesPageState extends State<SensesPage> {
                                 s.paused
                                     ? 'En pause'
                                     : s.screenOn || s.soundOn
-                                    ? 'Clicky ${[if (s.screenOn) 'voit ton écran', if (s.soundOn) 'entend ton PC'].join(' et ')}'
-                                    : 'Clicky ne regarde pas ton écran',
-                                style: theme.textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                                    ? 'Smily ${[if (s.screenOn) 'voit ton écran', if (s.soundOn) 'entend ton PC'].join(' et ')}'
+                                    : 'Smily ne regarde pas ton écran',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               const Text(
@@ -272,7 +279,7 @@ class _SensesPageState extends State<SensesPage> {
                       title: const Text('Réponses toutes prêtes'),
                       subtitle: const Text(
                         'Quand on te pose une question en message privé sur Discord : « je te prépare une réponse ? ». Elle est '
-                        'copiée, prête à coller : Clicky n\'envoie jamais rien tout seul.',
+                        'copiée, prête à coller : Smily n\'envoie jamais rien tout seul.',
                       ),
                       value: Replies.on,
                       onChanged: (v) async {
@@ -353,7 +360,10 @@ class _SensesPageState extends State<SensesPage> {
                       ),
                   ],
                   const Divider(height: 32),
-                  Text('Sa mémoire de l\'écran', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    'Sa mémoire de l\'écran',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: search,
@@ -378,7 +388,9 @@ class _SensesPageState extends State<SensesPage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
-                        s.screenOn || s.soundOn ? 'Rien pour l\'instant : ça se remplit au fil de ta journée.' : 'Rien : il ne regarde pas.',
+                        s.screenOn || s.soundOn
+                            ? 'Rien pour l\'instant : ça se remplit au fil de ta journée.'
+                            : 'Rien : il ne regarde pas.',
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
@@ -388,8 +400,14 @@ class _SensesPageState extends State<SensesPage> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      OutlinedButton(onPressed: () => _forget(const Duration(minutes: 15)), child: const Text('Oublier les 15 dernières minutes')),
-                      OutlinedButton(onPressed: () => _forget(const Duration(hours: 1)), child: const Text('Oublier la dernière heure')),
+                      OutlinedButton(
+                        onPressed: () => _forget(const Duration(minutes: 15)),
+                        child: const Text('Oublier les 15 dernières minutes'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => _forget(const Duration(hours: 1)),
+                        child: const Text('Oublier la dernière heure'),
+                      ),
                       TextButton.icon(
                         icon: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
                         label: Text('Tout oublier', style: TextStyle(color: theme.colorScheme.error)),

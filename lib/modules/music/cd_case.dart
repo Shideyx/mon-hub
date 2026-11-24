@@ -14,13 +14,7 @@ const musicCream = Color(0xFFE9E6DD);
 /// Pochette : image réseau, octets (pochette lue par Windows), ou un
 /// dégradé avec une note de musique.
 class CoverImage extends StatelessWidget {
-  const CoverImage({
-    super.key,
-    this.url,
-    this.bytes,
-    this.fit = BoxFit.cover,
-    this.color = musicRed,
-  });
+  const CoverImage({super.key, this.url, this.bytes, this.fit = BoxFit.cover, this.color = musicRed});
   final String? url;
   final Uint8List? bytes;
   final BoxFit fit;
@@ -90,17 +84,9 @@ Color? pickAccent(Uint8List rgba) {
   }
   final best = buckets.isEmpty ? null : buckets.values.reduce((a, b) => a.$1 >= b.$1 ? a : b);
   if (best == null || best.$1 < 6) return _calmAccent(rgba);
-  final c = Color.fromARGB(
-    255,
-    (best.$2 / best.$1).round(),
-    (best.$3 / best.$1).round(),
-    (best.$4 / best.$1).round(),
-  );
+  final c = Color.fromARGB(255, (best.$2 / best.$1).round(), (best.$3 / best.$1).round(), (best.$4 / best.$1).round());
   final hsv = HSVColor.fromColor(c);
-  return hsv
-      .withSaturation(math.max(0.55, hsv.saturation))
-      .withValue(hsv.value.clamp(0.45, 0.8))
-      .toColor();
+  return hsv.withSaturation(math.max(0.55, hsv.saturation)).withValue(hsv.value.clamp(0.45, 0.8)).toColor();
 }
 
 /// Pochette sans couleur vive (noir et blanc, tons pastel) : sa couleur
@@ -395,20 +381,13 @@ class CdCaseBack extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.brown.shade700,
-                        fontSize: h * 0.03,
-                        letterSpacing: h * 0.012,
-                      ),
+                      style: TextStyle(color: Colors.brown.shade700, fontSize: h * 0.03, letterSpacing: h * 0.012),
                     ),
                     SizedBox(height: h * 0.045),
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, area) {
-                          final rowH = math.min(
-                            h * 0.05,
-                            area.maxHeight / math.max(1, rows.length),
-                          );
+                          final rowH = math.min(h * 0.05, area.maxHeight / math.max(1, rows.length));
                           return Column(
                             children: [
                               for (final (i, t) in rows.indexed)
@@ -488,13 +467,7 @@ class _Plastic extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 3),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.35),
-          blurRadius: 24,
-          offset: const Offset(8, 14),
-        ),
-      ],
+      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(8, 14))],
     ),
     child: Stack(
       fit: StackFit.expand,
@@ -648,11 +621,7 @@ class _SpinningCdCaseState extends State<SpinningCdCase> with SingleTickerProvid
             ..rotateX(-0.06),
           child: showFront
               ? widget.front
-              : Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.rotationY(math.pi),
-                  child: widget.back,
-                ),
+              : Transform(alignment: Alignment.center, transform: Matrix4.rotationY(math.pi), child: widget.back),
         );
       },
     ),

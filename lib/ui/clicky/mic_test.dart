@@ -8,7 +8,7 @@ import 'clicky.dart';
 import 'ears.dart';
 import 'whisper.dart';
 
-/// « Tester le micro » : on parle, on voit tout de suite ce que Clicky
+/// « Tester le micro » : on parle, on voit tout de suite ce que Smily
 /// entend, et sinon ce qui bloque (avec le bon réglage à ouvrir).
 class MicTestDialog extends StatefulWidget {
   const MicTestDialog({super.key});
@@ -31,7 +31,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
   bool repairing = false;
   List<String> repairSteps = const [];
 
-  /// « Clicky répare » : relance le micro de toutes les façons possibles.
+  /// « Smily répare » : relance le micro de toutes les façons possibles.
   Future<void> _repair() async {
     setState(() {
       repairing = true;
@@ -119,7 +119,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
           children: [
             Text(
               listening
-                  ? 'Parle : dis par exemple « Bonjour Clicky, quel temps fait-il ? »'
+                  ? 'Parle : dis par exemple « Bonjour Smily, quel temps fait-il ? »'
                   : 'Appuie sur « Commencer », puis parle normalement.',
             ),
             const SizedBox(height: 12),
@@ -139,16 +139,14 @@ class _MicTestDialogState extends State<MicTestDialog> {
               ),
               child: Text(
                 heard.isEmpty ? (listening ? 'J\'écoute…' : (done ? 'Rien entendu.' : '')) : heard,
-                style: text.titleMedium?.copyWith(
-                  color: heard.isEmpty ? scheme.onSurfaceVariant : null,
-                ),
+                style: text.titleMedium?.copyWith(color: heard.isEmpty ? scheme.onSurfaceVariant : null),
               ),
             ),
             if (done && heard.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Le micro marche ! Maintiens Ctrl + Alt et parle à Clicky.',
+                  'Le micro marche ! Maintiens Ctrl + Alt et parle à Smily.',
                   style: text.bodyMedium?.copyWith(color: Colors.green),
                 ),
               ),
@@ -170,13 +168,9 @@ class _MicTestDialogState extends State<MicTestDialog> {
                 children: [
                   TextButton.icon(
                     icon: repairing
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.auto_fix_high_rounded, size: 16),
-                    label: Text(repairing ? 'Clicky répare…' : 'Clicky répare'),
+                    label: Text(repairing ? 'Smily répare…' : 'Smily répare'),
                     onPressed: repairing || starting ? null : _repair,
                   ),
                   if (p.fixUri != null)
@@ -207,11 +201,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
         if (listening)
-          FilledButton.icon(
-            icon: const Icon(Icons.stop_rounded),
-            label: const Text('J\'ai fini'),
-            onPressed: _stop,
-          )
+          FilledButton.icon(icon: const Icon(Icons.stop_rounded), label: const Text('J\'ai fini'), onPressed: _stop)
         else
           FilledButton.icon(
             icon: starting
@@ -276,7 +266,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
           }
         },
       );
-      // Clicky passe sur Whisper (réglage « Automatique » ou « Whisper »).
+      // Smily passe sur Whisper (réglage « Automatique » ou « Whisper »).
       final c = ClickyController.instance;
       if (c.micEngine == 'windows') await c.setOption('micEngine', 'auto');
       c.micProblem = null;
@@ -302,7 +292,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
           children: [
             if (done)
               const Text(
-                'Clicky t\'entend maintenant avec Whisper, directement sur ton PC : rien ne part sur '
+                'Smily t\'entend maintenant avec Whisper, directement sur ton PC : rien ne part sur '
                 'internet. Maintiens Ctrl + Alt et parle.',
               )
             else ...[
@@ -323,7 +313,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
               const SizedBox(height: 6),
               Text(
                 model == 'base'
-                    ? 'Rapide : la phrase s\'écrit en 1 à 2 secondes. Bien pour parler à Clicky.'
+                    ? 'Rapide : la phrase s\'écrit en 1 à 2 secondes. Bien pour parler à Smily.'
                     : 'Précis : se trompe moins (noms propres, phrases longues), mais met 2 à 3 fois plus de temps.',
                 style: text.bodySmall,
               ),
@@ -345,7 +335,8 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
                       TextButton.icon(
                         icon: const Icon(Icons.description_rounded, size: 16),
                         label: const Text('Voir le détail'),
-                        onPressed: () => launchUrl(Uri.file('${Whisper.folder}${Platform.pathSeparator}installation.log')),
+                        onPressed: () =>
+                            launchUrl(Uri.file('${Whisper.folder}${Platform.pathSeparator}installation.log')),
                       ),
                     if (ClickyController.instance.voiceOut.geminiKey.trim().isNotEmpty)
                       TextButton.icon(

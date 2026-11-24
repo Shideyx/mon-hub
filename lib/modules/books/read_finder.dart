@@ -19,7 +19,10 @@ class ReadQuery {
   final int? volume;
   final double? chapter;
 
-  static final _chapter = RegExp(r'\b(?:chapitres?|chapters?|chap\.?|ch\.|ch|#)\s*(\d+(?:[.,]\d+)?)', caseSensitive: false);
+  static final _chapter = RegExp(
+    r'\b(?:chapitres?|chapters?|chap\.?|ch\.|ch|#)\s*(\d+(?:[.,]\d+)?)',
+    caseSensitive: false,
+  );
   static final _volume = RegExp(r'\b(?:tomes?|volumes?|vol\.?|t\.)\s*(\d{1,3})\b', caseSensitive: false);
 
   /// Coupe le sous-titre (« : … », « - … », « (… ») sans casser « Re:Zero »
@@ -205,7 +208,10 @@ class ReadFinder {
       for (final r in results)
         for (final m in r) m.withScore(score(q, author, m), similarity: titleMatch(q, m)),
     ]..sort((a, b) => b.score.compareTo(a.score));
-    return [for (final m in scored) if (m.score >= 0.45) m];
+    return [
+      for (final m in scored)
+        if (m.score >= 0.45) m,
+    ];
   }
 
   /// Assez sûr pour l'ouvrir directement, sans demander « c'est celui-ci ? ».
@@ -310,15 +316,17 @@ class ReadFinder {
   Future<List<ScanChapter>> chapters(String mangaId) async {
     final all = <ScanChapter>[];
     for (var offset = 0; offset < 5000; offset += 500) {
-      final j = await _json(Uri.https('api.mangadex.org', '/manga/$mangaId/feed', {
-        'translatedLanguage[]': langs,
-        'contentRating[]': _safe,
-        'order[volume]': 'asc',
-        'order[chapter]': 'asc',
-        'includeExternalUrl': '1',
-        'limit': '500',
-        'offset': '$offset',
-      })) as Map;
+      final j = await _json(
+        Uri.https('api.mangadex.org', '/manga/$mangaId/feed', {
+          'translatedLanguage[]': langs,
+          'contentRating[]': _safe,
+          'order[volume]': 'asc',
+          'order[chapter]': 'asc',
+          'includeExternalUrl': '1',
+          'limit': '500',
+          'offset': '$offset',
+        }),
+      ) as Map;
       final data = (j['data'] as List?) ?? const [];
       for (final d in data) {
         if (d is Map) {
@@ -410,10 +418,12 @@ class ReadFinder {
   // ---- Projet Gutenberg (livres libres, en texte) ----
 
   Future<List<ReadMatch>> _gutenberg(String title, String author) async {
-    final j = await _json(Uri.https('gutendex.com', '/books/', {
-      'search': [title, if (author.trim().isNotEmpty) author.trim()].join(' '),
-      'languages': langs.join(','),
-    })) as Map;
+    final j = await _json(
+      Uri.https('gutendex.com', '/books/', {
+        'search': [title, if (author.trim().isNotEmpty) author.trim()].join(' '),
+        'languages': langs.join(','),
+      }),
+    ) as Map;
     final out = <ReadMatch>[];
     var rank = 0;
     for (final d in (j['results'] as List?) ?? const []) {
@@ -528,13 +538,15 @@ class ReadFinder {
   // ---- Internet Archive (livres scannés en accès libre) ----
 
   Future<List<ReadMatch>> _archive(String title, String author) async {
-    final j = await _json(Uri.https('openlibrary.org', '/search.json', {
-      'title': title,
-      if (author.trim().isNotEmpty) 'author': author.trim(),
-      'has_fulltext': 'true',
-      'limit': '15',
-      'fields': 'title,author_name,cover_i,ia,ebook_access,first_publish_year,language',
-    })) as Map;
+    final j = await _json(
+      Uri.https('openlibrary.org', '/search.json', {
+        'title': title,
+        if (author.trim().isNotEmpty) 'author': author.trim(),
+        'has_fulltext': 'true',
+        'limit': '15',
+        'fields': 'title,author_name,cover_i,ia,ebook_access,first_publish_year,language',
+      }),
+    ) as Map;
     final out = <ReadMatch>[];
     var rank = 0;
     for (final d in (j['docs'] as List?) ?? const []) {
@@ -557,7 +569,14 @@ class ReadFinder {
       title: '${d['title'] ?? ''}',
       author: ((d['author_name'] as List?) ?? const []).take(2).join(', '),
       coverUrl: d['cover_i'] == null ? null : 'https://covers.openlibrary.org/b/id/${d['cover_i']}-M.jpg',
-      languages: [for (final l in lang) l == 'fre' ? 'fr' : l == 'eng' ? 'en' : l],
+      languages: [
+        for (final l in lang)
+          l == 'fre'
+              ? 'fr'
+              : l == 'eng'
+              ? 'en'
+              : l,
+      ],
       webUrl: 'https://archive.org/details/$ia?view=theater',
       year: (d['first_publish_year'] as num?)?.toInt(),
       rank: rank,

@@ -1,8 +1,8 @@
-// Mon Hub — Clicky dans le navigateur.
+// Mon Hub — Smily dans le navigateur.
 //
 // L'extension se relie à Mon Hub, sur ce PC uniquement (ws://127.0.0.1),
-// et exécute ce que Clicky demande : lister les onglets, ouvrir un onglet à
-// lui (en arrière-plan, dans le groupe « Clicky »), lire une page, cliquer,
+// et exécute ce que Smily demande : lister les onglets, ouvrir un onglet à
+// lui (en arrière-plan, dans le groupe « Smily »), lire une page, cliquer,
 // écrire. Rien n'est envoyé sur internet par l'extension.
 //
 // Garde-fous : jamais sur les pages de banque, de paiement, de mots de passe
@@ -88,7 +88,7 @@ function blocked(url) {
 async function tabOf(id) {
   const tab = await chrome.tabs.get(Number(id));
   if (blocked(tab.url || tab.pendingUrl)) {
-    throw "Page protégée (banque, paiement, mots de passe ou compte) : Clicky n'y touche pas.";
+    throw "Page protégée (banque, paiement, mots de passe ou compte) : Smily n'y touche pas.";
   }
   return tab;
 }
@@ -199,7 +199,7 @@ async function addToGroup(tabId) {
     }
     if (groupId === null) {
       groupId = await chrome.tabs.group({ tabIds: [tabId] });
-      await chrome.tabGroups.update(groupId, { title: 'Clicky', color: 'blue' });
+      await chrome.tabGroups.update(groupId, { title: 'Smily', color: 'blue' });
     } else {
       await chrome.tabs.group({ tabIds: [tabId], groupId });
     }
@@ -351,7 +351,7 @@ function typeEl(n, text, replace) {
   const el = n ? document.querySelector('[data-monhub="' + n + '"]') : document.activeElement;
   if (!el) return { error: "Champ introuvable : relis la page (nav_lire)." };
   if (el.type === 'password' || /pass|mot.?de.?passe|code.?secret|cvc|cvv|iban/i.test(el.name + ' ' + el.id + ' ' + el.autocomplete)) {
-    return { error: "Clicky ne remplit jamais de mot de passe, de code ou de coordonnées bancaires." };
+    return { error: "Smily ne remplit jamais de mot de passe, de code ou de coordonnées bancaires." };
   }
   el.scrollIntoView({ block: 'center' });
   el.focus();

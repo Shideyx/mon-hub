@@ -48,15 +48,11 @@ class AppSession extends ChangeNotifier {
     final raw = ModuleStore.global.getString(_accountsKey);
     if (raw == null) return {};
     final m = jsonDecode(raw) as Map<String, dynamic>;
-    return {
-      for (final e in m.entries) e.key: HubAccount.fromJson(e.key, e.value as Map<String, dynamic>),
-    };
+    return {for (final e in m.entries) e.key: HubAccount.fromJson(e.key, e.value as Map<String, dynamic>)};
   }
 
-  Future<void> _saveAccounts(Map<String, HubAccount> a) => ModuleStore.global.setString(
-    _accountsKey,
-    jsonEncode({for (final e in a.entries) e.key: e.value.toJson()}),
-  );
+  Future<void> _saveAccounts(Map<String, HubAccount> a) =>
+      ModuleStore.global.setString(_accountsKey, jsonEncode({for (final e in a.entries) e.key: e.value.toJson()}));
 
   static String _hash(String salt, String password) {
     List<int> bytes = utf8.encode('$salt:$password');
@@ -110,18 +106,10 @@ class AppSession extends ChangeNotifier {
     final all = accounts;
     if (all.containsKey(id)) throw 'Cet identifiant est déjà pris';
     // Le tout premier compte reprend les données déjà présentes sur l'appareil.
-    final hasOldData = ModuleStore.global.getKeys().any(
-      (k) => k.startsWith('mod.') || k.startsWith('hub.'),
-    );
+    final hasOldData = ModuleStore.global.getKeys().any((k) => k.startsWith('mod.') || k.startsWith('hub.'));
     final ns = all.isEmpty && hasOldData ? '' : newNamespace();
     final salt = newSalt();
-    final acc = HubAccount(
-      id,
-      name.trim().isEmpty ? login.trim() : name.trim(),
-      ns,
-      salt,
-      _hash(salt, password),
-    );
+    final acc = HubAccount(id, name.trim().isEmpty ? login.trim() : name.trim(), ns, salt, _hash(salt, password));
     all[id] = acc;
     await _saveAccounts(all);
     if (name.trim().isNotEmpty) {
@@ -155,10 +143,7 @@ class AppSession extends ChangeNotifier {
     }
     final acc = accounts[id];
     if (acc == null || _hash(acc.salt, password) != acc.hash) {
-      await ModuleStore.global.setStringList(failKey, [
-        '${fails + 1}',
-        DateTime.now().toIso8601String(),
-      ]);
+      await ModuleStore.global.setStringList(failKey, ['${fails + 1}', DateTime.now().toIso8601String()]);
       throw 'Identifiant ou mot de passe incorrect';
     }
     await ModuleStore.global.remove(failKey);

@@ -64,7 +64,13 @@ La **photosynthèse** permet aux plantes de fabriquer du _glucose_ avec la [lumi
     expect(again.firstWhere((l) => l.text == 'dans les chloroplastes').block['indent'], 1);
     expect(again.firstWhere((l) => l.text == 'Absorption').block['list'], 'ordered');
     expect(again.any((l) => l.text == '☑ plan'), isTrue);
-    expect(() => DocFormat.fromDocx(DocFormat.toDocx([{'insert': '\n'}]).sublist(0, 10)), throwsA(anything));
+    expect(
+      () => DocFormat.fromDocx(
+        DocFormat.toDocx([
+          {'insert': '\n'},
+        ]).sublist(0, 10),
+      ),
+      throwsA(anything),
+    );
   });
-
 }

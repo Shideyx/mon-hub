@@ -9,7 +9,7 @@ import '../widgets.dart';
 import 'win.dart';
 
 /// Capture de tes gestes (Windows) : clics, raccourcis, changements de
-/// fenêtre, pour que Clicky raconte « ce que tu viens de faire » ou
+/// fenêtre, pour que Smily raconte « ce que tu viens de faire » ou
 /// t'explique comment refaire une manip. **Les lettres tapées ne sont
 /// jamais gardées**, seulement « a tapé du texte (12 touches) ».
 class WorkflowCapture extends ChangeNotifier {
@@ -90,11 +90,7 @@ class WorkflowCapture extends ChangeNotifier {
         _title = t;
         _add('passe à la fenêtre « $t »');
       }
-      for (final (vk, name) in const [
-        (0x01, 'clic'),
-        (0x02, 'clic droit'),
-        (0x04, 'clic molette'),
-      ]) {
+      for (final (vk, name) in const [(0x01, 'clic'), (0x02, 'clic droit'), (0x04, 'clic molette')]) {
         if (_pressed(vk)) {
           _flushTyping();
           final p = Win.cursor();
@@ -108,9 +104,7 @@ class WorkflowCapture extends ChangeNotifier {
         if ((ctrl || alt || win) && (vk >= 0x30 && vk <= 0x5A || vk >= 0x70)) {
           _flushTyping();
           final key = vk >= 0x70 ? 'F${vk - 0x6F}' : String.fromCharCode(vk);
-          _add(
-            'raccourci ${[if (ctrl) 'Ctrl', if (alt) 'Alt', if (win) 'Windows', key].join(' + ')}',
-          );
+          _add('raccourci ${[if (ctrl) 'Ctrl', if (alt) 'Alt', if (win) 'Windows', key].join(' + ')}');
         } else if (_names[vk] case final n?) {
           _flushTyping();
           _add('touche $n');
@@ -144,8 +138,7 @@ class LessonRecorder extends ChangeNotifier {
     try {
       final docs = await getApplicationDocumentsDirectory();
       final now = DateTime.now();
-      final name =
-          'lecon_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}';
+      final name = 'lecon_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}';
       final sep = Platform.pathSeparator;
       final d = Directory('${docs.path}${sep}Mon Hub${sep}Leçons$sep$name');
       await d.create(recursive: true);
@@ -173,8 +166,7 @@ class LessonRecorder extends ChangeNotifier {
 
   Future<void> _append(Directory d, String s) async {
     try {
-      await File('${d.path}${Platform.pathSeparator}lecon.md')
-          .writeAsString(s, mode: FileMode.append);
+      await File('${d.path}${Platform.pathSeparator}lecon.md').writeAsString(s, mode: FileMode.append);
     } catch (_) {}
   }
 

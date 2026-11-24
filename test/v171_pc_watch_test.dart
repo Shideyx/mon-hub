@@ -87,20 +87,29 @@ void main() {
     test('une clé USB (et ce qu\'il y a de suspect dessus)', () {
       expect(PcRules.newDrives(0x4, 0x14), ['E']);
       expect(PcRules.newDrives(0x14, 0x14), isEmpty);
-      expect(PcRules.suspicious(['photo.jpg', 'autorun.inf', 'jeu gratuit.exe', 'cours.pdf']), ['autorun.inf', 'jeu gratuit.exe']);
+      expect(PcRules.suspicious(['photo.jpg', 'autorun.inf', 'jeu gratuit.exe', 'cours.pdf']), [
+        'autorun.inf',
+        'jeu gratuit.exe',
+      ]);
     });
 
     test('ranger un fichier : seulement depuis les Téléchargements, et avec ton accord', () async {
       final tools = {for (final t in PcWatch.instance.tools()) t.name: t};
       expect(await tools['pc_ranger_fichier']!.run({'chemin': '/etc/hosts'}), contains('Téléchargements'));
-      expect(ClaudeBridge.isWriteAction(HubTool(name: 'pc_ranger_fichier', description: '', run: (_) async => null)), isTrue);
-      expect(ClaudeBridge.isWriteAction(HubTool(name: 'clicky_presse_papier', description: '', run: (_) async => null)), isFalse);
+      expect(
+        ClaudeBridge.isWriteAction(HubTool(name: 'pc_ranger_fichier', description: '', run: (_) async => null)),
+        isTrue,
+      );
+      expect(
+        ClaudeBridge.isWriteAction(HubTool(name: 'clicky_presse_papier', description: '', run: (_) async => null)),
+        isFalse,
+      );
     });
   });
 
   group('sa ville', () {
     test('« j\'habite à Lyon »', () {
-      expect(ClickyLife.cityFrom('Clicky, j\'habite à Lyon'), 'lyon');
+      expect(ClickyLife.cityFrom('Smily, j\'habite à Lyon'), 'lyon');
       expect(ClickyLife.cityFrom('ma ville c\'est Nantes'), 'nantes');
       expect(ClickyLife.cityFrom('j\'habite en Bretagne'), 'bretagne');
       expect(QuickAnswers.original('j\'habite à Lyon', 'lyon'), 'Lyon');
