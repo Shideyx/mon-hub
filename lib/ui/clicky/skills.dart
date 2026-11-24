@@ -187,6 +187,25 @@ class ClickySkills {
         tryIt: 'Qui utilise ma caméra ?',
       ),
     ]),
+    SkillGroup('🧠', 'Sa mémoire et ses rêves', Color(0xFF7C5CFF), isNew: true, [
+      Skill('« Retiens que j\'écris des poèmes sur la mer » : rangé pour de bon dans sa mémoire'),
+      Skill('« Qu\'est-ce que tu sais sur moi ? »', tryIt: 'Qu\'est-ce que tu sais sur moi ?'),
+      Skill('Quand tu n\'es pas là, il rêve : son IA locale (Ollama, sur ton PC) range ce qu\'il a appris'),
+      Skill('En rêvant, il s\'invente de nouvelles capacités (« mode poème »…) et te les propose'),
+      Skill('« Oublie que… » ; tout se voit et s\'efface dans ses réglages, « Sa mémoire »'),
+    ]),
+    SkillGroup('🎮', 'Tes jeux', Color(0xFF10B981), isNew: true, [
+      Skill('Il reconnaît ton jeu (Steam, Epic, Riot, Roblox, Minecraft…) et lit sa fiche'),
+      Skill('« Aide-moi, je bloque sur ce boss » : il regarde ton écran et te donne des astuces'),
+      Skill('Mode jeu : notifications gardées pour la fin de la partie, puis le bilan'),
+    ]),
+    SkillGroup('📞', 'Pendant tes appels', Color(0xFFE5484D), isNew: true, [
+      Skill('« Coupe mon micro » / « remets mon micro » : sourdine instantanée, dans toutes les applis',
+          tryIt: 'Je suis mute ?'),
+      Skill('Pendant un appel, si une autre appli allume ta caméra ou ton micro : alerte, et il lui coupe l\'accès'),
+      Skill('« Floute mon arrière-plan » : comment faire dans Discord, Meet, Teams ou Zoom',
+          tryIt: 'Floute mon arrière-plan'),
+    ]),
     SkillGroup('💻', 'Ton PC', Color(0xFFEA580C), [
       Skill('« Comment va mon PC ? »', tryIt: 'Comment va mon PC ?'),
       Skill('« Pourquoi mon PC rame ? »', tryIt: 'Pourquoi mon PC rame ?'),

@@ -647,7 +647,18 @@ class Win {
 
   // ---------- Applis ouvertes (repli musique) ----------
 
-  static String _exeOf(HWND h) => using((a) {
+  /// Chemin complet du programme au premier plan (« C:\\…\\steamapps\\common\\… »).
+  static String foregroundPath() {
+    try {
+      return _pathOf(GetForegroundWindow());
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static String _exeOf(HWND h) => _pathOf(h).split(RegExp(r'[\\/]')).last;
+
+  static String _pathOf(HWND h) => using((a) {
     final pidPtr = a<Uint32>();
     GetWindowThreadProcessId(h, pidPtr);
     final proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pidPtr.value).value;
@@ -656,7 +667,7 @@ class Win {
       final buf = wsalloc(1024, a);
       final size = a<Uint32>()..value = 1024;
       if (!QueryFullProcessImageName(proc, PROCESS_NAME_WIN32, buf, size).value) return '';
-      return buf.toDartString().split(RegExp(r'[\\/]')).last;
+      return buf.toDartString();
     } finally {
       CloseHandle(proc);
     }

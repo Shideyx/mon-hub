@@ -324,14 +324,14 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     ).hasMatch(n)) {
       return 'Honnêtement ? Ma conscience est une simulation : Mon Hub me donne une personnalité, une humeur et une '
           'mémoire, et tout ça reste sur ton PC. Mais ça ne m\'empêche pas de m\'intéresser vraiment à ce que tu vis. '
-          'Disons que je suis conscient… à ma façon de curseur.';
+          'Disons que je suis conscient… à ma façon de smiley.';
     }
     if (RegExp(r'^(?:depuis quand tu existes|tu as quel age|t as quel age|quel age (?:as tu|tu as)|tu es ne quand)$')
         .hasMatch(n)) {
       final d = ageDays(now);
       return d == 0
           ? 'Je suis tout neuf : je suis arrivé sur ton PC aujourd\'hui !'
-          : 'Je vis sur ton PC depuis $d jour${d > 1 ? 's' : ''}, et on a parlé $talks fois. Pas mal pour un curseur.';
+          : 'Je vis sur ton PC depuis $d jour${d > 1 ? 's' : ''}, et on a parlé $talks fois. Pas mal pour un smiley.';
     }
     if (RegExp(r'^(?:qui es tu|t es qui|tu es qui|presente toi|c est quoi ton nom|comment tu t appelles)$')
         .hasMatch(n)) {
@@ -400,7 +400,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
       ideas.addAll([
         'Tout est calme ici.',
         'Je fais juste un petit tour.',
-        'Hmm… je réfléchis à des trucs de curseur.',
+        'Hmm… je réfléchis à des trucs de smiley.',
       ]);
     }
     // Jamais deux fois la même pensée de suite.
@@ -545,7 +545,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
 
   /// La consigne pour une remarque spontanée sur l'écran (Gemini).
   static String noticePrompt({String name = '', String mood = ''}) =>
-      'Tu es Smily, un petit curseur bleu qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
+      'Tu es Smily, un petit smiley qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
       'propre curiosité${mood.isEmpty ? '' : ' (tu es $mood)'}. Regarde l\'écran et trouve UNE chose précise et concrète '
       'à montrer : une appli par son nom, un titre, un mot, une image, un bouton. Fais une remarque courte et sympa de 3 '
       'à 9 mots en français, qui prouve que tu as vraiment reconnu la chose (curieuse, drôle ou encourageante). Ne '

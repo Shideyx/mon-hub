@@ -4,6 +4,7 @@ import 'dart:io' show Directory, Platform;
 import 'package:material_ui/material_ui.dart';
 
 import 'core/account_sync.dart';
+import 'core/call_shield.dart';
 import 'core/camera_guard.dart';
 import 'core/self_repair.dart';
 import 'core/perf.dart';
@@ -13,7 +14,9 @@ import 'core/online/spaces.dart';
 import 'core/phone_link.dart';
 import 'core/browser_link.dart';
 import 'core/work_backup.dart';
+import 'core/game_pal.dart';
 import 'core/screen_time.dart';
+import 'ui/clicky/autonomy.dart';
 import 'ui/clicky/live_captions.dart';
 import 'ui/clicky/senses.dart';
 import 'ui/clicky/pc_watch.dart';
@@ -361,12 +364,46 @@ class _HubAppState extends State<HubApp> {
             );
             unawaited(clicky.think(body, aloud: false));
           };
+          // Bouclier d'appel : une autre appli écoute ou filme pendant ton
+          // appel → alerte tout de suite, et Smily propose de LUI couper l'accès.
+          CallShield.instance
+            ..warn = (title, body, key, mic) {
+              unawaited(
+                n.post(
+                  HubNotification(id: 'arnaque:appel:$key:$mic', title: title, body: body),
+                ),
+              );
+              unawaited(
+                clicky.proposeIdea(
+                  ClickyIdea(
+                    tool: 'camera_bloquer_appli',
+                    args: {'cle': key, 'appareil': mic ? 'micro' : 'camera'},
+                    say: body,
+                    why: 'appel protégé',
+                  ),
+                ),
+              );
+            }
+            ..onCallStart = (call, how) {
+              // En plein appel : jamais à voix haute.
+              unawaited(clicky.think('Caméra allumée sur $call. Pour flouter ton arrière-plan : $how', aloud: false));
+            };
           st.onTick = () async {
             try {
               final exe = Win.foregroundExe(), title = Win.foregroundTitle();
               await ScreenTime.instance.tick(exe: exe, title: title, idleSeconds: Win.idleSeconds());
               final full = Win.foregroundFullscreen();
-              final end = GameMode.instance.tick(exe: exe, fullscreen: full);
+              final path = Win.foregroundPath();
+              // Le jeu au premier plan (un vrai signe, pas « tout ce qui est
+              // en plein écran ») : Smily va lire ce qu'il y a à savoir dessus.
+              await GamePal.instance.tick(exe: exe, path: path, title: title);
+              final end = GameMode.instance.tick(
+                exe: exe,
+                fullscreen: full,
+                path: path,
+                title: title,
+                engine: GamePal.instance.current.isNotEmpty,
+              );
               await PcWatch.instance.tick(
                 title: title,
                 idle: Win.idleSeconds(),
@@ -374,6 +411,8 @@ class _HubAppState extends State<HubApp> {
               );
               // La garde de la caméra : qui filme, et depuis quand.
               await CameraGuard.instance.tick();
+              // Pendant un appel : seule l'appli de l'appel filme et écoute.
+              CallShield.instance.tick();
               // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
               await ClickySenses.instance.tick(
                 exe: exe,

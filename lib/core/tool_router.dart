@@ -254,6 +254,14 @@ class ToolRouter {
       ['temps_ecran'],
       ['temps d ecran', 'temps passe', 'combien de temps', 'limite', 'trop joue', 'accro', 'pause'],
     ),
+    'camera': (
+      ['camera_', 'micro_', 'appel_'],
+      ['camera', 'webcam', 'filme', 'micro', 'sourdine', 'mute', 'appel', 'flou', 'arriere plan', 'espion', 'ecoute'],
+    ),
+    'jeu': (
+      ['jeu_'],
+      ['jeu', 'jouer', 'je joue', 'niveau', 'boss', 'quete', 'mission', 'build', 'astuce', 'partie', 'manette'],
+    ),
     'anniversaires': (['anniversaire'], ['anniversaire', 'anniv', 'ne le', 'nee le', 'fete', 'cadeau']),
     'telephone': (['telephone_'], ['telephone', 'iphone', 'portable', 'mon tel']),
     'argent': (
@@ -304,8 +312,12 @@ class ToolRouter {
       ['previens moi', 'dis moi quand', 'surveille', 'alerte', 'fais moi signe', 'des que', 'reponse', 'repondre'],
     ),
     'memoire': (
-      ['memoire_', 'sens_'],
+      ['memoire_', 'sens_', 'clicky_creer_capacite', 'clicky_capacites_perso'],
       [
+        'retiens',
+        'tu sais sur moi',
+        'capacite',
+        'raccourci',
         'souviens',
         'rappelles',
         'j ai vu',

@@ -1,3 +1,4 @@
+import 'game_pal.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -316,14 +317,6 @@ class GameMode extends ChangeNotifier {
   int held = 0;
   int _seen = 0, _gone = 0;
 
-  /// Les programmes en plein écran qui ne sont pas des jeux.
-  static final notGame = RegExp(
-    r'^(chrome|msedge|firefox|opera|brave|vivaldi|vlc|mpc-hc64|mpv|potplayer|powerpnt|winword|excel|hub|explorer|'
-    r'applicationframehost|netflix|obs64|zoom|teams|ms-teams|acrord32|acrobat|photos|microsoft\.photos|code|devenv|'
-    r'robloxstudiobeta|discord|spotify|lockapp|searchhost|shellexperiencehost|startmenuexperiencehost)(\.exe)?$',
-    caseSensitive: false,
-  );
-
   /// Le mode jeu automatique est-il voulu ? (oui par défaut)
   static bool get enabled {
     try {
@@ -347,19 +340,28 @@ class GameMode extends ChangeNotifier {
     _seen = _gone = 0;
   }
 
-  static bool isGame(String exe, bool fullscreen) =>
-      fullscreen && exe.trim().isNotEmpty && !notGame.hasMatch(exe.trim().toLowerCase());
+  /// Un vrai jeu en plein écran (v1.62 : il faut un signe que c'est un jeu,
+  /// voir `GameRules.gameOf` ; avant, toute appli agrandie inconnue comptait).
+  static bool isGame(String exe, bool fullscreen, {String path = '', String title = '', bool engine = false}) =>
+      fullscreen && GameRules.gameOf(exe: exe, path: path, title: title, engine: engine) != null;
 
   /// Un tour (toutes les 15 s). Renvoie le bilan à dire quand la partie se
   /// termine (sinon null).
-  String? tick({required String exe, required bool fullscreen, DateTime? now}) {
+  String? tick({
+    required String exe,
+    required bool fullscreen,
+    String path = '',
+    String title = '',
+    bool engine = false,
+    DateTime? now,
+  }) {
     final n = now ?? DateTime.now();
-    if (isGame(exe, fullscreen) && (enabled || active)) {
+    if (isGame(exe, fullscreen, path: path, title: title, engine: engine) && (enabled || active)) {
       _gone = 0;
       // 30 s de jeu avant d'entrer en mode jeu (pas pour un simple coup d'œil).
       if (!active && ++_seen >= 2) {
         active = true;
-        game = ScreenTime.appName(exe, '');
+        game = GameRules.gameOf(exe: exe, path: path, title: title, engine: engine) ?? ScreenTime.appName(exe, '');
         since = n;
         held = 0;
         notifyListeners();
