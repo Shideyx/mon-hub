@@ -7,7 +7,7 @@ import 'life.dart';
 /// Polices des émojis en couleur (Windows, Apple, Android/Linux).
 const emojiFonts = ['Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji'];
 
-/// Le curseur de Smily **qui vit** (il garde son look de curseur) :
+/// Le curseur de Nexo **qui vit** (il garde son look de curseur) :
 /// * à côté de lui, l'émoji de ce qu'il ressent (😵‍💫, 🥰, 🤩…), qui
 ///   apparaît d'un petit rebond puis s'en va ;
 /// * 💤 qui flotte doucement quand il dort (et lui, penché, un peu pâle) ;

@@ -9,7 +9,7 @@ import '../widgets.dart';
 import 'win.dart';
 
 /// Capture de tes gestes (Windows) : clics, raccourcis, changements de
-/// fenêtre, pour que Smily raconte « ce que tu viens de faire » ou
+/// fenêtre, pour que Nexo raconte « ce que tu viens de faire » ou
 /// t'explique comment refaire une manip. **Les lettres tapées ne sont
 /// jamais gardées**, seulement « a tapé du texte (12 touches) ».
 class WorkflowCapture extends ChangeNotifier {

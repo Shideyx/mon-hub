@@ -28,13 +28,13 @@ Liens de téléchargement (toujours la dernière version) :
 
 1. Sur le PC : **Réglages → Mes appareils → Ajouter mon iPhone → Version web → Afficher le QR code**.
 2. Vise le QR code avec l'appareil photo de l'iPhone : Mon Hub s'ouvre dans Safari, déjà relié (ton prénom, le cerveau
-   de Smily, ses souvenirs). Pas de PC sous la main ? Ouvre simplement https://shideyx.github.io/mon-hub/ dans Safari.
+   de Nexo, ses souvenirs). Pas de PC sous la main ? Ouvre simplement https://shideyx.github.io/mon-hub/ dans Safari.
 3. Dans Safari : **Partager → Sur l'écran d'accueil → Ajouter**. Mon Hub s'ouvre maintenant comme une appli et se met à
    jour tout seul.
 4. Onglet **Téléphone → Activer les notifications** (iOS 16.4 ou plus).
 5. Même compte que le PC (espaces, messages) : **Réglages → Mon compte en ligne**, même adresse et même mot de passe.
 
-Smily y appelle, prépare tes SMS (tu appuies sur Envoyer), lance un itinéraire, un minuteur, un rappel dans
+Nexo y appelle, prépare tes SMS (tu appuies sur Envoyer), lance un itinéraire, un minuteur, un rappel dans
 l'agenda, ta musique, tes applis et tes **Raccourcis** iPhone (« lance le raccourci Mode nuit »).
 
 ## 2 ter. Sur iPhone, l'appli complète (iPhone 12 et plus récents, iOS 15+, avec un PC)
@@ -79,17 +79,17 @@ Pour Instagram, Discord et Claude, c'est la vraie page de connexion du service q
 
 | **Claude** | Carte Claude → **Ouvrir Claude** → connecte-toi comme sur claude.ai (si « Continuer avec Google » refuse dans l'appli, choisis « Continuer avec l'e-mail »). |
 
-## 3 ter. Smily, ton compagnon à côté du curseur
+## 3 ter. Nexo, ton compagnon à côté du curseur
 
-1. Carte **Claude** → **Configurer Smily** → choisis son cerveau :
-   - **Claude Pro** (conseillé si tu as un abonnement Claude Pro / Max) : Smily utilise ton abonnement via **Claude Code**, l'outil officiel d'Anthropic. Dans les réglages : **Installer Claude Code** (une fenêtre s'ouvre et l'installe), puis **Se connecter** (la page officielle de Claude s'ouvre dans ton navigateur), puis ↻. Mon Hub ne voit jamais ta connexion ; les questions comptent dans les limites de ton abonnement.
+1. Carte **Claude** → **Configurer Nexo** → choisis son cerveau :
+   - **Claude Pro** (conseillé si tu as un abonnement Claude Pro / Max) : Nexo utilise ton abonnement via **Claude Code**, l'outil officiel d'Anthropic. Dans les réglages : **Installer Claude Code** (une fenêtre s'ouvre et l'installe), puis **Se connecter** (la page officielle de Claude s'ouvre dans ton navigateur), puis ↻. Mon Hub ne voit jamais ta connexion ; les questions comptent dans les limites de ton abonnement.
    - **Clé API** : crée une clé sur https://console.anthropic.com/settings/keys (payée à l'usage, quelques centimes par question) et colle-la.
    - **Local gratuit (Ollama)** : sans clé ni compte, rien ne sort du PC. Installe https://ollama.com/download puis, dans un terminal : `ollama pull qwen2.5vl`. Il faut un PC assez puissant.
 2. **Maintiens Ctrl + Alt et parle**, relâche pour envoyer (appui court = écrire). Sur téléphone : touche la bulle bleue.
-3. Sur Windows, **Smily partout** (activé par défaut) : Smily suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
-4. **Smily prof** : dis « je comprends pas », « apprends-moi un truc », « montre-moi en schéma » ou « teste-moi » : il dessine un tableau (schéma, étapes, frise, quiz…).
-5. **Micro** : Réglages → Smily → **Tester le micro**. Sur Windows, s'il ne t'entend pas : Paramètres → Confidentialité et sécurité → **Microphone** (activer « Autoriser les applications de bureau ») et → **Voix** (activer « Reconnaissance vocale en ligne »). Smily affiche directement le bouton du bon réglage. En secours : bouton « Dictée Windows (Win + H) ».
-6. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Smily te prévient quand c'est fini.
+3. Sur Windows, **Nexo partout** (activé par défaut) : Nexo suit ta souris au-dessus de toutes tes applis et voit tous tes écrans, même Mon Hub réduit.
+4. **Nexo prof** : dis « je comprends pas », « apprends-moi un truc », « montre-moi en schéma » ou « teste-moi » : il dessine un tableau (schéma, étapes, frise, quiz…).
+5. **Micro** : Réglages → Nexo → **Tester le micro**. Sur Windows, s'il ne t'entend pas : Paramètres → Confidentialité et sécurité → **Microphone** (activer « Autoriser les applications de bureau ») et → **Voix** (activer « Reconnaissance vocale en ligne »). Nexo affiche directement le bouton du bon réglage. En secours : bouton « Dictée Windows (Win + H) ».
+6. Commence par **« Agent, … »** pour une tâche de fond (ex. « Agent, résume mes devoirs de la semaine ») : Nexo te prévient quand c'est fini.
 
 Le micro de Windows doit comprendre le français : *Paramètres → Heure et langue → Voix* (installe le pack français si besoin).
 

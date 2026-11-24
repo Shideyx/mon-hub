@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/hub_files.dart';
 import '../widgets.dart';
 
-/// Une notion vue avec Smily (une question et sa réponse).
+/// Une notion vue avec Nexo (une question et sa réponse).
 class JournalEntry {
   JournalEntry({
     required this.id,
@@ -59,8 +59,8 @@ class JournalEntry {
   }
 }
 
-/// Journal des connaissances : chaque question posée à Smily y est notée,
-/// et Smily te propose de **réviser** au bon moment (répétition espacée :
+/// Journal des connaissances : chaque question posée à Nexo y est notée,
+/// et Nexo te propose de **réviser** au bon moment (répétition espacée :
 /// 1 → 3 → 7 → 14 → 30 → 60 → 120 jours).
 class Journal extends ChangeNotifier {
   Journal._();
@@ -196,7 +196,7 @@ class JournalView extends StatefulWidget {
   const JournalView({super.key, required this.color, this.onQuiz});
   final Color color;
 
-  /// Lance un quiz avec Smily sur les notions à réviser.
+  /// Lance un quiz avec Nexo sur les notions à réviser.
   final void Function(List<JournalEntry> entries)? onQuiz;
 
   @override
@@ -265,7 +265,7 @@ class _JournalViewState extends State<JournalView> {
               const Padding(
                 padding: EdgeInsets.all(24),
                 child: EmptyHint(
-                  'Pose des questions à Smily : chaque notion apprise est notée ici pour la réviser plus tard.',
+                  'Pose des questions à Nexo : chaque notion apprise est notée ici pour la réviser plus tard.',
                   icon: Icons.menu_book_rounded,
                 ),
               ),
@@ -285,7 +285,7 @@ class _JournalViewState extends State<JournalView> {
                     Text('Question', style: text.labelMedium),
                     SelectableText(e.question),
                     const SizedBox(height: 8),
-                    Text('Ce que Smily a expliqué', style: text.labelMedium),
+                    Text('Ce que Nexo a expliqué', style: text.labelMedium),
                     SelectableText(e.answer),
                     const SizedBox(height: 8),
                     Wrap(

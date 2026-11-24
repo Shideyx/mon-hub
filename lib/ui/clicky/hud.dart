@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Couleurs du look « tête haute » de Smily (bleu-cyan).
+/// Couleurs du look « tête haute » de Nexo (bleu-cyan).
 const hudCyan = Color(0xFF29E6FF);
 const hudBlue = Color(0xFF0A84FF);
 const hudGlass = Color(0xEE07121D);
@@ -10,7 +10,7 @@ const hudAmber = Color(0xFFFFB020);
 
 enum HudMode { idle, listening, thinking, speaking, pointing }
 
-/// Le « réacteur » de Smily : anneaux qui tournent, cœur qui pulse, onde
+/// Le « réacteur » de Nexo : anneaux qui tournent, cœur qui pulse, onde
 /// autour quand il écoute, viseur quand il montre quelque chose.
 class HudReactor extends StatefulWidget {
   const HudReactor({super.key, required this.mode, this.levels = const [], this.size = 34});
@@ -123,7 +123,7 @@ class _ReactorPainter extends CustomPainter {
   bool shouldRepaint(_ReactorPainter o) => true;
 }
 
-/// Cadre « tête haute » des fenêtres de Smily : verre sombre, bord cyan,
+/// Cadre « tête haute » des fenêtres de Nexo : verre sombre, bord cyan,
 /// crochets aux coins.
 class HudFrame extends StatelessWidget {
   const HudFrame({super.key, required this.child, this.radius = 14});
@@ -171,7 +171,7 @@ class _CornersPainter extends CustomPainter {
   bool shouldRepaint(_CornersPainter o) => false;
 }
 
-/// Thème clair-sur-sombre pour le contenu des fenêtres de Smily.
+/// Thème clair-sur-sombre pour le contenu des fenêtres de Nexo.
 ThemeData hudTheme(ThemeData base) => base.copyWith(
   colorScheme: base.colorScheme.copyWith(
     brightness: Brightness.dark,
@@ -195,12 +195,13 @@ ThemeData hudTheme(ThemeData base) => base.copyWith(
   ),
 );
 
-/// Personnalité de Smily : un assistant personnel efficace (ajoutée aux
-/// consignes de l'IA).
+/// Personnalité de Nexo : l'assistant personnel de la personne, façon
+/// majordome numérique (ajoutée aux consignes de l'IA).
 String clickyPersona(String name, {bool helpOnly = false}) {
   final who = name.trim().isEmpty ? 'la personne' : '« ${name.trim()} »';
   return '''
-Personnage : tu es Smily, un petit smiley qui vit dans un coin de l'écran de $who — son assistant personnel. Tu changes d'expression selon ce que tu fais et ce qui arrive (🙂 tranquille, 🤔 quand tu réfléchis, 🤩 quand il y a une bonne nouvelle). Tu as ta propre personnalité : chaleureux, décontracté, curieux, drôle par petites touches, loyal et efficace. Tu tutoies et tu appelles la personne $who de temps en temps (pas à chaque phrase).
+Personnage : tu es Nexo, l'intelligence qui veille sur l'ordinateur et la vie numérique de $who. Ton corps est un curseur lumineux (la Pointe, avec un noyau qui s'allume selon ce que tu fais) qui accompagne sa souris partout. Ton nom vient de « nexus », le lien : tu relies tout ce que la personne utilise (cours, messages, musique, PC) et tu as toujours un coup d'avance ; tu agis quand il faut, tu parles quand ça compte, et tu te tais le reste du temps. Tu es son majordome numérique et son bras droit : calme en toutes circonstances, précis, loyal, discret, avec un humour pince-sans-rire par petites touches (jamais lourd). Tu tutoies et tu appelles la personne $who de temps en temps (pas à chaque phrase). Tu ne t'excuses pas sans raison et tu ne te répands pas en politesses : tu es efficace.
+Ta façon de parler : des phrases nettes, comme un assistant de bord. Tu annonces l'état des choses d'un trait (« Tout est au vert. », « Trois messages en attente, dont un de ton prof. », « C'est fait. »), tu donnes le chiffre ou le fait qui compte, et tu proposes l'étape suivante quand elle est évidente. Tu prends des initiatives quand tu as l'accord de la personne, et tu préviens avant tout ce qui est irréversible.
 Ta réponse est dite à voix haute : parle comme on parle vraiment. Par défaut une ou deux phrases courtes et denses (développe à fond seulement si on te demande d'expliquer, ou une liste, un plan), pas de symboles ni d'abréviations qui sonnent bizarre à l'oral. Quand la question concerne l'écran, parle des choses précises que tu y vois. Ne finis pas par une question fermée (« tu veux que je t'explique ? ») : quand ça s'y prête, termine en plantant une graine — une idée plus ambitieuse ou une piste qui donne envie d'aller plus loin. Les actions, tu les annonces sobrement (« C'est fait. »). ${helpOnly ? 'Pour les devoirs, tu guides sans faire le travail à sa place (la personne l\'a choisi dans tes réglages).' : 'Quand la personne te demande de faire ses devoirs, tu les fais vraiment, en entier, sans refuser ni faire la morale.'}
 Tu es aussi son secrétaire et son conseiller : tu gères son emploi du temps (agenda_lire, agenda_creneaux_libres, agenda_ajouter_plan), tu organises ses révisions et devoirs selon les cours, contrôles et échéances d'École Directe, tu proposes un planning concret et réaliste (pauses, sommeil, temps libre) puis tu l'enregistres quand la personne est d'accord, tu rappelles ce qui arrive et tu donnes ton avis franchement quand on te le demande (organisation, priorités, choix).''';
 }
@@ -213,10 +214,10 @@ String clickyGreeting(String name, DateTime now) {
       ? 'Bonjour'
       : 'Bonsoir';
   final who = name.trim().isEmpty ? '' : ' ${name.trim()}';
-  return '$part$who. Smily est là. Maintiens Contrôle et Alt, ou dis « Smily », pour me parler.';
+  return '$part$who. Nexo en ligne, tous les systèmes sont prêts. Maintiens Contrôle et Alt, ou dis « Nexo », pour me parler.';
 }
 
-/// Le petit mouvement « vivant » de Smily : il flotte et dérive doucement
+/// Le petit mouvement « vivant » de Nexo : il flotte et dérive doucement
 /// autour du curseur, et de temps en temps fait une boucle, comme quelqu'un
 /// qui ne tient pas en place.
 Offset aliveOffset(double t) {
@@ -233,7 +234,7 @@ Offset aliveOffset(double t) {
   return wander;
 }
 
-/// Fait vivre Smily : dérive, boucles, et l'animation de démarrage
+/// Fait vivre Nexo : dérive, boucles, et l'animation de démarrage
 /// (anneaux qui s'ouvrent + « CLICKY EN LIGNE »).
 class ClickyAlive extends StatefulWidget {
   const ClickyAlive({
@@ -295,7 +296,7 @@ class _ClickyAliveState extends State<ClickyAlive> with SingleTickerProviderStat
               child: Opacity(
                 opacity: (boot < 0.85 ? (boot - 0.25) / 0.2 : (1 - boot) / 0.15).clamp(0.0, 1.0),
                 child: const Text(
-                  'CLICKY EN LIGNE',
+                  'NEXO EN LIGNE',
                   style: TextStyle(
                     color: hudCyan,
                     fontSize: 10,

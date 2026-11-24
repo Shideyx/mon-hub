@@ -8,6 +8,7 @@ import '../../core/desktop_widgets.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
 import '../../ui/web_login.dart';
+import 'instagram_watch.dart';
 
 /// Instagram = le vrai instagram.com dans Mon Hub, exactement comme dans un
 /// navigateur : fil, reels, stories, messages, vocaux, appels.
@@ -91,7 +92,7 @@ class InstagramModule extends HubModule {
       name: 'instagram_ouvrir',
       description:
           'Ouvre le vrai Instagram dans Mon Hub : page = fil, reels, messages ou explorer, ou le profil de quelqu\'un '
-          '(nom). Smily ne lit et n\'envoie jamais de messages Instagram lui-même (Instagram l\'interdit) : la '
+          '(nom). Nexo ne lit et n\'envoie jamais de messages Instagram lui-même (Instagram l\'interdit) : la '
           'personne le fait dans la page.',
       params: {
         'page': ('string', 'fil, reels, messages ou explorer'),
@@ -203,6 +204,15 @@ class _InstagramPageState extends State<InstagramPage> {
   InAppWebViewController? _c;
 
   void _go(String url) => _c?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+
+  @override
+  void dispose() {
+    // Tu viens peut-être de te connecter ici : la veille des messages (page
+    // cachée) se recharge pour en profiter.
+    final w = InstagramWatch.instance;
+    if (w.active && w.loggedOut) unawaited(w.reload());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

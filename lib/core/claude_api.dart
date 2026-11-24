@@ -12,7 +12,7 @@ import 'token_budget.dart';
 
 /// Accès direct à Claude (API Anthropic) avec ta propre clé API.
 ///
-/// Sert au compagnon « Smily » (qui voit l'écran de Mon Hub, répond à voix
+/// Sert au compagnon « Nexo » (qui voit l'écran de Mon Hub, répond à voix
 /// haute et montre les boutons) et à la discussion intégrée du module Claude.
 /// La clé se crée sur console.anthropic.com (facturée à l'usage) et reste
 /// chiffrée sur l'appareil.
@@ -146,7 +146,7 @@ class ClaudeApi {
       final blocks = <int, Map<String, dynamic>>{};
       final json = <int, StringBuffer>{};
       var stop = '';
-      // Les jetons de cette demande (comptés pour le budget de Smily).
+      // Les jetons de cette demande (comptés pour le budget de Nexo).
       final usage = <String, dynamic>{};
       final shown = StringBuffer();
       await for (final line

@@ -11,7 +11,7 @@ import 'widgets.dart';
 class ChatMsg {
   ChatMsg({required this.mine, required this.text, DateTime? at, this.note}) : at = at ?? DateTime.now();
 
-  /// Écrit par toi (sinon : par Claude / Smily).
+  /// Écrit par toi (sinon : par Claude / Nexo).
   final bool mine;
   final String text;
   final DateTime at;
@@ -48,7 +48,7 @@ class ChatThread {
   final DateTime created;
   DateTime updated;
 
-  /// Appli au premier plan (Smily) : la mémoire est rangée par appli.
+  /// Appli au premier plan (Nexo) : la mémoire est rangée par appli.
   String app;
   bool pinned;
   final List<ChatMsg> messages;
@@ -105,7 +105,7 @@ class ChatThread {
 }
 
 /// Historique des conversations (une liste par source : discussion Claude,
-/// Smily). Gardé dans les fichiers du compte, partagé avec Smily partout.
+/// Nexo). Gardé dans les fichiers du compte, partagé avec Nexo partout.
 class ChatHistory extends ChangeNotifier {
   ChatHistory(String file, {this.maxThreads = 300, this.maxMessages = 400})
     : _file = JsonFile<List<ChatThread>>(
@@ -125,7 +125,7 @@ class ChatHistory extends ChangeNotifier {
   /// Discussion directe avec Claude (module Claude).
   static final claude = ChatHistory('claude-chats.json');
 
-  /// Échanges avec Smily.
+  /// Échanges avec Nexo.
   static final clicky = ChatHistory('clicky-history.json');
 
   List<ChatThread> get threads {

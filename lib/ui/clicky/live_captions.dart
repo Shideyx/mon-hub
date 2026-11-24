@@ -96,7 +96,7 @@ class LiveCaptions {
   /// Après une erreur 429 du mode « morceaux » : Whisper si le PC l'a.
   static String quotaStatus({required bool whisper}) => whisper
       ? 'Quota gratuit de Gemini épuisé : je passe à Whisper (texte dans la langue d\'origine).'
-      : 'Quota gratuit de Gemini épuisé pour aujourd\'hui. Installe Whisper (Réglages de Smily → Micro) pour continuer.';
+      : 'Quota gratuit de Gemini épuisé pour aujourd\'hui. Installe Whisper (Réglages de Nexo → Micro) pour continuer.';
 
   /// Le texte à afficher (null : pas de paroles).
   static String? clean(String answer) {
@@ -340,7 +340,7 @@ class _CaptionsViewState extends State<_CaptionsView> {
         text = LiveCaptions.clean(await Whisper.transcribe(f.path, lang: 'auto', timeout: const Duration(seconds: 30)));
         _status = 'Sans clé Gemini : texte dans la langue d\'origine';
       } else {
-        _status = 'Il me faut ta clé Gemini gratuite (Réglages de Smily → Voix) ou Whisper.';
+        _status = 'Il me faut ta clé Gemini gratuite (Réglages de Nexo → Voix) ou Whisper.';
       }
       if (text != null && mounted) {
         setState(() {

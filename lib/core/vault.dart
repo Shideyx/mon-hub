@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'module_store.dart';
 
 /// Coffre-fort local : chiffre les données de Mon Hub enregistrées sur
-/// l'appareil (historiques de Smily, journal, carnet, routines…) en
+/// l'appareil (historiques de Nexo, journal, carnet, routines…) en
 /// AES-256-GCM.
 ///
 /// La clé est tirée au hasard, une par compte Mon Hub, et rangée dans le
@@ -39,7 +39,7 @@ class Vault {
         final fresh = await _aes.newSecretKey();
         final bytes = await fresh.extractBytes();
         await ModuleStore.secure.write(key: name, value: base64.encode(bytes));
-        // Relu : si l'autre programme (Smily partout) a créé la sienne en
+        // Relu : si l'autre programme (Nexo partout) a créé la sienne en
         // même temps, on garde celle qui est enregistrée.
         final again = await ModuleStore.secure.read(key: name);
         return again == null ? fresh : SecretKey(base64.decode(again));

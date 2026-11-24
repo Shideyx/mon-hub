@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// Ce que Smily peut faire **sur le téléphone** depuis la version web.
+/// Ce que Nexo peut faire **sur le téléphone** depuis la version web.
 ///
 /// Une page web ne peut pas piloter l'iPhone toute seule (Apple l'interdit) :
 /// elle ouvre les applis par leurs liens (`tel:`, `sms:`, Plans, Spotify…),
@@ -52,7 +52,7 @@ class PhoneAction {
   /// Contact à retenir : (nom, numéro).
   final (String, String)? contact;
 
-  /// Ce que Smily répond en proposant l'action.
+  /// Ce que Nexo répond en proposant l'action.
   final String? say;
 
   /// Les actions qui se font sans bouton (rien ne sort du téléphone).
@@ -281,7 +281,7 @@ class PhoneRules {
     return [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Mon Hub//Smily//FR',
+      'PRODID:-//Mon Hub//Nexo//FR',
       'BEGIN:VEVENT',
       'UID:$id',
       'DTSTAMP:$now',
@@ -709,7 +709,7 @@ class PhoneRules {
 
 /// Ce que le PC donne au téléphone par le QR code (« Version web » dans
 /// Réglages → Mes appareils → Ajouter mon iPhone) : le prénom, la clé
-/// Gemini, le serveur Mon Hub en ligne et quelques souvenirs de Smily. Le
+/// Gemini, le serveur Mon Hub en ligne et quelques souvenirs de Nexo. Le
 /// code voyage dans la partie « # » du lien, qui n'est **jamais** envoyée au
 /// site (GitHub Pages ne la voit pas).
 class PhoneLinkCode {

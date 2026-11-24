@@ -12,7 +12,7 @@ import '../../core/birthdays.dart';
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
 typedef QuickTool = Future<Object?> Function(String name, Map<String, dynamic> args);
 
-/// Ce que Smily répond sans l'IA.
+/// Ce que Nexo répond sans l'IA.
 class QuickReply {
   const QuickReply(this.text, {this.timer, this.timerLabel = '', this.media});
   final String text;
@@ -35,11 +35,11 @@ class QuickAnswers {
 
   static const _days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
-  /// La phrase nettoyée : minuscules, sans accents, sans « Smily » ni
+  /// La phrase nettoyée : minuscules, sans accents, sans « Nexo » ni
   /// « s'il te plaît ».
   static String clean(String raw) {
     var n = normalize(raw);
-    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he|alors) )?(?:clicky|smily|smiley|simile) ?'), '');
+    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he|alors) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '');
     n = n.replaceFirst(RegExp(r' (?:s il te plait|s il vous plait|stp|svp|merci)$'), '');
     return n.trim();
   }
@@ -103,7 +103,7 @@ class QuickAnswers {
 
   static DateTime? _date(Object? v) => v is DateTime ? v : DateTime.tryParse('$v');
 
-  /// Ce que Smily sait ouvrir tout seul.
+  /// Ce que Nexo sait ouvrir tout seul.
   static const opens = {
     'youtube': 'https://www.youtube.com',
     'discord': 'https://discord.com/app',
@@ -433,7 +433,7 @@ class QuickAnswers {
       }
     }
 
-    // ---- Ce que Smily sait de lui-même : capacités, nouveautés, jetons ----
+    // ---- Ce que Nexo sait de lui-même : capacités, nouveautés, jetons ----
     Future<QuickReply?> said(String tool, [Map<String, dynamic> args = const {}]) async {
       final r = await call(tool, args);
       return r is Map && r['resume'] != null ? QuickReply('${r['resume']}') : null;
@@ -1335,7 +1335,7 @@ class Calc {
   /// Le résultat en phrase, ou null si ce n'est pas un calcul.
   static String? fromSentence(String raw) {
     var s = raw.toLowerCase().trim();
-    s = s.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis) )?(?:clicky|smily|smiley|simile)[, ]*'), '');
+    s = s.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile)[, ]*'), '');
     final before = s;
     s = s.replaceFirst(
       RegExp(

@@ -9,7 +9,7 @@ import 'package:win32/win32.dart';
 import '../../core/hub_feed.dart';
 import '../../core/hub_files.dart';
 
-/// Les fonctions « façon JARVIS » de Smily, **sans IA** : l'état du PC, le
+/// Les fonctions « façon JARVIS » de Nexo, **sans IA** : l'état du PC, le
 /// mode concentration, les rappels « quand j'ouvre telle appli », et le
 /// point de situation donné à l'IA pour qu'elle réponde juste du premier
 /// coup.
@@ -265,7 +265,7 @@ class SystemStatus {
     if (online == false) 'pas d\'internet',
   ];
 
-  /// Ce que Smily dit (à voix haute).
+  /// Ce que Nexo dit (à voix haute).
   String say({bool why = false}) {
     final parts = <String>[
       if (battery != null) 'batterie à $battery %${charging ? ', en charge' : ''}',
@@ -308,10 +308,10 @@ class SystemStatus {
 
 // ======================================================== Concentration
 
-/// **Mode concentration** : pendant la séance, Smily ne dit plus rien de
+/// **Mode concentration** : pendant la séance, Nexo ne dit plus rien de
 /// lui-même (idées, remarques, rappels), les notifications de Mon Hub sont
 /// gardées pour la fin (sauf les appels), et il annonce la fin avec le
-/// bilan. Gardé dans un fichier partagé : Mon Hub et Smily partout le
+/// bilan. Gardé dans un fichier partagé : Mon Hub et Nexo partout le
 /// voient tous les deux.
 class FocusMode extends ChangeNotifier {
   FocusMode._();
@@ -438,8 +438,8 @@ class AppReminder {
   );
 }
 
-/// Les rappels liés à une appli : dits par Smily la prochaine fois qu'elle
-/// passe au premier plan (fichier partagé entre Mon Hub et Smily partout).
+/// Les rappels liés à une appli : dits par Nexo la prochaine fois qu'elle
+/// passe au premier plan (fichier partagé entre Mon Hub et Nexo partout).
 class AppReminders {
   AppReminders._();
   static final instance = AppReminders._();

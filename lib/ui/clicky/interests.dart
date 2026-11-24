@@ -1,4 +1,4 @@
-// **Veille sur ce que tu aimes** (v1.58) : deux fois par jour, Smily regarde
+// **Veille sur ce que tu aimes** (v1.58) : deux fois par jour, Nexo regarde
 // les artistes de tes titres likés (Spotify ou Deezer) et te prévient quand
 // l'un d'eux sort un nouveau son (API publique de Deezer, sans compte ni
 // clé : seuls les noms d'artistes sont cherchés).

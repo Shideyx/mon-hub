@@ -81,9 +81,9 @@ void main() {
     expect(find.text('Aujourd\'hui'), findsOneWidget);
   });
 
-  testWidgets('sans Smily configuré, rien de Smily ne s\'affiche et l\'appli marche', (tester) async {
+  testWidgets('sans Nexo configuré, rien de Nexo ne s\'affiche et l\'appli marche', (tester) async {
     SharedPreferences.setMockInitialValues({
-      // Cerveau « clé API » sans clé : Smily n'est pas configuré.
+      // Cerveau « clé API » sans clé : Nexo n'est pas configuré.
       'mod.claude.clicky.provider': '"claude"',
     });
     await ModuleStore.init();
@@ -91,7 +91,7 @@ void main() {
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
     await tester.pump(const Duration(milliseconds: 100));
     expect(ClickyController.instance.ready, isFalse);
-    expect(find.byTooltip('Smily (maintiens Ctrl + Alt pour parler)'), findsNothing);
+    expect(find.byTooltip('Nexo (maintiens Ctrl + Alt pour parler)'), findsNothing);
     // Ctrl + Alt ne fait rien.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);

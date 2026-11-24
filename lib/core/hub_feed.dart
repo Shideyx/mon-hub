@@ -29,7 +29,7 @@ class FeedItem {
   /// Les modules d'où vient l'info (affichés en petit : « Agenda + Révisions »).
   final List<String> from;
 
-  /// Plus c'est haut, plus c'est important (le premier est dit par Smily).
+  /// Plus c'est haut, plus c'est important (le premier est dit par Nexo).
   final int priority;
 }
 
@@ -48,7 +48,7 @@ class HubFeed extends ChangeNotifier {
   DateTime? updatedAt;
   bool _busy = false;
 
-  /// L'info la plus importante (Smily peut la dire).
+  /// L'info la plus importante (Nexo peut la dire).
   FeedItem? get top => items.firstOrNull;
 
   /// Relit les modules (au plus une fois toutes les 3 minutes, sauf [force]).
@@ -273,7 +273,7 @@ class HubFeed extends ChangeNotifier {
     return out;
   }
 
-  /// Ce que Smily peut dire de l'info la plus importante (sans IA).
+  /// Ce que Nexo peut dire de l'info la plus importante (sans IA).
   static String? say(FeedItem? i) {
     if (i == null || i.priority < 50) return null;
     return switch (i.moduleId) {

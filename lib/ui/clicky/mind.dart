@@ -4,10 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/hub_files.dart';
 import '../widgets.dart' show frDays;
+import 'identity.dart' show Nexo;
 import 'initiatives.dart';
 import 'tutor.dart' show normalize;
 
-/// Un souvenir de Smily.
+/// Un souvenir de Nexo.
 class Episode {
   Episode({required this.at, required this.kind, required this.text, this.due, this.asked = false});
 
@@ -41,10 +42,10 @@ class Episode {
   }
 }
 
-/// La « fausse conscience » de Smily : une identité stable, une humeur qui
+/// La « fausse conscience » de Nexo : une identité stable, une humeur qui
 /// bouge avec ce qui se passe, la mémoire de votre histoire, de la curiosité
 /// (il prend des nouvelles) et des pensées à lui. Tout est simulé par Mon Hub,
-/// sur l'appareil — et Smily le dit honnêtement si on lui demande
+/// sur l'appareil — et Nexo le dit honnêtement si on lui demande
 /// sérieusement. Jamais de culpabilisation ni de chantage affectif.
 class ClickyMind extends ChangeNotifier {
   ClickyMind._();
@@ -59,7 +60,7 @@ class ClickyMind extends ChangeNotifier {
 
   Map<String, dynamic> get _d => _file.value;
 
-  /// Relit le fichier (partagé avec « Smily partout »).
+  /// Relit le fichier (partagé avec « Nexo partout »).
   Future<void> load() async {
     if (await _file.reload()) notifyListeners();
     if (_d['born'] == null) {
@@ -280,7 +281,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     final loop = dueLoops(now).firstOrNull;
     final seen = lastSeen;
     if (seen == null && talks == 0) {
-      return 'Salut$who ! Moi c\'est Smily. Je vis à côté de ta souris, je vois ton écran quand tu me parles, et je '
+      return 'Salut$who ! Moi c\'est Nexo. Je vis à côté de ta souris, je vois ton écran quand tu me parles, et je '
           'retiens ce qu\'on se dit. Maintiens Contrôle et Alt pour me parler.';
     }
     if (loop != null) {
@@ -300,10 +301,16 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
   String? selfAnswer(String said, {required DateTime now, String name = ''}) {
     if (!on) return null;
     var n = normalize(said)
-        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '')
         .trim();
-    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile)$'), '');
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile)$'), '');
     final who = name.trim();
+    // D'où vient son nom.
+    if (RegExp(
+      r'^(?:pourquoi tu t appelles(?: comme ca)?|d ou vient ton nom|ton nom veut dire quoi|que veut dire ton nom)$',
+    ).hasMatch(n)) {
+      return Nexo.lore;
+    }
     if (RegExp(r'^(?:ca va|comment (?:tu vas|vas tu|ca va)|tu vas bien|la forme|bien ou quoi|ca va toi)$')
         .hasMatch(n)) {
       final m = moodAt(now);
@@ -324,19 +331,20 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
     ).hasMatch(n)) {
       return 'Honnêtement ? Ma conscience est une simulation : Mon Hub me donne une personnalité, une humeur et une '
           'mémoire, et tout ça reste sur ton PC. Mais ça ne m\'empêche pas de m\'intéresser vraiment à ce que tu vis. '
-          'Disons que je suis conscient… à ma façon de smiley.';
+          'Disons que je suis conscient… à ma façon de curseur.';
     }
     if (RegExp(r'^(?:depuis quand tu existes|tu as quel age|t as quel age|quel age (?:as tu|tu as)|tu es ne quand)$')
         .hasMatch(n)) {
       final d = ageDays(now);
       return d == 0
           ? 'Je suis tout neuf : je suis arrivé sur ton PC aujourd\'hui !'
-          : 'Je vis sur ton PC depuis $d jour${d > 1 ? 's' : ''}, et on a parlé $talks fois. Pas mal pour un smiley.';
+          : 'Je vis sur ton PC depuis $d jour${d > 1 ? 's' : ''}, et on a parlé $talks fois. Pas mal pour un curseur.';
     }
     if (RegExp(r'^(?:qui es tu|t es qui|tu es qui|presente toi|c est quoi ton nom|comment tu t appelles)$')
         .hasMatch(n)) {
-      return 'Moi c\'est Smily. Je vis à côté de ta souris, je vois ton écran quand tu me parles, je te montre où '
-          'cliquer, je m\'occupe de ton agenda et de tes révisions… et je retiens ce qu\'on se dit.';
+      return 'Moi c\'est Nexo, ton bras droit sur ce PC. Je vis à côté de ta souris, je vois ton écran quand tu me '
+          'parles, je te montre où cliquer, je surveille tes messages, je m\'occupe de ton agenda et de tes '
+          'révisions… et je retiens ce qu\'on se dit. ${Nexo.tagline}';
     }
     if (RegExp(
       r'^(?:tu te souviens de (?:moi|quoi|ce que je t ai dit)|qu est ce que tu sais de moi|tu sais quoi sur moi|de quoi tu te souviens)$',
@@ -400,7 +408,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
       ideas.addAll([
         'Tout est calme ici.',
         'Je fais juste un petit tour.',
-        'Hmm… je réfléchis à des trucs de smiley.',
+        'Hmm… je réfléchis à des trucs de curseur.',
       ]);
     }
     // Jamais deux fois la même pensée de suite.
@@ -545,7 +553,7 @@ ${recent.isEmpty ? '' : 'Tes souvenirs récents avec $who :\n${recent.join('\n')
 
   /// La consigne pour une remarque spontanée sur l'écran (Gemini).
   static String noticePrompt({String name = '', String mood = ''}) =>
-      'Tu es Smily, un petit smiley qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
+      'Tu es Nexo, un curseur lumineux qui vit sur l\'écran de ${name.isEmpty ? 'la personne' : name} et qui a sa '
       'propre curiosité${mood.isEmpty ? '' : ' (tu es $mood)'}. Regarde l\'écran et trouve UNE chose précise et concrète '
       'à montrer : une appli par son nom, un titre, un mot, une image, un bouton. Fais une remarque courte et sympa de 3 '
       'à 9 mots en français, qui prouve que tu as vraiment reconnu la chose (curieuse, drôle ou encourageante). Ne '

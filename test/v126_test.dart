@@ -131,7 +131,7 @@ void main() {
         decode: (j) => (j as Map).cast<String, dynamic>(),
         encode: (v) => v,
       );
-      await f.save({'conversation': 'bonjour Smily'});
+      await f.save({'conversation': 'bonjour Nexo'});
       final onDisk = await (await HubFiles.file('test.json'))!.readAsString();
       expect(onDisk, startsWith(Vault.prefix));
       expect(onDisk, isNot(contains('bonjour')));
@@ -141,7 +141,7 @@ void main() {
         decode: (j) => (j as Map).cast<String, dynamic>(),
         encode: (v) => v,
       );
-      expect((await g.load())['conversation'], 'bonjour Smily');
+      expect((await g.load())['conversation'], 'bonjour Nexo');
     });
 
     test('export protégé par mot de passe', () async {

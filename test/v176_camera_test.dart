@@ -67,7 +67,7 @@ void main() {
     });
   });
 
-  group('Ce que Smily dit', () {
+  group('Ce que Nexo dit', () {
     test('caméra coupée', () {
       final say = CameraRules.say(const SensorState(blocked: true), const SensorState());
       expect(say, contains('coupée'));
@@ -109,7 +109,7 @@ void main() {
 
     test('« coupe ma caméra »', () async {
       expect((await ask('coupe ma caméra'))?.text, contains('coupée'));
-      expect((await ask('Smily, éteins ma webcam'))?.text, contains('coupée'));
+      expect((await ask('Nexo, éteins ma webcam'))?.text, contains('coupée'));
     });
 
     test('« rallume ma caméra »', () async {

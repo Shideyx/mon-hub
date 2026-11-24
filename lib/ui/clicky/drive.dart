@@ -8,7 +8,7 @@ import '../../core/nav.dart';
 import 'tutor.dart';
 import 'win.dart';
 
-/// Une action de « Smily pilote ».
+/// Une action de « Nexo pilote ».
 class DriveStep {
   const DriveStep(
     this.type, {
@@ -109,7 +109,7 @@ class DrivePlan {
 
 /// Fait les actions, avec des garde-fous :
 /// * Échap arrête tout de suite ;
-/// * si tu bouges la souris pendant l'exécution, Smily s'arrête ;
+/// * si tu bouges la souris pendant l'exécution, Nexo s'arrête ;
 /// * pas de saisie dans une fenêtre sensible (mots de passe, banque…) ;
 /// * aucune commande système n'est lancée, seulement des clics et des
 ///   touches.
@@ -170,7 +170,7 @@ class DriveRunner {
       context: ctx,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.mouse_rounded),
-        title: const Text('Smily veut piloter l\'ordinateur'),
+        title: const Text('Nexo veut piloter l\'ordinateur'),
         content: SizedBox(
           width: 420,
           child: SingleChildScrollView(

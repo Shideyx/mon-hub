@@ -38,7 +38,7 @@ class Deck {
   final DateTime created;
   final List<StudyCard> cards;
 
-  /// La fiche de révision (Markdown), préparée par Smily.
+  /// La fiche de révision (Markdown), préparée par Nexo.
   String? sheet;
 
   /// Le quiz préparé (QCM avec de vrais pièges).

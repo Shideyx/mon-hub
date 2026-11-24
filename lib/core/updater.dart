@@ -90,7 +90,7 @@ class Updater extends ChangeNotifier {
   String? error;
   bool busy = false;
 
-  /// Appelé juste avant de quitter pour installer (arrêter Smily partout…).
+  /// Appelé juste avant de quitter pour installer (arrêter Nexo partout…).
   Future<void> Function()? beforeInstall;
 
   Timer? _timer;
@@ -288,7 +288,7 @@ class Updater extends ChangeNotifier {
       _set(status: 'Installation…', progress: null);
       final dst = File(Platform.resolvedExecutable).parent.path;
       await beforeInstall?.call();
-      // Laisse Smily partout se fermer (il utilise les mêmes fichiers).
+      // Laisse Nexo partout se fermer (il utilise les mêmes fichiers).
       await Future<void>.delayed(const Duration(milliseconds: 800));
       await replaceInPlace(src, dst);
       _set(status: 'C\'est installé : Mon Hub redémarre…', progress: null);

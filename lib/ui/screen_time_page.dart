@@ -213,7 +213,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                       ),
                   const SizedBox(height: 20),
                   Text('Limites douces', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                  const Text('Smily te prévient une fois par jour quand tu arrives à la limite. Rien n\'est bloqué.'),
+                  const Text('Nexo te prévient une fois par jour quand tu arrives à la limite. Rien n\'est bloqué.'),
                   for (final e in limits.entries)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -245,7 +245,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                     subtitle: Text(
                       assistant.consent
                           ? 'Le soir, d\'après ton premier cours du lendemain (École Directe).'
-                          : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Smily).',
+                          : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Nexo).',
                     ),
                     value: assistant.on('sommeil'),
                     onChanged: assistant.consent ? (v) => assistant.setOn('sommeil', v) : null,
@@ -295,7 +295,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Ce que Smily a remarqué',
+                              'Ce que Nexo a remarqué',
                               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             for (final s in seen)
@@ -319,7 +319,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                       GameMode.instance.active
                           ? 'En ce moment : ${GameMode.instance.game}. Les notifications t\'attendent.'
                           : 'Quand un jeu est en plein écran : notifications gardées pour la fin, sauvegarde et synchro '
-                                'en pause, Smily se cache. Bilan de la partie à la fin.',
+                                'en pause, Nexo se cache. Bilan de la partie à la fin.',
                     ),
                     value: GameMode.enabled,
                     onChanged: (v) => GameMode.setEnabled(v).then((_) => setState(() {})),

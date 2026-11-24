@@ -36,7 +36,7 @@ class Win32Window {
   // |Show| is called. Returns true if the window was created successfully.
   bool Create(const std::wstring& title, const Point& origin, const Size& size);
 
-  // Fenêtre « Smily partout » : sans bordure, transparente, toujours au
+  // Fenêtre « Nexo partout » : sans bordure, transparente, toujours au
   // premier plan, absente de la barre des tâches et qui ne prend pas le
   // focus. Elle reste cachée tant que Dart ne l'affiche pas.
   void SetOverlay(bool overlay) { overlay_ = overlay; }
@@ -97,7 +97,7 @@ class Win32Window {
 
   bool quit_on_close_ = false;
 
-  // Fenêtre de Smily (voir SetOverlay).
+  // Fenêtre de Nexo (voir SetOverlay).
   bool overlay_ = false;
 
   // window handle for top level window.

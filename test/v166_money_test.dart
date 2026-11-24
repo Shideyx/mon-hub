@@ -307,7 +307,7 @@ void main() {
     });
   });
 
-  group('Smily sans IA', () {
+  group('Nexo sans IA', () {
     final calls = <String>[];
     Future<Object?> fake(String name, Map<String, dynamic> a) async {
       calls.add(name);

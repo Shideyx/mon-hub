@@ -28,7 +28,7 @@ class ScreenTime extends ChangeNotifier {
   int _ticks = 0;
   bool _loaded = false;
 
-  /// Prévenir (notification + Smily) quand une limite est atteinte.
+  /// Prévenir (notification + Nexo) quand une limite est atteinte.
   void Function(String title, String body)? alert;
 
   Map<String, dynamic> get _data => _file.value;
@@ -305,7 +305,7 @@ class Sleep {
 }
 
 /// **Mode jeu** : quand un jeu est en plein écran, Mon Hub se fait léger
-/// (notifications gardées pour la fin, rien de lourd en fond, Smily
+/// (notifications gardées pour la fin, rien de lourd en fond, Nexo
 /// discret) ; à la fin, le bilan de la partie.
 class GameMode extends ChangeNotifier {
   GameMode._();

@@ -129,7 +129,7 @@ void main() {
       expect(names.toSet().length, names.length);
     });
 
-    test('Smily web : règles d\'abord, puis Gemini avec ses fonctions', () async {
+    test('Nexo web : règles d\'abord, puis Gemini avec ses fonctions', () async {
       SharedPreferences.setMockInitialValues({});
       await ModuleStore.init();
       final s = WebSmily.instance;

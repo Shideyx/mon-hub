@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/module_store.dart';
 
-/// Un devoir repéré, et ce que Smily en a fait.
+/// Un devoir repéré, et ce que Nexo en a fait.
 @immutable
 class AutoHomework {
   const AutoHomework({required this.id, required this.subject, required this.at, this.docUrl, this.failed = false});

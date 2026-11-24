@@ -7,7 +7,7 @@ import 'clicky.dart';
 import 'life_view.dart' show emojiFonts;
 import 'mind.dart';
 
-/// Réglages → Conscience de Smily : son humeur, ses souvenirs, sa présence.
+/// Réglages → Conscience de Nexo : son humeur, ses souvenirs, sa présence.
 class MindPage extends StatefulWidget {
   const MindPage({super.key});
 
@@ -61,7 +61,7 @@ class _MindPageState extends State<MindPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Conscience de Smily')),
+      appBar: AppBar(title: const Text('Conscience de Nexo')),
       body: ListenableBuilder(
         listenable: m,
         builder: (context, _) {
@@ -85,7 +85,7 @@ class _MindPageState extends State<MindPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Smily est ${m.moodLabel(now)}',
+                            'Nexo est ${m.moodLabel(now)}',
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -231,7 +231,7 @@ class _MindPageState extends State<MindPage> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 secondary: const Icon(Icons.bolt_rounded, color: Color(0xFFFFA000)),
-                title: const Text('Smily décide tout seul', style: TextStyle(fontWeight: FontWeight.w800)),
+                title: const Text('Nexo décide tout seul', style: TextStyle(fontWeight: FontWeight.w800)),
                 subtitle: const Text(
                   'Il regarde ta journée, décide d\'une chose utile à faire (préparer un contrôle, organiser ta soirée, '
                   'lancer des révisions, chercher pour toi…) et te la propose. Il ne fait rien sans ton « oui », et ne '
@@ -270,7 +270,7 @@ class _MindPageState extends State<MindPage> {
                         await c.proposeIdea(i);
                       } else if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Rien d\'utile à proposer pour l\'instant, d\'après Smily.')),
+                          const SnackBar(content: Text('Rien d\'utile à proposer pour l\'instant, d\'après Nexo.')),
                         );
                       }
                     },
@@ -322,7 +322,7 @@ class _MindPageState extends State<MindPage> {
                         builder: (c) => AlertDialog(
                           title: const Text('Effacer sa mémoire ?'),
                           content: const Text(
-                            'Smily oubliera vos conversations, son humeur et ce dont il voulait prendre des nouvelles.',
+                            'Nexo oubliera vos conversations, son humeur et ce dont il voulait prendre des nouvelles.',
                           ),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),

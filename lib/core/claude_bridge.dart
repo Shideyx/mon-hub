@@ -47,16 +47,16 @@ class ClaudeBridge {
     return [...all, ...ToolRouter.metaTools(all)];
   }
 
-  /// Outils de l'appli elle-même (Smily : contrôle du PC, réparation du
+  /// Outils de l'appli elle-même (Nexo : contrôle du PC, réparation du
   /// micro), pour que Claude Code puisse aussi s'en servir.
   static List<HubTool> Function()? appTools;
 
   /// Outils en plus des modules (serveurs MCP ajoutés dans les réglages de
-  /// Smily).
+  /// Nexo).
   static final extras = ValueNotifier<List<HubTool>>(const []);
 
   /// Demande la permission avant une action qui envoie ou modifie quelque
-  /// chose, quand c'est Claude Code (Smily) qui l'appelle via /mcp.
+  /// chose, quand c'est Claude Code (Nexo) qui l'appelle via /mcp.
   static Future<bool> Function(HubTool tool, Map<String, dynamic> args)? confirm;
 
   /// Dossier imposé (tests).
@@ -177,7 +177,7 @@ class ClaudeBridge {
         // Comme pour Claude Code : une action qui envoie ou modifie quelque
         // chose attend ton accord (avant, l'extension de l'appli Claude
         // pouvait lancer une commande sur le PC sans rien demander).
-        // Smily partout (autre programme de Mon Hub) a déjà demandé l'accord
+        // Nexo partout (autre programme de Mon Hub) a déjà demandé l'accord
         // dans sa bulle ; l'extension de l'appli Claude, elle, passe ici.
         final asked = req.headers.value('x-monhub-client') == 'clicky' && body['confirme'] == true;
         if (isWriteAction(tool) && !asked) {
@@ -201,7 +201,7 @@ class ClaudeBridge {
   }
 
   /// Serveur MCP minimal (HTTP « streamable », réponses JSON) : c'est par là
-  /// que Claude Code, lancé par Smily avec ton abonnement Claude, utilise
+  /// que Claude Code, lancé par Nexo avec ton abonnement Claude, utilise
   /// les actions de Mon Hub (agenda, notes, messages…).
   Future<void> _mcp(HttpRequest req, HttpResponse res) async {
     if (req.method == 'DELETE') {
@@ -224,7 +224,7 @@ class ClaudeBridge {
     final batch = body is List;
     final messages = batch ? body : [body];
     final replies = <Map<String, dynamic>>[];
-    // Smily économe : « ?groupes=agenda,ecole » = seulement ces outils
+    // Nexo économe : « ?groupes=agenda,ecole » = seulement ces outils
     // (moins de texte envoyé à Claude à chaque question).
     final groups = req.uri.queryParameters['groupes'];
     for (final m in messages) {

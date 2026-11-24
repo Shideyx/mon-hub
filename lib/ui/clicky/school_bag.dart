@@ -106,7 +106,7 @@ class SchoolBag {
   static String _list(List<String> l) =>
       l.length <= 1 ? l.join() : '${l.sublist(0, l.length - 1).join(', ')} et ${l.last}';
 
-  /// Ce que Smily dit ([day] : « demain », « lundi »).
+  /// Ce que Nexo dit ([day] : « demain », « lundi »).
   static String say(
     ({List<String> subjects, List<String> items, List<String> homework, List<String> tests}) p,
     String day,

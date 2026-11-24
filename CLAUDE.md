@@ -10,12 +10,12 @@
 - Réponses et messages de commit en français, simples (la personne n'est pas développeuse).
 
 ## Repères
-- Flutter (Dart). Smily = l'assistant IA : `lib/ui/clicky/`.
+- Flutter (Dart). Nexo = l'assistant IA : `lib/ui/clicky/`.
 - Micro Windows : `SmartEars` (`whisper.dart`) choisit Windows ou Whisper (whisper.cpp v1.8.2 +
   modèle ggml, dans %APPDATA%\MonHub\whisper, enregistrement avec le paquet `record`).
   Reconnaissance Windows : `ears.dart` (PowerShell lancé en `detachedWithStdio` : ne jamais lire
   `exitCode` d'un processus détaché, ça lève « Bad state: Process is detached »).
-- Outils de Smily lui-même (`ClickyController.localTools`) : réparation du micro
+- Outils de Nexo lui-même (`ClickyController.localTools`) : réparation du micro
   (`clicky_diagnostic`, `clicky_reparer_micro`) et contrôle du PC (`pc.dart` : `pc_commande`,
   `pc_ouvrir`, `pc_lire`, `pc_ecrire_fichier`). Servis aussi à Claude Code via le pont local
   (`ClaudeBridge.appTools`). Permission : `ClaudeBridge.isWriteAction` + `confirmAction`.
@@ -25,7 +25,7 @@
   locales : JsonFile chiffré via `lib/core/vault.dart` ; secrets : `ModuleStore.writeSecret`.
 - École Directe : API non officielle (`ed_client.dart`), décodage des messages dans
   `EdClient.decodeContent` / `htmlToText` ; cloud : `EdClient.cloud`.
-- Smily agit (`act.dart` + `ClickyController.act`) : boucle capture → action JSON → exécution
+- Nexo agit (`act.dart` + `ClickyController.act`) : boucle capture → action JSON → exécution
   (`Win.glide/click/drag/windowList/windowAction`), déclenchée par `[AGIR]…[/AGIR]` ou « prends la
   main ». Compagnons : `buddies.dart`. Voix : une seule à la fois (`VoiceLock`).
 - Spotify : depuis février 2026, appli en mode développement = Premium du créateur obligatoire,
@@ -33,7 +33,7 @@
 - Réponse instantanée : Gemini Live (`live.dart`, WebSocket BidiGenerateContent, activité manuelle
   activityStart/End, audio PCM 16 kHz → 24 kHz joué par `PcmPlayer` waveOut). Branché dans
   `ClickyController.startListening/stopListening/ask` (`liveReady`). Erreurs : `ErrorLog`
-  (`journal-erreurs.log`), Smily partout surveillé par `ClickyDesktop.watch()`.
+  (`journal-erreurs.log`), Nexo partout surveillé par `ClickyDesktop.watch()`.
 - **Une seule voix : Gemini** (demande de la personne, v1.43). Voix de Windows (flutter_tts) et voix Microsoft (Edge)
   **retirées, ne pas les remettre**. `ClickyVoice` (`voice.dart`) : synthèse `GeminiVoice` par **gros morceaux**
   (`ClickyVoice.chunks/cutAt` : quota gratuit ~15 lectures/jour), relais `LiveReader` (Gemini Live, même voix) quand
@@ -45,7 +45,7 @@
   #E0457B, fond sombre), coins coupés, boutons penchés, rayures, chevrons, hexagones ; titres Chakra Petch, étiquettes
   JetBrains Mono (`assets/fonts`, OFL). Kit : `ui/hud/hud.dart` (`HudColors.of`, `HudPanel`, `HudButton`, `SlantBorder`,
   `hudCut`, `HudTag`, `HexAvatar`, `Hatch`, `SegBar`, `Barcode`, `Chevrons`, `HudBackground`). **Rien qui fasse
-  « IA / Gemini »** (pas de bordure en dégradé brillant) : la barre de Smily est une console (onglet CLICKY + `>_`).
+  « IA / Gemini »** (pas de bordure en dégradé brillant) : la barre de Nexo est une console (onglet CLICKY + `>_`).
   Le look Windows 11 de la v1.34 a été retiré en v1.35, ne pas le remettre. `core/windows_look.dart` ne sert plus
   qu'aux fenêtres des widgets détachés (barre de titre).
   Liens web : `core/browser.dart` (Chrome par défaut). Widgets détachés : `core/desktop_widgets.dart`,
@@ -62,9 +62,9 @@
 - YouTube : `modules/youtube/` = le vrai youtube.com dans `HubWebView`, recherche sans clé
   (`ytInitialData`, cookie `SOCS=CAI`), historique « Reprendre » local.
 - IA simple sans outils (corriger, résumer, faire des cartes) : `core/ai_text.dart` (`AiText.ask` : clé Gemini
-  d'abord — lit photos et PDF —, sinon le cerveau de Smily ; `AiText.json` ; `AiText.override` pour les tests).
+  d'abord — lit photos et PDF —, sinon le cerveau de Nexo ; `AiText.json` ; `AiText.override` pour les tests).
 - Documents = **le vrai Google Docs** (la personne ne veut pas d'éditeur maison) : `modules/docs/docs_module.dart`
-  ouvre docs.google.com dans `HubWebView` ; `GoogleDocs` (API Drive/Docs) pour Smily (`doc_creer` Markdown →
+  ouvre docs.google.com dans `HubWebView` ; `GoogleDocs` (API Drive/Docs) pour Nexo (`doc_creer` Markdown →
   .docx converti en Google Doc, `doc_lire` export texte, `doc_ecrire` via Docs API batchUpdate, `doc_exporter`).
   `DocFormat` (Delta ↔ Markdown ↔ .docx) sert à ces conversions ; `DocStore` = anciens documents v1.37 (bandeau
   pour les envoyer sur Google Docs ou en .docx). flutter_quill et pdf retirés.
@@ -76,7 +76,7 @@
   jamais de suppression, journal `rangement-*.json` pour annuler), `modules/drive/drive_tidy.dart` (Drive),
   écran `ui/tidy_page.dart` (Réglages → Rangement). Outils `pc_ranger_apercu/pc_ranger/pc_ranger_annuler`,
   `drive_ranger_*` (« ranger » = action à autoriser dans `ClaudeBridge.isWriteAction` et `PcControl.isWrite`).
-- Compte Google demandé par Smily après la visite guidée (et une fois aux anciens comptes) : `ui/google_welcome.dart`.
+- Compte Google demandé par Nexo après la visite guidée (et une fois aux anciens comptes) : `ui/google_welcome.dart`.
 - ⚠️ Les secrets GitHub GOOGLE_CLIENT_ID/SECRET étaient **vides** (journal de construction v1.37) : la connexion
   Google s'active dans l'appli (Réglages → Connexion Google, `ui/google_setup.dart` : 5 liens directs dont
   `flows/enableapi` pour toutes les API, puis le fichier JSON « Application de bureau » ; `GoogleAuth.setClient`).
@@ -117,23 +117,23 @@
   changement (`JsonFile.reload()` dit si le fichier a changé) ; le résumé d'une carte d'accueil est gardé au survol
   (`_ModuleCardState._summary`) ; le Discord caché est rendu invisible (`DiscordPhone.quietScript`) ; chiffrement et
   gros JSON hors du fil de l'interface (`Vault`, `JsonFile.load` avec `Isolate.run`).
-- Smily « conscient » façon heyclicky/JARVIS (v1.44) : `ui/clicky/mind.dart` (`ClickyMind` : humeur `moodAt`, lien `bond`,
+- Nexo « conscient » façon heyclicky/JARVIS (v1.44) : `ui/clicky/mind.dart` (`ClickyMind` : humeur `moodAt`, lien `bond`,
   souvenirs `Episode` — conversation, émotion, **attente** = « j'ai un oral jeudi » repéré par `DateSpotter`, il prend des
   nouvelles ensuite (`dueLoops`, salutation) —, `promptBlock` dans les consignes Claude et Gemini Live, `selfAnswer` sans IA
   (« ça va ? », « es-tu conscient ? » → honnête : simulation), `thought` (pensées par règles), quotas voix 4/j et remarques
-  8/j). Réglages → Conscience de Smily (`mind_page.dart`). Persona heyclicky dans `clickyPersona` (hud.dart).
+  8/j). Réglages → Conscience de Nexo (`mind_page.dart`). Persona heyclicky dans `clickyPersona` (hud.dart).
 - Présence : `ClickyController._presenceTick` (toutes les 2 s) : regards autour quand la souris ne bouge plus (`glance`,
   `gaze/gazeNote`, `lookSpots` = fenêtre au premier plan, horloge, autre écran), remarques spontanées `noticeSomething`
   (Gemini vision, jamais Claude ; jamais en plein écran `Win.foregroundFullscreen`, ni sur `privateApp`, ni sur Mon Hub),
-  `think()` (rappels de l'assistant dits par Smily ; `think64`/`notice` envoyés à Smily partout). Vol = `flight.dart`
+  `think()` (rappels de l'assistant dits par Nexo ; `think64`/`notice` envoyés à Nexo partout). Vol = `flight.dart`
   (`ClickyFlight` : arc, 0,26–0,75 s selon la distance, orientation `angleAt`, taille 1,3 au milieu ; `springTowards` pour
   suivre la souris), `flightPose` ; il parcourt la fenêtre pendant qu'il réfléchit (`_scanStep`) et part vers la cible
   avant de viser précisément. Bulle qui rebondit et s'écrit (`TypedText`).
-- Smily **autonome** (v1.45) : `ui/clicky/autonomy.dart` (`ClickyIdea`, `Autonomy.allowed` / `never` = jamais envoyer un
+- Nexo **autonome** (v1.45) : `ui/clicky/autonomy.dart` (`ClickyIdea`, `Autonomy.allowed` / `never` = jamais envoyer un
   message, supprimer, lancer une commande ; `prompt` Gemini JSON, `parse`, `rules` sans IA, `answer` « oui/non » à la voix).
   `ClickyController.startAutonomy` (Mon Hub, toutes les minutes) → `autonomyTick` (présent = `Win.idleSeconds` < 2 min,
   pas en plein écran, rythme `ClickyMind.ideaAllowed` : rarement/normal/souvent) → `decideIdea` → `proposeIdea` (boîte de
-  Smily avec Oui / Non / Plus tard `_IdeaButtons`, à l'oral ; envoyée à Smily partout par `idea64`) → `answerIdea` →
+  Nexo avec Oui / Non / Plus tard `_IdeaButtons`, à l'oral ; envoyée à Nexo partout par `idea64`) → `answerIdea` →
   `_runIdea` (outil direct, ou `agent` = `_runAgent`). Il apprend (`recordDecision`, `likes/dislikes`, `skipTools` après 2
   refus). Retour après 20 min d'absence : `welcomeBack`. Outil `assistant_ajouter_plan_journee` (ajoute le plan, avec accord).
 - Lecture dans la Bibliothèque (v1.46) : `modules/books/read_finder.dart` (`ReadFinder` : titre nettoyé `ReadQuery.parse`
@@ -142,25 +142,25 @@
   d'emprunt) ; `confident` = ressemblance du titre ≥ 0,95 sinon « C'est celui-ci ? » ; `pickChapters` un chapitre par
   numéro ; chapitres officiels `externalUrl` ouverts dans le navigateur). `Book.read` = `ReadLink` (source, chapitre,
   page). Lecteurs : `modules/books/reader_page.dart` (`openReading`, `ScanReaderPage` page par page / webtoon / sens
-  japonais, `TextReaderPage` liseuse avec texte gardé dans `lectures/`, `WebBookPage`). Outil Smily `livre_ou_lire`.
+  japonais, `TextReaderPage` liseuse avec texte gardé dans `lectures/`, `WebBookPage`). Outil Nexo `livre_ou_lire`.
   Jamais de site pirate ni de scraping : seulement ces API publiques.
 - **Sécurité (v1.47)** : `SECURITY.md`. Pont local (`claude_bridge.dart`) : clé 64 hex comparée en temps constant
   (`sameKey`), refus des pages web (`fromThisPc` : Origin / Host), corps limité (`maxBody`), `/call` demande l'accord
-  pour les actions d'écriture (sauf Smily partout qui l'a déjà demandé : en-tête `x-monhub-client: clicky` +
+  pour les actions d'écriture (sauf Nexo partout qui l'a déjà demandé : en-tête `x-monhub-client: clicky` +
   `confirme`). **Jamais `cmd /c start`** : `core/safe_open.dart` (`SafeOpen.launch` = ShellExecute, `risky` → accord
   via `PcControl.confirmRisky`). `PcControl.secretPath` (mots de passe, cookies, clés : jamais lus/écrits),
   `riskyWrite` (démarrage, scripts : toujours demandés), `dangerous` élargi. Bouclier anti-piège
   `core/prompt_shield.dart` (`wrap` = résultats d'outils extérieurs étiquetés « données », `tainted` 15 min → le mode
   auto redemande, `rule` dans les consignes Claude et Gemini Live). `ErrorLog.redact` (clés masquées). Mise à jour :
   empreinte SHA-256 obligatoire + `Updater.trustedUrl`. Workflow : `permissions: contents: read`, Dependabot.
-- **Smily économe** : `core/tool_router.dart` (`ToolRouter` : groupes d'outils par mots-clés, `pick`, méta-outils
+- **Nexo économe** : `core/tool_router.dart` (`ToolRouter` : groupes d'outils par mots-clés, `pick`, méta-outils
   `mon_hub_outils` / `mon_hub_action` résolus par `resolve` pour garder les permissions, `cap` des résultats ;
   `/mcp?groupes=`), `ui/clicky/thrift.dart` (`ClaudeThrift.light` → Gemini, `heavy` → effort medium sinon low,
   `ClaudeUsage` compteur local), `cache_control` dans `ClaudeApi`, réglage `thrift`. Modèle conseillé : Claude Opus 5.5
   (`claude-opus-5-5`).
 - **Ton fil** (modules reliés) : `core/hub_feed.dart` (`HubFeed.build` sans IA à partir des outils de lecture
-  agenda/devoirs/révisions/livres + pastilles ; `say` pour Smily), `ui/hub_feed_view.dart` (`HubFeedStrip` à
-  l'accueil). Smily proactif : `ClickyController.feedNudge` (1 info importante, ≤ 6/jour, 45 min d'écart) + retour.
+  agenda/devoirs/révisions/livres + pastilles ; `say` pour Nexo), `ui/hub_feed_view.dart` (`HubFeedStrip` à
+  l'accueil). Nexo proactif : `ClickyController.feedNudge` (1 info importante, ≤ 6/jour, 45 min d'écart) + retour.
 - **Modules perso** : `core/custom_modules.dart` (`CustomModules` : catalogue, site https dans `HubWebView`, liste de
   liens ; `hub.custom` ; ids `perso_…`), `ui/add_module.dart` (carte « + » à l'accueil, `AddModuleSheet`),
   `HubController.add/remove`.
@@ -177,7 +177,7 @@
   empreinte]` ; fusion `SyncMerge` clé par clé, **le plus récent gagne**, suppressions gardées 90 j, garde-fou
   `checkNotWiped`. `sync-base.json` = empreintes de la dernière synchro. Jamais synchronisé : `sync.*`, `app.*`,
   `shortcut.*`, `hub.detached*`, `vault.key`, `rangement-*`. Toutes les 3 min (`start` dans `HubApp._sync`, `onApplied` →
-  `HubController.reload`, Smily). **PC principal hors de portée** : le nouvel appareil dépose `demande-compte-<id>.json`
+  `HubController.reload`, Nexo). **PC principal hors de portée** : le nouvel appareil dépose `demande-compte-<id>.json`
   (`requestCopy`) ; Mon Hub ouvert sur le PC principal la voit (`answerRequests`, toutes les 5 min, tous les comptes Google
   connectés) → active la synchro tout seul, efface la demande, notification (`onNotice`). Nouvel appareil : page de
   connexion → « Retrouver mon compte d'un autre appareil » (`ui/account_sync_view.dart` `JoinAccountView` : `beginJoin`
@@ -206,7 +206,7 @@
   fenêtre »).
 - Gels : `core/freeze_watch.dart` (`FreezeWatch` : guetteur dans un Isolate, note « figé » dans `journal-erreurs.log`
   après 4 s sans battement, avec `FreezeWatch.note(...)` = ce que l'appli faisait ; démarré par `ErrorLog.install`,
-  pas en debug). Photos de Révisions réduites hors du fil (`Photo.toJpeg`). Smily coincé : `_armStuck` (écoute 2 min,
+  pas en debug). Photos de Révisions réduites hors du fil (`Photo.toJpeg`). Nexo coincé : `_armStuck` (écoute 2 min,
   réflexion 4 min sans nouvelle → `cancel()` + message, noté dans le journal).
 - **Écouter un cours** : `ui/clicky/course_listener.dart` (`CourseListener` : micro `record` en WAV 16 kHz par morceaux de
   4 min, transcrits pendant le cours — Whisper d'abord (`Whisper.transcribe(timeout:)`), sinon `GeminiTranscriber` —,
@@ -215,13 +215,13 @@
   `doc_creer` / cartes `revision_generer`, `CourseRecLayer` = pastille rouge dans le builder de `HubApp`). Outils
   `cours_ecouter` / `cours_arreter` / `cours_comptes_rendus` (groupe `cours` du `ToolRouter`), phrases sans IA dans
   `QuickAnswers` (« écoute le cours », « arrête le cours »). Bouton dans Révisions.
-- Réglages de Smily **rangés** : `ui/clicky/clicky_settings_page.dart` (`ClickySettingsPage` : recherche, « L'essentiel »,
+- Réglages de Nexo **rangés** : `ui/clicky/clicky_settings_page.dart` (`ClickySettingsPage` : recherche, « L'essentiel »,
   rubriques `ClickySection.all` → `ClickyMoreSettings(section:)` ou `(query:)`), `ClaudeModule.showSettings` = cette page,
-  `ClaudeModule.showBrain` = le cerveau seul. Réglages de Mon Hub : une seule entrée « Réglages de Smily ».
-- **Smily façon JARVIS (v1.51)** : `ui/clicky/jarvis.dart` — `SystemStatus` (FFI win32 : batterie `GetSystemPowerStatus`,
+  `ClaudeModule.showBrain` = le cerveau seul. Réglages de Mon Hub : une seule entrée « Réglages de Nexo ».
+- **Nexo façon JARVIS (v1.51)** : `ui/clicky/jarvis.dart` — `SystemStatus` (FFI win32 : batterie `GetSystemPowerStatus`,
   mémoire, disque C:, processeur `GetSystemTimes` sur 0,4 s, internet ; `topMemory` = `tasklist /fo csv` regroupé ;
   `say()` « Tous les systèmes sont opérationnels » ou les soucis ; `batteryNow`/`batteryAlert` à 20 % puis 10 %),
-  `FocusMode` (fichier partagé `concentration.json` : Smily ne dit rien de lui-même — `_calm` et `autonomyTick` —,
+  `FocusMode` (fichier partagé `concentration.json` : Nexo ne dit rien de lui-même — `_calm` et `autonomyTick` —,
   `NotificationCenter.post` garde les notifications (sauf appels Discord), bilan à la fin par `autonomyTick`, pastille
   `FocusPill` dans `CourseRecLayer`), `AppReminders` (`rappels-applis.json`, dit quand l'appli **arrive** au premier plan,
   `_checkAppReminder` dans `_presenceTick`), `ClickySituation` (bloc « En ce moment » dans `_system` et `_liveSystem`,
@@ -233,14 +233,14 @@
   **Conversation continue** (réglage `followUp`, partagé) : après une réponse à une question posée à la voix
   (`_spokenAsk` → `_voiceTurn`, Live : `_liveStop`), `_followUpSoon` attend la fin de la voix et réécoute
   (`following`, `_armFollowTimer` : rien dit en 6 s → arrêt silencieux, 20 s max, 5 tours de suite). Page
-  « Ce que Smily sait faire » = `ClickySkillsPage` (`jarvis_view.dart`), en tête des réglages de Smily.
-- **Smily partout colle à la souris (v1.52)** : c'est **Windows** qui déplace la fenêtre, dans le lanceur
+  « Ce que Nexo sait faire » = `ClickySkillsPage` (`jarvis_view.dart`), en tête des réglages de Nexo.
+- **Nexo partout colle à la souris (v1.52)** : c'est **Windows** qui déplace la fenêtre, dans le lanceur
   (`windows/runner/clicky_follow.cpp/.h` : raw input `RIDEV_INPUTSINK` → `SetWindowPos` à chaque mouvement, restant dans
   l'écran du curseur ; message `WM_APP + 0x51` envoyé par Dart = `Win.follow(on, dx, dy)`, décalage `Win.packOffset`).
   Dart (`_DesktopState._place`) ne reprend la main que pour les vols, la boîte ouverte, une fenêtre posée et les dessins
   (`_setNative(false)` relit `Win.windowRect`), vols calculés à chaque image (`Ticker _frames`) ; `Win.resize` (sans
-  bouger) pour la taille et rester au premier plan. `moveCursor` ne redessine plus Smily en mode partout. Captures :
-  Smily n'est plus caché (`Win.excludeFromCapture` = `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`, sinon ancien
+  bouger) pour la taille et rester au premier plan. `moveCursor` ne redessine plus Nexo en mode partout. Captures :
+  Nexo n'est plus caché (`Win.excludeFromCapture` = `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`, sinon ancien
   repli), image réduite par Windows (`Win.captureScaled`, StretchBlt HALFTONE), **JPEG** fait dans un Isolate
   (`shot_encode.dart` `encodeShot` : alpha remis à 255 sinon blanc) ; `png64` peut donc être du JPEG → toujours annoncer
   `imageMime(b64)`. Le C++ se vérifie ici avec `x86_64-w64-mingw32-g++ -fsyntax-only -Wall -Wextra -Werror`.
@@ -249,7 +249,7 @@
   `matchSubject` « maths » → MATHEMATIQUES, `weekReport`) ; outils `ecole_moyenne`, `ecole_bilan_notes`, notification
   « bilan » le vendredi ≥ 17 h (`poll`, id `bilan-notes:<lundi>`). **Prépare ton sac** : `ui/clicky/school_bag.dart`
   (`SchoolBag.plan/say`, une famille d'affaires par cours, réglages `parseCustom`), automatisme `sac` de l'`Assistant`
-  (`bagMinutes` 19 h 30, `bagItems`, `_BagDialog`), outil `assistant_sac`. **Ctrl + Alt + C** (Smily partout) =
+  (`bagMinutes` 19 h 30, `bagItems`, `_BagDialog`), outil `assistant_sac`. **Ctrl + Alt + C** (Nexo partout) =
   `ClickyController.fixSelection` (copie la sélection, `TextFix.prompt/clean/changes`, recolle, remet le presse-papier ;
   modes corriger / reformuler / traduire:langue ; outil `clicky_corriger_selection`). **Notifications regroupées** :
   `NotificationCenter.digest` (30 min par défaut, réglage), `urgent` (sans module, appels, cours annulés) passe,
@@ -263,7 +263,7 @@
 - **Extension Chrome + « fais-le à ma place » (v1.54)** : `assets/chrome-extension/` (MV3 : `manifest.json` avec
   `key` → id fixe `nejfhocplopdmnijfodbmcbelcciblji`, `background.js` : WebSocket `ws://127.0.0.1:47614/navigateur`,
   réveil `chrome.alarms`, commandes tabs/open/read/describe/click/type/key/focus/close, pages bloquées `BLOCKED`, onglets
-  dans le groupe « Smily », vrai clavier/souris par `chrome.debugger` (CDP `Input.insertText`) ; **les fonctions
+  dans le groupe « Nexo », vrai clavier/souris par `chrome.debugger` (CDP `Input.insertText`) ; **les fonctions
   injectées dans la page ne voient pas le reste du fichier** — `find` y est celui du navigateur). Testé en vrai avec
   Playwright (Chromium, `channel: 'chromium'`, `--load-extension`). Côté Mon Hub : `core/browser_link.dart`
   (`BrowserLink` : serveur local, `allowedOrigin`, `call`, outils `nav_*`, `risky` → `confirm`, `trustedUntil`,
@@ -271,10 +271,10 @@
   ressources dans %APPDATA%\MonHub\extension-chrome, ouvre chrome://extensions). Tâches de fond :
   `ui/clicky/background_tasks.dart` (`BackgroundTasks.start` → `runner` = `ClickyController.runTask`, pastille
   `TaskPill`, `cancel`), `ClickyController.forMeRe` (« fais-le à ma place », « en arrière-plan », « agent, »)
-  → `doForMe` (Smily partout passe par l'outil `clicky_a_ma_place` de Mon Hub), `confirmBrowser`. Sécurité :
+  → `doForMe` (Nexo partout passe par l'outil `clicky_a_ma_place` de Mon Hub), `confirmBrowser`. Sécurité :
   `nav_cliquer/ecrire/touche/fermer` = actions à autoriser (`isWriteAction`), sauf pendant une tâche (`trusted`),
   `nav_lire/onglets` = données extérieures (`PromptShield`). Voir `SECURITY.md`.
-- **Devoirs (v1.55)** : Smily **fait** les devoirs quand on le lui demande (demande de la personne) — plus de « tu
+- **Devoirs (v1.55)** : Nexo **fait** les devoirs quand on le lui demande (demande de la personne) — plus de « tu
   guides sans faire à sa place » : `clickyPersona(helpOnly:)`, `ClickyController.homeworkRules` (énoncé trouvé à l'écran,
   `ecole_devoirs`, `ecole_fichier_lire mode=enonce` = `FileViewer.summarize(full: true)`, travail complet + « Comment j'ai
   fait », long → Google Doc). « Fais mes devoirs (de maths pour lundi) » = `homeworkRequest` → `homeworkTask` → tâche
@@ -289,10 +289,10 @@
   `core/screen_time.dart` (`ScreenTime` tour 15 s dans `HubApp._sync`, `temps-ecran.json` **jamais synchronisé**,
   `appName` sites d'après le titre, `matchApp`, limites douces, `Sleep.bedtime`, automatisme `sommeil` +
   `assistant_coucher`), `GameMode` (plein écran ≥ 30 s hors `notGame` : notifications gardées, sauvegarde et synchro en
-  pause, Smily partout caché, bilan à la fin ; `jeu.auto`), page `ui/screen_time_page.dart` (Réglages → Bien-être) ;
+  pause, Nexo partout caché, bilan à la fin ; `jeu.auto`), page `ui/screen_time_page.dart` (Réglages → Bien-être) ;
   recherche partout `core/everywhere_search.dart` (`EverywhereSearch.run` : outils de lecture + index Windows ADODB
   `pcScript`, `pcQuery` nettoie les mots ; `fromTool` par outil) + `ui/search_page.dart` (`SearchPage.show`, Ctrl + Espace
-  via `HubHome.onSearchText`, Ctrl + Alt + Espace dans Smily partout → `recherche_ouvrir` + `Win.raiseMain`, bouton 🔍 de
+  via `HubHome.onSearchText`, Ctrl + Alt + Espace dans Nexo partout → `recherche_ouvrir` + `Win.raiseMain`, bouton 🔍 de
   l'accueil) ; anniversaires `core/birthdays.dart` (`anniversaires.json` synchronisé, `nameInTitle` agenda, `parseDate`,
   `upcoming`, `wish`) + automatisme `anniversaires` (veille 19 h, jour même 8 h) + `ui/birthdays_page.dart`. Outils dans
   `ClickyController.lifeTools` / `jarvisTools` / `Assistant.tools`, groupes `securite`/`recherche`/`ecran`/`anniversaires`
@@ -316,7 +316,7 @@
   (powrprof SetSuspendState), `shutdown /s /t 60` + `/a`). `extraRoutes` = autres pages sur le même serveur (soirée).
   Page du téléphone : `assets/phone/` (onglets Envoyer / Du PC / Texte / Télécommande, pavé tactile 1 doigt = souris,
   2 doigts = défiler, toucher = clic ; « Sur l'écran d'accueil » iPhone). Mon Hub : `PhoneLinkPage` (QR `QrView`, paquet
-  `qr`), bouton de l'accueil + Réglages → Mes appareils → Mon téléphone. Outil Smily `telephone_envoyer` (groupe
+  `qr`), bouton de l'accueil + Réglages → Mes appareils → Mon téléphone. Outil Nexo `telephone_envoyer` (groupe
   `telephone`). Le pare-feu de Windows demande l'autorisation la 1ʳᵉ fois.
 - **Playlist de soirée** : `core/party.dart` (`Party` : route `extraRoutes` du serveur de `PhoneLink` (démarré avec
   `start(force: true)`, arrêté à la fin si « Mon téléphone » n'est pas activé), lien des invités `/soiree/<24 hex>/` qui
@@ -344,7 +344,7 @@
   « jeux gratuits »). **Mots de passe fuités** : `core/pwned.dart` (`PwnedPasswords` : k-anonymat, SHA-1 sur l'appareil,
   seuls 5 caractères envoyés, `Add-Padding`), carte `PwnedCheckCard` dans le bilan de sécurité (mot de passe effacé
   après la vérification, jamais gardé).
-- **Outils d'études (vague 3)**, menu ✨ de Révisions + outils Smily (groupe `etudes`) :
+- **Outils d'études (vague 3)**, menu ✨ de Révisions + outils Nexo (groupe `etudes`) :
   **Correction de copie** `ui/clicky/copy_check.dart` (`CopyCheck` : photo → `Photo.toJpeg` 1800 px → `AiText.ask` (Gemini
   d'abord) avec `box_2d` [ymin, xmin, ymax, xmax] en millièmes, `parse` remet dans l'ordre et borne ; `CopyCheckPage` :
   cadres colorés numérotés par type sur la photo (`InteractiveViewer`), liste faux → correction + règle, note /20 ; une
@@ -358,13 +358,13 @@
   les minutes + `AiText` ; chapitres cliquables → `YouTubeModule.open` à la seconde, quiz, Google Doc / cartes), outil
   `video_fiche`. **Carte mentale** `ui/clicky/mind_map.dart` (`MindMaps.parse` 3 niveaux, `layout` radial (240 px puis
   +200 par niveau, chaque branche dans sa part du cercle), `MindMapPage` : une seule `AnimationController` interpole
-  positions des idées et des liens (`_Links`), déplier/replier, « Smily explique » à voix haute, Google Doc / cartes),
+  positions des idées et des liens (`_Links`), déplier/replier, « Nexo explique » à voix haute, Google Doc / cartes),
   outil `carte_mentale`, « fais une carte mentale sur … ».
 - **Langues** (groupe `langues`) : **Interprète** `ui/clicky/interpreter.dart` (`GeminiLive(autoVad: true, language: null,
   tools: [])` : Gemini repère seul les tours de parole, consignes `Interpreter.system` = traduire seulement ; micro coupé
   pendant que la traduction est lue (`PcmPlayer.playing`) pour ne pas se traduire lui-même ; transcriptions entrée /
   sortie affichées), outil `interprete_ouvrir`, « interprète anglais ». `GeminiLive` : `tools` et `realtimeInputConfig`
-  omis quand vides / `autoVad`, `languageCode` omis si `language` null (Smily inchangé). **Sous-titres en direct**
+  omis quand vides / `autoVad`, `languageCode` omis si `language` null (Nexo inchangé). **Sous-titres en direct**
   `ui/clicky/loopback.dart` (`LoopbackCapture` : WASAPI en boucle (`AUDCLNT_STREAMFLAGS_LOOPBACK`) dans un Isolate, format
   de mixage float32 ou int16 → mono → `Resampler` (interpolation linéaire, sans couture) → PCM 16 kHz) +
   `ui/clicky/live_captions.dart` (`hub.exe --widget=soustitres` → `runCaptionsWindow` : fenêtre à part, toujours au
@@ -372,7 +372,7 @@
   à Gemini qui écrit la traduction (`LiveCaptions.prompt/clean`, « (rien) » = pas de paroles), sinon Whisper `lang: auto`
   (langue d'origine) ; quitter = `DesktopWidgets.send(id, 'quit')`), outil `soustitres_lancer`, « mets les sous-titres ».
   Les deux sont aussi dans le menu ✨ de Révisions.
-- **Smily vivant (v1.57)** : il **garde son look de curseur** (pas de visage, demande de la personne) et vit avec des
+- **Nexo vivant (v1.57)** : il **garde son look de curseur** (pas de visage, demande de la personne) et vit avec des
   **émojis** à côté de lui. `ui/clicky/life.dart` (`ClickyLife` : `show` émoji passager, `shown` (💤 quand il dort, 🎵
   quand il danse), accessoire `refreshAccessory` — fêtes `seasonAccessory` (🎅 1–26 déc., 🎃, 🥳, 🐟…) > vraie météo
   `weatherAccessory` (résultat de `carnet_meteo` : 🧣 ≤ 4 °C, ☂️, ⛄, 😎 ≥ 28 °C) ; ☕ le matin passe avant tout —,
@@ -389,13 +389,13 @@
   `restSpot` ; réveil = souris ≥ 160 px, clavier ou clic → 😮 🥱 ; bâille le soir ; s'ennuie → émoji après 1 h 30 sans
   question ; café + rêve le matin), `_perch` (1 regard sur 4 : assis en haut de la fenêtre `perchSpot`, tombe 😱 si elle
   bouge / change, caresse = petits allers-retours 🥰 `ClickyMind.petted`, souris qui approche = il revient),
-  `_lifeMove` (dans `moveCursor` ; `_lifeHold` empêche le retour auto), `userClicked` (clics, Smily partout `_loop`),
-  `_checkDance` (Smily partout : `musique_joue` du module Musique, sans rien recharger, puis `LoopbackCapture` →
+  `_lifeMove` (dans `moveCursor` ; `_lifeHold` empêche le retour auto), `userClicked` (clics, Nexo partout `_loop`),
+  `_checkDance` (Nexo partout : `musique_joue` du module Musique, sans rien recharger, puis `LoopbackCapture` →
   `BeatDetector`), `reactTo` (branché sur `NotificationCenter.onAny` dans `HubApp._sync`) → `feel` (`feel64` vers
-  Smily partout), `lifeNote` (sa bulle, qui suit la souris). Réglages dans `ClickyMind` (`life`, `life.dance`,
-  `life.perch`, `life.react`, `lifePace`, `lifeState` = dernier rêve / sieste) et Réglages → Conscience de Smily
+  Nexo partout), `lifeNote` (sa bulle, qui suit la souris). Réglages dans `ClickyMind` (`life`, `life.dance`,
+  `life.perch`, `life.react`, `lifePace`, `lifeState` = dernier rêve / sieste) et Réglages → Conscience de Nexo
   (« Sa vie à lui »). Tests : `test/v169_alive_test.dart`.
-- **Yeux et oreilles de Smily (v1.58)** : il voit l'écran et entend le son du PC **en continu, sur le PC** (demande de la
+- **Yeux et oreilles de Nexo (v1.58)** : il voit l'écran et entend le son du PC **en continu, sur le PC** (demande de la
   personne). `core/screen_memory.dart` (`ScreenMemory` : `memoire-ecran.json` chiffré, 7 jours, 1 500 moments, **jamais
   synchronisé** (`AccountSync.syncedFile`), `ScreenMoment` vu/entendu (`heard`), même fenêtre + même texte = prolongé,
   `search` (mots, pluriels), `between`, `say/sayBetween`, `forget` ; `TimeWindow.parse` : hier (soir), mardi vers 16 h,
@@ -417,7 +417,7 @@
   `memoire_oublier`, `sens_etat`, `sens_regler` (**action à autoriser**, `isWriteAction`), `clicky_expliquer_ecran`
   (groupe `memoire` du `ToolRouter`), phrases sans IA dans `QuickAnswers` (« tu te souviens du site sur… », « qu'est-ce
   que je faisais mardi vers 16 h », « qu'est-ce qu'il a dit ? », « oublie les 10 dernières minutes », « ferme les yeux
-  pendant 1 h », « regarde mon écran »). Page `ui/clicky/senses_page.dart` (Réglages de Smily → Ses yeux et ses
+  pendant 1 h », « regarde mon écran »). Page `ui/clicky/senses_page.dart` (Réglages de Nexo → Ses yeux et ses
   oreilles). Tests : `test/v170_senses_test.dart`.
 - **Presse-papier malin + PC qui réagit (v1.58)** : `ui/clicky/pc_watch.dart`. `ClipSmart.classify` (sans IA) : lien
   d'arnaque (`ScamShield.checkUrl`, même copié dans une messagerie) → bulle + notification ; calcul (`Calc`, pas les dates /
@@ -431,7 +431,7 @@
   (15 s) : clé USB (`GetLogicalDrives`, `DRIVE_REMOVABLE`, `PcRules.suspicious` → alerte), appli « (Ne répond pas) » 30 s
   → `pc_etat`, disque < 5 Go → `pc_ranger_apercu`. Idées dans le budget commun `ClickySenses.offer`. Réglages
   `app.clip.malin` / `app.pc.reagit` (oui par défaut) dans la page Ses yeux et ses oreilles. Tests `test/v171_pc_watch_test.dart`.
-- **Ville** (météo, accessoires de Smily) : Carnet → Réglages, ou Réglages de Smily → Conscience → Sa vie à lui, ou
+- **Ville** (météo, accessoires de Nexo) : Carnet → Réglages, ou Réglages de Nexo → Conscience → Sa vie à lui, ou
   « j'habite à Lyon » (`ClickyLife.cityFrom` dans `_handleSelf` → `Carnet.setSetting('city')`).
 - **« Préviens-moi quand… » (v1.58)** : `ui/clicky/watchers.dart`. `WatchParse` (sans IA : `lead` = « préviens-moi / dis-moi /
   tu me dis quand… », `parse` → `Watch` note (matière), devoir, message (Discord / ED, `mail` = mails seulement), page (lien
@@ -445,19 +445,19 @@
 - **Habitudes (v1.58)** : `ScreenTime.hours` (jour → heure → appli → secondes, 35 j). `ui/clicky/habits.dart` (`Habits.find`
   : ≥ 10 min, 3 semaines sur les 4 dernières ; `upcoming` ; `nudge` = « d'habitude à 14 h c'est Roblox… contrôle de SVT
   demain : 20 min avant ? » (`ClickySenses._habitNudge`, une fois par jour) ; `insights` : habitudes, heure la plus active,
-  heure où tu quittes le PC, appli n° 1). Outil `clicky_habitudes`, « mes habitudes », section « Ce que Smily a remarqué »
+  heure où tu quittes le PC, appli n° 1). Outil `clicky_habitudes`, « mes habitudes », section « Ce que Nexo a remarqué »
   dans la page Temps d'écran.
 - **Veille sur tes artistes (v1.58)** : `ui/clicky/interests.dart` (`ArtistWatch` : 2 fois par jour, `topArtists` des titres
   likés (`musique_titres_likes`), API publique Deezer (recherche d'artiste + albums), `fresh` < 10 jours, 3 annonces max,
   `veille.json` jamais synchronisé, réglage `app.veille`). Interrupteurs dans la page Ses yeux et ses oreilles. Tests :
   `test/v172_watchers_test.dart`.
 - **Menus plus clairs + nouvelle visite (v1.59)** : Réglages de Mon Hub (`ui/settings_page.dart`) = recherche + carte
-  **Smily** en tête (`_ClickyHero` : Réglages de Smily, Ce qu'il sait faire, Revoir la visite) + rubriques
+  **Nexo** en tête (`_ClickyHero` : Réglages de Nexo, Ce qu'il sait faire, Revoir la visite) + rubriques
   `SettingsCategory.all` (Mon compte, Apparence, Notifications, Mes modules, Mes appareils, Google/sauvegarde/rangement,
   Bien-être, Sécurité et vie privée, Démarrage et raccourcis ; `find` par mots-clés, `clickyMatches`) ouvertes chacune sur
   sa page (`_SettingsSection`, contenu `_content(id, context, refresh)` — utiliser `refresh()` et pas `setState` dedans).
-  Réglages de Smily (`clicky_settings_page.dart` `_groups`) rangés par thème : Bien démarrer, Lui parler, Ce qu'il fait
-  pour toi, Sa personnalité, Vie privée et avancé. Catalogue **« Ce que Smily sait faire »** = `ui/clicky/skills.dart`
+  Réglages de Nexo (`clicky_settings_page.dart` `_groups`) rangés par thème : Bien démarrer, Lui parler, Ce qu'il fait
+  pour toi, Sa personnalité, Vie privée et avancé. Catalogue **« Ce que Nexo sait faire »** = `ui/clicky/skills.dart`
   (`ClickySkills.groups` : `SkillGroup` emoji/titre/`isNew`, `Skill(text, tryIt:)` ; recherche `search`, filtres, ▶ =
   essayer → `ClickyController.askAnywhere` ; bouton ✨ dans l'en-tête de l'accueil) — **y ajouter chaque nouvelle
   capacité**. Visite guidée `ui/clicky/tutorial.dart` (`ClickyTutorial.tour` : 11 `TourPage` avec `examples` à essayer
@@ -465,7 +465,7 @@
   `_LifeGridVisual`, `_AliveVisual` (vrai `ClickyLifeBody`) ; `FittedBox` sur petit écran ; clé `tutorial.v159` =
   remontrée une fois à tous ; changer la clé quand la visite change beaucoup). Tests `test/v173_menus_tour_test.dart`.
 - **v1.60 — Mon Hub en ligne + interface HUD** (demande de la personne : « un vrai truc », espaces partagés entre
-  comptes, même compte partout, Android + iPhone, toutes les applis, chat entre comptes et entre Smily).
+  comptes, même compte partout, Android + iPhone, toutes les applis, chat entre comptes et entre Nexo).
   **Serveur** = projet Supabase de la personne : `supabase/schema.sql` (tables `profiles`, `spaces`, `space_members`,
   `tasks`, `messages`, `account_files` ; RLS partout ; ajout de membres seulement par RPC `create_space` / `join_space`
   (code 10 hex) / `open_dm` (@pseudo) / `new_invite_code` ; temps réel messages/tâches/membres), copié dans l'appli
@@ -479,16 +479,16 @@
   `core/online/online_account.dart` (`putOnline` = même mot de passe que Mon Hub, `join` = nouvel appareil : page de
   connexion → « Mon compte en ligne » (`ui/online/online_sign_in.dart`), `NoOnlineCopy` → créer le compte ici).
   Réglages → « Compte en ligne et espaces » → `ui/online/online_page.dart` (serveur en 4 étapes, « Copier le script »,
-  compte, profil, Smily entre eux). **Espaces** : `core/online/spaces.dart` (`Spaces` : liste, membres, profils,
+  compte, profil, Nexo entre eux). **Espaces** : `core/online/spaces.dart` (`Spaces` : liste, membres, profils,
   non lus, épinglés `hub.spaces.pinned` (synchronisés), tâches `todo/doing/review/done`, messages, un seul canal temps
-  réel + relecture toutes les 2 min, `onMessage` → notification `espace:<id>:<n>` + Smily). UI : `ui/spaces/` (`SpacePage`
-  tableau glisser-déposer + discussion, `SpacesPage`, `SpaceActions` créer/rejoindre/message/inviter). **Smily dans les
-  discussions** : `core/online/clicky_chat.dart` (`@clicky` dans **mon** message → **mon** Smily répond ; entre Smily
+  réel + relecture toutes les 2 min, `onMessage` → notification `espace:<id>:<n>` + Nexo). UI : `ui/spaces/` (`SpacePage`
+  tableau glisser-déposer + discussion, `SpacesPage`, `SpaceActions` créer/rejoindre/message/inviter). **Nexo dans les
+  discussions** : `core/online/clicky_chat.dart` (`@clicky` dans **mon** message → **mon** Nexo répond ; entre Nexo
   seulement si `spaces.clicky_chat` ET réglage `hub.clickychat.autres` ; un seul répond (`replyTo`), `maxDepth` 4, 15 s
   d'écart, 30/jour ; aucun outil ; messages étiquetés `PromptShield.wrap('espaces_messages')`). Branché dans
   `HubApp._startOnline`. **Interface** : `ui/app_shell.dart` (menu : Aujourd'hui, Mes applis, Espaces (épinglés
   d'abord), Discussions, Modules — sections repliables `hub.menu.replie` ; téléphone : barre Aujourd'hui / Espaces /
-  Chercher / Menu en tiroir), `ui/home_page.dart` (en-tête HUD, console Smily : question → `ClickyController.ask`, ou
+  Chercher / Menu en tiroir), `ui/home_page.dart` (en-tête HUD, console Nexo : question → `ClickyController.ask`, ou
   nom d'appli → Entrée l'ouvre ; blocs) + `ui/hud/home_layout.dart` (`HomeLayout` : blocs `mod:<id>` / `fil` /
   `espaces` / `taches` / `discussions` / `applis`, largeur S/M/L, `resolve`, `rows` (rangées construites **à la
   demande** : SliverList), mode « Personnaliser » glisser/taille/retirer/ajouter, `hub.accueil.blocs`). **Toutes les
@@ -500,14 +500,14 @@
   (nouvel accueil).
 - **Mode léger (v1.61)** : `core/perf.dart` (`Perf` : réglage `app.perf` = auto / `leger` / `complet`, détection
   `PerfRules.modest` (cœurs `Platform.numberOfProcessors` + mémoire `GlobalMemoryStatusEx`), `Perf.slow(durée)` pour
-  tous les tours de surveillance, `Perf.everywhere` (Smily partout = second programme, **coupé** sur un PC modeste :
+  tous les tours de surveillance, `Perf.everywhere` (Nexo partout = second programme, **coupé** sur un PC modeste :
   c'est ce qui l'empêchait de démarrer), `Perf.heavy` (yeux/oreilles, sauvegarde, guetteur de gels), `Perf.animations`,
   `Perf.later(rang, …)` = **démarrage étalé** au lieu de tout lancer à la connexion dans `HubApp._sync`). Branché dans
   `main.dart`, `screen_time.dart`, `pc_watch.dart`, `senses.dart` (`screenOn`/`soundOn` faux en mode léger),
   `clicky.dart` (`_startPresence`), `clicky_desktop.dart` (`launch`/`watch`/boucle 16 ms), `error_log.dart`
   (`FreezeWatch`). Réglages → Vitesse de l'appli. Tests `test/v175_perf_test.dart`.
 - **Interface simplifiée (v1.61)** : accueil (`ui/home_page.dart`) = **un seul** menu « Plus » en haut (notifications +
-  `PopupMenuButton` : ce que Smily sait faire, mon téléphone, clair/sombre, personnaliser, réglages) au lieu de sept
+  `PopupMenuButton` : ce que Nexo sait faire, mon téléphone, clair/sombre, personnaliser, réglages) au lieu de sept
   boutons dont trois doublaient le menu de gauche ; plus de faux jargon (« SYSTÈME OK », « RIEN DE NOUVEAU », code-barres) :
   des phrases normales. Menu (`ui/app_shell.dart`) : **une seule** section « Espaces et messages » (avant « Espaces » +
   « Discussions », mêmes pages) avec un seul « + » (créer / rejoindre / écrire). Tests `test/v162_iphone_test.dart`
@@ -522,21 +522,18 @@
   Tests `test/v176_camera_test.dart`.
 - **Il se répare tout seul (v1.61)** : `core/self_repair.dart` (`RepairRules` sans fichiers : `recentLines` (48 h,
   garde les lignes sans date), `diagnose` → `Repair` (micro bloqué ≥ 2 traces → `clicky_reparer_micro`,
-  `CERTIFICATE_VERIFY_FAILED` → `TrustedCertificates.install`, « figé » ≥ 3 ou Smily partout fermé ≥ 3 →
+  `CERTIFICATE_VERIFY_FAILED` → `TrustedCertificates.install`, « figé » ≥ 3 ou Nexo partout fermé ≥ 3 →
   `Perf.setChoice('leger')`, disque < 2 Go → `pc_ranger_apercu`, JSON abîmé → `AccountSync.syncNow`), `say` ;
   `SelfRepair` : `run({manual})` (une panne réparée n'est retentée qu'à la demande, `app.repare.fait`), branché dans
-  `main.dart` (`Perf.later(7, …)` au démarrage, notification « 🔧 Smily s'est réparé tout seul »), outil
+  `main.dart` (`Perf.later(7, …)` au démarrage, notification « 🔧 Nexo s'est réparé tout seul »), outil
   `clicky_reparer` dans `repairTools`, phrases sans IA (« répare-toi », « tu bugues »)). Il ne supprime jamais rien et
   dit toujours ce qu'il a fait. Tests `test/v177_self_repair_test.dart`.
-- **Smily (v1.61, ex-Clicky)** : l'assistant s'appelle **Smily** et c'est un **smiley** qui change d'expression, plus un
-  curseur (le nom, le look « curseur » et la persona venaient d'un produit existant : ne jamais les remettre).
-  `ui/clicky/smily.dart` (`SmilyMood` : 🙂 calm, 😮 listening, 🤔 thinking, 😄 speaking, 😎 acting, 🧐 working, 😴 asleep,
-  🤫 quiet, 🤩 happy, 😟 worried ; `SmilyRules.moodFor` — ce qu'il **fait** passe avant son humeur —, `SmilyRules.say` ;
-  `SmilyFace` = l'émoji en fondu + le compteur de tâches), utilisé par `_Pointer` dans `clicky.dart` (`_TrianglePainter`
-  supprimé). Mot de réveil : `WakeWord.phrases` = smily / smiley / similé (+ « clicky » gardé en alias). Les **noms de
-  code restent** `Clicky*` / `clicky_*` (classes, outils, clés de réglages, fichiers) : seuls les textes vus par la
-  personne ont changé. Le titre de la fenêtre est « Smily » dans `windows/runner/main.cpp` **et** dans `Win.windowRect` :
-  les deux doivent rester d'accord. Tests `test/v178_smily_test.dart`.
+- **Smily (v1.61, ex-Clicky)** : l'assistant s'était appelé Smily, un smiley qui change d'expression (`ui/clicky/smily.dart` :
+  `SmilyMood`, `SmilyRules.moodFor` — ce qu'il **fait** passe avant son humeur —, `SmilyRules.say`, `SmilyFace`). Depuis la
+  v1.66 c'est **Nexo** avec un **curseur** (voir plus bas) ; `SmilyMood`/`SmilyRules` servent toujours à choisir son mode.
+  Les **noms de code restent** `Clicky*` / `clicky_*` / `Smily*` (classes, outils, clés de réglages, fichiers) : seuls les
+  textes vus par la personne changent. Le titre de la fenêtre de l'assistant partout est « Nexo » dans
+  `windows/runner/main.cpp` **et** dans `Win.findClicky` / `_perchSpot` : les deux doivent rester d'accord.
 - **Il n'insiste plus (v1.61)** : `ui/clicky/patience.dart` (`Answer` oui/plus tard/non/jamais, `PatienceRules.read`
   (« j'ai pas envie », « lâche-moi », « ne me le répète plus »), `silence` (1ᵉʳ refus 6 h, 2ᵉ 2 jours, 3ᵉ **abandon** ;
   « plus tard » = 2 h, « arrête » = abandon direct), `mayTalk`, `ack` ; `Patience` = un **seul** endroit qui retient les
@@ -585,7 +582,7 @@
   `_tellDream` raconte d'abord `takeUntold()`, puis `_offerDreamSkill` → idée `clicky_creer_capacite` (VoiceSkill
   `ask`, **action à autoriser**). `Assistant.remember` écrit aussi dans cette mémoire. Outils `memoire_retenir`,
   `memoire_souvenirs`, `memoire_effacer_souvenir`, `clicky_capacites_perso`. Page `ui/clicky/memory_page.dart`
-  (Réglages de Smily → Sa personnalité → Sa mémoire ; réglage `dreams`, bouclier d'appel). Tests
+  (Réglages de Nexo → Sa personnalité → Sa mémoire ; réglage `dreams`, bouclier d'appel). Tests
   `test/v181_jeux_appels_memoire_test.dart`.
 - **Version web (v1.63, iPhone sans PC)** : `lib/web/` = **appli à part** (`flutter build web -t lib/web/main.dart`,
   `--no-web-resources-cdn`), car l'appli PC ne compile pas pour le web (win32/FFI/dart:io). **Ne rien importer dans
@@ -603,7 +600,7 @@
   `PhoneSetupPage`). `account_copy.dart` lit (sans écrire) la copie `SyncBox` du compte en ligne (`p:hub.name`,
   `s:mod.claude.gemini.key`, `f:memoire.json`). `web_smily.dart` (`WebSmily` : règles puis Gemini `gemini-flash-latest`
   avec `PhoneRules.tools`, `geminiOverride` pour les tests, minuteurs, notification des messages d'espaces quand
-  l'appli est cachée). Écrans `web_app.dart` (bienvenue 3 choix, onglets Smily / Espaces / Téléphone / Réglages).
+  l'appli est cachée). Écrans `web_app.dart` (bienvenue 3 choix, onglets Nexo / Espaces / Téléphone / Réglages).
   Notifications quand l'appli est **fermée** : pas encore (il faudra un envoi « push » depuis le Supabase de la
   personne ; `smily_sw.js` sait déjà les afficher). Tests `test/v182_web_test.dart`.
 - **Caméra privée + flou du visage (v1.64)** (demande de la personne : peur qu'on pirate sa webcam) : **mode caméra
@@ -626,20 +623,63 @@
   une demande `generateContent` toutes les 8 s épuisait le petit quota gratuit en quelques minutes (« les sous-titres
   marchent pas »). Secours : morceaux `OralCoach.listen(fast: true)` (sans réflexion), puis Whisper après un 429
   (`quotaStatus`).
-- **Smily se connaît et compte ses jetons (v1.65)** (demande de la personne : « qu'il connaisse ses capacités, les
+- **Nexo se connaît et compte ses jetons (v1.65)** (demande de la personne : « qu'il connaisse ses capacités, les
   mises à jour via GitHub, les tokens, qu'il se règle et limite Claude ») : `ui/clicky/self_knowledge.dart`
   (`SelfKnowledge.search` = catalogue `ClickySkills` **+ les vraies actions** branchées, outil `clicky_capacites`
   **toujours envoyé** (`ToolRouter.always`), `promptBlock` dans `_system` et `_liveSystem`) ; `core/whats_new.dart`
   (`WhatsNew` : versions GitHub `releases?per_page=8` (corps = message du commit fusionné → **écrire un message de
-  fusion en français clair**, c'est ce que Smily raconte), `NewsRules.clean`, cache `app.nouveautes`, `afterUpdate` →
+  fusion en français clair**, c'est ce que Nexo raconte), `NewsRules.clean`, cache `app.nouveautes`, `afterUpdate` →
   notification « ✨ Mon Hub vX est installé » + `think` une fois (`app.version.vue`), outil `clicky_nouveautes`).
   **Jetons** : `core/token_budget.dart` (`TokenBudget` : `usage` lu dans le flux de `ClaudeApi._call`
   (`message_start` + `message_delta`), le `result` de Claude Code, `usageMetadata` de Gemini (`AiText`, Live) ; `poids`
   = lus + écrits × 5 + cache × 0,05 + mise en cache × 1,25 ; budget `jetons.budget` (200 k par défaut, Réglages de
-  Smily → Outils) ; `TokenRules.level` normal / économe ≥ 50 % / très économe ≥ 80 % / dépassé → `historyTurns` 8/4/2,
+  Nexo → Outils) ; `TokenRules.level` normal / économe ≥ 50 % / très économe ≥ 80 % / dépassé → `historyTurns` 8/4/2,
   `effort` low (sauf « réfléchis bien »), `geminiFirst` (Gemini répond d'abord, « CLAUDE » s'il lui faut Mon Hub),
   `webAllowed` ; annonce du dépassement une fois par jour ; outils `clicky_jetons`, `clicky_budget_jetons`). **Cache
   Claude** : `_system` = partie fixe, puis `ClaudeApi.momentMark`, puis le moment (heure, écran, situation, mémoire,
   jetons) → `ClaudeApi.systemBlocks` met un point de cache après la partie fixe (avant : l'heure en tête des consignes
   cassait le cache à chaque minute). Ne rien mettre qui change à chaque question **avant** la marque. Tests
   `test/v184_smily_lui_meme_test.dart`.
+- **Nexo (v1.66)** — demande explicite de la personne (24 nov. 2026) : « on remet Clicky… on garde le curseur mais un
+  meilleur nom, une vraie identité, façon JARVIS », puis « change de nom, un truc cool, utile et simple ». L'assistant
+  s'appelle **Nexo** (de *nexus*, le lien ; sans accent, facile à dire et à reconnaître) et c'est de nouveau un
+  **curseur** : **la Pointe** (`ui/clicky/identity.dart` : `Nexo` = nom, devise, `lore`, couleurs violet #7C5CFF /
+  rose #E0457B, `modeFor(SmilyMood)` ; `NexoPointer` + `NexoPainter` = flèche à deux faces, liseré clair, **noyau** qui
+  montre l'état — écoute (pulse avec la voix), réflexion (arc qui tourne), parole, action (pointe allumée), travail
+  (pastille), sommeil/concentration (atténué) ; animation **seulement** dans les modes actifs `Nexo.animated`). Dessin
+  original (pas le triangle bleu d'un autre produit) : ne pas revenir au smiley. Persona façon majordome numérique
+  (`clickyPersona`, calme, précis, pince-sans-rire, « C'est fait. »). Mot de réveil `WakeWord.phrases` = nexo / nexos /
+  nekso (+ anciens noms en alias) ; les regex qui retirent le nom en tête de phrase contiennent `nexo|nexos|nekso|nexou`.
+  Visite guidée : `NexoPointer` à la place de l'ancien « réacteur ».
+- **Installation pour de bon + connexions gardées (v1.66)** : la personne lançait Mon Hub **depuis l'intérieur du zip**
+  (WinRAR → `AppData\Local\Temp\Rar$…`), et WebView2 rangeait le profil (connexions Discord, Instagram, Google…) à côté
+  du programme → perdu à chaque zip (« trop chiant de se connecter »), et une copie de plus à chaque fois.
+  `core/install.dart` (`AppInstall`) : `useStableWebData` (tout début de `main`, **tous** les programmes) pose
+  `WEBVIEW2_USER_DATA_FOLDER` = `%LOCALAPPDATA%\MonHub\WebView2` ; `migrateWebData` recopie une fois l'ancien
+  `hub.exe.WebView2` (sans caches ni verrous, `worthCopying`) ; `moveIfTemporary` (`decide` / `isTemporary` : Temp,
+  Rar$, 7z, Téléchargements) installe dans `%LOCALAPPDATA%\Programs\Mon Hub` (`version-monhub.txt`, copie via
+  `Updater.replaceInPlace`) ou ouvre la copie installée plus récente, relance avec `--relance`, `exit(0)` ; `stamp`.
+  Rien n'est jamais supprimé. Les raccourcis se réparent seuls (`AppShortcuts.ensure`).
+- **Une seule copie (v1.66)** : `windows/runner/main.cpp` : mutex `Local\MonHub.Principal` (un widget :
+  `Local\MonHub.Widget.<id>`) ; deuxième lancement = la fenêtre déjà ouverte revient devant (`SetPropW`
+  `MonHubFenetrePrincipale` + `EnumWindows`) ; `--updated` / `--relance` attendent 15 s que l'ancienne copie parte.
+  L'assistant partout garde son verrou Dart (port 47613).
+- **Notifications instantanées (v1.66)** : `NotificationCenter.pollNow` relève les modules **en même temps** (avant : un
+  par un, un module lent bloquait tout et figeait l'appli), limite `pollTimeout` 25 s, pas de relève en double
+  (`_inFlight`), `pollAfter` (`argent` attend `mail`, même connexion), `pollModules(ids)` = relève immédiate, relève
+  demandée pendant une autre = faite juste après. `core/web_notify.dart` (`WebNotify` : `shimScript` = relais de l'API
+  `Notification` mis avant le site, `statusScript`, `countInTitle`, `news`). **Discord** : le Discord caché
+  (`DiscordPhone`) porte le relais ; un non-lu de plus dans son titre ou une notification relayée → `onActivity` →
+  `pollModules({'discord'})` (≤ 2–4 s au lieu de 2 min, au plus 1 relève / 3 s). **Instagram** :
+  `modules/instagram/instagram_watch.dart` (`InstagramWatch` + `InstagramWatchLayer` dans le builder de `HubApp`) =
+  instagram.com/direct/inbox/ ouvert **caché** comme un onglet (`quietScript`, son/micro refusés), titre lu toutes les
+  3 s → `onNews` → notification `insta:` + pastille du module ; page de connexion → rechargée toutes les 10 min ou en
+  quittant la page Instagram. **Toujours aucune requête automatique ni API privée Instagram** : rien de plus qu'un onglet
+  ouvert. Réglage propre au PC `app.instagram.direct` (oui par défaut).
+- **Lag (v1.66)** : la garde caméra/micro lit le registre par FFI (`CameraGuard._readRegistry` : RegGetValue /
+  RegOpenKeyEx / RegEnumKeyEx) au lieu de lancer PowerShell toutes les 30 s (PowerShell = secours), et ne redessine que
+  si ça change. Bulle de l'assistant : `TypedText.nextCut/safePrefix` ne coupe plus un émoji en deux (« string is not
+  well-formed UTF-16 », plantage vu dans le journal). Tests `test/v185_nexo_test.dart`.
+- Vérifier ici sous Windows : `dart analyze --fatal-infos` (pas `flutter analyze`, qui se perd dans le SDK quand il est
+  dans un chemin long) ; 4 tests de l'accueil échouent **seulement sous Windows** (PowerShell de `PcApps.load` →
+  minuteur en attente, texte « PC (Windows) ») : sous Linux (GitHub) ils passent.

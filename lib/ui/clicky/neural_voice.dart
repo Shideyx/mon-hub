@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-/// La voix de Smily : la synthèse vocale de Google Gemini, avec une clé
+/// La voix de Nexo : la synthèse vocale de Google Gemini, avec une clé
 /// gratuite d'AI Studio (quota gratuit limité par jour). C'est la seule voix
 /// (la voix Microsoft / Edge a été retirée à la demande de la personne).
 class GeminiVoice {

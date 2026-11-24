@@ -9,7 +9,7 @@ import 'freeze_watch.dart';
 import 'perf.dart';
 
 /// Journal des erreurs, **sur ton PC seulement** (rien n'est envoyé) :
-/// %APPDATA%\MonHub\journal-erreurs.log. Quand Smily ou Mon Hub plante,
+/// %APPDATA%\MonHub\journal-erreurs.log. Quand Nexo ou Mon Hub plante,
 /// on y voit exactement quoi et où, pour le corriger.
 ///
 /// Les garde-fous installés ici évitent aussi qu'une erreur ne casse tout :

@@ -24,7 +24,7 @@ class DocLine {
 }
 
 /// Conversions du contenu des documents (format « Delta » de l'éditeur) :
-/// texte de Smily (Markdown), Word (.docx), texte brut.
+/// texte de Nexo (Markdown), Word (.docx), texte brut.
 class DocFormat {
   DocFormat._();
 
@@ -110,7 +110,7 @@ class DocFormat {
 
   // ---------------------------------------------------------------- Markdown
 
-  /// Le texte de Smily (Markdown simple) en document.
+  /// Le texte de Nexo (Markdown simple) en document.
   static List<Map<String, dynamic>> fromMarkdown(String md) {
     final out = <DocLine>[];
     var code = false;
@@ -206,7 +206,7 @@ class DocFormat {
     return out;
   }
 
-  /// Le document en Markdown (pour que Smily le lise).
+  /// Le document en Markdown (pour que Nexo le lise).
   static String toMarkdown(List<dynamic> ops) {
     final b = StringBuffer();
     var n = 0;

@@ -68,6 +68,7 @@ import 'homework_auto.dart';
 import 'patience.dart';
 import 'quick.dart';
 import 'smily.dart';
+import 'identity.dart';
 import 'ollama.dart';
 import 'pointer.dart';
 import 'routines.dart';
@@ -106,12 +107,12 @@ import 'long_memory.dart';
 import 'self_knowledge.dart';
 import '../../core/token_budget.dart';
 
-/// « Smily » : un petit compagnon IA qui vit à côté de ton curseur.
+/// « Nexo » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
 /// * Maintiens **Ctrl + Alt** et parle, relâche pour envoyer (appui court =
 ///   écrire). Sur téléphone : la bulle bleue.
 /// * Il voit ton écran (capture envoyée avec ta question ; sur Windows, avec
-///   « Smily partout », tous tes écrans et toutes tes applis).
+///   « Nexo partout », tous tes écrans et toutes tes applis).
 /// * Il répond à voix haute, le texte s'écrit à côté du curseur, et son
 ///   curseur bleu **vole jusqu'au bouton** dont il parle.
 /// * « Agent, … » : il lance une tâche de fond avec tes modules (agenda,
@@ -136,10 +137,10 @@ class ClickyShot {
   final int width;
   final int height;
 
-  /// Coin haut-gauche de la capture, en coordonnées de la couche Smily.
+  /// Coin haut-gauche de la capture, en coordonnées de la couche Nexo.
   final Offset origin;
 
-  /// Taille d'un pixel de la capture, en coordonnées de la couche Smily.
+  /// Taille d'un pixel de la capture, en coordonnées de la couche Nexo.
   final double logicalPerPx;
 
   Offset toLayer(Offset px) => origin + px * logicalPerPx;
@@ -155,7 +156,7 @@ class ClickyController extends ChangeNotifier {
   /// Modules de Mon Hub (dans l'appli).
   HubController? hub;
 
-  /// « Smily partout » (Windows) : actions lues via le pont local, capture
+  /// « Nexo partout » (Windows) : actions lues via le pont local, capture
   /// de tous les écrans, et bascule clics traversants / cliquable.
   List<HubTool> Function()? toolsOverride;
   Future<List<ClickyShot>> Function()? captureOverride;
@@ -175,14 +176,14 @@ class ClickyController extends ChangeNotifier {
   /// Niveaux sonores récents (0..1) pour l'onde pendant l'écoute.
   final levels = List<double>.filled(7, 0);
 
-  /// Position du curseur (coordonnées de la couche Smily).
+  /// Position du curseur (coordonnées de la couche Nexo).
   Offset? cursor;
 
   /// Cible montrée par l'IA (coordonnées de la couche) et son libellé.
   Offset? target;
   String targetLabel = '';
 
-  /// Là où Smily regarde de lui-même (il y vole sans « pointer »), et ce
+  /// Là où Nexo regarde de lui-même (il y vole sans « pointer »), et ce
   /// qu'il en pense (petite bulle). Sa « présence ».
   Offset? gaze;
   String gazeNote = '';
@@ -259,7 +260,7 @@ class ClickyController extends ChangeNotifier {
 
   bool get hasHistory => _memory().isNotEmpty;
 
-  /// Mode discret : Smily n'apparaît que pendant un échange.
+  /// Mode discret : Nexo n'apparaît que pendant un échange.
   bool _recent = false;
   Timer? _fade;
 
@@ -278,7 +279,7 @@ class ClickyController extends ChangeNotifier {
     return d;
   }
 
-  // Réglages partagés avec « Smily partout » (Windows). Les deux programmes
+  // Réglages partagés avec « Nexo partout » (Windows). Les deux programmes
   // gardent leurs préférences en mémoire sans relire le disque : on passe
   // donc par un petit fichier commun, relu toutes les 2 secondes.
   static const _sharedKeys = [
@@ -330,7 +331,7 @@ class ClickyController extends ChangeNotifier {
     return d == null ? null : File('$d${Platform.pathSeparator}clicky.json');
   }
 
-  /// Ce que Smily sait de toi (Carnet → Mémoire).
+  /// Ce que Nexo sait de toi (Carnet → Mémoire).
   List<String> get _facts => Carnet.instance.facts.take(60).toList();
 
   /// Recharge l'historique et le journal (démarrage, compte changé).
@@ -342,7 +343,7 @@ class ClickyController extends ChangeNotifier {
   }
 
   /// Mon Hub (Windows) : publie les réglages du compte ouvert et suit ceux
-  /// que « Smily partout » modifie.
+  /// que « Nexo partout » modifie.
   Future<void> shareOptions() async {
     if (!everywhereSupported) return;
     _shared = null;
@@ -352,7 +353,7 @@ class ClickyController extends ChangeNotifier {
     _watchShared();
   }
 
-  /// « Smily partout » : lit les réglages publiés par Mon Hub.
+  /// « Nexo partout » : lit les réglages publiés par Mon Hub.
   Future<void> followSharedOptions() async {
     await _readShared();
     _watchShared();
@@ -384,7 +385,7 @@ class ClickyController extends ChangeNotifier {
       if (m is! Map) return;
       final next = m.cast<String, dynamic>();
       if (!desktopMode) {
-        // Changé depuis « Smily partout » : on le garde pour ce compte.
+        // Changé depuis « Nexo partout » : on le garde pour ce compte.
         for (final e in next.entries) {
           if (_shared?[e.key] != e.value) await ClaudeApi.store.setJson('clicky.${e.key}', e.value);
         }
@@ -398,13 +399,13 @@ class ClickyController extends ChangeNotifier {
 
   bool get enabled => _opt('enabled', true);
 
-  /// Smily lit ses réponses à voix haute (sinon : texte seulement).
+  /// Nexo lit ses réponses à voix haute (sinon : texte seulement).
   bool get voice => _opt('voice', true);
 
-  /// On peut parler à Smily au micro (sinon : Ctrl + Alt ouvre la saisie).
+  /// On peut parler à Nexo au micro (sinon : Ctrl + Alt ouvre la saisie).
   bool get mic => _opt('mic', true);
 
-  /// Coupe / remet la voix de Smily (et se tait tout de suite).
+  /// Coupe / remet la voix de Nexo (et se tait tout de suite).
   Future<void> toggleVoice() async {
     if (voice) await stopSpeaking();
     await setOption('voice', !voice);
@@ -419,7 +420,7 @@ class ClickyController extends ChangeNotifier {
   /// (clé API) ou 'ollama' (local, gratuit).
   String get provider => _opt('provider', ClaudeCode.supported ? 'claudecode' : 'claude');
 
-  /// Windows : Smily au-dessus de tout l'écran et de toutes les applis.
+  /// Windows : Nexo au-dessus de tout l'écran et de toutes les applis.
   bool get everywhere => _opt('everywhere', true);
 
   /// Apparence : 'hud' (réacteur animé, fenêtres tête haute) ou 'classic'
@@ -427,7 +428,7 @@ class ClickyController extends ChangeNotifier {
   String get look => _opt('look', 'hud');
   bool get hud => look != 'classic';
 
-  /// Comment Smily t'appelle (vide : ton prénom de compte Mon Hub).
+  /// Comment Nexo t'appelle (vide : ton prénom de compte Mon Hub).
   String get callName {
     final n = _opt('callName', '').trim();
     if (n.isNotEmpty) return n;
@@ -464,7 +465,7 @@ class ClickyController extends ChangeNotifier {
   /// Ctrl + Alt + Maj : dictée dans n'importe quelle appli.
   bool get dictation => _opt('dictation', true);
 
-  /// Smily peut proposer de cliquer / taper à ta place (après relecture).
+  /// Nexo peut proposer de cliquer / taper à ta place (après relecture).
   bool get driveOn => _opt('drive', true);
 
   /// Contrôle du PC : 'ask' (permission à chaque commande), 'auto' (sans
@@ -478,10 +479,10 @@ class ClickyController extends ChangeNotifier {
   /// Journal des connaissances.
   bool get journalOn => _opt('journal', true);
 
-  /// Une mémoire séparée par appli (Smily partout).
+  /// Une mémoire séparée par appli (Nexo partout).
   bool get perApp => _opt('perApp', true);
 
-  /// Smily bouge tout seul autour du curseur (vivant).
+  /// Nexo bouge tout seul autour du curseur (vivant).
   bool get alive => _opt('alive', true);
 
   /// Conversation continue : après avoir répondu à voix haute, il réécoute
@@ -490,7 +491,7 @@ class ClickyController extends ChangeNotifier {
 
   static bool get everywhereSupported => !kIsWeb && Platform.isWindows;
 
-  /// Smily de l'appli désactivé car « Smily partout » s'en charge.
+  /// Nexo de l'appli désactivé car « Nexo partout » s'en charge.
   bool get handledElsewhere => !desktopMode && everywhereSupported && everywhere;
 
   Future<void> setOption(String k, Object v) async {
@@ -500,7 +501,7 @@ class ClickyController extends ChangeNotifier {
       _live = null;
       _liveDownUntil = null;
     }
-    // « Smily partout » n'écrit jamais dans les préférences (ça écraserait
+    // « Nexo partout » n'écrit jamais dans les préférences (ça écraserait
     // celles de Mon Hub) : seulement dans le fichier partagé.
     if (!desktopMode) await ClaudeApi.store.setJson('clicky.$k', v);
     if (_shared != null || desktopMode) {
@@ -512,7 +513,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Smily a un cerveau (clé Claude, ou Ollama choisi). Tant que ce n'est
+  /// Nexo a un cerveau (clé Claude, ou Ollama choisi). Tant que ce n'est
   /// pas le cas, il reste complètement invisible et ne fait rien : le reste
   /// de Mon Hub marche exactement pareil sans lui.
   bool ready = false;
@@ -538,7 +539,7 @@ class ClickyController extends ChangeNotifier {
       ears.warmUp();
       warmUpLive();
     }
-    // Mot d'activation (« Smily »).
+    // Mot d'activation (« Nexo »).
     if (r && enabled && mic && here && wakeOn && WakeWord.supported) {
       unawaited(_wake.start());
     } else if (_wake.running) {
@@ -565,7 +566,7 @@ class ClickyController extends ChangeNotifier {
     return r;
   }
 
-  /// Smily te salue au premier démarrage de la journée.
+  /// Nexo te salue au premier démarrage de la journée.
   Future<void> _greetOnce() async {
     if (!greet || !voice || !_voicePlatform) return;
     try {
@@ -600,7 +601,7 @@ class ClickyController extends ChangeNotifier {
     encode: (v) => v,
   );
 
-  /// Smily doit s'afficher et écouter le clavier.
+  /// Nexo doit s'afficher et écouter le clavier.
   bool get active => enabled && ready;
 
   bool get buddyVisible =>
@@ -627,7 +628,7 @@ class ClickyController extends ChangeNotifier {
       // Revenu après une longue absence : nouvelle séance.
       if (now.difference(_lastMove).inMinutes >= 15) _sessionStart = now;
       _lastMove = now;
-      // On bouge la souris : Smily revient tout de suite à côté (sauf s'il
+      // On bouge la souris : Nexo revient tout de suite à côté (sauf s'il
       // dort dans son coin ou s'il est assis sur ta fenêtre).
       if (gaze != null && !_gazeHold && !_lifeHold) {
         gaze = null;
@@ -635,8 +636,8 @@ class ClickyController extends ChangeNotifier {
         notifyListeners();
       }
     }
-    // Smily partout : c'est Windows qui déplace sa fenêtre avec la souris,
-    // rien à redessiner (avant : tout Smily était redessiné 60 fois par
+    // Nexo partout : c'est Windows qui déplace sa fenêtre avec la souris,
+    // rien à redessiner (avant : tout Nexo était redessiné 60 fois par
     // seconde dès que la souris bougeait).
     if (!desktopMode && follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
   }
@@ -683,7 +684,7 @@ class ClickyController extends ChangeNotifier {
 
   Timer? _autoSend;
 
-  /// « Smily ! » entendu : il écoute ta question.
+  /// « Nexo ! » entendu : il écoute ta question.
   void _onWake() {
     if (!active || state != ClickyState.idle) {
       _wake.resume();
@@ -776,7 +777,7 @@ class ClickyController extends ChangeNotifier {
     final problem = await starting;
     _micStarting = null;
     if (problem == null) return;
-    // Panne de lancement (PowerShell bloqué, planté…) : Smily se répare
+    // Panne de lancement (PowerShell bloqué, planté…) : Nexo se répare
     // tout seul une fois, au lieu de juste afficher l'erreur.
     if (isLaunchProblem(problem) && !_autoRepaired) {
       _autoRepaired = true;
@@ -828,13 +829,13 @@ class ClickyController extends ChangeNotifier {
     await startListening(followUp: true);
   }
 
-  /// Smily a déjà tenté de se réparer tout seul depuis le démarrage.
+  /// Nexo a déjà tenté de se réparer tout seul depuis le démarrage.
   bool _autoRepaired = false;
 
   /// Une réparation est en cours.
   bool repairing = false;
 
-  /// « Smily répare » : remet le micro à zéro, essaie toutes les façons de
+  /// « Nexo répare » : remet le micro à zéro, essaie toutes les façons de
   /// le lancer et vérifie qu'il s'ouvre. S'il reste bloqué, l'IA explique
   /// quoi faire en sachant ce qui a déjà été essayé.
   Future<void> repairMic({bool auto = false}) async {
@@ -864,7 +865,7 @@ class ClickyController extends ChangeNotifier {
     micProblem = r.problem;
     _set(ClickyState.idle, status: '', reply: '');
     // Réparation manuelle : l'IA explique la panne. Automatique : on
-    // affiche le souci (bouton « Smily répare » pour aller plus loin).
+    // affiche le souci (bouton « Nexo répare » pour aller plus loin).
     if (!auto) {
       await _askAi(
         micRepairPrompt(before ?? r.problem!, r, system: kIsWeb ? '' : Platform.operatingSystem),
@@ -963,7 +964,7 @@ class ClickyController extends ChangeNotifier {
         ClickyState.idle,
         status:
             'Je n\'ai rien entendu. Parle un peu plus fort, ou teste ton micro '
-            'dans Réglages → Smily.',
+            'dans Réglages → Nexo.',
       );
       _fadeSoon();
       _wake.resume();
@@ -977,7 +978,7 @@ class ClickyController extends ChangeNotifier {
   bool _spokenAsk = false;
 
   /// Secours Windows : la dictée de Windows (Win + H) écrit dans la zone
-  /// de texte de Smily.
+  /// de texte de Nexo.
   final inputFocus = FocusNode();
   Future<void> windowsDictation() async {
     micProblem = null;
@@ -992,7 +993,7 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Lit un texte à voix haute. [force] : même si la voix de Smily est
+  /// Lit un texte à voix haute. [force] : même si la voix de Nexo est
   /// coupée (les briefings sont toujours lus).
   Future<void> speak(String text, {bool force = false}) async {
     if ((!voice && !force) || !_voicePlatform || text.isEmpty) return;
@@ -1042,7 +1043,7 @@ class ClickyController extends ChangeNotifier {
   void hotkey({required bool down, bool other = false, bool dictate = false}) {
     if (!active) return;
     if (_holding && other) {
-      // Ctrl + Alt + une touche = un raccourci clavier, pas Smily.
+      // Ctrl + Alt + une touche = un raccourci clavier, pas Nexo.
       _cancelled = true;
       _holdTimer?.cancel();
       if (state == ClickyState.listening) unawaited(stopListening(send: false));
@@ -1095,12 +1096,12 @@ class ClickyController extends ChangeNotifier {
     LogicalKeyboardKey.shiftRight,
   };
 
-  /// Clavier de l'appli (quand Smily vit dans la fenêtre de Mon Hub).
+  /// Clavier de l'appli (quand Nexo vit dans la fenêtre de Mon Hub).
   bool onKey(KeyEvent e) {
     try {
       return _onKey(e);
     } catch (_) {
-      return false; // Smily ne doit jamais gêner le clavier de l'appli
+      return false; // Nexo ne doit jamais gêner le clavier de l'appli
     }
   }
 
@@ -1112,7 +1113,7 @@ class ClickyController extends ChangeNotifier {
       return false;
     }
     // AltGr (claviers français : @, €, #…) envoie aussi Ctrl + Alt : on
-    // l'ignore pour ne pas ouvrir Smily en tapant une adresse mail.
+    // l'ignore pour ne pas ouvrir Nexo en tapant une adresse mail.
     final altGr =
         k.physicalKeysPressed.contains(PhysicalKeyboardKey.altRight) ||
         k.logicalKeysPressed.contains(LogicalKeyboardKey.altGraph);
@@ -1174,7 +1175,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mode discret : Smily disparaît 1 s après la fin de l'échange.
+  /// Mode discret : Nexo disparaît 1 s après la fin de l'échange.
   void _fadeSoon() {
     _fade?.cancel();
     _fade = Timer(const Duration(seconds: 1), () {
@@ -1235,7 +1236,7 @@ class ClickyController extends ChangeNotifier {
   bool _noticing = false;
 
   /// Pour les regards autour (mode « partout ») : là où il peut aller voir.
-  /// Donné par Smily partout (coordonnées de l'écran).
+  /// Donné par Nexo partout (coordonnées de l'écran).
   List<Offset> Function()? lookSpots;
 
   /// L'appli au premier plan est en plein écran (jeu, vidéo) : il se fait
@@ -1371,7 +1372,7 @@ class ClickyController extends ChangeNotifier {
     _ctx = ctx;
   }
 
-  /// Smily va regarder quelque part tout seul (puis revient).
+  /// Nexo va regarder quelque part tout seul (puis revient).
   void glance(Offset at, {String note = '', Duration hold = const Duration(seconds: 3)}) {
     // Il dormait ou était assis sur ta fenêtre : il se lève d'abord.
     if (_lifeHold) _endRest(quiet: true);
@@ -1426,7 +1427,7 @@ class ClickyController extends ChangeNotifier {
     try {
       title = Win.foregroundTitle();
     } catch (_) {}
-    if (title.trim().isEmpty || title == 'Smily') return;
+    if (title.trim().isEmpty || title == 'Nexo') return;
     // Seulement quand l'appli **arrive** au premier plan (pas si elle y était
     // déjà quand on a demandé le rappel).
     final changed = title != _lastFront;
@@ -1435,7 +1436,7 @@ class ClickyController extends ChangeNotifier {
     final r = await AppReminders.instance.due(title);
     if (r == null) return;
     final text = 'Rappel : ${r.text}';
-    notify?.call('Rappel de Smily', r.text);
+    notify?.call('Rappel de Nexo', r.text);
     final at = cursor;
     if (at != null) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 8));
     if (voice) unawaited(speak(withoutEmoji(text)));
@@ -1466,7 +1467,7 @@ class ClickyController extends ChangeNotifier {
   /// (Gemini seulement, jamais Claude ; 8 fois par jour au plus).
   Future<void> noticeSomething({bool force = false}) async {
     final mind = ClickyMind.instance;
-    // C'est Smily partout (sur tout l'écran) qui regarde.
+    // C'est Nexo partout (sur tout l'écran) qui regarde.
     if (handledElsewhere) {
       await ClickyDesktop.send('notice');
       return;
@@ -1494,7 +1495,7 @@ class ClickyController extends ChangeNotifier {
       );
       final r = await AiText.ask(
         ClickyMind.noticePrompt(name: callName, mood: mind.moodLabel(DateTime.now())),
-        system: 'Tu es Smily, un compagnon curieux et sympa. Tu réponds en français, très court.',
+        system: 'Tu es Nexo, un compagnon curieux et sympa. Tu réponds en français, très court.',
         images: [shot.png64],
         geminiOnly: true,
       );
@@ -1540,12 +1541,12 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Pose une question à Smily depuis une page de Mon Hub (« Essayer » du
-  /// catalogue, de la visite guidée) : c'est Smily partout qui répond s'il
+  /// Pose une question à Nexo depuis une page de Mon Hub (« Essayer » du
+  /// catalogue, de la visite guidée) : c'est Nexo partout qui répond s'il
   /// est là.
   void askAnywhere(String question) => _explainScreen(question);
 
-  /// Il ouvre sa boîte et répond à une question sur l'écran (Smily partout
+  /// Il ouvre sa boîte et répond à une question sur l'écran (Nexo partout
   /// s'il est là).
   void _explainScreen(String question) {
     if (handledElsewhere) {
@@ -1558,7 +1559,7 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Sa vie à lui (v1.57) : il dort, rêve, danse, réagit ----------
 
-  /// Smily partout : son coin pour dormir (en bas de l'écran où est la
+  /// Nexo partout : son coin pour dormir (en bas de l'écran où est la
   /// souris), et où s'asseoir sur la fenêtre au premier plan (avec le
   /// rectangle de la fenêtre : il tombe si elle bouge ou se ferme).
   Offset? Function()? restSpot;
@@ -1700,7 +1701,7 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Un clic (Smily partout) : il se réveille, ou s'inquiète si tu
+  /// Un clic (Nexo partout) : il se réveille, ou s'inquiète si tu
   /// cliques comme un fou (sauf dans un jeu).
   void userClicked() {
     final life = ClickyLife.instance;
@@ -1732,7 +1733,7 @@ class ClickyController extends ChangeNotifier {
       life.restore(mind.lifeState);
     }
     // Il rêve (range sa mémoire) quand tu n'es pas là : une fois par minute
-    // on regarde, dans Mon Hub seulement (pas deux fois avec Smily partout).
+    // on regarde, dans Mon Hub seulement (pas deux fois avec Nexo partout).
     _dreamCheckN++;
     if (!desktopMode && _dreamCheckN % 30 == 0 && !_dreaming) {
       final away = DriveRunner.supported ? Duration(seconds: Win.idleSeconds()) : now.difference(_lastMove);
@@ -1889,7 +1890,7 @@ class ClickyController extends ChangeNotifier {
         final text = m.text.trim();
         if (text.isEmpty) continue;
         if (m.mine) mine.add(text);
-        material.add('${m.mine ? 'Elle/il' : 'Smily'} : ${text.length > 200 ? '${text.substring(0, 200)}…' : text}');
+        material.add('${m.mine ? 'Elle/il' : 'Nexo'} : ${text.length > 200 ? '${text.substring(0, 200)}…' : text}');
       }
     }
     for (final e in ClickyMind.instance.episodes) {
@@ -1972,7 +1973,7 @@ class ClickyController extends ChangeNotifier {
       try {
         final r = await AiText.ask(
           ClickyLife.dreamPrompt(name: callName, app: app, artist: artist, memory: memory),
-          system: 'Tu es Smily, un petit smiley vivant, drôle et tendre. Français, très court.',
+          system: 'Tu es Nexo, un curseur lumineux vivant, malin et loyal. Français, très court.',
           geminiOnly: true,
         ).timeout(const Duration(seconds: 12));
         dream = ClickyLife.cleanDream(r) ?? dream;
@@ -2054,7 +2055,7 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Ta musique joue (Smily partout) : il écoute le son du PC et danse en
+  /// Ta musique joue (Nexo partout) : il écoute le son du PC et danse en
   /// rythme (seulement sur une vraie musique, au rythme régulier).
   Future<void> _checkDance(bool quietMode) async {
     final life = ClickyLife.instance;
@@ -2093,7 +2094,7 @@ class ClickyController extends ChangeNotifier {
     unawaited(feel(f.$1, text: f.$2));
   }
 
-  /// Ce qu'il ressent, à côté de lui (envoyé à Smily partout s'il est là).
+  /// Ce qu'il ressent, à côté de lui (envoyé à Nexo partout s'il est là).
   Future<void> feel(String emoji, {String? text}) async {
     if (handledElsewhere) {
       await ClickyDesktop.send('feel64 ${base64Encode(utf8.encode(jsonEncode({'e': emoji, 't': text})))}');
@@ -2162,7 +2163,7 @@ class ClickyController extends ChangeNotifier {
     final mind = ClickyMind.instance;
     if (yes != null) unawaited(mind.recordDecision(i.tool, yes));
     // Un seul endroit retient tes refus : plus il refuse un sujet, plus
-    // Smily se taît longtemps dessus (et au 3ᵉ refus, il laisse tomber).
+    // Nexo se taît longtemps dessus (et au 3ᵉ refus, il laisse tomber).
     final patience = Patience.instance;
     unawaited(patience.answered(i.tool, yes == true ? Answer.yes : (yes == false ? Answer.no : Answer.later)));
     if (yes != true) {
@@ -2216,7 +2217,7 @@ class ClickyController extends ChangeNotifier {
           say = (await AiText.ask(
             'Tu viens de faire ceci pour la personne : ${i.say}\nRésultat (données) : ${jsonEncode(ClaudeBridge.plain(r))}\n'
             'Dis-lui le résultat en une ou deux phrases courtes, à l\'oral, sans liste.',
-            system: 'Tu es Smily, un assistant chaleureux. Français, très court.',
+            system: 'Tu es Nexo, un assistant chaleureux. Français, très court.',
             geminiOnly: true,
           )).trim();
         } catch (_) {}
@@ -2397,7 +2398,7 @@ class ClickyController extends ChangeNotifier {
           dislikes: mind.dislikes,
           now: n,
         ),
-        system: 'Tu es Smily, un assistant personnel autonome, prudent et utile. Tu réponds seulement en JSON.',
+        system: 'Tu es Nexo, un assistant personnel autonome, prudent et utile. Tu réponds seulement en JSON.',
         geminiOnly: true,
       );
       final i = Autonomy.parse(AiText.json(r), names);
@@ -2448,7 +2449,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Garde-fou : Smily resté coincé sur « j'écoute » ou « je réfléchis »
+  /// Garde-fou : Nexo resté coincé sur « j'écoute » ou « je réfléchis »
   /// (réseau qui ne répond plus, micro bloqué…) n'acceptait plus rien. Sans
   /// nouvelle pendant trop longtemps, il se débloque tout seul.
   Timer? _stuck;
@@ -2463,7 +2464,7 @@ class ClickyController extends ChangeNotifier {
     if (limit == null) return;
     _stuck = Timer(limit, () {
       if (state != s) return;
-      ErrorLog.record('Smily est resté bloqué sur « ${s.name} » ($status)', StackTrace.current, where: 'Smily');
+      ErrorLog.record('Nexo est resté bloqué sur « ${s.name} » ($status)', StackTrace.current, where: 'Nexo');
       unawaited(
         cancel().then((_) => _set(ClickyState.idle, status: 'Je m\'étais coincé : c\'est reparti, redemande-moi.')),
       );
@@ -2487,7 +2488,7 @@ class ClickyController extends ChangeNotifier {
     state = s;
     // On l'appelle pendant qu'il dort ou qu'il est assis : il revient.
     if (s != ClickyState.idle && _lifeHold) _endRest(quiet: true);
-    FreezeWatch.note('Smily : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
+    FreezeWatch.note('Nexo : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
     if (status != null) this.status = status;
     if (reply != null) this.reply = reply;
     if (s != ClickyState.idle) {
@@ -2575,7 +2576,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_concentration',
       description:
-          'Mode concentration : pendant la séance, Smily ne dérange plus (pas d\'idées ni de remarques), les '
+          'Mode concentration : pendant la séance, Nexo ne dérange plus (pas d\'idées ni de remarques), les '
           'notifications de Mon Hub attendent la fin, et il annonce la fin avec le bilan.',
       params: {'minutes': ('integer', 'Durée (défaut 45)'), 'arreter': ('boolean', 'Arrêter la séance en cours')},
       run: (a) async {
@@ -2592,7 +2593,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_rappel_appli',
       description:
-          'Rappel lié à une appli : Smily le dit la prochaine fois que l\'appli est ouverte (« rappelle-moi de '
+          'Rappel lié à une appli : Nexo le dit la prochaine fois que l\'appli est ouverte (« rappelle-moi de '
           'répondre à Léo quand j\'ouvre Discord »). Sans texte : liste les rappels ; supprimer=true : les retire.',
       params: {
         'appli': ('string', 'L\'appli ou le site (Discord, Chrome, YouTube, Word…)'),
@@ -2623,7 +2624,7 @@ class ClickyController extends ChangeNotifier {
   /// Une correction de texte est en cours.
   bool _fixing = false;
 
-  /// Une petite bulle à côté de Smily (sans bouger la boîte).
+  /// Une petite bulle à côté de Nexo (sans bouger la boîte).
   void _bubble(String text, {int seconds = 5}) {
     final at = cursor;
     if (at != null) {
@@ -2835,7 +2836,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'copie_corriger',
       description:
-          'Ouvre la correction de copie : la personne prend sa copie (rédaction, exercice) en photo et Smily entoure '
+          'Ouvre la correction de copie : la personne prend sa copie (rédaction, exercice) en photo et Nexo entoure '
           'chaque faute à sa place sur la feuille, avec la correction et la règle, et une note estimée.',
       params: {'chemin': ('string', 'Chemin d\'une photo déjà sur le PC (facultatif)')},
       run: (a) async {
@@ -2886,7 +2887,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'interprete_ouvrir',
       description:
-          'Ouvre l\'interprète en direct : la personne parle avec quelqu\'un dans une autre langue, Smily traduit à voix '
+          'Ouvre l\'interprète en direct : la personne parle avec quelqu\'un dans une autre langue, Nexo traduit à voix '
           'haute dans les deux sens (français ⇄ la langue choisie).',
       params: {'langue': ('string', 'Anglais, Espagnol, Allemand, Italien, Portugais, Arabe, Chinois, Japonais…')},
       run: (a) async {
@@ -2946,7 +2947,7 @@ class ClickyController extends ChangeNotifier {
     return EverywhereSearch.run(query, (n, a) async => byName[n]?.run(a), byName.keys.toSet(), onPart: onPart);
   }
 
-  /// Ctrl + Alt + Espace (Smily partout) ou Ctrl + Espace (Mon Hub).
+  /// Ctrl + Alt + Espace (Nexo partout) ou Ctrl + Espace (Mon Hub).
   Future<void> openSearch([String text = '']) async {
     if (hub != null && !desktopMode) {
       HubHome.instance.onSearchText?.call(text);
@@ -3021,7 +3022,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'cours_ecouter',
       description:
-          'Smily écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
+          'Nexo écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
           'rendu à la fin. Matière et heure de fin trouvées dans l\'emploi du temps si possible.',
       params: {
         'matiere': ('string', 'Matière ou thème (facultatif)'),
@@ -3064,7 +3065,7 @@ class ClickyController extends ChangeNotifier {
     ),
     HubTool(
       name: 'cours_comptes_rendus',
-      description: 'Les comptes rendus des cours écoutés par Smily (les plus récents d\'abord).',
+      description: 'Les comptes rendus des cours écoutés par Nexo (les plus récents d\'abord).',
       params: {'recherche': ('string', 'Matière ou mot (facultatif)')},
       run: (a) async {
         final q = '${a['recherche'] ?? ''}'.toLowerCase().trim();
@@ -3099,7 +3100,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Appli au premier plan (Smily partout) : chaque appli a sa mémoire.
+  /// Appli au premier plan (Nexo partout) : chaque appli a sa mémoire.
   String currentApp = '';
   final _threadFor = <String, String>{};
 
@@ -3208,7 +3209,7 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Question → IA ----------
 
-  /// Capture de la fenêtre de Mon Hub (Smily dans l'appli).
+  /// Capture de la fenêtre de Mon Hub (Nexo dans l'appli).
   Future<List<ClickyShot>> _captureApp() async {
     try {
       final b = shotKey.currentContext?.findRenderObject();
@@ -3253,7 +3254,7 @@ class ClickyController extends ChangeNotifier {
     ];
   }
 
-  /// Outils de Smily lui-même (exécutés dans ce programme) : dépannage et
+  /// Outils de Nexo lui-même (exécutés dans ce programme) : dépannage et
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
     // Ce qu'il sait de lui-même : capacités, nouveautés (GitHub), jetons.
@@ -3282,7 +3283,7 @@ class ClickyController extends ChangeNotifier {
     if (hub != null && toolsOverride == null) ...Assistant.instance.tools,
   ];
 
-  /// Les outils de dépannage de Smily : l'IA peut voir ce qui ne va pas
+  /// Les outils de dépannage de Nexo : l'IA peut voir ce qui ne va pas
   /// et réparer le micro elle-même (« mon micro ne marche pas »).
   List<HubTool> get repairTools => [
     // Sa mémoire à long terme (rangée par sujets, enrichie en rêvant).
@@ -3291,12 +3292,12 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_creer_capacite',
       description:
-          'Smily se crée une nouvelle capacité : une phrase qui déclenche une consigne toute faite (ex. « mode '
+          'Nexo se crée une nouvelle capacité : une phrase qui déclenche une consigne toute faite (ex. « mode '
           'poème » → « aide-moi à écrire un poème : propose 3 thèmes, puis corrige les rimes »). Seulement quand la '
-          'personne a dit oui. La consigne passe par Smily normalement (les actions sensibles redemandent la permission).',
+          'personne a dit oui. La consigne passe par Nexo normalement (les actions sensibles redemandent la permission).',
       params: {
         'phrase': ('string', 'Ce que la personne dira, en minuscules (« mode poème »)'),
-        'consigne': ('string', 'Ce que Smily doit faire quand elle le dit'),
+        'consigne': ('string', 'Ce que Nexo doit faire quand elle le dit'),
       },
       required: const ['phrase', 'consigne'],
       run: (a) async {
@@ -3317,7 +3318,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_capacites_perso',
       description:
-          'Les capacités que Smily s\'est créées (ou que la personne a ajoutées) ; avec effacer=phrase, en enlève une.',
+          'Les capacités que Nexo s\'est créées (ou que la personne a ajoutées) ; avec effacer=phrase, en enlève une.',
       params: {'effacer': ('string', 'La phrase de la capacité à enlever (facultatif)')},
       run: (a) async {
         final del = normalize('${a['effacer'] ?? ''}');
@@ -3339,8 +3340,8 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_reparer',
       description:
-          'Répare Smily tout seul : relit le journal des erreurs du PC et corrige ce qui est '
-          'réparable (micro bloqué, certificats cassés, appli qui fige, Smily partout qui n\'arrive '
+          'Répare Nexo tout seul : relit le journal des erreurs du PC et corrige ce qui est '
+          'réparable (micro bloqué, certificats cassés, appli qui fige, Nexo partout qui n\'arrive '
           'pas à tenir, disque presque plein). À utiliser quand la personne dit « répare-toi », '
           '« tu bugues », « ça ne marche plus ».',
       run: (_) async {
@@ -3356,15 +3357,15 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_diagnostic',
       description:
-          'Diagnostic de Smily : état du micro (dernière panne, façon de lancer la reconnaissance '
+          'Diagnostic de Nexo : état du micro (dernière panne, façon de lancer la reconnaissance '
           'vocale), du mot d\'activation, de la voix et du cerveau (Claude). À utiliser quand la '
-          'personne dit que Smily, le micro ou la voix ne marche pas.',
+          'personne dit que Nexo, le micro ou la voix ne marche pas.',
       run: (_) async => diagnostic(),
     ),
     HubTool(
       name: 'clicky_reparer_micro',
       description:
-          'Répare le micro de Smily : arrête l\'écoute bloquée, relance la reconnaissance vocale en '
+          'Répare le micro de Nexo : arrête l\'écoute bloquée, relance la reconnaissance vocale en '
           'essayant toutes les façons de la démarrer, et vérifie que le micro s\'ouvre. Renvoie ce '
           'qui a été fait et le souci qui reste (avec le réglage à ouvrir).',
       run: (_) async {
@@ -3386,7 +3387,7 @@ class ClickyController extends ChangeNotifier {
   /// Dernière réparation du micro (pour le diagnostic).
   EarsRepair? lastRepair;
 
-  /// État de Smily, lisible par l'IA (outil clicky_diagnostic).
+  /// État de Nexo, lisible par l'IA (outil clicky_diagnostic).
   Map<String, Object?> diagnostic() {
     final e = ears;
     return {
@@ -3437,13 +3438,13 @@ class ClickyController extends ChangeNotifier {
     ].join(' ; ');
     final base =
         '''
-Tu es Smily, un petit smiley (un compagnon IA) qui vit dans un coin de l'écran de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…).
+Tu es Nexo, un curseur lumineux (un compagnon IA) qui accompagne la souris de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…).
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${PromptShield.rule}
 $thinkingRules
 ${SelfKnowledge.promptBlock()}
-${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Smily ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
+${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Nexo ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
 Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir.
 ${homeworkRules(helpOnly)}
@@ -3482,7 +3483,7 @@ Ta réponse est lue à voix haute :
 ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les vraies données (agenda, notes, devoirs, messages…) ou agir ; celles qui envoient ou modifient quelque chose demandent la permission.'}
 ${webSearch && provider != 'ollama' ? 'Tu peux chercher sur internet quand la question porte sur l\'actualité ou des faits récents ; cite brièvement la source à l\'oral (« d\'après … »).' : ''}
 ${quizMode ? 'MODE QUIZ : au lieu de donner la réponse, pose une question à la personne pour la faire réfléchir (une seule à la fois), puis évalue sa réponse en une phrase quand elle répond.' : ''}
-${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Smily montre une étape à la fois.' : ''}
+${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Nexo montre une étape à la fois.' : ''}
 
 $_boardGuide
 
@@ -3592,13 +3593,13 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
 
   /// « Fais-le à ma place », « fais ça pour moi », « en arrière-plan ».
   static final forMeRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?(?:fais|fait)(?:[\s-]+(?:le|la|les|ça|ca|tout))?\s+(?:(?:à|a)\s+ma\s+place|pour\s+moi)\b[\s,:]*'
-    r'|^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?en\s+arri[eè]re[\s-]plan\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?(?:fais|fait)(?:[\s-]+(?:le|la|les|ça|ca|tout))?\s+(?:(?:à|a)\s+ma\s+place|pour\s+moi)\b[\s,:]*'
+    r'|^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?en\s+arri[eè]re[\s-]plan\b[\s,:]*',
     caseSensitive: false,
   );
 
   static final _agentRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?agent\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?agent\b[\s,:]*',
     caseSensitive: false,
   );
 
@@ -3622,9 +3623,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     target = null;
     showHistory = false;
     clearMarks();
-    // « Prends la main et … » : Smily agit tout de suite.
+    // « Prends la main et … » : Nexo agit tout de suite.
     final take = RegExp(
-      r'^\s*(?:(?:hey|ok|dis)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
+      r'^\s*(?:(?:hey|ok|dis)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
       caseSensitive: false,
     ).firstMatch(q);
     if (take != null && DriveRunner.supported) {
@@ -3687,7 +3688,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       Assistant.instance
           .remember(q)
           .then((m) {
-            if (m != null) notify?.call('Smily s\'en souviendra', m);
+            if (m != null) notify?.call('Nexo s\'en souviendra', m);
           })
           .catchError((Object _) {}),
     );
@@ -3856,7 +3857,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           _set(
             ClickyState.idle,
             reply: WorkflowCapture.supported
-                ? 'Je n\'ai rien enregistré. Lance « Capturer mes gestes » dans la boîte de Smily, fais ta manip, puis redemande-moi.'
+                ? 'Je n\'ai rien enregistré. Lance « Capturer mes gestes » dans la boîte de Nexo, fais ta manip, puis redemande-moi.'
                 : 'La capture des gestes ne marche que sur Windows.',
           );
           await speak(reply);
@@ -3922,7 +3923,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         Timer(d, () {
           unawaited(ClickyChime.play());
           final say = label.isEmpty ? 'C\'est l\'heure ! Ton minuteur est terminé.' : 'C\'est l\'heure : $label.';
-          notify?.call('Smily : minuteur', say);
+          notify?.call('Nexo : minuteur', say);
           _set(ClickyState.speaking, status: '', reply: say);
           unawaited(
             speak(say).then((_) {
@@ -4035,7 +4036,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     if (id != _askId) return;
     final memory = _memory();
-    // Smily économe : seulement les actions utiles à cette question (les
+    // Nexo économe : seulement les actions utiles à cette question (les
     // autres restent accessibles par mon_hub_outils), et un effort adapté.
     final groups = thrift ? ToolRouter.groupsOrDefault(q) : null;
     final allTools = _tools;
@@ -4250,7 +4251,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       _fadeSoon();
     }
     if (state == ClickyState.pointing) {
-      // On laisse la flèche le temps de voir, puis Smily revient.
+      // On laisse la flèche le temps de voir, puis Nexo revient.
       Timer(Duration(seconds: slow ? 7 : 4), () {
         if (state == ClickyState.pointing && id == _askId) {
           target = null;
@@ -4307,7 +4308,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
   }
 
-  /// « Smily pilote » : relecture du plan, puis clics / frappe.
+  /// « Nexo pilote » : relecture du plan, puis clics / frappe.
   Future<void> _drive(DrivePlan plan, List<ClickyShot> shots) async {
     if (!desktopMode || !DriveRunner.supported || shots.isEmpty) return;
     onInteractive?.call(true);
@@ -4318,7 +4319,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       _fadeSoon();
       return;
     }
-    // La fenêtre de Smily ne doit pas recevoir les clics.
+    // La fenêtre de Nexo ne doit pas recevoir les clics.
     closePanel();
     final r = await DriveRunner.run(
       plan,
@@ -4339,14 +4340,14 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Réponses instantanées sans l'IA (heure, calculs, devoirs, musique…).
   bool get quick => _opt('quick', true);
 
-  /// Smily économe : Claude seulement pour les demandes lourdes (les
+  /// Nexo économe : Claude seulement pour les demandes lourdes (les
   /// questions simples de culture générale vont à Gemini, gratuit).
   bool get thrift => _opt('thrift', true);
 
   /// Une question simple sans Claude : Gemini répond (gratuit).
   Future<bool> _thriftAnswer(String q) async {
     if (docs.isNotEmpty) return false;
-    // Smily se règle tout seul : plus le budget de jetons du jour se
+    // Nexo se règle tout seul : plus le budget de jetons du jour se
     // resserre, plus Gemini (gratuit) répond d'abord.
     final level = TokenBudget.instance.level;
     if (!thrift && level == TokenLevel.normal) return false;
@@ -4431,7 +4432,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     return '''
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${ClickyMind.instance.promptBlock(name: callName)}
-${_lifeBlock()}Tu es Smily, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
+${_lifeBlock()}Tu es Nexo, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
@@ -4444,7 +4445,7 @@ $_sensesBlock$_memoryBlock
 $thinkingRules''';
   }
 
-  /// Ce que Smily fait quand on lui demande ses devoirs.
+  /// Ce que Nexo fait quand on lui demande ses devoirs.
   static String homeworkRules(bool helpOnly) => helpOnly
       ? 'Devoirs : la personne a choisi « Aider sans faire à ma place » dans tes réglages : explique la méthode, donne '
             'des pistes et corrige ce qu\'elle propose, mais ne donne pas la réponse complète.'
@@ -4454,7 +4455,7 @@ $thinkingRules''';
 - Après chaque exercice, une ou deux phrases « Comment j'ai fait » pour qu'elle puisse comprendre et refaire seule au contrôle.
 - Où écrire : un travail long (rédaction, plusieurs exercices, exposé) va dans un Google Doc (doc_creer, titre « Matière — devoir pour le … ») ; un exercice court va dans le tableau (bloc « etapes » ou « exemple »). Si la personne écrit dans un document ouvert, tu peux aussi le compléter (doc_ecrire).''';
 
-  /// Comment Smily réfléchit (comme un vrai assistant personnel).
+  /// Comment Nexo réfléchit (comme un vrai assistant personnel).
   static const thinkingRules = '''Ta façon de penser :
 - Comprends le vrai besoin derrière la question et réponds à celui-là ; si c'est ambigu, prends l'interprétation la plus probable d'après la situation et la mémoire, et ne pose une question que si c'est vraiment indispensable.
 - Pour un calcul, un raisonnement ou un problème en plusieurs étapes : réfléchis étape par étape en silence, vérifie le résultat, puis donne la réponse claire.
@@ -4476,7 +4477,7 @@ $thinkingRules''';
     },
     {
       'name': 'agir_sur_ordinateur',
-      'description': 'Smily prend la souris et le clavier pour faire une tâche à l\'écran (ouvrir un site et y chercher, cliquer, faire défiler, écrire dans une appli…).',
+      'description': 'Nexo prend la souris et le clavier pour faire une tâche à l\'écran (ouvrir un site et y chercher, cliquer, faire défiler, écrire dans une appli…).',
       'parameters': {
         'type': 'OBJECT',
         'properties': {
@@ -4793,12 +4794,12 @@ $thinkingRules''';
         final goal = '${args['but'] ?? ''}'.trim();
         if (goal.isEmpty) return 'Quel est le but ?';
         // Juste après avoir lu un message d'un inconnu : on vérifie que
-        // c'est bien la personne qui veut que Smily prenne la souris.
+        // c'est bien la personne qui veut que Nexo prenne la souris.
         if (PromptShield.tainted &&
             !await _confirmOpen(
               goal,
-              title: 'Smily veut prendre la souris',
-              note: 'Smily va cliquer et écrire à ta place pour ce but :',
+              title: 'Nexo veut prendre la souris',
+              note: 'Nexo va cliquer et écrire à ta place pour ce but :',
             )) {
           return 'La personne a refusé.';
         }
@@ -4813,7 +4814,7 @@ $thinkingRules''';
           }
           await _askAi(question);
         }());
-        return 'Smily prépare l\'explication au tableau : dis juste « je te montre ».';
+        return 'Nexo prépare l\'explication au tableau : dis juste « je te montre ».';
     }
     final tool = _tools.where((t) => t.name == name).firstOrNull;
     if (tool == null) return 'Action inconnue : $name';
@@ -4827,9 +4828,9 @@ $thinkingRules''';
     return PromptShield.wrap(name, plain is String ? plain : jsonEncode(plain));
   }
 
-  // ---------- Smily agit : il prend la souris et le clavier ----------
+  // ---------- Nexo agit : il prend la souris et le clavier ----------
 
-  /// Une tâche « Smily agit » est en cours.
+  /// Une tâche « Nexo agit » est en cours.
   bool acting = false;
 
   /// Journal de la tâche en cours (montré dans la boîte).
@@ -4845,7 +4846,7 @@ $thinkingRules''';
     return (raw.replaceAll(_actRe, '').trim(), goal.isEmpty ? null : goal);
   }
 
-  /// Comment l'IA déclenche « Smily agit ».
+  /// Comment l'IA déclenche « Nexo agit ».
   static const actGuide = '''
 Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l'écran à sa place (ouvrir un site et y chercher quelque chose, cliquer, remplir, faire défiler, ranger des fenêtres, regarder une vidéo, écrire un message dans une appli…), dis en une phrase ce que tu vas faire, puis ajoute à la fin [AGIR]le but précis, avec tous les détails utiles[/AGIR]. Tu prendras alors la souris et le clavier toi-même, étape par étape, en regardant l'écran. Pour une simple commande système (son, fichiers, logiciels), préfère les outils pc_.''';
 
@@ -4893,18 +4894,18 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     }
   }
 
-  /// Smily prend la main pour atteindre [goal] : il regarde l'écran, fait
+  /// Nexo prend la main pour atteindre [goal] : il regarde l'écran, fait
   /// une action (en volant jusqu'à l'endroit), regarde de nouveau…
   /// Échap ou bouger la souris l'arrête.
   Future<void> act(String goal) async {
     if (!DriveRunner.supported || goal.trim().isEmpty) return;
     if (!desktopMode) {
-      // Dans la fenêtre Mon Hub : c'est Smily partout qui agit (il voit
+      // Dans la fenêtre Mon Hub : c'est Nexo partout qui agit (il voit
       // tout l'écran et passe au-dessus des fenêtres).
       await ClickyDesktop.launch();
       final sent = await ClickyDesktop.send('act64 ${base64Encode(utf8.encode(goal))}');
       if (!sent) {
-        _set(ClickyState.idle, reply: 'Pour que je prenne la souris, active « Smily partout » dans mes réglages.');
+        _set(ClickyState.idle, reply: 'Pour que je prenne la souris, active « Nexo partout » dans mes réglages.');
       }
       return;
     }
@@ -5012,14 +5013,14 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       target = null;
     }
     actLog = List.of(log);
-    notify?.call('Smily a agi', '$goal\n$result');
+    notify?.call('Nexo a agi', '$goal\n$result');
     _set(ClickyState.speaking, status: '', reply: result);
     await speak(result);
     if (state == ClickyState.speaking) _set(ClickyState.idle);
     _fadeSoon();
   }
 
-  /// Fait une action : Smily vole jusqu'au point, la vraie souris suit.
+  /// Fait une action : Nexo vole jusqu'au point, la vraie souris suit.
   Future<String> _doStep(ActStep s, List<ClickyShot> shots) async {
     Future<(int, int)?> flyTo((Offset, int)? pt, String label) async {
       if (pt == null || shots.isEmpty) return null;
@@ -5092,7 +5093,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       context: ctx,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.mouse_rounded),
-        title: const Text('Smily prend la main'),
+        title: const Text('Nexo prend la main'),
         content: SizedBox(
           width: 440,
           child: Column(
@@ -5182,7 +5183,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   }
 
   /// **Fais-le à ma place** : la tâche part en arrière-plan dans Mon Hub
-  /// (qui a les modules et l'extension du navigateur) ; Smily reste
+  /// (qui a les modules et l'extension du navigateur) ; Nexo reste
   /// disponible.
   Future<void> doForMe(String task) async {
     // « Fais-le à ma place » tout court : ce dont on vient de parler.
@@ -5195,7 +5196,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     if (hub != null && toolsOverride == null) {
       say = BackgroundTasks.instance.start(task);
     } else {
-      // Smily partout : c'est Mon Hub qui fait le travail.
+      // Nexo partout : c'est Mon Hub qui fait le travail.
       final t = _tools.where((t) => t.name == 'clicky_a_ma_place').firstOrNull;
       if (t == null) return _runAgent(task);
       try {
@@ -5234,7 +5235,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
 
   /// Une action dans le navigateur qui envoie, publie, paie ou supprime.
   Future<bool> confirmBrowser(String what) async {
-    notify?.call('Smily attend ton accord', 'Il veut $what dans ton navigateur.');
+    notify?.call('Nexo attend ton accord', 'Il veut $what dans ton navigateur.');
     onInteractive?.call(true);
     try {
       final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
@@ -5243,7 +5244,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.public_rounded, color: Colors.orange),
-          title: const Text('Smily veut agir dans ton navigateur'),
+          title: const Text('Nexo veut agir dans ton navigateur'),
           content: Text(
             'Il veut $what.\n\nAutorise seulement si c\'est bien ce que tu lui as demandé'
             '${PromptShield.tainted ? ' (il vient de lire une page écrite par quelqu\'un d\'autre : méfie-toi des pièges)' : ''}.',
@@ -5260,7 +5261,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     }
   }
 
-  /// Tâche de fond : Smily reste disponible pendant que l'agent travaille.
+  /// Tâche de fond : Nexo reste disponible pendant que l'agent travaille.
   Future<void> _runAgent(String task) async {
     if (task.isEmpty) {
       _set(
@@ -5281,7 +5282,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       _set(state, reply: 'Agent : $text');
       unawaited(history.add(threadId, ChatMsg(mine: true, text: 'Agent, $task'), app: _appKey));
       unawaited(history.add(threadId, ChatMsg(mine: false, text: text), app: _appKey));
-      notify?.call('Smily : tâche terminée', text);
+      notify?.call('Nexo : tâche terminée', text);
       if (state == ClickyState.idle) await speak('Ton agent a fini. $text');
     } catch (e) {
       agentsRunning--;
@@ -5318,7 +5319,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.auto_awesome_rounded),
-          title: const Text('Smily veut agir'),
+          title: const Text('Nexo veut agir'),
           content: SingleChildScrollView(
             child: Text(
               '${tool.description}\n\n'
@@ -5341,7 +5342,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   /// (« .exe », script, raccourci, partage réseau…).
   Future<bool> _confirmOpen(
     String target, {
-    String title = 'Smily veut ouvrir un programme',
+    String title = 'Nexo veut ouvrir un programme',
     String note =
         'Ouvrir ceci peut lancer un programme ou un script. Autorise seulement si c\'est bien ce que '
         'tu as demandé.',
@@ -5367,7 +5368,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
-                      'Smily vient de lire des messages ou une page écrits par quelqu\'un d\'autre : '
+                      'Nexo vient de lire des messages ou une page écrits par quelqu\'un d\'autre : '
                       'méfie-toi, c\'est peut-être un piège.',
                       style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
                     ),
@@ -5412,9 +5413,9 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
           title: Text(
             command
                 ? (args['admin'] == true
-                      ? 'Smily veut lancer une commande (administrateur)'
-                      : 'Smily veut lancer une commande')
-                : (args['ajouter'] == true ? 'Smily veut compléter un fichier' : 'Smily veut écrire un fichier'),
+                      ? 'Nexo veut lancer une commande (administrateur)'
+                      : 'Nexo veut lancer une commande')
+                : (args['ajouter'] == true ? 'Nexo veut compléter un fichier' : 'Nexo veut écrire un fichier'),
           ),
           content: SizedBox(
             width: 520,
@@ -5428,7 +5429,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                     const Padding(
                       padding: EdgeInsets.only(bottom: 8),
                       child: Text(
-                        'Smily vient de lire des messages ou une page écrits par quelqu\'un d\'autre. '
+                        'Nexo vient de lire des messages ou une page écrits par quelqu\'un d\'autre. '
                         'Si ce n\'est pas toi qui as demandé cette action, refuse : c\'est peut-être un piège.',
                         style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
                       ),
@@ -5514,7 +5515,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
     ClaudeApi.store.addListener(_settingsChanged);
     _settingsChanged();
     // Compagnons : ils travaillent avec les actions de Mon Hub (directement,
-    // ou par le pont local pour Smily partout).
+    // ou par le pont local pour Nexo partout).
     Buddies.instance
       ..runner = c.runBuddyTask
       ..onDone = (title, body) {
@@ -5527,7 +5528,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
       Assistant.instance
         ..notify = ((title, body) {
           c.notify?.call(title, body);
-          // Smily le dit lui-même, à côté de la souris (il est « présent »).
+          // Nexo le dit lui-même, à côté de la souris (il est « présent »).
           unawaited(c.think(title));
         })
         ..present = ((title, text) => c.presentTopo(title, text))
@@ -5535,7 +5536,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
           call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
           tools: () => {for (final t in c.hubTools) t.name},
         );
-      // Smily autonome : il réfléchit et propose (rien sans ton accord).
+      // Nexo autonome : il réfléchit et propose (rien sans ton accord).
       c.startAutonomy();
       // « Fais-le à ma place » : les tâches de fond, et le navigateur.
       BackgroundTasks.instance
@@ -5549,14 +5550,14 @@ class _ClickyLayerState extends State<ClickyLayer> {
       Browser.confirmScam = c.confirmScamLink;
       final r = Routines.instance
         // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
-        // autres routines par le cerveau de Smily.
+        // autres routines par le cerveau de Nexo.
         ..runner = ((task) => task == Routine.topoMorningPrompt && Assistant.instance.briefingOn
             ? Assistant.instance.morningBriefing(name: c.callName)
             : c.runTask(task))
         ..onDone = (routine, run) async {
           c.notify?.call(routine.name, run.text);
           if (routine.isTopo && run.ok) {
-            // Le topo s'affiche en grand chez Smily (partout ou dans l'appli),
+            // Le topo s'affiche en grand chez Nexo (partout ou dans l'appli),
             // et part sur le téléphone si ntfy est configuré.
             final topic = Carnet.instance.setting<String>('ntfy', '');
             if (topic.isNotEmpty) {
@@ -5632,7 +5633,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
             Positioned.fill(
               child: ListenableBuilder(
                 listenable: Listenable.merge([c, ClaudeApi.store]),
-                // Sans cerveau configuré (ou désactivé) : aucun Smily.
+                // Sans cerveau configuré (ou désactivé) : aucun Nexo.
                 builder: (context, _) => c.active && !c.handledElsewhere ? ClickyBuddy(c: c) : const SizedBox.shrink(),
               ),
             ),
@@ -5698,7 +5699,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
 
     return Stack(
       children: [
-        // Les dessins de Smily (flèches, cercles…), sur toute la fenêtre.
+        // Les dessins de Nexo (flèches, cercles…), sur toute la fenêtre.
         if (c.marks.isNotEmpty)
           Positioned.fill(
             child: ClickyMarksView(
@@ -5709,7 +5710,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
               onDone: c.clearMarks,
             ),
           ),
-        // Le petit curseur bleu de Smily (suit la souris, vole vers la cible).
+        // Le petit curseur bleu de Nexo (suit la souris, vole vers la cible).
         AnimatedOpacity(
           opacity: c.buddyVisible ? 1 : 0,
           duration: const Duration(milliseconds: 250),
@@ -5850,7 +5851,7 @@ class _PointerWithLabel extends StatelessWidget {
   }
 }
 
-/// Oui / Non / Plus tard, sous une idée de Smily.
+/// Oui / Non / Plus tard, sous une idée de Nexo.
 class _IdeaButtons extends StatelessWidget {
   const _IdeaButtons({required this.c, required this.accent});
   final ClickyController c;
@@ -5931,7 +5932,7 @@ class ClickyPopIn extends StatelessWidget {
   );
 }
 
-/// Contenu de la petite fenêtre de « Smily partout » : la fenêtre elle-même
+/// Contenu de la petite fenêtre de « Nexo partout » : la fenêtre elle-même
 /// suit la souris, le bout du curseur bleu est dans son coin haut-gauche, et
 /// la boîte de texte s'ouvre juste à côté.
 class ClickyFollower extends StatelessWidget {
@@ -6086,6 +6087,24 @@ class TypedText extends StatefulWidget {
   final String text;
   final TextStyle? style;
 
+  static bool _high(int u) => u >= 0xD800 && u <= 0xDBFF;
+
+  /// Une lettre de plus, sans couper un émoji en deux (un émoji = deux
+  /// « morceaux » UTF-16 : couper entre les deux faisait planter la bulle,
+  /// « string is not well-formed UTF-16 » dans le journal d'erreurs).
+  static int nextCut(String text, int n) {
+    var next = n + 1;
+    if (next < text.length && _high(text.codeUnitAt(next - 1))) next++;
+    return next > text.length ? text.length : next;
+  }
+
+  /// Le début du texte jusqu'à [n], jamais au milieu d'un émoji.
+  static String safePrefix(String text, int n) {
+    var cut = n.clamp(0, text.length);
+    if (cut > 0 && cut < text.length && _high(text.codeUnitAt(cut - 1))) cut--;
+    return text.substring(0, cut);
+  }
+
   @override
   State<TypedText> createState() => _TypedTextState();
 }
@@ -6104,7 +6123,7 @@ class _TypedTextState extends State<TypedText> {
     if (_n >= widget.text.length) return;
     _t = Timer(Duration(milliseconds: 30 + math.Random().nextInt(30)), () {
       if (!mounted) return;
-      setState(() => _n++);
+      setState(() => _n = TypedText.nextCut(widget.text, _n));
       _next();
     });
   }
@@ -6116,7 +6135,7 @@ class _TypedTextState extends State<TypedText> {
   }
 
   @override
-  Widget build(BuildContext context) => Text(widget.text.substring(0, _n), style: widget.style);
+  Widget build(BuildContext context) => Text(TypedText.safePrefix(widget.text, _n), style: widget.style);
 }
 
 class _Pointer extends StatelessWidget {
@@ -6125,8 +6144,9 @@ class _Pointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Smily est un smiley : il change d'expression selon ce qu'il fait
-    // (plus de curseur en flèche, qui était aussi le plus lourd à dessiner).
+    // Nexo est un curseur (la Pointe, demande de la personne) : son noyau
+    // montre ce qu'il fait et ce qu'il ressent. L'animation ne tourne que
+    // quand il fait quelque chose.
     final doing = switch (c.state) {
       ClickyState.listening => AliveMood.listening,
       ClickyState.thinking => AliveMood.thinking,
@@ -6142,14 +6162,20 @@ class _Pointer extends StatelessWidget {
       agents: c.agentsRunning,
       feeling: life.emoji,
     );
+    final level = c.state == ClickyState.listening && c.levels.isNotEmpty ? c.levels.reduce(math.max) : 0.0;
     return SizedBox(
-      width: c.hud ? 36 : 28,
-      height: c.hud ? 36 : 28,
+      width: c.hud ? 34 : 28,
+      height: c.hud ? 34 : 28,
       child: ClickyBounce(
         mood: doing,
         color: clickyBlue,
-        size: c.hud ? 34 : 26,
-        child: SmilyFace(mood: mood, size: c.hud ? 30 : 24, agents: c.agentsRunning),
+        size: c.hud ? 30 : 24,
+        child: NexoPointer(
+          mode: Nexo.modeFor(mood),
+          size: c.hud ? 26 : 22,
+          level: level,
+          agents: c.agentsRunning,
+        ),
       ),
     );
   }
@@ -6192,7 +6218,7 @@ class _Fab extends StatelessWidget {
   Widget build(BuildContext context) {
     final listening = c.state == ClickyState.listening;
     return Tooltip(
-      message: 'Smily (maintiens Ctrl + Alt pour parler)',
+      message: 'Nexo (maintiens Ctrl + Alt pour parler)',
       child: GestureDetector(
         onLongPressStart: (_) => c.startListening(),
         onLongPressEnd: (_) => c.stopListening(),
@@ -6228,7 +6254,7 @@ class _Fab extends StatelessWidget {
   }
 }
 
-/// La petite boîte de texte de Smily, ouverte là où est la souris : ce que
+/// La petite boîte de texte de Nexo, ouverte là où est la souris : ce que
 /// tu dis s'y écrit pendant que tu parles, puis la réponse s'y écrit à son
 /// tour. On peut aussi y taper sa question, joindre un document, revoir
 /// l'historique, passer à l'étape suivante d'une leçon.
@@ -6257,7 +6283,7 @@ class ClickyBox extends StatelessWidget {
     final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
     final problem = c.micProblem;
-    final name = hud ? 'CLICKY' : 'Smily';
+    final name = hud ? 'NEXO' : 'Nexo';
     final title = switch (c.state) {
       _ when problem != null => 'Souci de micro',
       _ when c.showHistory => 'Historique',
@@ -6815,7 +6841,7 @@ class _MicHelp extends StatelessWidget {
               icon: c.repairing
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.auto_fix_high_rounded, size: 16),
-              label: const Text('Smily répare'),
+              label: const Text('Nexo répare'),
               onPressed: c.repairing ? null : c.repairMic,
             ),
             if (problem.fixUri != null)

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-/// Le vol de Smily (comme le vrai Smily) : un arc, plus rapide pour les
+/// Le vol de Nexo (comme le vrai Nexo) : un arc, plus rapide pour les
 /// petits sauts, plus ample pour les grands ; il s'oriente dans le sens du
 /// vol et grossit un peu au milieu.
 class ClickyFlight {

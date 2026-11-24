@@ -34,7 +34,7 @@ import 'mock_exam.dart';
 /// - cartes qui reviennent juste avant que tu les oublies (FSRS, l'algorithme
 ///   d'Anki) ;
 /// - quiz QCM, réponse écrite, jeu d'association ;
-/// - Smily crée les cartes à partir d'un cours (texte, document, photo, PDF) ;
+/// - Nexo crée les cartes à partir d'un cours (texte, document, photo, PDF) ;
 /// - minuteur de concentration et série de jours 🔥 ;
 /// - plan de révision placé dans l'agenda avant chaque contrôle d'École
 ///   Directe.
@@ -101,7 +101,7 @@ class RevisionsModule extends HubModule {
     unawaited(Navigator.push(ctx, MaterialPageRoute<void>(builder: (_) => page())));
   }
 
-  // ------------------------------------------------------------ Smily (IA)
+  // ------------------------------------------------------------ Nexo (IA)
 
   static const _cardsSystem =
       'Tu crées des cartes de révision (flashcards) pour un lycéen français. Réponds uniquement en JSON.';
@@ -126,7 +126,7 @@ class RevisionsModule extends HubModule {
     ].where((c) => c.$1.isNotEmpty && c.$2.isNotEmpty).toList();
   }
 
-  /// Smily fabrique des cartes à partir d'un cours.
+  /// Nexo fabrique des cartes à partir d'un cours.
   Future<List<(String, String)>> generate({
     String text = '',
     List<String> images = const [],
@@ -134,7 +134,7 @@ class RevisionsModule extends HubModule {
     int count = 15,
   }) async {
     if (!await AiText.available()) {
-      throw 'Smily a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
+      throw 'Nexo a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
     }
     final what = text.trim().isNotEmpty
         ? 'ce cours :\n---\n${text.length > 30000 ? text.substring(0, 30000) : text}\n---'
@@ -143,7 +143,7 @@ class RevisionsModule extends HubModule {
         : 'ces photos de cours (lis bien tout le texte)';
     final out = await AiText.ask(cardsPrompt(count, what), system: _cardsSystem, images: images, pdf: pdf);
     final cards = parseCards(out);
-    if (cards.isEmpty) throw 'Smily n\'a pas réussi à faire des cartes avec ce contenu';
+    if (cards.isEmpty) throw 'Nexo n\'a pas réussi à faire des cartes avec ce contenu';
     return cards;
   }
 
@@ -161,7 +161,7 @@ class RevisionsModule extends HubModule {
   }
 
   static const _prepSystem =
-      'Tu es Smily, le coach de révision d\'un lycéen français. Tu réponds uniquement en JSON valide.';
+      'Tu es Nexo, le coach de révision d\'un lycéen français. Tu réponds uniquement en JSON valide.';
 
   static String prepPrompt(EdHomework t, String material) =>
       'Prépare la révision d\'un contrôle de ${t.subject} le ${frDays[t.due.weekday - 1]} ${t.due.day} '
@@ -178,7 +178,7 @@ class RevisionsModule extends HubModule {
   /// Ce que la réponse de l'IA contient : (titre, fiche, cartes, quiz).
   static (String, String, List<(String, String)>, List<QuizQuestion>) parsePrep(String text) {
     final j = AiText.json(text);
-    if (j is! Map) throw 'Smily n\'a pas réussi à préparer ce contrôle';
+    if (j is! Map) throw 'Nexo n\'a pas réussi à préparer ce contrôle';
     final cards = parseCards(jsonEncode(j['cartes'] ?? const []));
     final quiz = [
       for (final q in (j['quiz'] as List?) ?? const [])
@@ -193,14 +193,14 @@ class RevisionsModule extends HubModule {
           ),
     ];
     final sheet = '${j['fiche'] ?? ''}'.trim();
-    if (sheet.isEmpty && cards.isEmpty) throw 'Smily n\'a pas réussi à préparer ce contrôle';
+    if (sheet.isEmpty && cards.isEmpty) throw 'Nexo n\'a pas réussi à préparer ce contrôle';
     return ('${j['titre'] ?? ''}'.trim(), sheet, cards, quiz);
   }
 
   /// Fiche + cartes + quiz pour un contrôle (dans un paquet à part).
   Future<Deck> prepareTest(EdHomework t) async {
     if (!await AiText.available()) {
-      throw 'Smily a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
+      throw 'Nexo a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
     }
     // Les cours de la personne sur Google Docs, s'il y en a pour la matière.
     final material = StringBuffer();
@@ -254,7 +254,7 @@ class RevisionsModule extends HubModule {
       return HubNotification(
         id: 'prep-${testKey(next)}',
         title: '📝 Contrôle de ${next.subject} ${_inDays(next.due)}',
-        body: 'Smily a préparé ta fiche, ${deck.cards.length} cartes et un quiz de ${deck.quiz.length} questions.',
+        body: 'Nexo a préparé ta fiche, ${deck.cards.length} cartes et un quiz de ${deck.quiz.length} questions.',
         moduleId: id,
       );
     } catch (_) {
@@ -365,7 +365,7 @@ class RevisionsModule extends HubModule {
     ),
     HubTool(
       name: 'revision_generer',
-      description: 'Smily crée des cartes de révision à partir d\'un texte de cours ou d\'un Google Doc.',
+      description: 'Nexo crée des cartes de révision à partir d\'un texte de cours ou d\'un Google Doc.',
       params: {
         'paquet': ('string', 'Nom du paquet'),
         'texte': ('string', 'Le cours (facultatif si document)'),
@@ -411,7 +411,7 @@ class RevisionsModule extends HubModule {
                 )
                 .firstOrNull ??
             revisions.decks.where((d) => d.name.toLowerCase().contains(q.toLowerCase())).firstOrNull;
-        // Les comptes rendus des cours écoutés par Smily dans cette matière.
+        // Les comptes rendus des cours écoutés par Nexo dans cette matière.
         final notes = [
           for (final n in await CourseListener.instance.list())
             if (n.done && GradeMath.matchSubject(q, [n.subject]) != null) n.summary,
@@ -464,7 +464,7 @@ class RevisionsModule extends HubModule {
       name: 'revision_preparer_controle',
       description:
           'Prépare un contrôle d\'École Directe : fiche de révision, cartes et quiz (le prochain, ou celui d\'une matière). '
-          'Smily le fait aussi tout seul dès qu\'il voit un contrôle dans le cahier de texte.',
+          'Nexo le fait aussi tout seul dès qu\'il voit un contrôle dans le cahier de texte.',
       params: {'matiere': ('string', 'Matière (facultatif : le prochain contrôle)')},
       run: (a) async {
         final m = '${a['matiere'] ?? ''}'.toLowerCase().trim();
@@ -640,7 +640,7 @@ class RevisionsHomePage extends StatelessWidget {
     if (context.mounted) await module.push(context, () => DeckPage(module: module, deckId: d.id));
   }
 
-  /// « Préparer maintenant » un contrôle (Smily le fait aussi tout seul).
+  /// « Préparer maintenant » un contrôle (Nexo le fait aussi tout seul).
   Future<void> _prepare(BuildContext context, EdHomework t) async {
     final nav = Navigator.of(context);
     unawaited(
@@ -652,7 +652,7 @@ class RevisionsHomePage extends StatelessWidget {
             children: [
               const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
               const SizedBox(width: 16),
-              Expanded(child: Text('Smily prépare ta fiche, tes cartes et ton quiz de ${t.subject}…')),
+              Expanded(child: Text('Nexo prépare ta fiche, tes cartes et ton quiz de ${t.subject}…')),
             ],
           ),
         ),
@@ -861,7 +861,7 @@ class RevisionsHomePage extends StatelessWidget {
                       child: _ActionTile(
                         icon: Icons.auto_awesome_rounded,
                         color: const Color(0xFF7C5CFF),
-                        title: 'Créer avec Smily',
+                        title: 'Créer avec Nexo',
                         text: 'À partir d\'un cours, d\'une photo, d\'un PDF',
                         onTap: () => showGenerateSheet(context, module),
                       ),
@@ -977,8 +977,8 @@ class RevisionsHomePage extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 30),
                     child: EmptyHint(
-                      'Pas encore de cartes. Crée-les avec Smily à partir d\'un cours (photo, PDF, texte), '
-                      'ou dis : « Smily, fais-moi des cartes sur la guerre froide ».',
+                      'Pas encore de cartes. Crée-les avec Nexo à partir d\'un cours (photo, PDF, texte), '
+                      'ou dis : « Nexo, fais-moi des cartes sur la guerre froide ».',
                       icon: Icons.style_outlined,
                     ),
                   )
@@ -1383,7 +1383,7 @@ class DeckPage extends StatelessWidget {
                   const Spacer(),
                   TextButton.icon(
                     icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('Smily'),
+                    label: const Text('Nexo'),
                     onPressed: () => showGenerateSheet(context, module, deck: d),
                   ),
                   TextButton.icon(
@@ -1470,9 +1470,9 @@ class _Mode extends StatelessWidget {
   );
 }
 
-// ================================================================== Smily
+// ================================================================== Nexo
 
-/// « Créer avec Smily » : un cours (texte, document, photos, PDF) devient
+/// « Créer avec Nexo » : un cours (texte, document, photos, PDF) devient
 /// des cartes.
 Future<void> showGenerateSheet(BuildContext context, RevisionsModule module, {Deck? deck}) => showDialog<void>(
   context: context,
@@ -1563,7 +1563,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
   }
 
   Future<void> _add() async {
-    final name = deckName.text.trim().isEmpty ? 'Cartes de Smily' : deckName.text.trim();
+    final name = deckName.text.trim().isEmpty ? 'Cartes de Nexo' : deckName.text.trim();
     final d = widget.deck ?? await widget.module.revisions.createDeck(name);
     final list = [
       for (var i = 0; i < cards!.length; i++)
@@ -1591,7 +1591,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
         children: [
           Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
           SizedBox(width: 10),
-          Text('Créer des cartes avec Smily'),
+          Text('Créer des cartes avec Nexo'),
         ],
       ),
       content: SizedBox(
@@ -1722,7 +1722,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.auto_awesome_rounded),
-            label: Text(busy ? 'Smily lit ton cours…' : 'Créer les cartes'),
+            label: Text(busy ? 'Nexo lit ton cours…' : 'Créer les cartes'),
             onPressed: busy || !ready ? null : _go,
           )
         else
@@ -2133,7 +2133,7 @@ class QuizPage extends StatefulWidget {
 class _QuizPageState extends State<QuizPage> {
   late final r = widget.random ?? math.Random();
 
-  /// Le quiz préparé par Smily (avec de vrais pièges), sinon des questions
+  /// Le quiz préparé par Nexo (avec de vrais pièges), sinon des questions
   /// tirées des cartes.
   late final List<StudyCard> questions = widget.deck.quiz.isNotEmpty
       ? [

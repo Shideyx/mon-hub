@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/claude_api.dart';
 
-/// Cerveau local et gratuit pour Smily : Ollama (ollama.com), qui fait
+/// Cerveau local et gratuit pour Nexo : Ollama (ollama.com), qui fait
 /// tourner un modèle d'IA directement sur le PC. Aucune clé, aucun compte,
 /// rien n'est envoyé sur internet. Il faut un modèle qui comprend les images
 /// (« qwen2.5vl », « gemma3 », « llama3.2-vision »…).

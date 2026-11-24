@@ -182,9 +182,9 @@ $o | ConvertTo-Json -Depth 4 -Compress
       out.add(
         const SecurityItem(
           id: 'clicky',
-          title: 'Smily contrôle le PC « sans demander »',
+          title: 'Nexo contrôle le PC « sans demander »',
           ok: false,
-          detail: 'Plus prudent : « Demander » (Réglages de Smily → Outils avancés → Contrôle du PC).',
+          detail: 'Plus prudent : « Demander » (Réglages de Nexo → Outils avancés → Contrôle du PC).',
         ),
       );
     }
@@ -219,7 +219,7 @@ $o | ConvertTo-Json -Depth 4 -Compress
     return out;
   }
 
-  /// Ce que Smily dit (les soucis d'abord).
+  /// Ce que Nexo dit (les soucis d'abord).
   static String say(List<SecurityItem> items) {
     final bad = [
       for (final i in items)

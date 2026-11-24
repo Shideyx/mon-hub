@@ -303,7 +303,7 @@ class Whisper {
       .trim();
 }
 
-/// Les « oreilles » de Smily avec Whisper : enregistre, puis transcrit
+/// Les « oreilles » de Nexo avec Whisper : enregistre, puis transcrit
 /// sur le PC.
 class WhisperEars extends RecordingEars {
   @override
@@ -330,7 +330,7 @@ class WhisperEars extends RecordingEars {
 class GeminiEars extends RecordingEars {
   GeminiEars(this.key);
 
-  /// Clé Gemini (celle de la voix de Smily).
+  /// Clé Gemini (celle de la voix de Nexo).
   final String Function() key;
 
   @override
@@ -344,7 +344,7 @@ class GeminiEars extends RecordingEars {
 
   @override
   EarsProblem get missing => const EarsProblem(
-    'Pas de clé Gemini : ajoute ta clé gratuite (aistudio.google.com) dans Réglages Smily → Voix.',
+    'Pas de clé Gemini : ajoute ta clé gratuite (aistudio.google.com) dans Réglages Nexo → Voix.',
     code: 'gemini-missing',
   );
 }

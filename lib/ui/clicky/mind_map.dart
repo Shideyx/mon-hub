@@ -28,7 +28,7 @@ class MindNode {
 }
 
 /// **Carte mentale animée** d'un cours ou d'un sujet : les branches se
-/// déplient, on zoome, et Smily explique une branche à voix haute.
+/// déplient, on zoome, et Nexo explique une branche à voix haute.
 class MindMaps {
   MindMaps._();
 
@@ -442,7 +442,7 @@ class _MindMapPageState extends State<MindMapPage> with SingleTickerProviderStat
                       ),
                     ),
                     IconButton.filledTonal(
-                      tooltip: 'Smily explique',
+                      tooltip: 'Nexo explique',
                       onPressed: () => _explain(sel),
                       icon: const Icon(Icons.record_voice_over_rounded),
                     ),

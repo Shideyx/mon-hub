@@ -8,7 +8,7 @@ import 'clicky.dart';
 import 'ears.dart';
 import 'whisper.dart';
 
-/// « Tester le micro » : on parle, on voit tout de suite ce que Smily
+/// « Tester le micro » : on parle, on voit tout de suite ce que Nexo
 /// entend, et sinon ce qui bloque (avec le bon réglage à ouvrir).
 class MicTestDialog extends StatefulWidget {
   const MicTestDialog({super.key});
@@ -31,7 +31,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
   bool repairing = false;
   List<String> repairSteps = const [];
 
-  /// « Smily répare » : relance le micro de toutes les façons possibles.
+  /// « Nexo répare » : relance le micro de toutes les façons possibles.
   Future<void> _repair() async {
     setState(() {
       repairing = true;
@@ -119,7 +119,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
           children: [
             Text(
               listening
-                  ? 'Parle : dis par exemple « Bonjour Smily, quel temps fait-il ? »'
+                  ? 'Parle : dis par exemple « Bonjour Nexo, quel temps fait-il ? »'
                   : 'Appuie sur « Commencer », puis parle normalement.',
             ),
             const SizedBox(height: 12),
@@ -146,7 +146,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Le micro marche ! Maintiens Ctrl + Alt et parle à Smily.',
+                  'Le micro marche ! Maintiens Ctrl + Alt et parle à Nexo.',
                   style: text.bodyMedium?.copyWith(color: Colors.green),
                 ),
               ),
@@ -170,7 +170,7 @@ class _MicTestDialogState extends State<MicTestDialog> {
                     icon: repairing
                         ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.auto_fix_high_rounded, size: 16),
-                    label: Text(repairing ? 'Smily répare…' : 'Smily répare'),
+                    label: Text(repairing ? 'Nexo répare…' : 'Nexo répare'),
                     onPressed: repairing || starting ? null : _repair,
                   ),
                   if (p.fixUri != null)
@@ -266,7 +266,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
           }
         },
       );
-      // Smily passe sur Whisper (réglage « Automatique » ou « Whisper »).
+      // Nexo passe sur Whisper (réglage « Automatique » ou « Whisper »).
       final c = ClickyController.instance;
       if (c.micEngine == 'windows') await c.setOption('micEngine', 'auto');
       c.micProblem = null;
@@ -292,7 +292,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
           children: [
             if (done)
               const Text(
-                'Smily t\'entend maintenant avec Whisper, directement sur ton PC : rien ne part sur '
+                'Nexo t\'entend maintenant avec Whisper, directement sur ton PC : rien ne part sur '
                 'internet. Maintiens Ctrl + Alt et parle.',
               )
             else ...[
@@ -313,7 +313,7 @@ class _WhisperInstallDialogState extends State<WhisperInstallDialog> {
               const SizedBox(height: 6),
               Text(
                 model == 'base'
-                    ? 'Rapide : la phrase s\'écrit en 1 à 2 secondes. Bien pour parler à Smily.'
+                    ? 'Rapide : la phrase s\'écrit en 1 à 2 secondes. Bien pour parler à Nexo.'
                     : 'Précis : se trompe moins (noms propres, phrases longues), mais met 2 à 3 fois plus de temps.',
                 style: text.bodySmall,
               ),

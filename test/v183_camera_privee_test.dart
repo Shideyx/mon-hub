@@ -41,7 +41,7 @@ void main() {
     test('rallumée hors appel : 20 minutes de répit', () {
       expect(step(blocked: false, openedAt: now.subtract(const Duration(minutes: 5))), PrivateStep.none);
       expect(step(blocked: false, openedAt: now.subtract(const Duration(minutes: 21))), PrivateStep.reblock);
-      // Rallumée sans Smily (avant le mode) : on n'y touche pas.
+      // Rallumée sans Nexo (avant le mode) : on n'y touche pas.
       expect(step(blocked: false), PrivateStep.none);
     });
 

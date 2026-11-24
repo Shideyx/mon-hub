@@ -4,8 +4,8 @@ import '../../core/version.dart';
 import '../../core/whats_new.dart';
 import 'skills.dart';
 
-/// **Ce que Smily sait de lui-même** : ses capacités (le catalogue « Ce que
-/// Smily sait faire » **et** ses vraies actions, pour qu'il ne dise jamais
+/// **Ce que Nexo sait de lui-même** : ses capacités (le catalogue « Ce que
+/// Nexo sait faire » **et** ses vraies actions, pour qu'il ne dise jamais
 /// « je ne sais pas faire » à tort), sa version et ses nouveautés.
 ///
 /// Une seule source pour tout : les actions branchées (la liste réelle,
@@ -119,7 +119,7 @@ class SelfKnowledge {
       return {
         'resume':
             'Je sais faire plus de ${ClickySkills.count} choses, rangées en ${ClickySkills.groups.length} thèmes : '
-            '${ClickySkills.groups.map((g) => g.title).join(', ')}. Tout est dans « Ce que Smily sait faire » (bouton ✨).',
+            '${ClickySkills.groups.map((g) => g.title).join(', ')}. Tout est dans « Ce que Nexo sait faire » (bouton ✨).',
         'themes': [
           for (final g in ClickySkills.groups)
             {'theme': '${g.emoji} ${g.title}', 'exemples': g.items.take(3).map((s) => s.text).toList()},
@@ -163,7 +163,7 @@ class SelfKnowledge {
     HubTool(
       name: 'clicky_capacites',
       description:
-          'Ce que Smily sait faire : cherche dans son catalogue de capacités ET dans toutes ses actions réelles. '
+          'Ce que Nexo sait faire : cherche dans son catalogue de capacités ET dans toutes ses actions réelles. '
           'À utiliser avant de répondre « je ne sais pas faire ça », et pour « tu sais faire quoi ? », « tu peux '
           '… ? », « comment je fais pour … avec toi ? ». Sans recherche : la liste des thèmes.',
       params: {'recherche': ('string', 'Ce que la personne veut faire (mots-clés), ou vide pour tout')},

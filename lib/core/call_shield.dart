@@ -15,7 +15,7 @@ class CallRules {
   /// pendant un appel).
   static const callApps = {'Discord', 'Teams', 'Zoom', 'Skype', 'WhatsApp', 'Chrome', 'Edge', 'Firefox', 'Snapchat'};
 
-  /// Celles qui ont toujours le droit (Mon Hub lui-même : Smily écoute ta
+  /// Celles qui ont toujours le droit (Mon Hub lui-même : Nexo écoute ta
   /// question ; le magnétophone de Windows quand c'est toi qui le lances).
   static const alwaysOk = {'Mon Hub', 'OBS', 'Appareil photo'};
 
@@ -60,7 +60,7 @@ class CallRules {
 
 /// **Bouclier d'appel** (v1.62) : pendant un appel, seule l'appli de
 /// l'appel a le droit de filmer et d'écouter. Si une autre appli allume la
-/// caméra ou le micro, Smily le dit tout de suite et propose de **lui**
+/// caméra ou le micro, Nexo le dit tout de suite et propose de **lui**
 /// couper l'accès (le réglage de Windows, appli par appli). Et « coupe mon
 /// micro » met le micro en sourdine **pour de vrai**, dans toutes les applis
 /// à la fois, instantanément (et « remets mon micro » le rallume).
@@ -89,7 +89,7 @@ class CallShield extends ChangeNotifier {
   String? call;
 
   /// Prévenir (branché par Mon Hub) : titre, texte, et la clé de l'appli à
-  /// couper (pour la proposition de Smily).
+  /// couper (pour la proposition de Nexo).
   void Function(String title, String body, String key, bool mic)? warn;
 
   /// Au début d'un appel avec caméra : comment flouter (une fois par appel).

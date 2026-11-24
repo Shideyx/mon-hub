@@ -23,7 +23,7 @@ class CopyMistake {
   final String why;
 }
 
-/// Ce que Smily pense de la copie.
+/// Ce que Nexo pense de la copie.
 class CopyReport {
   const CopyReport({this.grade, this.summary = '', this.mistakes = const [], this.good = const [], this.tips = const []});
   final double? grade;
@@ -33,7 +33,7 @@ class CopyReport {
   final List<String> tips;
 }
 
-/// **Correction de copie sur la photo** : Smily entoure chaque faute à
+/// **Correction de copie sur la photo** : Nexo entoure chaque faute à
 /// l'endroit exact de la feuille, comme un prof, avec l'explication.
 class CopyCheck {
   CopyCheck._();
@@ -192,7 +192,7 @@ class _CopyCheckPageState extends State<CopyCheckPage> {
       final r = await CopyCheck.check(p, _subject);
       if (mounted) setState(() => _report = r);
     } catch (e) {
-      if (mounted) setState(() => _error = '$e'.contains('clé') || '$e'.contains('Pas de') ? 'Il faut le cerveau de Smily (clé Gemini conseillée) et internet.' : '$e');
+      if (mounted) setState(() => _error = '$e'.contains('clé') || '$e'.contains('Pas de') ? 'Il faut le cerveau de Nexo (clé Gemini conseillée) et internet.' : '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -361,7 +361,7 @@ class _CopyCheckPageState extends State<CopyCheckPage> {
                       Text('Prends ta copie en photo, bien à plat', style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
                       const SizedBox(height: 8),
                       const Text(
-                        'Smily entoure chaque faute à sa place sur la feuille, avec la correction et la règle. '
+                        'Nexo entoure chaque faute à sa place sur la feuille, avec la correction et la règle. '
                         'Envoie la photo depuis ton téléphone (page « Mon téléphone ») : elle s\'ouvre ici toute seule.',
                         textAlign: TextAlign.center,
                       ),

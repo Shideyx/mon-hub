@@ -10,7 +10,7 @@ import '../../core/token_budget.dart';
 
 /// Gemini Live : la conversation **en direct**, comme le JARVIS « Mark LII »
 /// (Gemini Live API). Le micro part vers Gemini pendant que tu parles, et la
-/// réponse revient directement en voix, morceau par morceau : Smily répond
+/// réponse revient directement en voix, morceau par morceau : Nexo répond
 /// au tac au tac, sans attendre une transcription, une IA, puis une voix.
 ///
 /// Une connexion (WebSocket) reste ouverte entre deux questions : pas de
@@ -30,7 +30,7 @@ class GeminiLive {
   final String? language;
 
   /// true : Gemini repère tout seul quand on commence et finit de parler
-  /// (conversation continue, interprète) ; false : Smily le lui dit.
+  /// (conversation continue, interprète) ; false : Nexo le lui dit.
   final bool autoVad;
 
   final String key;
@@ -153,7 +153,7 @@ class GeminiLive {
             'functionDeclarations': [for (final t in tools) declaration(t), ...extraDeclarations],
           },
         ],
-      // Smily dit lui-même quand tu commences et finis de parler
+      // Nexo dit lui-même quand tu commences et finis de parler
       // (Ctrl + Alt, ou silence) : la réponse part dès que tu lâches.
       if (!autoVad)
         'realtimeInputConfig': {

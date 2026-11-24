@@ -89,7 +89,7 @@ class DocStore extends ChangeNotifier {
 
   HubDoc? byId(String id) => _index.value.where((d) => d.id == id).firstOrNull;
 
-  /// Retrouve un document par son titre (pour Smily : « mon exposé »).
+  /// Retrouve un document par son titre (pour Nexo : « mon exposé »).
   HubDoc? find(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return null;

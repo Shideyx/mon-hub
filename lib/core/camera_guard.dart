@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'package:win32/win32.dart';
 
 import 'cam_blur.dart';
 import 'hub_module.dart';
@@ -146,7 +149,7 @@ class CameraRules {
     return SensorState(blocked: blocked, uses: out);
   }
 
-  /// La phrase dite à la personne (ou à Smily).
+  /// La phrase dite à la personne (ou à Nexo).
   static String say(SensorState cam, SensorState mic) {
     final parts = <String>[];
     if (cam.blocked) {
@@ -173,7 +176,7 @@ class CameraRules {
 enum PrivateStep { none, ask, reblock }
 
 /// Les règles du **mode caméra privée**, sans Windows : la caméra reste
-/// coupée ; pendant un appel, Smily demande s'il doit l'allumer ; après
+/// coupée ; pendant un appel, Nexo demande s'il doit l'allumer ; après
 /// l'appel (ou 20 min après l'avoir rallumée hors appel), il la recoupe.
 class PrivateCamRules {
   const PrivateCamRules._();
@@ -274,7 +277,7 @@ class CameraGuard extends ChangeNotifier {
   bool _sawCall = false;
   bool _asked = false;
 
-  /// La caméra a été rallumée pendant le mode privé (par toi ou Smily).
+  /// La caméra a été rallumée pendant le mode privé (par toi ou Nexo).
   void _opened() {
     if (!privateMode) return;
     _openedAt = DateTime.now();
@@ -360,15 +363,97 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
     if (!force && _readAt != null && now.difference(_readAt!) < const Duration(seconds: 10)) return;
     _readAt = now;
     try {
-      final r = await PowerShell.run(readScript, const {}, const Duration(seconds: 20));
-      final out = '${r.stdout}'.trim();
-      if (out.isEmpty) return;
-      final j = jsonDecode(out);
-      if (j is! Map) return;
-      camera = CameraRules.parse(j['camera']);
-      micro = CameraRules.parse(j['micro']);
-      notifyListeners();
+      // Directement dans le registre (quelques millisecondes). Avant, un
+      // PowerShell était lancé à chaque tour (toutes les 30 s) : ça faisait
+      // ramer le PC. PowerShell ne sert plus que de secours.
+      var j = _readRegistry();
+      if (j == null) {
+        final r = await PowerShell.run(readScript, const {}, const Duration(seconds: 20));
+        final out = '${r.stdout}'.trim();
+        if (out.isEmpty) return;
+        final d = jsonDecode(out);
+        if (d is! Map) return;
+        j = d.cast<String, dynamic>();
+      }
+      final cam = CameraRules.parse(j['camera']), mic = CameraRules.parse(j['micro']);
+      final changed = '${_sig(cam)}|${_sig(mic)}' != '${_sig(camera)}|${_sig(micro)}';
+      camera = cam;
+      micro = mic;
+      // On ne redessine que si quelque chose a changé.
+      if (changed) notifyListeners();
     } catch (_) {}
+  }
+
+  static String _sig(SensorState s) => '${s.blocked}:${[for (final u in s.recent) '${u.key}${u.active}'].join(',')}';
+
+  static const _consent = r'SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore';
+
+  /// Même lecture que [readScript], par les fonctions de Windows (sans
+  /// lancer de programme). null si ça échoue (on passe par PowerShell).
+  static Map<String, dynamic>? _readRegistry() {
+    try {
+      return using((a) {
+        Map<String, dynamic> lire(String cap) {
+          final root = '$_consent\\$cap';
+          var blocked = false;
+          final buf = a<Uint16>(64);
+          final size = a<Uint32>()..value = 128;
+          final r = RegGetValue(
+            HKEY_CURRENT_USER,
+            root.toPcwstr(allocator: a),
+            'Value'.toPcwstr(allocator: a),
+            RRF_RT_REG_SZ,
+            null,
+            buf,
+            size,
+          );
+          if (r == ERROR_SUCCESS) blocked = PCWSTR(buf.cast<Utf16>()).toDartString() == 'Deny';
+          final apps = <Map<String, dynamic>>[];
+          for (final sub in [root, '$root\\NonPackaged']) {
+            final hk = a<Pointer>();
+            if (RegOpenKeyEx(HKEY_CURRENT_USER, sub.toPcwstr(allocator: a), 0, KEY_READ, hk) != ERROR_SUCCESS) {
+              continue;
+            }
+            final key = HKEY(hk.value);
+            try {
+              final name = a<Uint16>(520);
+              final len = a<Uint32>();
+              final q = a<Uint64>();
+              final qs = a<Uint32>();
+              int? qword(Pointer<Utf16> child, String value) {
+                qs.value = 8;
+                final ok = RegGetValue(
+                  key,
+                  PCWSTR(child),
+                  value.toPcwstr(allocator: a),
+                  RRF_RT_REG_QWORD,
+                  null,
+                  q,
+                  qs,
+                );
+                return ok == ERROR_SUCCESS ? q.value : null;
+              }
+
+              for (var i = 0; i < 4000; i++) {
+                len.value = 520;
+                if (RegEnumKeyEx(key, i, PWSTR(name.cast<Utf16>()), len, null, null, null) != ERROR_SUCCESS) break;
+                final child = PCWSTR(name.cast<Utf16>()).toDartString(length: len.value);
+                final start = qword(name.cast<Utf16>(), 'LastUsedTimeStart');
+                if (start == null) continue;
+                apps.add({'cle': child, 'debut': start, 'fin': qword(name.cast<Utf16>(), 'LastUsedTimeStop') ?? 0});
+              }
+            } finally {
+              RegCloseKey(key);
+            }
+          }
+          return {'bloque': blocked, 'apps': apps};
+        }
+
+        return {'camera': lire('webcam'), 'micro': lire('microphone')};
+      });
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Coupe (ou rallume) la caméra, ou le micro avec [mic].
@@ -388,7 +473,7 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
     return false;
   }
 
-  /// Ce que Smily dit de l'état.
+  /// Ce que Nexo dit de l'état.
   String say() => CameraRules.say(camera, micro);
 
   // Les applis déjà signalées (on ne prévient pas deux fois).
@@ -419,7 +504,7 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
   }
 }
 
-/// Les outils de Smily pour la caméra et le micro.
+/// Les outils de Nexo pour la caméra et le micro.
 extension CameraTools on CameraGuard {
   List<HubTool> tools() => [
     HubTool(
@@ -492,7 +577,7 @@ extension CameraTools on CameraGuard {
       name: 'camera_privee',
       description:
           'Mode caméra privée : la caméra du PC reste coupée tout le temps (aucune appli ni pirate ne peut '
-          'filmer) ; pendant un appel, Smily demande s\'il doit l\'allumer, et la recoupe à la fin. À utiliser '
+          'filmer) ; pendant un appel, Nexo demande s\'il doit l\'allumer, et la recoupe à la fin. À utiliser '
           'pour « mode caméra privée », « j\'ai peur qu\'on pirate ma webcam », « laisse ma caméra coupée ».',
       params: {'activer': ('string', 'oui (défaut) pour l\'allumer, non pour l\'éteindre')},
       run: (a) async {

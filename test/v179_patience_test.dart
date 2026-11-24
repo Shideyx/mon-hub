@@ -42,7 +42,7 @@ void main() {
     });
   });
 
-  group('Plus il refuse, plus Smily se taît', () {
+  group('Plus il refuse, plus Nexo se taît', () {
     test('premier refus : six heures', () {
       expect(PatienceRules.silence(1), const Duration(hours: 6));
     });

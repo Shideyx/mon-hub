@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'hub_controller.dart';
+import 'hub_module.dart';
 import 'module_store.dart';
 import 'freeze_watch.dart';
 import 'screen_time.dart';
@@ -168,7 +169,7 @@ class NotificationCenter extends ChangeNotifier {
 
   /// Publie une alerte : historique (cloche), bandeau dans la fenêtre et
   /// notification du système.
-  /// Chaque alerte publiée (Smily y réagit : un émoji, une phrase pour une
+  /// Chaque alerte publiée (Nexo y réagit : un émoji, une phrase pour une
   /// note). Branché par Mon Hub.
   static void Function(HubNotification n)? onAny;
 
@@ -245,8 +246,37 @@ class NotificationCenter extends ChangeNotifier {
     _timer = Timer.periodic(Duration(minutes: interval), (_) => pollNow());
   }
 
-  Future<void> pollNow() async {
-    if (_polling) return;
+  /// Une relève qui traîne (mails, École Directe…) est abandonnée au bout de
+  /// ce temps : elle ne bloque plus les autres.
+  static const pollTimeout = Duration(seconds: 25);
+
+  /// Modules qui partagent une connexion : le second attend le premier (le
+  /// module Argent lit les mails avec la connexion du module Mails).
+  static const pollAfter = {'argent': 'mail'};
+
+  // Relève demandée pendant qu'une autre tournait : faite juste après.
+  bool _pendingAll = false;
+  final _pending = <String>{};
+  final _inFlight = <String>{};
+
+  /// Relève **tout de suite** certains modules (un message Discord vient
+  /// d'arriver dans le vrai Discord…), sans attendre le tour suivant.
+  Future<void> pollModules(Set<String> ids) => pollNow(only: ids);
+
+  /// Relève les modules. Avant, ils passaient **l'un après l'autre** : un
+  /// module lent (la boîte mail, École Directe) faisait attendre tous les
+  /// autres — un message Discord pouvait arriver des minutes plus tard, et
+  /// l'appli figeait (« vérifie les notifications depuis 31 s »).
+  /// Maintenant ils sont relevés **en même temps**, chacun avec une limite.
+  Future<void> pollNow({Set<String>? only}) async {
+    if (_polling) {
+      if (only == null) {
+        _pendingAll = true;
+      } else {
+        _pending.addAll(only);
+      }
+      return;
+    }
     FreezeWatch.note('vérifie les notifications');
     _polling = true;
     try {
@@ -256,14 +286,37 @@ class NotificationCenter extends ChangeNotifier {
       final seeded = (prefs.getStringList(_seededKey) ?? const []).toSet();
       final fresh = <HubNotification>[];
 
-      for (final m in hub.enabled) {
-        List<HubNotification> items;
+      final mods = [
+        for (final m in hub.enabled)
+          if (only == null || only.contains(m.id)) m,
+      ];
+      final running = <String, Future<List<HubNotification>?>>{};
+      Future<List<HubNotification>?> pollOne(HubModule m) async {
+        final first = pollAfter[m.id];
+        final wait = first == null ? null : running[first];
+        if (wait != null) await wait;
+        // Sa relève d'avant n'est toujours pas finie (abandonnée après la
+        // limite) : on ne la double pas.
+        if (_inFlight.contains(m.id)) return null;
+        _inFlight.add(m.id);
+        final job = m.poll().whenComplete(() => _inFlight.remove(m.id));
         try {
-          items = await m.poll();
+          return await job.timeout(pollTimeout);
         } catch (e) {
           debugPrint('poll ${m.id}: $e');
-          continue;
+          return null;
         }
+      }
+
+      for (final m in mods) {
+        running[m.id] = pollOne(m);
+      }
+      final results = await Future.wait([for (final m in mods) running[m.id]!]);
+
+      for (var i = 0; i < mods.length; i++) {
+        final m = mods[i];
+        final items = results[i];
+        if (items == null) continue;
         // Premier passage d'un module : on mémorise sans alerter, pour ne
         // pas recevoir 50 alertes d'anciens messages d'un coup.
         final first = !seeded.contains(m.id);
@@ -287,6 +340,14 @@ class NotificationCenter extends ChangeNotifier {
       }
     } finally {
       _polling = false;
+    }
+    // Ce qui a été demandé pendant la relève : tout de suite après.
+    if (_pendingAll || _pending.isNotEmpty) {
+      final all = _pendingAll;
+      final ids = {..._pending};
+      _pendingAll = false;
+      _pending.clear();
+      unawaited(pollNow(only: all ? null : ids));
     }
   }
 

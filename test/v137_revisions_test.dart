@@ -76,7 +76,7 @@ void main() {
     expect(Answer.correct('', 'Rome'), isFalse);
   });
 
-  test('import « question - réponse » et cartes de Smily', () {
+  test('import « question - réponse » et cartes de Nexo', () {
     final l = RevisionsStore.parseLines(
       'Capitale de l\'Italie - Rome\n1789 : Révolution française\nH2O = eau\nligne sans réponse\n- Mitochondrie\tcentrale énergétique',
     );
@@ -100,7 +100,7 @@ void main() {
     expect(o.toSet(), hasLength(4));
   });
 
-  test('séances, série de jours, cartes générées par Smily', () async {
+  test('séances, série de jours, cartes générées par Nexo', () async {
     SharedPreferences.setMockInitialValues({});
     await ModuleStore.init();
     final dir = Directory.systemTemp.createTempSync('rev');
@@ -124,7 +124,7 @@ void main() {
       expect(s.streak(t0.add(const Duration(days: 1))), 2);
       expect(s.streak(t0.add(const Duration(days: 3))), 0);
 
-      // Smily fabrique des cartes (IA simulée).
+      // Nexo fabrique des cartes (IA simulée).
       AiText.override = (prompt, system) async {
         expect(prompt, contains('guerre froide'));
         return '[{"q":"Qui a construit le mur de Berlin ?","r":"La RDA"},{"q":"Année de la crise de Cuba","r":"1962"}]';

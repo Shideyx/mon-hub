@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'alive.dart' show AliveMood;
 import 'life_view.dart' show emojiFonts;
 
-/// Ce que Smily ressent, à l'écran : un smiley par état.
+/// Ce que Nexo ressent, à l'écran : un smiley par état.
 ///
 /// Avant, c'était un curseur en forme de flèche (un look copié ailleurs, et
 /// le plus coûteux à dessiner). Maintenant c'est un visage : un vrai smiley,
@@ -96,7 +96,7 @@ class SmilyRules {
   };
 }
 
-/// **Le visage de Smily** : un smiley qui change d'expression.
+/// **Le visage de Nexo** : un smiley qui change d'expression.
 class SmilyFace extends StatelessWidget {
   const SmilyFace({super.key, required this.mood, this.size = 24, this.agents = 0});
 

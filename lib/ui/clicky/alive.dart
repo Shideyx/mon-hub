@@ -3,11 +3,11 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Ce que fait Smily (pour choisir son animation).
+/// Ce que fait Nexo (pour choisir son animation).
 enum AliveMood { idle, listening, thinking, speaking, pointing }
 
-/// Donne de la vie au curseur de Smily, **sans animation qui tourne en
-/// boucle pour rien** (fluidité, et Smily partout reste sur l'écran toute
+/// Donne de la vie au curseur de Nexo, **sans animation qui tourne en
+/// boucle pour rien** (fluidité, et Nexo partout reste sur l'écran toute
 /// la journée) :
 /// * à chaque changement d'état : un petit rebond (écrasé puis étiré) ;
 /// * quand il commence à parler : un saut de joie ;
@@ -167,7 +167,7 @@ class _ClickyBounceState extends State<ClickyBounce> with TickerProviderStateMix
   }
 }
 
-/// Le halo qui tourne pendant que Smily réfléchit (un arc dégradé).
+/// Le halo qui tourne pendant que Nexo réfléchit (un arc dégradé).
 class _HaloPainter extends CustomPainter {
   _HaloPainter(this.t, this.color);
   final double t;

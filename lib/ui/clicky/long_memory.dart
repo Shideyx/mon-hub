@@ -8,7 +8,7 @@ import '../../core/hub_module.dart';
 import '../../core/prompt_shield.dart';
 import 'tutor.dart' show normalize;
 
-/// Un souvenir de Smily sur la personne.
+/// Un souvenir de Nexo sur la personne.
 @immutable
 class Memory {
   const Memory({
@@ -83,7 +83,7 @@ class DreamResult {
   /// (sujet, texte)
   final List<(String, String)> memories;
 
-  /// (phrase qui déclenche, consigne pour Smily)
+  /// (phrase qui déclenche, consigne pour Nexo)
   final List<(String, String)> skills;
   final String dream;
 
@@ -226,7 +226,7 @@ class MemoryRules {
   static String? rememberRequest(String said) {
     final n = said.trim();
     final m = RegExp(
-      r"^(?:(?:smily|smiley|clicky)[\s,]+)?(?:retiens|souviens[- ]toi|n'oublie pas|note|rappelle[- ]toi)\s+(?:bien\s+)?(?:que|qu'|de ce que)\s*(.{4,300})$",
+      r"^(?:(?:smily|smiley|nexo|nexos|nekso|nexou|clicky)[\s,]+)?(?:retiens|souviens[- ]toi|n'oublie pas|note|rappelle[- ]toi)\s+(?:bien\s+)?(?:que|qu'|de ce que)\s*(.{4,300})$",
       caseSensitive: false,
     ).firstMatch(n);
     if (m == null) return null;
@@ -248,17 +248,17 @@ class MemoryRules {
     final who = name.isEmpty ? 'la personne' : name;
     final mem = known.take(60).map((m) => '- (${m.topic}) ${m.text}').join('\n');
     final day = material.take(120).map((l) => '- ${l.length > 220 ? '${l.substring(0, 220)}…' : l}').join('\n');
-    return 'Tu es la mémoire de Smily, l\'assistant de $who. Pendant que $who n\'est pas là, tu ranges ce que Smily '
+    return 'Tu es la mémoire de Nexo, l\'assistant de $who. Pendant que $who n\'est pas là, tu ranges ce que Nexo '
         'a vécu aujourd\'hui, comme un cerveau qui rêve.\n\n'
         'Ce qu\'il savait déjà :\n${mem.isEmpty ? '(rien)' : mem}\n\n'
         'Ce qu\'il a vécu (messages de $who, faits) :\n$day\n\n'
         'Réponds UNIQUEMENT en JSON :\n'
         '{"souvenirs": [{"sujet": "moi|proches|ecole|gouts|projets|objectifs|habitudes|a_eviter|savoir|divers", '
         '"texte": "une phrase courte et durable sur $who"}], '
-        '"capacites": [{"phrase": "ce que $who pourrait dire", "consigne": "ce que Smily doit faire alors"}], '
+        '"capacites": [{"phrase": "ce que $who pourrait dire", "consigne": "ce que Nexo doit faire alors"}], '
         '"reve": "un rêve drôle et tendre de 1 à 2 phrases, inspiré de la journée"}\n'
         'Règles : seulement des choses VRAIES et UTILES plus tard (goûts, projets, personnes, objectifs, ce que '
-        '$who n\'aime pas que Smily fasse). Rien de passager (« il a faim »). Pas de mots de passe, d\'adresses, '
+        '$who n\'aime pas que Nexo fasse). Rien de passager (« il a faim »). Pas de mots de passe, d\'adresses, '
         'de numéros, ni de secrets de santé. 0 à 8 souvenirs. "capacites" : seulement si $who a demandé PLUSIEURS '
         'fois la même chose qu\'un raccourci ferait mieux (0 à 2).';
   }
@@ -320,7 +320,7 @@ class MemoryRules {
       .replaceFirst(RegExp(r'^je ', caseSensitive: false), 'Il/elle ')
       .replaceFirst(RegExp(r'^mon ', caseSensitive: false), 'Son ')
       .replaceFirst(RegExp(r'^ma ', caseSensitive: false), 'Sa ')
-      .replaceAll(RegExp(r'\btu\b', caseSensitive: false), 'Smily')
+      .replaceAll(RegExp(r'\btu\b', caseSensitive: false), 'Nexo')
       .replaceAll(RegExp(r'\bme\b', caseSensitive: false), 'lui');
 
   /// Faut-il rêver maintenant ? (absent depuis 20 min, au plus toutes les
@@ -348,12 +348,12 @@ class MemoryRules {
   }
 }
 
-/// **La mémoire à long terme de Smily** (v1.62) : un seul endroit, rangé par
+/// **La mémoire à long terme de Nexo** (v1.62) : un seul endroit, rangé par
 /// sujets, où il garde ce qui compte sur toi. Il l'enrichit en **rêvant** :
 /// quand tu n'es pas là, une IA **locale** (Ollama, sur ton PC) relit sa
 /// journée et range ce qu'il a appris ; sans IA locale, des règles simples
 /// font le tri. Il oublie les détails, garde l'important, et tu peux tout voir,
-/// corriger et effacer (Réglages de Smily → Sa mémoire).
+/// corriger et effacer (Réglages de Nexo → Sa mémoire).
 class LongMemory extends ChangeNotifier {
   LongMemory._();
   static final instance = LongMemory._();
@@ -500,7 +500,7 @@ class LongMemory extends ChangeNotifier {
     HubTool(
       name: 'memoire_souvenirs',
       description:
-          'Ce que Smily sait sur la personne (sa mémoire à long terme, par sujets). Avec « question » : les '
+          'Ce que Nexo sait sur la personne (sa mémoire à long terme, par sujets). Avec « question » : les '
           'souvenirs utiles pour elle.',
       params: {'question': ('string', 'facultatif')},
       run: (a) async {

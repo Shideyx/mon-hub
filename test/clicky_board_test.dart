@@ -22,7 +22,7 @@ const sample = '''Regarde le schéma, c'est un cycle. [TABLEAU]
 [/TABLEAU] [POINT:none]''';
 
 void main() {
-  test('Smily sépare la réponse orale et le tableau', () {
+  test('Nexo sépare la réponse orale et le tableau', () {
     final (text, board) = ClickyBoard.extract(sample);
     expect(text, 'Regarde le schéma, c\'est un cycle. [POINT:none]');
     expect(board, isNotNull);
@@ -79,7 +79,7 @@ void main() {
     expect(windowsProblem('0x1234', 'bizarre').message, contains('Win + H'));
   });
 
-  test('micro Windows : Smily se relance autrement sans « Process is detached »', () {
+  test('micro Windows : Nexo se relance autrement sans « Process is detached »', () {
     // Chaque façon de lancer donne des paramètres valides.
     for (final how in EarsLaunch.values) {
       final a = WindowsEars.launchArgs(how, r'C:\x\clicky-ecoute.ps1');
@@ -103,7 +103,7 @@ void main() {
 
   test('commande « répare le micro »', () {
     for (final q in [
-      'Smily, répare le micro',
+      'Nexo, répare le micro',
       'répare-toi',
       'le micro ne marche pas',
       'tu ne m\'entends pas',

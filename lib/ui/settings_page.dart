@@ -10,6 +10,7 @@ import 'online/online_page.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import '../modules/instagram/instagram_watch.dart';
 import 'phone_link_page.dart';
 import 'account_sync_view.dart';
 import 'backup_page.dart';
@@ -295,6 +296,20 @@ class _SettingsPageState extends State<SettingsPage> {
             onChanged: (v) => n.digest = v ?? 30,
           ),
         ),
+        if (InstagramWatch.supported)
+          SwitchListTile(
+            secondary: const Icon(Icons.camera_alt_rounded),
+            title: const Text('Messages Instagram en direct'),
+            subtitle: const Text(
+              'Le vrai Instagram reste ouvert en fond, comme un onglet : tu es prévenu dès qu\'on t\'écrit. '
+              'Rien n\'est demandé à Instagram (aucun risque pour ton compte).',
+            ),
+            value: InstagramWatch.wanted,
+            onChanged: (v) async {
+              await InstagramWatch.setWanted(v);
+              refresh();
+            },
+          ),
         ListTile(
           leading: const Icon(Icons.notifications_active_outlined),
           title: const Text('Tester une alerte'),
@@ -481,7 +496,7 @@ class _SettingsPageState extends State<SettingsPage> {
           title: Text('Ce qui part sur internet'),
           subtitle: Text(
             'Seulement vers le service concerné, directement depuis ton appareil : École Directe, '
-            'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Smily va à '
+            'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Nexo va à '
             'Claude (ton compte Anthropic) ou à Gemini (ta clé Google), et sa voix aussi à Gemini. Les mises à jour viennent '
             'de GitHub, qui ne reçoit rien de toi.',
           ),
@@ -497,7 +512,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Text(
-            'Mon Hub regarde la puissance de ton PC et s\'adapte. En mode léger, Smily reste dans la '
+            'Mon Hub regarde la puissance de ton PC et s\'adapte. En mode léger, Nexo reste dans la '
             'fenêtre de Mon Hub (pas de second programme) et tout ce qui surveille en continu se fait '
             'plus rarement.',
             style: theme.textTheme.bodyMedium,
@@ -532,7 +547,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 choice(
                   'complet',
                   'Toujours complet',
-                  'Smily partout, ses yeux et ses oreilles, sauvegarde en continu.',
+                  'Nexo partout, ses yeux et ses oreilles, sauvegarde en continu.',
                 ),
                 ListTile(
                   leading: const Icon(Icons.speed_rounded),
@@ -568,7 +583,7 @@ class _SettingsPageState extends State<SettingsPage> {
               builder: (context, setState) => SwitchListTile(
                 secondary: const Icon(Icons.power_settings_new_rounded),
                 title: const Text('Lancer Mon Hub au démarrage de Windows'),
-                subtitle: const Text('Pratique pour avoir Smily et les alertes tout de suite'),
+                subtitle: const Text('Pratique pour avoir Nexo et les alertes tout de suite'),
                 value: AppShortcuts.startup,
                 onChanged: (v) async {
                   await AppShortcuts.setStartup(v);
@@ -892,7 +907,7 @@ class SettingsCategory {
     ];
   }
 
-  /// La carte de Smily correspond-elle à [q] ?
+  /// La carte de Nexo correspond-elle à [q] ?
   static bool clickyMatches(String q) {
     final ws = _words(q);
     return ws.isEmpty ||
@@ -903,7 +918,7 @@ class SettingsCategory {
   }
 }
 
-/// La carte de Smily, en tête des réglages : ses réglages, tout ce qu'il
+/// La carte de Nexo, en tête des réglages : ses réglages, tout ce qu'il
 /// sait faire, et la visite guidée.
 class _ClickyHero extends StatelessWidget {
   const _ClickyHero();
@@ -931,7 +946,7 @@ class _ClickyHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Smily',
+                      'Nexo',
                       style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                     ),
                     const Text(
@@ -951,7 +966,7 @@ class _ClickyHero extends StatelessWidget {
               FilledButton.icon(
                 style: white(),
                 icon: const Icon(Icons.tune_rounded),
-                label: const Text('Réglages de Smily'),
+                label: const Text('Réglages de Nexo'),
                 onPressed: () => ClickySettingsPage.open(context),
               ),
               OutlinedButton.icon(

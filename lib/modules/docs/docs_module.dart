@@ -34,7 +34,7 @@ class GoogleDocs {
 
   static String edit(String id) => 'https://docs.google.com/document/d/$id/edit';
 
-  /// La connexion Google (API) est prête : Smily peut lire et écrire.
+  /// La connexion Google (API) est prête : Nexo peut lire et écrire.
   static bool get connected => GoogleAuth.available && GoogleAuth.driveAccount != null;
 
   static String account() {
@@ -161,7 +161,7 @@ class GoogleDocs {
 }
 
 /// Documents : **le vrai Google Docs**, avec ton Drive, dans Mon Hub (et
-/// Smily qui peut créer, lire, compléter et exporter tes Google Docs).
+/// Nexo qui peut créer, lire, compléter et exporter tes Google Docs).
 class DocsModule extends HubModule {
   @override
   String get id => 'documents';

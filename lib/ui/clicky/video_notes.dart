@@ -60,7 +60,7 @@ class VideoSheet {
 
 /// **Vidéo de cours → fiche** : résumé, chapitres cliquables (on saute au
 /// bon moment) et quiz. Gemini regarde la vidéo lui-même (vidéos publiques) ;
-/// sinon on lit les sous-titres et le cerveau de Smily résume.
+/// sinon on lit les sous-titres et le cerveau de Nexo résume.
 class VideoNotes {
   VideoNotes._();
 
@@ -233,7 +233,7 @@ class VideoNotes {
     final subs = await captions(id);
     if (subs == null) {
       throw key.isEmpty
-          ? 'Cette vidéo n\'a pas de sous-titres que je peux lire. Avec ta clé Gemini gratuite (Réglages de Smily → Voix), '
+          ? 'Cette vidéo n\'a pas de sous-titres que je peux lire. Avec ta clé Gemini gratuite (Réglages de Nexo → Voix), '
                 'je regarde la vidéo moi-même.'
           : 'Je n\'arrive pas à lire cette vidéo (privée, trop longue ou sans sous-titres).';
     }

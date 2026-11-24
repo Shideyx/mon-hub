@@ -20,7 +20,7 @@ import 'mic_test.dart' show WhisperInstallDialog;
 import 'thrift.dart';
 import '../../core/token_budget.dart';
 
-/// Un réglage de Smily : sa rubrique, les mots pour le retrouver, et son
+/// Un réglage de Nexo : sa rubrique, les mots pour le retrouver, et son
 /// interrupteur (ou ses boutons).
 class _Opt {
   const _Opt(this.section, this.words, this.widget);
@@ -29,7 +29,7 @@ class _Opt {
   final Widget widget;
 }
 
-/// Les rubriques des réglages de Smily (une page chacune).
+/// Les rubriques des réglages de Nexo (une page chacune).
 class ClickySection {
   const ClickySection(this.id, this.title, this.subtitle, this.icon, this.color);
   final String id;
@@ -42,7 +42,7 @@ class ClickySection {
     ClickySection(
       'look',
       'Apparence',
-      'Réacteur ou curseur, ton prénom, Smily vivant, suivre la souris',
+      'Réacteur ou curseur, ton prénom, Nexo vivant, suivre la souris',
       Icons.palette_rounded,
       Color(0xFF7C5CFF),
     ),
@@ -56,7 +56,7 @@ class ClickySection {
     ClickySection(
       'listen',
       'Écoute et micro',
-      'Reconnaissance vocale (Whisper), « Smily » mains libres, dictée',
+      'Reconnaissance vocale (Whisper), « Nexo » mains libres, dictée',
       Icons.hearing_rounded,
       Color(0xFF0EA5E9),
     ),
@@ -105,7 +105,7 @@ String _plain(String s) {
   return b.toString();
 }
 
-/// Les réglages de Smily : une rubrique ([section]), ceux qui
+/// Les réglages de Nexo : une rubrique ([section]), ceux qui
 /// correspondent à une recherche ([query]), ou tous.
 class ClickyMoreSettings extends StatelessWidget {
   const ClickyMoreSettings({super.key, this.section, this.query = ''});
@@ -169,7 +169,7 @@ class ClickyMoreSettings extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 c.hud
-                    ? 'Un réacteur bleu animé à côté du curseur (il tourne quand Smily réfléchit, '
+                    ? 'Un réacteur bleu animé à côté du curseur (il tourne quand Nexo réfléchit, '
                           's\'anime quand il t\'écoute) et des fenêtres « tête haute ».'
                     : 'Le petit curseur bleu d\'origine.',
                 style: text.bodySmall,
@@ -182,19 +182,19 @@ class ClickyMoreSettings extends StatelessWidget {
           'look',
           'comment clicky t appelle prenom surnom nom',
           _TextOption(
-            label: 'Comment Smily t\'appelle',
+            label: 'Comment Nexo t\'appelle',
             hint: c.callName.isEmpty ? 'Ton prénom, un surnom…' : c.callName,
             value: c.callName,
             onSave: (v) => c.setOption('callName', v),
           ),
         );
-        sw('look', 'show', c.alwaysShow, 'Toujours afficher Smily', 'Sinon, il n\'apparaît que quand tu lui parles.');
-        sw('look', 'follow', c.follow, 'Smily suit la souris');
+        sw('look', 'show', c.alwaysShow, 'Toujours afficher Nexo', 'Sinon, il n\'apparaît que quand tu lui parles.');
+        sw('look', 'follow', c.follow, 'Nexo suit la souris');
         sw(
           'look',
           'alive',
           c.alive,
-          'Smily vivant',
+          'Nexo vivant',
           'Il flotte et bouge tout seul autour de ta souris, fait des petites boucles.',
         );
         sw('look', 'greet', c.greet, 'Me saluer au premier démarrage de la journée');
@@ -222,7 +222,7 @@ class ClickyMoreSettings extends StatelessWidget {
             c.instant,
             'Réponse instantanée (Gemini Live, comme JARVIS)',
             c.voiceOut.geminiKey.trim().isEmpty
-                ? 'Ajoute ta clé Gemini gratuite (ci-dessous) : Smily répondra au tac au tac, en direct.'
+                ? 'Ajoute ta clé Gemini gratuite (ci-dessous) : Nexo répondra au tac au tac, en direct.'
                 : 'Ta voix part en direct vers Gemini, qui répond tout de suite en voix. Pour un tableau, un schéma ou '
                       'montrer où cliquer, Claude prend le relais.'
                       '${c.liveError == null ? '' : '\nDernier souci : ${c.liveError}'}',
@@ -255,7 +255,7 @@ class ClickyMoreSettings extends StatelessWidget {
             'wake',
             c.wakeOn,
             'Mot d\'activation (mains libres)',
-            'Dis « Smily » et pose ta question, sans toucher au clavier. L\'écoute du mot se fait sur ton PC.',
+            'Dis « Nexo » et pose ta question, sans toucher au clavier. L\'écoute du mot se fait sur ton PC.',
           );
         }
         if (Win.supportedHere) {
@@ -353,7 +353,7 @@ class ClickyMoreSettings extends StatelessWidget {
           'perApp',
           c.perApp,
           'Une mémoire par appli',
-          'Smily partout garde une conversation séparée pour chaque appli (Word, Chrome, Roblox Studio…).',
+          'Nexo partout garde une conversation séparée pour chaque appli (Word, Chrome, Roblox Studio…).',
         );
         add(
           'privacy',
@@ -364,8 +364,8 @@ class ClickyMoreSettings extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 icon: const Icon(Icons.delete_sweep_rounded, size: 18),
-                label: const Text('Effacer l\'historique de Smily'),
-                onPressed: () => _confirm(context, 'Effacer tout l\'historique de Smily ?', ChatHistory.clicky.clear),
+                label: const Text('Effacer l\'historique de Nexo'),
+                onPressed: () => _confirm(context, 'Effacer tout l\'historique de Nexo ?', ChatHistory.clicky.clear),
               ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.delete_sweep_rounded, size: 18),
@@ -388,11 +388,11 @@ class ClickyMoreSettings extends StatelessWidget {
           'tools',
           'thrift',
           c.thrift,
-          'Smily économe (Claude pour les demandes difficiles)',
+          'Nexo économe (Claude pour les demandes difficiles)',
           'Les questions simples vont à Gemini (gratuit) ; Claude ne reçoit que les actions utiles à ta question '
               'et réfléchit juste ce qu\'il faut. ${ClaudeUsage.summary}',
         );
-        // Budget de jetons : Smily se règle tout seul selon ce qu'il a déjà
+        // Budget de jetons : Nexo se règle tout seul selon ce qu'il a déjà
         // dépensé aujourd'hui.
         add(
           'tools',
@@ -420,7 +420,7 @@ class ClickyMoreSettings extends StatelessWidget {
             'tools',
             'drive',
             c.driveOn,
-            'Smily pilote (Smily partout)',
+            'Nexo pilote (Nexo partout)',
             'Sur demande (« fais-le pour moi »), il propose un plan de clics et de frappe ; tu le relis avant. '
                 'Échap arrête tout, bouger la souris aussi.',
           );
@@ -447,18 +447,18 @@ class ClickyMoreSettings extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(switch (c.pcControl) {
                   'auto' =>
-                    'Smily fait tout ce que tu lui demandes sur le PC (commandes, fichiers, logiciels, '
+                    'Nexo fait tout ce que tu lui demandes sur le PC (commandes, fichiers, logiciels, '
                         'réglages) sans demander. Il demande quand même pour les commandes dangereuses '
                         '(formatage, suppressions en masse, extinction…) et en administrateur.',
-                  'off' => 'Smily ne touche pas à ton PC (il peut seulement t\'expliquer comment faire).',
+                  'off' => 'Nexo ne touche pas à ton PC (il peut seulement t\'expliquer comment faire).',
                   _ =>
-                    'Dis « Smily, installe VLC », « range mes téléchargements », « mets le son à 30 % »… : '
+                    'Dis « Nexo, installe VLC », « range mes téléchargements », « mets le son à 30 % »… : '
                         'il le fait lui-même. Chaque commande s\'affiche avant et attend ton « Autoriser ».',
                 }, style: text.bodySmall),
                 const SizedBox(height: 8),
                 if (WorkflowCapture.supported)
                   Text(
-                    'Capture des gestes et enregistrement de leçon : menu ⋮ dans la boîte de Smily.',
+                    'Capture des gestes et enregistrement de leçon : menu ⋮ dans la boîte de Nexo.',
                     style: text.bodySmall,
                   ),
               ],
@@ -755,7 +755,7 @@ class _McpEditorState extends State<_McpEditor> {
               IconButton(tooltip: 'Ajouter', icon: const Icon(Icons.add_rounded), onPressed: _add),
             ],
           ),
-          const Text('Des serveurs MCP à toi, utilisables par Claude et Smily (avec permission).'),
+          const Text('Des serveurs MCP à toi, utilisables par Claude et Nexo (avec permission).'),
           if (info != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(info!)),
           for (final s in list)
             ListTile(
@@ -801,14 +801,14 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
       info = null;
     });
     final err = await c.voiceOut.test(
-      'Salut${c.callName.isEmpty ? '' : ' ${c.callName}'} ! C\'est Smily. Voilà ma nouvelle voix.',
+      'Salut${c.callName.isEmpty ? '' : ' ${c.callName}'} ! C\'est Nexo. Voilà ma nouvelle voix.',
     );
     if (mounted) {
       setState(() {
         testing = false;
         info = err == null
             ? null
-            : 'La voix Gemini ne répond pas ($err). Vérifie ta clé et ta connexion internet ; sinon Smily répond par écrit.';
+            : 'La voix Gemini ne répond pas ($err). Vérifie ta clé et ta connexion internet ; sinon Nexo répond par écrit.';
       });
     }
   }
@@ -819,8 +819,8 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
     children: [
       Text(
         'Une seule voix, naturelle : celle de Google Gemini, avec ta clé gratuite (aistudio.google.com → '
-        'Get API key). Smily lit ses réponses par gros morceaux ; si le quota gratuit du jour est épuisé, '
-        'Gemini Live prend le relais avec la même voix. Sans clé ni internet, Smily répond par écrit.',
+        'Get API key). Nexo lit ses réponses par gros morceaux ; si le quota gratuit du jour est épuisé, '
+        'Gemini Live prend le relais avec la même voix. Sans clé ni internet, Nexo répond par écrit.',
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 8),
@@ -958,7 +958,7 @@ class _TopoSettingsState extends State<_TopoSettings> {
           'Bilan de ta journée, devoirs et emploi du temps de demain, météo de demain, actus du jour, mails importants.',
         ),
         Text(
-          'Smily l\'affiche en grand et le lit avec sa voix ; il arrive aussi sur ton téléphone si ntfy est '
+          'Nexo l\'affiche en grand et le lit avec sa voix ; il arrive aussi sur ton téléphone si ntfy est '
           'configuré (Carnet → Réglages). Mon Hub doit être ouvert.',
           style: Theme.of(context).textTheme.bodySmall,
         ),

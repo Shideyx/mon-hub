@@ -4,8 +4,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Le « tableau » de Smily : quand tu ne comprends pas, ou quand tu veux
-/// apprendre quelque chose, Smily dessine son explication (étapes, schéma
+/// Le « tableau » de Nexo : quand tu ne comprends pas, ou quand tu veux
+/// apprendre quelque chose, Nexo dessine son explication (étapes, schéma
 /// fléché, cycle, comparaison, frise, graphique, formule, vocabulaire, à
 /// retenir) et peut finir par un petit quiz.
 ///
@@ -64,7 +64,7 @@ class ClickyBoard {
     return ClickyBoard(title: str(d['titre'] ?? d['title']), blocks: blocks);
   }
 
-  /// Titre lisible (pour la mémoire de Smily).
+  /// Titre lisible (pour la mémoire de Nexo).
   String get summary => title.isNotEmpty ? title : 'tableau visuel';
 
   bool get hasQuiz => blocks.any((b) => b.type == 'quiz');
@@ -202,7 +202,7 @@ class ClickyBoardView extends StatelessWidget {
   final ClickyBoard board;
   final VoidCallback onClose;
 
-  /// Pose une nouvelle question à Smily (boutons « Je n'ai pas compris »…).
+  /// Pose une nouvelle question à Nexo (boutons « Je n'ai pas compris »…).
   final void Function(String question) onAsk;
   final bool busy;
 
@@ -230,7 +230,7 @@ class ClickyBoardView extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    board.title.isEmpty ? 'Le tableau de Smily' : board.title,
+                    board.title.isEmpty ? 'Le tableau de Nexo' : board.title,
                     style: text.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1026,7 +1026,7 @@ class _Vocab extends StatelessWidget {
   }
 }
 
-/// Une question à choix : on clique, Smily dit si c'est juste et pourquoi.
+/// Une question à choix : on clique, Nexo dit si c'est juste et pourquoi.
 class _Quiz extends StatefulWidget {
   const _Quiz(this.b, {required this.onAsk});
   final BoardBlock b;

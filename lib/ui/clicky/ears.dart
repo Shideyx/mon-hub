@@ -24,20 +24,20 @@ class EarsProblem {
   String toString() => message;
 }
 
-/// Résultat d'une réparation du micro par Smily.
+/// Résultat d'une réparation du micro par Nexo.
 class EarsRepair {
   const EarsRepair({required this.problem, required this.steps});
 
   /// Le souci qui reste (null : le micro marche).
   final EarsProblem? problem;
 
-  /// Ce que Smily a essayé, dans l'ordre (pour l'afficher ou l'expliquer).
+  /// Ce que Nexo a essayé, dans l'ordre (pour l'afficher ou l'expliquer).
   final List<String> steps;
 
   bool get ok => problem == null;
 }
 
-/// Les pannes de lancement que Smily répare tout seul en essayant une
+/// Les pannes de lancement que Nexo répare tout seul en essayant une
 /// autre façon de démarrer PowerShell (les autres demandent un réglage).
 bool isLaunchProblem(EarsProblem p) =>
     p.code == 'launch' || p.code == 'died' || p.code == 'timeout' || p.code == 'start-timeout';
@@ -61,25 +61,25 @@ enum EarsLaunch {
   bool get detached => this != EarsLaunch.normal;
 }
 
-/// Ce que Smily envoie à l'IA quand il n'a pas pu réparer le micro tout
+/// Ce que Nexo envoie à l'IA quand il n'a pas pu réparer le micro tout
 /// seul : la panne, ce qu'il a déjà essayé, et ce qu'on attend de lui.
 String micRepairPrompt(EarsProblem problem, EarsRepair repair, {String system = ''}) {
   final tried = repair.steps.isEmpty
       ? ''
       : ' Tu as déjà essayé tout seul (inutile de relancer clicky_reparer_micro) : ${repair.steps.join(' ; ')}.';
-  return 'Mon micro ne marche pas avec toi (Smily, dans Mon Hub${system.isEmpty ? '' : ' sur $system'}). '
+  return 'Mon micro ne marche pas avec toi (Nexo, dans Mon Hub${system.isEmpty ? '' : ' sur $system'}). '
       'Erreur affichée : « ${problem.message} »${problem.code.isEmpty ? '' : ' (code ${problem.code})'}.$tried '
       'Explique-moi simplement ce qui bloque et comment le régler, étape par étape '
       '(quel réglage ouvrir, quoi cocher). Rappelle-moi qu\'en attendant je peux écrire, '
       'ou utiliser la dictée de Windows (Win + H).';
 }
 
-/// Les « oreilles » de Smily : transforment ce que tu dis en texte.
+/// Les « oreilles » de Nexo : transforment ce que tu dis en texte.
 ///
 /// * Windows : la reconnaissance vocale moderne de Windows (la même que la
 ///   dictée Win + H), en français, via un petit script PowerShell gardé
 ///   ouvert en arrière-plan. L'ancien module (speech_to_text_windows)
-///   n'écoutait qu'en anglais et perdait les événements du micro : Smily
+///   n'écoutait qu'en anglais et perdait les événements du micro : Nexo
 ///   n'entendait rien.
 /// * Android, iPhone, Mac : le module speech_to_text.
 abstract class ClickyEars {
@@ -149,7 +149,7 @@ class WindowsEars extends ClickyEars {
 
   /// Façon de lancer PowerShell. Par défaut sans fichier de script
   /// (-EncodedCommand), car certains PC bloquent les fichiers .ps1 ; si ça
-  /// ne marche pas, Smily passe tout seul à la suivante.
+  /// ne marche pas, Nexo passe tout seul à la suivante.
   EarsLaunch _launch = EarsLaunch.encoded;
 
   /// Façon de lancer utilisée en ce moment.

@@ -196,7 +196,7 @@ void main() {
 
     test('« retiens que… »', () {
       expect(MemoryRules.rememberRequest('Retiens que je préfère les mangas aux romans'), 'Il/elle préfère les mangas aux romans');
-      expect(MemoryRules.rememberRequest('Smily, souviens-toi que mon frère s\'appelle Tom'), 'son frère s\'appelle Tom');
+      expect(MemoryRules.rememberRequest('Nexo, souviens-toi que mon frère s\'appelle Tom'), 'son frère s\'appelle Tom');
       expect(MemoryRules.rememberRequest('retiens bien ça'), isNull);
       expect(MemoryRules.rememberRequest('quelle heure est-il ?'), isNull);
     });

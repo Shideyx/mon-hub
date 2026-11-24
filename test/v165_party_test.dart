@@ -100,7 +100,7 @@ void main() {
     expect(party.link, isNull);
   });
 
-  test('Smily sans IA', () async {
+  test('Nexo sans IA', () async {
     final calls = <String>[];
     Future<Object?> fake(String name, Map<String, dynamic> a) async {
       calls.add(name);

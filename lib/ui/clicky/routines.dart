@@ -20,7 +20,7 @@ class RoutineRun {
   );
 }
 
-/// Une tâche que Smily fait tout seul, régulièrement (« briefing du matin
+/// Une tâche que Nexo fait tout seul, régulièrement (« briefing du matin
 /// à 7 h 15 », « devoirs pour demain à 18 h »…), avec tes modules.
 class Routine {
   Routine({
@@ -58,7 +58,7 @@ class Routine {
   /// du matin se fait à l'allumage, jusqu'à midi).
   int catchUp;
 
-  /// Topo du matin / du soir (affiché en grand par Smily).
+  /// Topo du matin / du soir (affiché en grand par Nexo).
   bool get isTopo => id.startsWith('topo-');
   DateTime? lastRun;
   final List<RoutineRun> runs;
@@ -241,7 +241,7 @@ class Routines extends ChangeNotifier {
   Timer? _timer;
   final _busy = <String>{};
 
-  /// Fait le travail (l'agent de Smily) : renvoie le compte rendu.
+  /// Fait le travail (l'agent de Nexo) : renvoie le compte rendu.
   Future<String> Function(String prompt)? runner;
 
   /// Prévient (alerte + voix).
@@ -394,7 +394,7 @@ class _RoutinesViewState extends State<RoutinesView> {
                     minLines: 3,
                     maxLines: 6,
                     decoration: const InputDecoration(
-                      labelText: 'Ce que Smily doit faire',
+                      labelText: 'Ce que Nexo doit faire',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -471,7 +471,7 @@ class _RoutinesViewState extends State<RoutinesView> {
         padding: const EdgeInsets.all(12),
         children: [
           Text(
-            'Smily fait ces tâches tout seul, avec tes modules, tant que Mon Hub est ouvert, '
+            'Nexo fait ces tâches tout seul, avec tes modules, tant que Mon Hub est ouvert, '
             'et te prévient quand c\'est prêt.',
             style: Theme.of(context).textTheme.bodySmall,
           ),

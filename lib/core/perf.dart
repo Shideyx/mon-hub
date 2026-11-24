@@ -10,7 +10,7 @@ import 'module_store.dart';
 
 /// Comment Mon Hub tourne sur **ce PC** : à fond, ou en douceur.
 enum PerfLevel {
-  /// Mode léger : Smily reste dans la fenêtre de Mon Hub, et tout ce qui
+  /// Mode léger : Nexo reste dans la fenêtre de Mon Hub, et tout ce qui
   /// surveille en continu tourne beaucoup moins souvent.
   light,
 
@@ -39,13 +39,13 @@ class PerfRules {
 
 /// **Mode léger** : Mon Hub s'adapte à la puissance du PC.
 ///
-/// Avant, dès la connexion, l'appli lançait tout en même temps (Smily
+/// Avant, dès la connexion, l'appli lançait tout en même temps (Nexo
 /// partout en second programme, les yeux et les oreilles, le presse-papier,
 /// la sauvegarde, le téléphone…). Sur un PC modeste, ça l'étouffait et
-/// Smily n'arrivait même pas à démarrer. Maintenant :
+/// Nexo n'arrivait même pas à démarrer. Maintenant :
 ///
 /// * la puissance du PC est regardée une fois, au premier démarrage ;
-/// * en mode léger, Smily vit dans la fenêtre de Mon Hub (pas de second
+/// * en mode léger, Nexo vit dans la fenêtre de Mon Hub (pas de second
 ///   programme), les surveillances tournent bien moins souvent, et rien de
 ///   lourd (lecture de l'écran, écoute du son) ne démarre tout seul ;
 /// * le démarrage est **étalé** au lieu d'être fait d'un coup.
@@ -141,7 +141,7 @@ class Perf {
   /// Un tour de surveillance, allongé en mode léger.
   static Duration slow(Duration d, {double factor = 2.5}) => PerfRules.slow(d, light: light, factor: factor);
 
-  /// Smily peut-il sortir de la fenêtre (second programme) ?
+  /// Nexo peut-il sortir de la fenêtre (second programme) ?
   /// Non en mode léger : c'est lui qui coûtait le plus cher.
   static bool get everywhere => !light;
 
@@ -173,7 +173,7 @@ class Perf {
 
   /// Phrase expliquée à la personne (Réglages, et une fois au démarrage).
   static String get explain => light
-      ? 'Mode léger : Smily reste dans la fenêtre de Mon Hub et les surveillances se font plus '
+      ? 'Mode léger : Nexo reste dans la fenêtre de Mon Hub et les surveillances se font plus '
             'rarement, pour que tout reste fluide.'
-      : 'Mode complet : tout est allumé (Smily partout, surveillances en continu).';
+      : 'Mode complet : tout est allumé (Nexo partout, surveillances en continu).';
 }

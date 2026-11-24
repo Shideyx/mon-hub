@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/cam_blur.dart';
 import '../../core/notifications.dart';
+import '../../core/web_notify.dart';
 import '../../ui/call_page.dart';
 
 /// Ce que fait le « téléphone » Discord.
@@ -32,7 +33,7 @@ class DiscordPhone extends ChangeNotifier {
   static bool get supported => !kIsWeb && Platform.isWindows;
 
   /// Seule la fenêtre principale de Mon Hub garde Discord ouvert (pas
-  /// Smily partout, ni les widgets du bureau).
+  /// Nexo partout, ni les widgets du bureau).
   static bool allowed = false;
 
   /// Le Discord caché existe (il tourne en fond).
@@ -51,6 +52,18 @@ class DiscordPhone extends ChangeNotifier {
 
   /// Pour annoncer un appel (bandeau + notification de Windows).
   NotificationCenter? notifications;
+
+  /// Un nouveau message vient d'arriver dans le vrai Discord (son titre
+  /// compte un non-lu de plus, ou il a voulu montrer une notification) :
+  /// Mon Hub relève Discord **tout de suite** au lieu d'attendre 2 minutes.
+  /// Branché par Mon Hub.
+  void Function()? onActivity;
+
+  bool _measured = false;
+  int? _unread;
+  int _relayed = 0;
+  DateTime? _lastActivity;
+  Timer? _activityTimer;
 
   InAppWebViewController? _c;
   Timer? _watch;
@@ -88,6 +101,9 @@ class DiscordPhone extends ChangeNotifier {
   void stop() {
     _watch?.cancel();
     _watch = null;
+    _activityTimer?.cancel();
+    _activityTimer = null;
+    _measured = false;
     _c = null;
     CamBlur.instance.apply = null;
     active = false;
@@ -114,6 +130,9 @@ class DiscordPhone extends ChangeNotifier {
   @visibleForTesting
   void attach(InAppWebViewController c) {
     _c = c;
+    _measured = false;
+    _unread = null;
+    _relayed = 0;
     // Le flou de la caméra se change en plein appel.
     CamBlur.instance.apply = (js) async {
       await _js(js);
@@ -163,6 +182,16 @@ class DiscordPhone extends ChangeNotifier {
       loggedOut = out;
       notifyListeners();
     }
+    // Du nouveau dans Discord ? (non-lus du titre, notification relayée)
+    final unread = WebNotify.countInTitle('${j['title'] ?? ''}');
+    final relayed = (j['n'] as num?)?.toInt() ?? _relayed;
+    final news = !_measured
+        ? null // premier regard : on prend juste la mesure
+        : WebNotify.news(before: _unread, now: unread, notifsBefore: _relayed, notifsNow: relayed);
+    _measured = true;
+    _unread = unread;
+    _relayed = relayed;
+    if (news != null) _activity();
     final ringing = j['ringing'] == true;
     final inCall = j['inCall'] == true;
     final name = '${j['who'] ?? ''}'.trim();
@@ -182,6 +211,23 @@ class DiscordPhone extends ChangeNotifier {
     if (state == PhoneState.ringing || state == PhoneState.inCall || state == PhoneState.starting) {
       _set(PhoneState.ready, who: '');
     }
+  }
+
+  /// Relève Discord tout de suite (au plus une fois toutes les 3 s : une
+  /// rafale de messages = une seule relève).
+  void _activity() {
+    final now = DateTime.now();
+    final last = _lastActivity;
+    if (last == null || now.difference(last) >= const Duration(seconds: 3)) {
+      _lastActivity = now;
+      onActivity?.call();
+      return;
+    }
+    _activityTimer ??= Timer(const Duration(seconds: 3), () {
+      _activityTimer = null;
+      _lastActivity = DateTime.now();
+      onActivity?.call();
+    });
   }
 
   void _announce(String name) {
@@ -355,7 +401,10 @@ $_helpers
   var box = ringBox(), who = box ? nameNear(box) : '';
   var inCall = buttons().some(function (b) { return HANG.test((b.getAttribute('aria-label') || '')); });
   var out = /^\\/(login|register)/.test(location.pathname);
-  return JSON.stringify({ ringing: !!box, who: who.slice(0, 60), inCall: inCall, loggedOut: out, path: location.pathname });
+  return JSON.stringify({
+    ringing: !!box, who: who.slice(0, 60), inCall: inCall, loggedOut: out, path: location.pathname,
+    title: String(document.title || '').slice(0, 200), n: window.__mhNotifN || 0
+  });
 })();
 ''';
 
@@ -478,6 +527,9 @@ class _PhoneWebView extends StatelessWidget {
         source: CamBlur.script(CamBlur.instance.mode),
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
+      // Les notifications que Discord voudrait montrer : relayées à Mon Hub,
+      // qui relève tout de suite (au lieu de toutes les 2 minutes).
+      UserScript(source: WebNotify.shimScript, injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START),
     ]),
     onWebViewCreated: DiscordPhone.instance.attach,
     // Micro et caméra pour les appels.

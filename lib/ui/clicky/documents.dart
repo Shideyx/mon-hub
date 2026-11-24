@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:file_selector/file_selector.dart';
 
-/// Un document joint à Smily : il s'en sert pour tes prochaines questions
+/// Un document joint à Nexo : il s'en sert pour tes prochaines questions
 /// (cours en PDF, exercice en Word, tableau Excel, photo d'un livre…).
 class ClickyDoc {
   ClickyDoc({required this.name, this.text = '', this.pdf64, this.image64, this.mime = 'image/png'});

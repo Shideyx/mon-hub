@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'holo.dart';
 
-/// Annotations que Smily dessine sur l'écran pendant qu'il explique, comme
+/// Annotations que Nexo dessine sur l'écran pendant qu'il explique, comme
 /// un prof au tableau :
 ///
 /// * `[ARROW:x1,y1->x2,y2]` : flèche animée d'un point à un autre ;
@@ -130,7 +130,7 @@ List<String> splitSteps(String raw) {
   return parts.isEmpty ? [raw.trim()] : parts;
 }
 
-/// Retire toutes les balises de Smily (même à moitié écrites) du texte
+/// Retire toutes les balises de Nexo (même à moitié écrites) du texte
 /// affiché ou lu à voix haute pendant qu'il s'écrit.
 String stripClickyTags(String t) =>
     HoloScene.strip(t)
@@ -158,7 +158,7 @@ class ClickyMarksView extends StatefulWidget {
   final List<ClickyMark> marks;
   final Color color;
 
-  /// Décalage à soustraire (fenêtre de Smily partout).
+  /// Décalage à soustraire (fenêtre de Nexo partout).
   final Offset offset;
 
   /// Temps d'affichage avant l'effacement.

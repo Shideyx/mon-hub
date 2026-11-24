@@ -124,7 +124,7 @@ class AccountSync extends ChangeNotifier {
 
   // ---------- Marche / arrêt ----------
 
-  /// Compte ouvert (Mon Hub, pas les widgets ni Smily partout) : synchro
+  /// Compte ouvert (Mon Hub, pas les widgets ni Nexo partout) : synchro
   /// maintenant puis toutes les [every], et réponse aux demandes des autres
   /// appareils toutes les [watchEvery].
   void start() {
@@ -605,7 +605,7 @@ class AccountSync extends ChangeNotifier {
       name != 'sauvegarde.json' &&
       // Le temps d'écran est propre à ce PC.
       name != 'temps-ecran.json' &&
-      // Ce que Smily a vu et entendu reste sur ce PC (jamais envoyé).
+      // Ce que Nexo a vu et entendu reste sur ce PC (jamais envoyé).
       name != 'memoire-ecran.json' &&
       name != 'sens-recent.json' &&
       // Les guetteurs tournent sur ce PC (sinon : deux alertes).

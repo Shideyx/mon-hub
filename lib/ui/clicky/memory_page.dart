@@ -8,7 +8,7 @@ import 'clicky.dart';
 import 'long_memory.dart';
 import 'ollama.dart';
 
-/// **Sa mémoire** : tout ce que Smily sait de toi, rangé par sujets. Tu peux
+/// **Sa mémoire** : tout ce que Nexo sait de toi, rangé par sujets. Tu peux
 /// tout lire, effacer un souvenir ou tout oublier, et choisir s'il rêve
 /// (range sa mémoire quand tu n'es pas là) avec son IA locale.
 class MemoryPage extends StatefulWidget {
@@ -71,7 +71,7 @@ class _MemoryPageState extends State<MemoryPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Tout oublier ?'),
-        content: const Text('Smily oubliera tout ce qu\'il a retenu sur toi. On ne peut pas revenir en arrière.'),
+        content: const Text('Nexo oubliera tout ce qu\'il a retenu sur toi. On ne peut pas revenir en arrière.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Tout oublier')),
@@ -144,7 +144,7 @@ class _MemoryPageState extends State<MemoryPage> {
                               title: Text('Installer une IA locale'),
                               subtitle: Text(
                                 'ollama.com → installer, puis dans un terminal : « ollama pull qwen2.5:3b » (petit et '
-                                'rapide) ou « ollama pull gemma3 ». Smily la trouvera tout seul.',
+                                'rapide) ou « ollama pull gemma3 ». Nexo la trouvera tout seul.',
                               ),
                             ),
                         ],

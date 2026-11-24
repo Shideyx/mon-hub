@@ -1,4 +1,4 @@
-// **Smily te connaît** (v1.58) : il apprend tes habitudes avec le temps
+// **Nexo te connaît** (v1.58) : il apprend tes habitudes avec le temps
 // d'écran par heure (sur ce PC seulement, jamais envoyé) — « le mercredi
 // vers 14 h, c'est Roblox (4 semaines sur 4) », ton heure la plus active,
 // l'heure où tu quittes le PC le soir, ton appli n° 1 — et s'en sert pour
@@ -87,7 +87,7 @@ class Habits {
     return null;
   }
 
-  /// Ce que Smily a remarqué (des phrases), sur les 4 dernières semaines.
+  /// Ce que Nexo a remarqué (des phrases), sur les 4 dernières semaines.
   static List<String> insights(Map raw, Map<String, int> week, DateTime now) {
     final out = <String>[];
     final habits = find(raw, now);

@@ -97,8 +97,8 @@ void main() {
 
   test('Whisper : texte nettoyé', () {
     expect(
-      Whisper.clean('[00:00:00.000 --> 00:00:02.000]  Bonjour Smily,\n quelle heure est-il ?\n'),
-      'Bonjour Smily, quelle heure est-il ?',
+      Whisper.clean('[00:00:00.000 --> 00:00:02.000]  Bonjour Nexo,\n quelle heure est-il ?\n'),
+      'Bonjour Nexo, quelle heure est-il ?',
     );
     expect(Whisper.clean(' [Musique]\n'), '');
   });

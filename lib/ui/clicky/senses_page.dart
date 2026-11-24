@@ -10,7 +10,7 @@ import 'interests.dart';
 import 'watchers.dart' show Replies;
 import 'whisper.dart' show Whisper;
 
-/// Réglages de Smily → **Ses yeux et ses oreilles** : voir l'écran et
+/// Réglages de Nexo → **Ses yeux et ses oreilles** : voir l'écran et
 /// entendre le son du PC en continu (tout reste sur le PC), ce qu'il voit et
 /// entend en ce moment, et sa mémoire de l'écran (chercher, oublier).
 class SensesPage extends StatefulWidget {
@@ -56,7 +56,7 @@ class _SensesPageState extends State<SensesPage> {
         context: context,
         builder: (c) => AlertDialog(
           icon: const Text('👀', style: TextStyle(fontSize: 34)),
-          title: Text('Smily $what en continu ?'),
+          title: Text('Nexo $what en continu ?'),
           content: const Text(
             'Tout se passe sur ton PC : le texte de l\'écran est lu par Windows et le son est transcrit par Whisper, '
             'sans internet. Ce qu\'il a vu et entendu reste 7 jours sur ce PC, chiffré, jamais synchronisé ni envoyé.\n\n'
@@ -78,7 +78,7 @@ class _SensesPageState extends State<SensesPage> {
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Tout oublier ?'),
-          content: const Text('Smily effacera tout ce qu\'il a vu et entendu sur ce PC.'),
+          content: const Text('Nexo effacera tout ce qu\'il a vu et entendu sur ce PC.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Tout oublier')),
@@ -161,8 +161,8 @@ class _SensesPageState extends State<SensesPage> {
                                 s.paused
                                     ? 'En pause'
                                     : s.screenOn || s.soundOn
-                                    ? 'Smily ${[if (s.screenOn) 'voit ton écran', if (s.soundOn) 'entend ton PC'].join(' et ')}'
-                                    : 'Smily ne regarde pas ton écran',
+                                    ? 'Nexo ${[if (s.screenOn) 'voit ton écran', if (s.soundOn) 'entend ton PC'].join(' et ')}'
+                                    : 'Nexo ne regarde pas ton écran',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
@@ -279,7 +279,7 @@ class _SensesPageState extends State<SensesPage> {
                       title: const Text('Réponses toutes prêtes'),
                       subtitle: const Text(
                         'Quand on te pose une question en message privé sur Discord : « je te prépare une réponse ? ». Elle est '
-                        'copiée, prête à coller : Smily n\'envoie jamais rien tout seul.',
+                        'copiée, prête à coller : Nexo n\'envoie jamais rien tout seul.',
                       ),
                       value: Replies.on,
                       onChanged: (v) async {

@@ -42,17 +42,17 @@ Future<(String, DateTime)?> currentLesson() async {
   return null;
 }
 
-/// « Smily, écoute le cours » : l'écoute en direct, puis les comptes rendus.
+/// « Nexo, écoute le cours » : l'écoute en direct, puis les comptes rendus.
 class CoursePage extends StatefulWidget {
   const CoursePage({super.key, this.autoStart = false});
 
-  /// Commencer tout de suite (demandé à Smily).
+  /// Commencer tout de suite (demandé à Nexo).
   final bool autoStart;
 
   static Future<void> open(BuildContext context, {bool autoStart = false}) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => CoursePage(autoStart: autoStart)));
 
-  /// Ouvre la page depuis n'importe où (Smily, raccourci).
+  /// Ouvre la page depuis n'importe où (Nexo, raccourci).
   static Future<void> show({bool autoStart = false}) async {
     final ctx = await hubDialogContext();
     if (ctx != null && ctx.mounted) unawaited(open(ctx, autoStart: autoStart));
@@ -203,7 +203,7 @@ class _CoursePageState extends State<CoursePage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Smily écoute tout le cours, puis te fait le compte rendu',
+                    'Nexo écoute tout le cours, puis te fait le compte rendu',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -592,7 +592,7 @@ class _CourseNotePageState extends State<CourseNotePage> {
 }
 
 /// La pastille rouge « J'écoute le cours » en haut de Mon Hub, sur toutes
-/// les pages, tant que Smily écoute : on voit qu'on enregistre, et un clic
+/// les pages, tant que Nexo écoute : on voit qu'on enregistre, et un clic
 /// ramène à l'écoute.
 class CourseRecLayer extends StatelessWidget {
   const CourseRecLayer({super.key, required this.child});
@@ -641,7 +641,7 @@ class CourseRecLayer extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                l.recording ? 'Smily écoute le cours' : 'Compte rendu en cours…',
+                                l.recording ? 'Nexo écoute le cours' : 'Compte rendu en cours…',
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                               ),
                             ],

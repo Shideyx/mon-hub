@@ -98,7 +98,7 @@ void main() {
   });
 
   test('tu réponds « oui » ou « non » à voix haute', () {
-    for (final y in ['oui', 'Ouais vas-y', 'OK', 'd\'accord', 'vas-y', 'Smily fais-le', 'carrément']) {
+    for (final y in ['oui', 'Ouais vas-y', 'OK', 'd\'accord', 'vas-y', 'Nexo fais-le', 'carrément']) {
       expect(Autonomy.answer(y), isTrue, reason: y);
     }
     for (final n in ['non', 'non merci', 'pas maintenant', 'laisse tomber', 'plus tard']) {

@@ -274,7 +274,7 @@ void main() {
       );
       final tools = {for (final t in a.tools) t.name: t};
       final r = await QuickAnswers.answer(
-        'Smily, par quoi je commence ?',
+        'Nexo, par quoi je commence ?',
         tools: tools.keys.toSet(),
         call: (name, args) async => tools[name]?.run(args),
       );

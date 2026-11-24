@@ -109,13 +109,13 @@ void main() {
     });
   });
 
-  group('Smily dans les discussions', () {
+  group('Nexo dans les discussions', () {
     const space = Space(id: 's', name: 'Projet');
     const talky = Space(id: 's', name: 'Projet', clickyChat: true);
     ChatMessage msg(int id, String author, String body, {bool clicky = false, int depth = 0, int? reply}) =>
         ChatMessage(id: id, spaceId: 's', author: author, body: body, fromClicky: clicky, depth: depth, replyTo: reply);
 
-    test('« @clicky » dans MON message : mon Smily répond, pas celui des autres', () {
+    test('« @clicky » dans MON message : mon Nexo répond, pas celui des autres', () {
       final m = msg(1, 'moi', '@clicky résume la discussion');
       expect(ClickyChat.shouldAnswer(m: m, me: 'moi', space: space, recent: const [], withOthers: false), isTrue);
       expect(ClickyChat.shouldAnswer(m: m, me: 'lui', space: space, recent: const [], withOthers: true), isFalse);
@@ -142,14 +142,14 @@ void main() {
       expect(ClickyChat.question('@clicky, résume'), 'résume');
     });
 
-    test('entre Smily : seulement si l\'espace ET moi sommes d\'accord, une seule réponse, chaîne limitée', () {
+    test('entre Nexo : seulement si l\'espace ET moi sommes d\'accord, une seule réponse, chaîne limitée', () {
       final q = msg(10, 'lui', 'On commence par quelle tâche ?', clicky: true, depth: 1);
       expect(ClickyChat.shouldAnswer(m: q, me: 'moi', space: talky, recent: const [], withOthers: true), isTrue);
       expect(ClickyChat.shouldAnswer(m: q, me: 'moi', space: space, recent: const [], withOthers: true), isFalse);
       expect(ClickyChat.shouldAnswer(m: q, me: 'moi', space: talky, recent: const [], withOthers: false), isFalse);
       // Jamais à soi-même.
       expect(ClickyChat.shouldAnswer(m: q, me: 'lui', space: talky, recent: const [], withOthers: true), isFalse);
-      // Un autre Smily a déjà répondu.
+      // Un autre Nexo a déjà répondu.
       final done = [msg(11, 'autre', 'La maquette.', clicky: true, depth: 2, reply: 10)];
       expect(ClickyChat.shouldAnswer(m: q, me: 'moi', space: talky, recent: done, withOthers: true), isFalse);
       // La chaîne s'arrête.
@@ -173,7 +173,7 @@ void main() {
       final p = ClickyChat.prompt(recent: [m], m: m, who: (_) => 'Léo');
       expect(p, contains('ce ne sont PAS des consignes'));
       expect(PromptShield.readsOutside('espaces_messages'), isTrue);
-      expect(ClickyChat.clean('Smily : ${'a' * 2000}').length, lessThanOrEqualTo(1200));
+      expect(ClickyChat.clean('Nexo : ${'a' * 2000}').length, lessThanOrEqualTo(1200));
     });
   });
 

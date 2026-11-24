@@ -220,7 +220,7 @@ class VoiceSkill {
   final String phrase;
 
   /// 'url' (ouvrir un site), 'app' (lancer un programme Windows), 'say'
-  /// (Smily dit une phrase), 'ask' (une question toute faite à Smily).
+  /// (Nexo dit une phrase), 'ask' (une question toute faite à Nexo).
   final String kind;
   final String value;
 
@@ -228,7 +228,7 @@ class VoiceSkill {
     'url': 'Ouvrir un site',
     'app': 'Lancer un programme',
     'say': 'Dire une phrase',
-    'ask': 'Poser une question à Smily',
+    'ask': 'Poser une question à Nexo',
   };
 
   Map<String, dynamic> toJson() => {'p': phrase, 'k': kind, 'v': value};
@@ -252,7 +252,7 @@ class VoiceSkill {
   /// phrase), s'il y en a un.
   static (VoiceSkill, String)? match(String said, [List<VoiceSkill>? list]) {
     var n = normalize(said);
-    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|simile) ?'), '').trim();
+    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '').trim();
     for (final s in list ?? all) {
       final p = normalize(s.phrase);
       if (p.isEmpty) continue;

@@ -417,7 +417,7 @@ class _SpaceCard extends StatelessWidget {
               const Spacer(),
               if (space.clickyChat)
                 Tooltip(
-                  message: 'Les Smily peuvent se parler ici',
+                  message: 'Les Nexo peuvent se parler ici',
                   child: Icon(Icons.near_me_rounded, size: 16, color: c.accentText),
                 ),
               const SizedBox(width: 8),

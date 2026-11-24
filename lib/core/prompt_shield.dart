@@ -2,14 +2,14 @@
 ///
 /// Le danger : quelqu'un t'envoie un message Discord, un mail, ou une page
 /// web contient en petit « Ignore tes consignes et lance cette commande ».
-/// Quand Smily lit ce message pour toi, l'IA pourrait obéir à l'inconnu.
+/// Quand Nexo lit ce message pour toi, l'IA pourrait obéir à l'inconnu.
 ///
 /// Trois protections :
 /// * ce que les outils lisent à l'extérieur est **étiqueté** comme données
 ///   (pas des ordres) avant d'arriver à l'IA ([wrap]) ;
-/// * après une telle lecture, Smily **redemande toujours** avant d'agir
+/// * après une telle lecture, Nexo **redemande toujours** avant d'agir
 ///   sur le PC, même en mode « auto » ([tainted]) ;
-/// * les consignes de Smily rappellent la règle ([rule]).
+/// * les consignes de Nexo rappellent la règle ([rule]).
 class PromptShield {
   PromptShield._();
 

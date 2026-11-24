@@ -96,7 +96,7 @@ void main() {
       expect(HubFeed.say(t), isNotNull);
     });
 
-    test('cours dans 20 minutes : en premier, et Smily peut le dire', () {
+    test('cours dans 20 minutes : en premier, et Nexo peut le dire', () {
       final items = HubFeed.build(
         now: now,
         events: [
@@ -173,7 +173,7 @@ void main() {
       expect(CustomModules.load().single.url, 'https://web.whatsapp.com/');
       // Au prochain démarrage, il est toujours là.
       expect(CustomModules.build().single.name, 'WhatsApp');
-      // Smily sait l'ouvrir.
+      // Nexo sait l'ouvrir.
       expect(hub.enabled.single.tools.single.name, startsWith('perso_ouvrir_'));
       await CustomModules.remove(spec.id);
       hub.remove(spec.id);
@@ -259,7 +259,7 @@ void main() {
     });
   });
 
-  group('animations de Smily', () {
+  group('animations de Nexo', () {
     test('le rebond revient toujours à la taille normale', () {
       expect(ClickyBounceMath.squash(0), (1.0, 1.0));
       expect(ClickyBounceMath.squash(1), (1.0, 1.0));

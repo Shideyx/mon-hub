@@ -41,8 +41,8 @@ class _SpacePageState extends State<SpacePage> {
         case 'clicky':
           await sp.update(s, clickyChat: !s.clickyChat);
           _toast(!s.clickyChat
-              ? 'Les Smily peuvent se parler ici (chacun doit aussi l\'allumer dans Compte en ligne).'
-              : 'Les Smily ne se parlent plus ici.');
+              ? 'Les Nexo peuvent se parler ici (chacun doit aussi l\'allumer dans Compte en ligne).'
+              : 'Les Nexo ne se parlent plus ici.');
         case 'rename':
           final name = await _ask('RENOMMER', s.name);
           if (name != null && name.trim().isNotEmpty) await sp.update(s, name: name);
@@ -149,7 +149,7 @@ class _SpacePageState extends State<SpacePage> {
                           PopupMenuItem(value: 'pin', child: Text(sp.isPinned(s.id) ? 'Désépingler du menu' : 'Épingler en haut du menu')),
                           if (!chatOnly && owner) const PopupMenuItem(value: 'rename', child: Text('Renommer')),
                           if (!chatOnly && owner)
-                            PopupMenuItem(value: 'clicky', child: Text(s.clickyChat ? 'Les Smily ne se parlent plus ici' : 'Laisser les Smily se parler ici')),
+                            PopupMenuItem(value: 'clicky', child: Text(s.clickyChat ? 'Les Nexo ne se parlent plus ici' : 'Laisser les Nexo se parler ici')),
                           if (!chatOnly && owner) const PopupMenuItem(value: 'code', child: Text('Nouveau code d\'invitation')),
                           PopupMenuItem(value: 'leave', child: Text(owner && !chatOnly ? 'Supprimer l\'espace' : 'Quitter')),
                         ],
@@ -581,7 +581,7 @@ class _ChatState extends State<_Chat> {
       children: [
         Expanded(
           child: list.isEmpty
-              ? HudEmpty('Pas encore de message. Dis bonjour !\nAstuce : « @clicky … » et ton Smily répond ici pour tout le monde.')
+              ? HudEmpty('Pas encore de message. Dis bonjour !\nAstuce : « @clicky … » et ton Nexo répond ici pour tout le monde.')
               : ListView.builder(
                   controller: _scroll,
                   reverse: true,
@@ -620,7 +620,7 @@ class _ChatState extends State<_Chat> {
                       maxLength: 4000,
                       buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
                       decoration: const InputDecoration(
-                        hintText: 'Écris… (« @clicky » pour demander à ton Smily)',
+                        hintText: 'Écris… (« @clicky » pour demander à ton Nexo)',
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
@@ -669,7 +669,7 @@ class _Bubble extends StatelessWidget {
                 children: [
                   const Icon(Icons.near_me_rounded, size: 14, color: Color(0xFF7C5CFF)),
                   const SizedBox(width: 6),
-                  Text('CLICKY DE ${name.toUpperCase()}', style: hudLabel(context, size: 10, color: c.accentText)),
+                  Text('NEXO DE ${name.toUpperCase()}', style: hudLabel(context, size: 10, color: c.accentText)),
                   const Spacer(),
                   Text(time, style: hudMono(context, size: 10, color: c.dim)),
                 ],

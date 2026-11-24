@@ -25,7 +25,7 @@ import 'package:hub/ui/clicky/tutor.dart';
 import 'package:hub/ui/clicky/voice.dart';
 
 void main() {
-  group('Smily : dessins et étapes', () {
+  group('Nexo : dessins et étapes', () {
     test('annotations lues et retirées du texte', () {
       final (text, marks) = ClickyMark.extract(
         'Regarde ici [ARROW:10,20->110,220:le menu] puis là [CIRCLE:50,60,30:Fichier] '
@@ -57,10 +57,10 @@ void main() {
     });
   });
 
-  group('Smily : commandes vocales', () {
+  group('Nexo : commandes vocales', () {
     test('commandes reconnues', () {
       expect(parseCommand('Suivant')?.$1, ClickyCommand.next);
-      expect(parseCommand('Smily, continue')?.$1, ClickyCommand.next);
+      expect(parseCommand('Nexo, continue')?.$1, ClickyCommand.next);
       expect(parseCommand('répète')?.$1, ClickyCommand.repeat);
       expect(parseCommand('Stop !')?.$1, ClickyCommand.stop);
       expect(parseCommand('Qu\'est-ce qu\'on a vu aujourd\'hui ?')?.$1, ClickyCommand.today);
@@ -93,7 +93,7 @@ void main() {
         VoiceSkill('ouvre youtube', 'url', 'https://youtube.com'),
         VoiceSkill('mode revision', 'ask', 'Quiz'),
       ];
-      expect(VoiceSkill.match('Smily, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
+      expect(VoiceSkill.match('Nexo, ouvre YouTube', list)?.$1.value, 'https://youtube.com');
       expect(VoiceSkill.match('Mode révision maths', list)?.$2, 'maths');
       expect(VoiceSkill.match('ouvre la porte', list), isNull);
     });
@@ -226,13 +226,13 @@ void main() {
     expect(historySection(DateTime(2026, 9, 1), DateTime(2026, 11, 16)), 'Plus ancien');
   });
 
-  test('voix : bip de Smily et salutation', () {
+  test('voix : bip de Nexo et salutation', () {
     final wav = ClickyChime.wav();
     expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
     expect(clickyGreeting('Erik', DateTime(2026, 11, 16, 8)), startsWith('Bonjour Erik.'));
     expect(clickyGreeting('', DateTime(2026, 11, 16, 20)), startsWith('Bonsoir.'));
     expect(clickyPersona('Erik'), contains('« Erik »'));
-    expect(clickyPersona('Erik'), contains('Smily'));
+    expect(clickyPersona('Erik'), contains('Nexo'));
   });
 
   group('messages vocaux et likes', () {
