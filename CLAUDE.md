@@ -626,3 +626,20 @@
   une demande `generateContent` toutes les 8 s épuisait le petit quota gratuit en quelques minutes (« les sous-titres
   marchent pas »). Secours : morceaux `OralCoach.listen(fast: true)` (sans réflexion), puis Whisper après un 429
   (`quotaStatus`).
+- **Smily se connaît et compte ses jetons (v1.65)** (demande de la personne : « qu'il connaisse ses capacités, les
+  mises à jour via GitHub, les tokens, qu'il se règle et limite Claude ») : `ui/clicky/self_knowledge.dart`
+  (`SelfKnowledge.search` = catalogue `ClickySkills` **+ les vraies actions** branchées, outil `clicky_capacites`
+  **toujours envoyé** (`ToolRouter.always`), `promptBlock` dans `_system` et `_liveSystem`) ; `core/whats_new.dart`
+  (`WhatsNew` : versions GitHub `releases?per_page=8` (corps = message du commit fusionné → **écrire un message de
+  fusion en français clair**, c'est ce que Smily raconte), `NewsRules.clean`, cache `app.nouveautes`, `afterUpdate` →
+  notification « ✨ Mon Hub vX est installé » + `think` une fois (`app.version.vue`), outil `clicky_nouveautes`).
+  **Jetons** : `core/token_budget.dart` (`TokenBudget` : `usage` lu dans le flux de `ClaudeApi._call`
+  (`message_start` + `message_delta`), le `result` de Claude Code, `usageMetadata` de Gemini (`AiText`, Live) ; `poids`
+  = lus + écrits × 5 + cache × 0,05 + mise en cache × 1,25 ; budget `jetons.budget` (200 k par défaut, Réglages de
+  Smily → Outils) ; `TokenRules.level` normal / économe ≥ 50 % / très économe ≥ 80 % / dépassé → `historyTurns` 8/4/2,
+  `effort` low (sauf « réfléchis bien »), `geminiFirst` (Gemini répond d'abord, « CLAUDE » s'il lui faut Mon Hub),
+  `webAllowed` ; annonce du dépassement une fois par jour ; outils `clicky_jetons`, `clicky_budget_jetons`). **Cache
+  Claude** : `_system` = partie fixe, puis `ClaudeApi.momentMark`, puis le moment (heure, écran, situation, mémoire,
+  jetons) → `ClaudeApi.systemBlocks` met un point de cache après la partie fixe (avant : l'heure en tête des consignes
+  cassait le cache à chaque minute). Ne rien mettre qui change à chaque question **avant** la marque. Tests
+  `test/v184_smily_lui_meme_test.dart`.

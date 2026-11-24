@@ -38,6 +38,25 @@ class ClickySkills {
       ),
       Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
     ]),
+    SkillGroup('🤖', 'Ce qu\'il sait de lui-même', Color(0xFF7C5CFF), isNew: true, [
+      Skill(
+        '« Qu\'est-ce que tu sais faire ? » : il cherche dans tout ce qu\'il sait faire, pas de « je sais pas » à tort',
+        tryIt: 'Qu\'est-ce que tu sais faire ?',
+      ),
+      Skill(
+        '« Quoi de neuf dans Mon Hub ? » : les nouveautés des dernières mises à jour (lues sur GitHub), et il te '
+        'les dit tout seul après chaque mise à jour',
+        tryIt: 'Quoi de neuf dans Mon Hub ?',
+      ),
+      Skill(
+        '« Combien de jetons t\'as utilisé ? » : ses jetons (tokens) du jour et ce que ça a coûté',
+        tryIt: 'Combien de jetons t\'as utilisé ?',
+      ),
+      Skill(
+        'Il se règle tout seul : plus son budget du jour se resserre, plus il passe par Gemini (gratuit), avec moins '
+        'd\'historique et une réflexion plus légère. « Mets ton budget de jetons à 100k » pour le changer.',
+      ),
+    ]),
     SkillGroup('🌐', 'Espaces partagés et discussions', Color(0xFF7C5CFF), isNew: true, [
       Skill(
         'Crée un espace (exposé, classe, équipe, entreprise) et invite tes amis avec un code : tableau de tâches et discussion en direct.',

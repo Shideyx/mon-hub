@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/claude_api.dart';
 import '../../core/claude_bridge.dart';
 import 'shot_encode.dart';
+import '../../core/token_budget.dart';
 
 /// Cerveau « Claude Pro » de Smily : ton propre Claude Code, connecté à ton
 /// abonnement Claude (Pro, Max…).
@@ -323,6 +324,10 @@ class ClaudeCode {
             if (e['subtype'] == 'api_retry') onStatus?.call('Claude est occupé, je réessaie…');
           case 'result':
             result = '${e['result'] ?? ''}';
+            // Les jetons de la réponse (abonnement : pas facturés à l'unité,
+            // mais comptés pour que Smily se règle).
+            final u = e['usage'];
+            if (u is Map) unawaited(TokenBudget.instance.recordClaude(ClaudeApi.model, u).catchError((Object _) {}));
             failed = e['is_error'] == true || '${e['subtype']}' != 'success';
         }
       }

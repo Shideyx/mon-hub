@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import '../ui/clicky/claude_code.dart';
 import '../ui/clicky/clicky.dart';
 import '../ui/clicky/ollama.dart';
 import 'claude_api.dart';
+import 'token_budget.dart';
 
 /// Une demande simple à l'IA, sans outils : corriger un texte, résumer,
 /// créer des cartes de révision… Utilise ce que tu as déjà : ta clé Gemini
@@ -133,6 +135,17 @@ class AiText {
         }
         if (res.statusCode != 200) throw 'Gemini : erreur ${res.statusCode}';
         final j = jsonDecode(body) as Map;
+        final um = j['usageMetadata'];
+        if (um is Map) {
+          unawaited(
+            TokenBudget.instance
+                .recordGemini(
+                  (um['promptTokenCount'] as num? ?? 0).toInt(),
+                  (um['candidatesTokenCount'] as num? ?? 0).toInt() + (um['thoughtsTokenCount'] as num? ?? 0).toInt(),
+                )
+                .catchError((Object _) {}),
+          );
+        }
         final parts =
             ((((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?) ?? const [];
         final text = [

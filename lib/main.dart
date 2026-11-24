@@ -44,6 +44,7 @@ import 'core/shortcuts.dart';
 import 'core/updater.dart';
 import 'ui/app_shell.dart';
 import 'core/hub_home.dart';
+import 'core/whats_new.dart';
 import 'ui/clicky/assistant_view.dart';
 import 'ui/clicky/clicky.dart';
 import 'ui/clicky/clicky_desktop.dart';
@@ -351,6 +352,21 @@ class _HubAppState extends State<HubApp> {
               PhoneState.inCall,
             }.contains(DiscordPhone.instance.state));
           unawaited(_announceSenses(n));
+          // Après une mise à jour : Smily dit ce qui a changé (lu dans les
+          // versions publiées sur GitHub), une seule fois.
+          Perf.later(6, () async {
+            final news = await WhatsNew.instance.afterUpdate();
+            if (news.isEmpty) return;
+            final text = NewsRules.say(news);
+            await n.post(
+              HubNotification(
+                id: 'maj:${news.first.tag}',
+                title: '✨ Mon Hub ${news.first.tag} est installé',
+                body: text,
+              ),
+            );
+            await clicky.think('Je viens d\'être mis à jour. $text', aloud: false);
+          });
           // Le presse-papier malin et les réactions du PC (téléchargements,
           // captures, clés USB…).
           PcWatch.instance

@@ -433,6 +433,50 @@ class QuickAnswers {
       }
     }
 
+    // ---- Ce que Smily sait de lui-même : capacités, nouveautés, jetons ----
+    Future<QuickReply?> said(String tool, [Map<String, dynamic> args = const {}]) async {
+      final r = await call(tool, args);
+      return r is Map && r['resume'] != null ? QuickReply('${r['resume']}') : null;
+    }
+
+    if (has('clicky_capacites') &&
+        RegExp(
+          r'^(?:qu est ce que tu sais faire|tu sais faire quoi|tu sers a quoi|tu peux faire quoi|qu est ce que tu peux faire|'
+          r'c est quoi tes capacites|quelles sont tes capacites|montre moi (?:tes capacites|ce que tu sais faire))\s?$',
+        ).hasMatch(n)) {
+      final r = await said('clicky_capacites');
+      if (r != null) return r;
+    }
+    if (has('clicky_nouveautes') &&
+        RegExp(
+          r'^(?:c est quoi |quelle est )?(?:la )?(?:derniere|nouvelle) (?:mise a jour|version|maj)(?: de mon hub| de smily)?$|'
+          r'^quoi de neuf (?:dans|sur|avec) (?:mon hub|toi|smily|l appli)$|^(?:quelles sont )?(?:les )?nouveautes(?: de mon hub| de smily)?$|'
+          r'^(?:t as|tu as) appris quoi de nouveau$|^(?:quelle version (?:es tu|t es|j ai|de mon hub))$|^qu est ce qui a change$',
+        ).hasMatch(n)) {
+      final r = await said('clicky_nouveautes');
+      if (r != null) return r;
+    }
+    if (has('clicky_budget_jetons')) {
+      final m = RegExp(
+        r'^(?:mets|regle|fixe|change|passe) (?:ton |le |mon )?budget (?:de |en )?(?:tokens?|jetons?) (?:a|sur) ([0-9][0-9 ]*)\s*(k|mille)?(?: (?:tokens?|jetons?))?(?: par jour)?$',
+      ).firstMatch(n);
+      if (m != null) {
+        var v = int.tryParse(m.group(1)!.replaceAll(' ', '')) ?? 0;
+        if (m.group(2) != null) v *= 1000;
+        final r = await said('clicky_budget_jetons', {'jetons': v});
+        if (r != null) return r;
+      }
+    }
+    if (has('clicky_jetons') &&
+        RegExp(
+          r'^(?:combien (?:de )?(?:tokens?|jetons?)(?: (?:t as|tu as) (?:utilise|consomme|depense|pris))?(?: aujourd hui)?|'
+          r'tu consommes beaucoup(?: de tokens| de jetons)?|t as consomme combien|combien tu (?:m )?as coute(?: aujourd hui)?|'
+          r'(?:ton |mon |le )?budget (?:de |en )?(?:tokens?|jetons?)|(?:tes|mes) (?:tokens?|jetons?))\s?$',
+        ).hasMatch(n)) {
+      final r = await said('clicky_jetons');
+      if (r != null) return r;
+    }
+
     // « Qu'est-ce que j'ai raté ? »
     if (has('clicky_rate') &&
         RegExp(
