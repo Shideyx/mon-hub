@@ -155,6 +155,10 @@ class ChatMessage {
 /// membre, leurs membres, les tâches et la discussion (en direct), les
 /// espaces épinglés et les messages non lus.
 class Spaces extends ChangeNotifier {
+  /// Le message appelle-t-il Smily (« @smily », ou l'ancien « @clicky ») ?
+  static bool mentionsSmily(String body) => _mention.hasMatch(body);
+  static final _mention = RegExp(r'(^|[\s,;:!?(])@(clicky|smily|smiley)\b', caseSensitive: false);
+
   Spaces._();
   static final instance = Spaces._();
 

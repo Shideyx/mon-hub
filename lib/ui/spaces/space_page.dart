@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/online/clicky_chat.dart';
 import '../../core/online/spaces.dart';
 import '../hud/hud.dart';
 import 'spaces_page.dart';
@@ -289,7 +288,7 @@ class _BoardState extends State<_Board> {
     final c = HudColors.of(context);
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return HudEmpty(_error!, action: HudButton(label: 'Réessayer', onPressed: _load));
-    final touch = Platform.isAndroid || Platform.isIOS;
+    final touch = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
     return ListView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
@@ -700,7 +699,7 @@ class _Bubble extends StatelessWidget {
                     Text(mine ? '$name (toi)' : name, style: TextStyle(fontWeight: FontWeight.w700, color: mine ? c.accentText : c.text)),
                     const SizedBox(width: 8),
                     Text(time, style: hudMono(context, size: 10, color: c.dim)),
-                    if (ClickyChat.mentions(m.body)) ...[
+                    if (Spaces.mentionsSmily(m.body)) ...[
                       const SizedBox(width: 8),
                       HudTag('@clicky', color: c.selected, textColor: c.accentText),
                     ],

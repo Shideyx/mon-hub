@@ -54,6 +54,8 @@ import 'ui/theme.dart';
 import 'ui/update_screen.dart';
 import 'ui/widget_window.dart';
 import 'ui/search_page.dart';
+import 'ui/online/online_page.dart';
+import 'ui/spaces/spaces_page.dart';
 
 Future<void> main(List<String> args) async {
   // « hub.exe --clicky » : Smily partout (Windows), voir clicky_desktop.dart.
@@ -91,6 +93,7 @@ Future<void> main(List<String> args) async {
   updater.start();
   // Fichiers de l'ancienne version mis de côté pendant la mise à jour.
   unawaited(Updater.cleanup());
+  SpaceActions.openAccount = OnlinePage.open;
   runApp(const HubApp());
 }
 

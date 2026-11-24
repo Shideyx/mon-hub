@@ -35,12 +35,10 @@ class ClickyChat {
   static bool get withOthers => ModuleStore.prefs.getBool(_withOthersKey) ?? false;
   static Future<void> setWithOthers(bool on) => ModuleStore.prefs.setBool(_withOthersKey, on);
 
-  static final _mention = RegExp(r'(^|[\s,;:!?(])@clicky\b', caseSensitive: false);
-
-  static bool mentions(String body) => _mention.hasMatch(body);
+  static bool mentions(String body) => Spaces.mentionsSmily(body);
 
   /// Le message sans « @clicky ».
-  static String question(String body) => body.replaceAll(RegExp(r'@clicky\b[,:]?\s*', caseSensitive: false), '').trim();
+  static String question(String body) => body.replaceAll(RegExp(r'@(clicky|smily|smiley)\b[,:]?\s*', caseSensitive: false), '').trim();
 
   /// Mon Smily doit-il répondre à [m] ?
   static bool shouldAnswer({

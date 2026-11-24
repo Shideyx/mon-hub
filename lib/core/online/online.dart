@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show SocketException;
 
 import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/foundation.dart';
@@ -295,7 +294,7 @@ class Online extends ChangeNotifier {
   /// Une erreur du serveur, dite simplement.
   static String explain(Object e) {
     if (e is String) return e;
-    if (e is SocketException || e is TimeoutException) return 'Pas d\'internet pour le moment.';
+    if (e is TimeoutException) return 'Pas d\'internet pour le moment.';
     if (e is AuthException) {
       final m = e.message.toLowerCase();
       if (m.contains('invalid login') || m.contains('invalid credentials')) return _wrongCredentials;

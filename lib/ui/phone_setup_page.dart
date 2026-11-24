@@ -7,6 +7,7 @@ import '../core/account_sync.dart';
 import '../core/browser.dart';
 import '../core/google_auth.dart';
 import 'google_setup.dart';
+import 'web_version_card.dart';
 
 /// Réglages → Mes appareils → **Ajouter mon iPhone** (sur le PC) : installer
 /// Mon Hub sur l'iPhone, lui donner la connexion Google du PC (code de
@@ -174,6 +175,9 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
+              const WebVersionCard(),
+              const SizedBox(height: 6),
+              Text('Ou l\'appli complète, installée depuis ce PC :', style: theme.textTheme.titleSmall),
               for (final (i, (icon, title, body)) in steps.indexed)
                 Card(
                   margin: const EdgeInsets.symmetric(vertical: 6),
