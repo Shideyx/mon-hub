@@ -4081,6 +4081,10 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
 
   /// Le cœur : question → captures → IA → réponse parlée, pointée, dessinée.
   Future<void> _askAi(String q, {String? shown, bool withScreen = true}) async {
+    // Le modèle de Claude suit le réglage « Qui répond » (Sonnet en économe,
+    // Opus pour « réfléchis bien »).
+    ClaudeApi.econome = brainMode == 'econome';
+    ClaudeApi.deep = ClaudeThrift.deep(q);
     final id = ++_askId;
     _lastQuestion = shown ?? q;
     steps = const [];

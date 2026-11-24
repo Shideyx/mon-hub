@@ -49,9 +49,17 @@ class ClaudeApi {
     ];
   }
 
+  /// Mode économe (réglé par Nexo) et question difficile (« réfléchis bien »).
+  static bool econome = true;
+  static bool deep = false;
+
+  /// Le modèle : celui choisi dans les réglages ; sinon, en mode économe,
+  /// Sonnet (deux fois moins cher qu'Opus), et Opus seulement pour
+  /// « réfléchis bien ».
   static String get model {
     final m = store.getJson<String>('model');
-    return models.containsKey(m) ? m! : 'claude-opus-5-5';
+    if (models.containsKey(m)) return m!;
+    return econome && !deep ? 'claude-sonnet-5-5' : 'claude-opus-5-5';
   }
 
   static Future<void> setModel(String m) => store.setJson('model', m);

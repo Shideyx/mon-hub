@@ -39,7 +39,10 @@ class ClaudeCode {
 
   static String get model {
     final m = ClaudeApi.store.getJson<String>('claudecode.model') ?? '';
-    return models.containsKey(m) ? m : '';
+    if (models.containsKey(m)) return m;
+    // Économe : Sonnet (moins de ton forfait Claude utilisé), Opus seulement
+    // pour « réfléchis bien ».
+    return ClaudeApi.econome && !ClaudeApi.deep ? 'sonnet' : '';
   }
 
   static Future<void> setModel(String m) => ClaudeApi.store.setJson('claudecode.model', m);

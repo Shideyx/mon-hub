@@ -4,6 +4,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/browser.dart';
+import '../../core/cam_blur.dart';
 import '../../core/desktop_widgets.dart';
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
@@ -227,6 +228,21 @@ class _InstagramPageState extends State<InstagramPage> {
           ],
         ),
         actions: [
+          // Le flou de la caméra pour les appels Instagram (choisi avant
+          // l'appel, ou changé en plein appel).
+          ListenableBuilder(
+            listenable: CamBlur.instance,
+            builder: (context, _) => PopupMenuButton<String>(
+              tooltip: 'Flou de la caméra : ${CamBlur.label(CamBlur.instance.mode)}',
+              icon: Icon(CamBlur.instance.mode == 'non' ? Icons.blur_off_rounded : Icons.blur_on_rounded),
+              initialValue: CamBlur.instance.mode,
+              onSelected: (m) async {
+                await CamBlur.instance.setMode(m);
+                await _c?.evaluateJavascript(source: CamBlur.liveScript(m));
+              },
+              itemBuilder: (_) => [for (final m in CamBlur.modes) PopupMenuItem(value: m, child: Text(CamBlur.label(m)))],
+            ),
+          ),
           for (final (label, icon, url) in InstagramModule.places)
             IconButton(tooltip: label, icon: Icon(icon), onPressed: () => _go(url)),
           IconButton(
@@ -239,6 +255,14 @@ class _InstagramPageState extends State<InstagramPage> {
       body: HubWebView(
         url: widget.url,
         onController: (c) => _c = c,
+        // Le flou de la caméra, mis avant Instagram (dans la page et dans la
+        // fenêtre d'appel), comme pour le Discord intégré.
+        userScripts: () => [
+          UserScript(
+            source: CamBlur.script(CamBlur.instance.mode),
+            injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+          ),
+        ],
         onTitleChanged: (t) {
           final n = InstagramModule.unreadFromTitle(t);
           if (n != null || (t ?? '').trim() == 'Instagram') m.badge.value = n ?? 0;

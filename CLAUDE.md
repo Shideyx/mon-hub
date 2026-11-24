@@ -719,6 +719,12 @@
 - **Flou (v1.66)** : mode `fond` dans `CamBlur` (arrière-plan flou, tête et épaules nettes ; pas de visage = tout
   flou), « floute mon arrière-plan ». Toujours seulement les appels passés par Mon Hub (pas de caméra virtuelle sous
   Windows 10).
+- **Appels Instagram (v1.66)** : `HubWebView.userScripts` (scripts mis avant le site, aussi dans les fenêtres
+  `_PopupWindow`, qui autorisent maintenant caméra et micro : avant, la fenêtre d'appel ne répondait pas aux demandes)
+  → `InstagramPage` y met `CamBlur.script` + bouton « Flou » dans sa barre (`liveScript` en plein appel).
+  Ctrl + Alt + M marche pour tous les appels. **Modèle Claude économe** : sans modèle choisi, `ClaudeApi.model` =
+  Sonnet en mode `econome` (Opus seulement si `ClaudeApi.deep`, « réfléchis bien ») ; Claude Code : `--model sonnet`
+  (réglé dans `_askAi`).
 - Vérifier ici sous Windows : `dart analyze --fatal-infos` (pas `flutter analyze`, qui se perd dans le SDK quand il est
   dans un chemin long) ; 4 tests de l'accueil échouent **seulement sous Windows** (PowerShell de `PcApps.load` →
   minuteur en attente, texte « PC (Windows) ») : sous Linux (GitHub) ils passent.
