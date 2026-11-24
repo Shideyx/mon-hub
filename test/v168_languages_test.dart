@@ -117,4 +117,18 @@ void main() {
       expect(ToolRouter.groupsFor('je veux une traduction de ma conversation'), contains('langues'));
     });
   });
+
+  group('Sous-titres en continu (v1.64)', () {
+    test('consignes de Gemini Live : sous-titrer, rien d\'autre', () {
+      final s = LiveCaptions.liveSystem('français');
+      expect(s, contains('français'));
+      expect(s, contains('Ne réponds jamais'));
+      expect(s, contains('ne dis rien'));
+    });
+
+    test('quota épuisé : Whisper ou explication', () {
+      expect(LiveCaptions.quotaStatus(whisper: true), contains('Whisper'));
+      expect(LiveCaptions.quotaStatus(whisper: false), contains('Installe Whisper'));
+    });
+  });
 }

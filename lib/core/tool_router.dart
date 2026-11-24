@@ -256,7 +256,7 @@ class ToolRouter {
     ),
     'camera': (
       ['camera_', 'micro_', 'appel_'],
-      ['camera', 'webcam', 'filme', 'micro', 'sourdine', 'mute', 'appel', 'flou', 'arriere plan', 'espion', 'ecoute'],
+      ['camera', 'webcam', 'filme', 'micro', 'sourdine', 'mute', 'appel', 'flou', 'arriere plan', 'espion', 'ecoute', 'visage', 'pirate', 'privee'],
     ),
     'jeu': (
       ['jeu_'],

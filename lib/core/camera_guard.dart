@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'cam_blur.dart';
 import 'hub_module.dart';
 import 'module_store.dart';
 import 'perf.dart';
@@ -168,6 +169,37 @@ class CameraRules {
   }
 }
 
+/// Ce que fait le mode caméra privée à un moment donné.
+enum PrivateStep { none, ask, reblock }
+
+/// Les règles du **mode caméra privée**, sans Windows : la caméra reste
+/// coupée ; pendant un appel, Smily demande s'il doit l'allumer ; après
+/// l'appel (ou 20 min après l'avoir rallumée hors appel), il la recoupe.
+class PrivateCamRules {
+  const PrivateCamRules._();
+
+  static const graceOutsideCall = Duration(minutes: 20);
+
+  static PrivateStep step({
+    required bool on,
+    required bool blocked,
+    required String? call,
+    required bool asked,
+    required DateTime? openedAt,
+    required bool sawCall,
+    required DateTime now,
+  }) {
+    if (!on) return PrivateStep.none;
+    if (call != null) return blocked && !asked ? PrivateStep.ask : PrivateStep.none;
+    if (blocked || openedAt == null) return PrivateStep.none;
+    if (sawCall || now.difference(openedAt) >= graceOutsideCall) return PrivateStep.reblock;
+    return PrivateStep.none;
+  }
+
+  static String askText(String call) =>
+      'Ta caméra est coupée (mode caméra privée). Je l\'allume pour ton appel $call ? Je la recoupe dès que tu raccroches.';
+}
+
 /// **Protection de la caméra et du micro** (Windows, sur ce PC).
 ///
 /// Deux choses :
@@ -203,6 +235,82 @@ class CameraGuard extends ChangeNotifier {
 
   /// Prévenir la personne (branché par Mon Hub).
   void Function(String title, String body)? warn;
+
+  // ------------------------------------------------ Mode caméra privée
+
+  static const _kPrivate = 'app.camera.privee';
+
+  /// La caméra reste coupée, sauf pendant un appel (avec ton accord).
+  bool get privateMode {
+    try {
+      return ModuleStore.global.getBool(_kPrivate) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Allume (coupe la caméra tout de suite) ou éteint (la rallume) le mode.
+  Future<bool> setPrivate(bool on) async {
+    try {
+      await ModuleStore.global.setBool(_kPrivate, on);
+    } catch (_) {}
+    _openedAt = null;
+    _sawCall = false;
+    _asked = false;
+    notifyListeners();
+    return setBlocked(on);
+  }
+
+  /// Un appel passé **dans** Mon Hub (le Discord intégré), branché par Mon Hub.
+  static String? Function()? inAppCall;
+
+  /// Demander « j'allume ta caméra pour l'appel ? » (branché par Mon Hub).
+  void Function(String call, String text)? onPrivateCall;
+
+  /// Prévenir que la caméra a été recoupée (branché par Mon Hub).
+  void Function(String text)? onReblocked;
+
+  DateTime? _openedAt;
+  bool _sawCall = false;
+  bool _asked = false;
+
+  /// La caméra a été rallumée pendant le mode privé (par toi ou Smily).
+  void _opened() {
+    if (!privateMode) return;
+    _openedAt = DateTime.now();
+    _sawCall = false;
+  }
+
+  /// Un tour du mode privé : [call] = l'appel en cours (null sinon).
+  Future<void> privateTick(String? call) async {
+    if (!supported || !privateMode) return;
+    if (call == null) {
+      _asked = false;
+    } else if (_openedAt != null) {
+      _sawCall = true;
+    }
+    final step = PrivateCamRules.step(
+      on: true,
+      blocked: camera.blocked,
+      call: call,
+      asked: _asked,
+      openedAt: _openedAt,
+      sawCall: _sawCall,
+      now: DateTime.now(),
+    );
+    switch (step) {
+      case PrivateStep.ask:
+        _asked = true;
+        onPrivateCall?.call(call!, PrivateCamRules.askText(call));
+      case PrivateStep.reblock:
+        if (await setBlocked(true)) {
+          _openedAt = null;
+          _sawCall = false;
+          onReblocked?.call('🔒 J\'ai recoupé ta caméra (mode caméra privée).');
+        }
+      case PrivateStep.none:
+    }
+  }
 
   SensorState camera = const SensorState();
   SensorState micro = const SensorState();
@@ -273,6 +381,7 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
       }, const Duration(seconds: 20));
       if ('${r.stdout}'.contains('Ok')) {
         await read(force: true);
+        if (!mic && !off) _opened();
         return mic ? micro.blocked == off : camera.blocked == off;
       }
     } catch (_) {}
@@ -288,12 +397,13 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
 
   /// Un tour de garde (appelé par le tour de 15 s de Mon Hub).
   Future<void> tick() async {
-    if (!supported || !alerts) return;
+    if (!supported || (!alerts && !privateMode)) return;
     final now = DateTime.now();
     // En mode léger, on regarde deux fois moins souvent.
     if (_tick != null && now.difference(_tick!) < Perf.slow(const Duration(seconds: 30), factor: 2)) return;
     _tick = now;
     await read(force: true);
+    if (!alerts) return;
     final live = {for (final u in camera.active) u.key};
     for (final u in camera.active) {
       if (!_told.add(u.key)) continue;
@@ -354,6 +464,48 @@ extension CameraTools on CameraGuard {
           'resume': ok
               ? '$what ${off ? 'est coupé${mic ? '' : 'e'} : plus aucune appli ne peut ${mic ? 'écouter' : 'filmer'}.' : 'remarche.'}'
               : 'Je n\'ai pas réussi à changer ça (Windows a refusé). Réglages → Confidentialité → Caméra.',
+          'fait': ok,
+        };
+      },
+    ),
+    HubTool(
+      name: 'camera_flou',
+      description:
+          'Floute la caméra dans les appels Discord passés par Mon Hub (le Discord intégré) : visage = seulement '
+          'le visage (toute l\'image si le visage n\'est pas trouvé), tout = toute l\'image, non = enlever le flou. '
+          'Marche aussi en plein appel. À utiliser pour « floute mon visage », « enlève le flou ».',
+      params: {'mode': ('string', 'visage, tout ou non')},
+      run: (a) async {
+        final m = '${a['mode'] ?? 'visage'}'.toLowerCase();
+        final mode = CamBlur.modes.contains(m) ? m : 'visage';
+        await CamBlur.instance.setMode(mode);
+        return {
+          'resume':
+              '${CamBlur.say(mode, faces: CamBlur.instance.faceDetection)}'
+              '${mode == 'non' ? '' : ' (dans les appels Discord passés par Mon Hub ; pour le Discord normal, c\'est son propre flou d\'arrière-plan)'}',
+          'mode': mode,
+          'fait': true,
+        };
+      },
+    ),
+    HubTool(
+      name: 'camera_privee',
+      description:
+          'Mode caméra privée : la caméra du PC reste coupée tout le temps (aucune appli ni pirate ne peut '
+          'filmer) ; pendant un appel, Smily demande s\'il doit l\'allumer, et la recoupe à la fin. À utiliser '
+          'pour « mode caméra privée », « j\'ai peur qu\'on pirate ma webcam », « laisse ma caméra coupée ».',
+      params: {'activer': ('string', 'oui (défaut) pour l\'allumer, non pour l\'éteindre')},
+      run: (a) async {
+        if (!CameraGuard.supported) return {'resume': 'Cette protection n\'existe que sur le PC.'};
+        final on = !'${a['activer'] ?? 'oui'}'.toLowerCase().startsWith('n');
+        final ok = await setPrivate(on);
+        return {
+          'resume': !ok
+              ? 'Je n\'ai pas réussi à changer la caméra (Windows a refusé). Réglages → Confidentialité → Caméra.'
+              : on
+              ? '🔒 Mode caméra privée : ta caméra est coupée. Pendant un appel, je te demande avant de l\'allumer, '
+                    'et je la recoupe quand tu raccroches.'
+              : 'Mode caméra privée éteint : ta caméra remarche normalement.',
           'fait': ok,
         };
       },

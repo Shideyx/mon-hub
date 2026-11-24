@@ -606,3 +606,23 @@
   l'appli est cachée). Écrans `web_app.dart` (bienvenue 3 choix, onglets Smily / Espaces / Téléphone / Réglages).
   Notifications quand l'appli est **fermée** : pas encore (il faudra un envoi « push » depuis le Supabase de la
   personne ; `smily_sw.js` sait déjà les afficher). Tests `test/v182_web_test.dart`.
+- **Caméra privée + flou du visage (v1.64)** (demande de la personne : peur qu'on pirate sa webcam) : **mode caméra
+  privée** dans `core/camera_guard.dart` (`PrivateCamRules.step` sans Windows : appel avec caméra coupée → `ask` une fois,
+  après l'appel ou 20 min hors appel → `reblock` ; `CameraGuard.privateMode` = `app.camera.privee`, `setPrivate`,
+  `privateTick(call)` appelé dans le tour de 15 s de `main.dart` et quand le Discord intégré change d'état ;
+  `inAppCall` = appel dans Mon Hub ; `onPrivateCall` → idée `camera_couper couper=non`), outil `camera_privee` (**action à
+  autoriser**). **Flou** : `core/cam_blur.dart` (`CamBlur` : modes `non`/`visage`/`tout`, `app.cam.flou` ; `script` =
+  script mis **avant** discord.com dans le Discord intégré (`_PhoneWebView` `initialUserScripts`) : chaque caméra passe
+  par MediaStreamTrackProcessor → OffscreenCanvas → MediaStreamTrackGenerator, visage repéré par `FaceDetector`
+  (WebView2 lancé avec `--enable-blink-features=ShapeDetection` via `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`, posé tout
+  au début de `main` par `core/cam_blur_env.dart` : **le même pour tous les programmes**, sinon WebView2 refuse) ; visage
+  pas trouvé = **toute** l'image floue ; flou impossible avec flou demandé = pas d'image ; changeable en plein appel
+  (`liveScript`, bouton `_BlurButton` de la barre d'appel), outil `camera_flou`, phrases `CamBlur.modeFrom`). Seulement
+  les appels passés **par Mon Hub** (le Discord normal : son propre flou d'arrière-plan). Le flou ne protège pas d'un
+  pirate (il lit la caméra avant) : c'est la caméra coupée qui protège. Testé dans Chromium (caméra factice). Tests
+  `test/v183_camera_privee_test.dart`.
+- **Sous-titres en continu (v1.64)** : `runCaptionsWindow` envoie le son du PC **en continu** à Gemini Live
+  (`LiveCaptions.liveSystem`, `autoVad`, texte = `onOutputText`, ligne finie à `onTurnComplete`, reconnexion ×5) : avant,
+  une demande `generateContent` toutes les 8 s épuisait le petit quota gratuit en quelques minutes (« les sous-titres
+  marchent pas »). Secours : morceaux `OralCoach.listen(fast: true)` (sans réflexion), puis Whisper après un 429
+  (`quotaStatus`).

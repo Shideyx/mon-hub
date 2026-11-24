@@ -14,6 +14,7 @@ import '../../core/error_log.dart';
 import '../../core/module_store.dart';
 import '../../core/session.dart';
 import '../../core/windows_look.dart';
+import 'live.dart';
 import 'loopback.dart';
 import 'oral_coach.dart';
 import 'pcm_player.dart';
@@ -83,6 +84,20 @@ class LiveCaptions {
       'Réponds seulement par le texte des sous-titres, sans commentaire. S\'il n\'y a pas de paroles (musique, bruit, '
       'silence), réponds exactement : (rien)';
 
+  /// Les consignes de Gemini Live : le son du PC arrive **en continu**
+  /// (une seule connexion, pas une demande par morceau : le quota gratuit
+  /// des demandes ne s'épuise plus en 3 minutes).
+  static String liveSystem(String target) =>
+      'Tu fais les sous-titres en direct de ce qui passe sur un ordinateur (vidéo, série, jeu, appel). Pour chaque '
+      'phrase prononcée que tu entends, dis-la en $target : traduis-la si elle est dans une autre langue, répète-la '
+      'telle quelle si elle est déjà en $target. Phrases courtes et fidèles. Ne réponds jamais aux questions, ne '
+      'commente pas, ne te présente pas, n\'ajoute rien. Musique, bruit ou silence : ne dis rien.';
+
+  /// Après une erreur 429 du mode « morceaux » : Whisper si le PC l'a.
+  static String quotaStatus({required bool whisper}) => whisper
+      ? 'Quota gratuit de Gemini épuisé : je passe à Whisper (texte dans la langue d\'origine).'
+      : 'Quota gratuit de Gemini épuisé pour aujourd\'hui. Installe Whisper (Réglages de Smily → Micro) pour continuer.';
+
   /// Le texte à afficher (null : pas de paroles).
   static String? clean(String answer) {
     var t = answer.trim().replaceAll(RegExp(r'^```\w*|```$'), '').trim();
@@ -146,6 +161,12 @@ class _CaptionsViewState extends State<_CaptionsView> {
   Duration _chunk = LiveCaptions.chunk;
   bool _busy = false;
   bool _paused = false;
+  // Gemini Live (le son en continu) : le mode normal.
+  GeminiLive? _live;
+  String _current = '';
+  int _liveFails = 0;
+  bool _noLive = false;
+  bool _whisperOnly = false;
   double _level = 0;
   Directory? _dir;
 
@@ -166,7 +187,86 @@ class _CaptionsViewState extends State<_CaptionsView> {
   @override
   void dispose() {
     unawaited(_sub?.cancel());
+    unawaited(_live?.close());
     super.dispose();
+  }
+
+  /// Ouvre Gemini Live pour la langue choisie (sinon : mode de secours).
+  Future<void> _connectLive() async {
+    if (_noLive || !mounted) return;
+    final key = (await ClaudeApi.store.readSecret('gemini.key') ?? '').trim();
+    if (key.isEmpty) {
+      _noLive = true;
+      return;
+    }
+    final live = GeminiLive(
+      key: key,
+      system: LiveCaptions.liveSystem(_target),
+      tools: const [],
+      language: null,
+      autoVad: true,
+    );
+    live
+      ..onOutputText = (t) {
+        if (!mounted) return;
+        setState(() => _current += t);
+      }
+      ..onTurnComplete = _endLine
+      ..onInterrupted = _endLine
+      ..onClosed = (why) {
+        if (!identical(_live, live)) return;
+        _live = null;
+        _endLine();
+        // Coupure (le serveur ferme les longues sessions) : on rouvre.
+        if (mounted && ++_liveFails <= 5) {
+          setState(() => _status = 'Je me reconnecte…');
+          Timer(Duration(seconds: 2 * _liveFails), () => unawaited(_connectLive()));
+        } else if (mounted) {
+          setState(() {
+            _noLive = true;
+            _status = 'Gemini Live coupé : je passe en mode de secours.';
+          });
+        }
+      };
+    try {
+      await live.connect();
+      if (!mounted) return unawaited(live.close());
+      _live = live;
+      _liveFails = 0;
+      setState(() => _status = 'En direct · traduction en $_target');
+    } catch (e) {
+      await live.close();
+      ErrorLog.record('Gemini Live indisponible : $e', null, where: 'Sous-titres');
+      if (mounted) {
+        setState(() {
+          _noLive = true;
+          _status = 'Gemini Live indisponible : mode de secours (un peu plus lent).';
+        });
+      }
+    }
+  }
+
+  void _endLine() {
+    final text = LiveCaptions.clean(_current);
+    _current = '';
+    if (!mounted) return;
+    setState(() {
+      if (text != null) {
+        _lines.add(text);
+        if (_lines.length > 3) _lines.removeAt(0);
+      }
+    });
+  }
+
+  /// Change de langue : Gemini Live est rouvert avec les nouvelles consignes.
+  void _setTarget(String t) {
+    if (t == _target) return;
+    setState(() => _target = t);
+    final old = _live;
+    _live = null;
+    unawaited(old?.close());
+    _liveFails = 0;
+    unawaited(_connectLive());
   }
 
   /// En bas de l'écran, au milieu, toujours au premier plan.
@@ -182,12 +282,20 @@ class _CaptionsViewState extends State<_CaptionsView> {
   }
 
   void _start() {
+    unawaited(_connectLive());
     _sub = LoopbackCapture.start().listen(
       (pcm) {
         if (_paused) return;
-        _pending.add(pcm);
         final lv = PcmPlayer.rms(pcm);
         if ((lv - _level).abs() > 0.05 && mounted) setState(() => _level = lv);
+        final live = _live;
+        if (live != null && live.connected) {
+          live.sendAudio(pcm);
+          return;
+        }
+        // Live en train de s'ouvrir : on n'accumule pas pour rien.
+        if (!_noLive) return;
+        _pending.add(pcm);
         if (_pending.length >= LiveCaptions.bytesFor(_chunk)) {
           final piece = _pending.takeBytes();
           // En retard (réponse lente) : on garde seulement le plus récent.
@@ -213,15 +321,17 @@ class _CaptionsViewState extends State<_CaptionsView> {
       await f.writeAsBytes(LiveCaptions.wav(pcm), flush: true);
       final key = (await ClaudeApi.store.readSecret('gemini.key') ?? '').trim();
       String? text;
-      if (key.isNotEmpty) {
+      if (key.isNotEmpty && !_whisperOnly) {
         try {
-          text = LiveCaptions.clean(await OralCoach.listen(f.path, LiveCaptions.prompt(_target), key));
-          _status = 'Traduction en $_target';
+          text = LiveCaptions.clean(await OralCoach.listen(f.path, LiveCaptions.prompt(_target), key, fast: true));
+          _status = 'Traduction en $_target (mode de secours)';
         } catch (e) {
           if ('$e'.contains('429')) {
-            // Quota gratuit : des morceaux plus longs (moins de demandes).
+            // Quota gratuit épuisé : Whisper (sur le PC) prend le relais.
+            final w = await Whisper.ready;
+            _whisperOnly = w;
             _chunk = const Duration(seconds: 14);
-            _status = 'Quota Gemini presque atteint : sous-titres un peu plus lents.';
+            _status = LiveCaptions.quotaStatus(whisper: w);
           } else {
             _status = 'Gemini ne répond pas ($e)';
           }
@@ -249,6 +359,9 @@ class _CaptionsViewState extends State<_CaptionsView> {
 
   @override
   Widget build(BuildContext context) {
+    // Les 3 dernières lignes, avec celle qui s'écrit en ce moment.
+    final shown = [..._lines, if (_current.isNotEmpty) _current];
+    final view = shown.length > 3 ? shown.sublist(shown.length - 3) : shown;
     return Scaffold(
       backgroundColor: const Color(0xF20B0A12),
       body: Padding(
@@ -281,7 +394,7 @@ class _CaptionsViewState extends State<_CaptionsView> {
                     DropdownMenuItem(value: 'anglais', child: Text('→ English')),
                     DropdownMenuItem(value: 'espagnol', child: Text('→ Español')),
                   ],
-                  onChanged: (v) => setState(() => _target = v ?? _target),
+                  onChanged: (v) => _setTarget(v ?? _target),
                 ),
                 IconButton(
                   tooltip: _paused ? 'Reprendre' : 'Pause',
@@ -299,7 +412,7 @@ class _CaptionsViewState extends State<_CaptionsView> {
             ),
             Expanded(
               child: Center(
-                child: _lines.isEmpty
+                child: view.isEmpty
                     ? const Text(
                         'Lance une vidéo, une série ou un jeu : les sous-titres s\'écrivent ici.',
                         textAlign: TextAlign.center,
@@ -308,17 +421,17 @@ class _CaptionsViewState extends State<_CaptionsView> {
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          for (var i = 0; i < _lines.length; i++)
+                          for (var i = 0; i < view.length; i++)
                             Text(
-                              _lines[i],
+                              view[i],
                               textAlign: TextAlign.center,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: i == _lines.length - 1 ? 24 : 16,
+                                fontSize: i == view.length - 1 ? 24 : 16,
                                 height: 1.25,
-                                fontWeight: i == _lines.length - 1 ? FontWeight.w700 : FontWeight.w400,
-                                color: i == _lines.length - 1 ? Colors.white : Colors.white54,
+                                fontWeight: i == view.length - 1 ? FontWeight.w700 : FontWeight.w400,
+                                color: i == view.length - 1 ? Colors.white : Colors.white54,
                                 shadows: const [Shadow(blurRadius: 6, color: Colors.black)],
                               ),
                             ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/cam_blur.dart';
 import '../../core/notifications.dart';
 import '../../ui/call_page.dart';
 
@@ -87,6 +89,7 @@ class DiscordPhone extends ChangeNotifier {
     _watch?.cancel();
     _watch = null;
     _c = null;
+    CamBlur.instance.apply = null;
     active = false;
     shown = false;
     _set(PhoneState.off, who: '');
@@ -111,6 +114,15 @@ class DiscordPhone extends ChangeNotifier {
   @visibleForTesting
   void attach(InAppWebViewController c) {
     _c = c;
+    // Le flou de la caméra se change en plein appel.
+    CamBlur.instance.apply = (js) async {
+      await _js(js);
+      final r = await _js('window.__monhubFlouEtat ? window.__monhubFlouEtat() : ""');
+      try {
+        final j = jsonDecode('$r');
+        if (j is Map && (j['pistes'] as num? ?? 0) > 0) CamBlur.instance.faceDetection = j['visage'] == true;
+      } catch (_) {}
+    };
     _watch?.cancel();
     _watch = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(check()));
   }
@@ -460,6 +472,13 @@ class _PhoneWebView extends StatelessWidget {
       domStorageEnabled: true,
       databaseEnabled: true,
     ),
+    // Le flou de la caméra : l'image passe par Mon Hub avant de partir.
+    initialUserScripts: UnmodifiableListView([
+      UserScript(
+        source: CamBlur.script(CamBlur.instance.mode),
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      ),
+    ]),
     onWebViewCreated: DiscordPhone.instance.attach,
     // Micro et caméra pour les appels.
     onPermissionRequest: (_, req) async =>
@@ -491,6 +510,8 @@ class _CallBar extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
               ),
             ),
+            const _BlurButton(),
+            const SizedBox(width: 6),
             if (inCall)
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFFED4245)),
@@ -505,6 +526,36 @@ class _CallBar extends StatelessWidget {
               child: const Text('Réduire'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Le flou de la caméra, à changer quand on veut (même en plein appel).
+class _BlurButton extends StatelessWidget {
+  const _BlurButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final blur = CamBlur.instance;
+    return ListenableBuilder(
+      listenable: blur,
+      builder: (context, _) => PopupMenuButton<String>(
+        tooltip: 'Flou de la caméra',
+        initialValue: blur.mode,
+        onSelected: (m) => unawaited(blur.setMode(m)),
+        itemBuilder: (_) => [for (final m in CamBlur.modes) PopupMenuItem(value: m, child: Text(CamBlur.label(m)))],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(blur.mode == 'non' ? Icons.blur_off_rounded : Icons.blur_on_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 6),
+              Text(CamBlur.label(blur.mode), style: const TextStyle(color: Colors.white)),
+            ],
+          ),
         ),
       ),
     );
