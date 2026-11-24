@@ -138,6 +138,37 @@ jobs:
 
   # Publie les fichiers sur la page « Releases » avec des liens fixes :
   # https://github.com/<compte>/mon-hub/releases/latest
+  # La version web (iPhone sans PC ni App Store) : publiée sur GitHub Pages,
+  # https://<compte>.github.io/<dépôt>/. À activer une seule fois dans le
+  # dépôt : Settings → Pages → Source : « GitHub Actions ». Ne retarde pas la
+  # mise à jour du PC. Seuls le serveur Mon Hub en ligne (public par nature)
+  # et le numéro de version sont mis dedans, jamais les secrets Google.
+  web:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter build web --release -t lib/web/main.dart --base-href "/${{ github.event.repository.name }}/" --no-web-resources-cdn --dart-define=APP_VERSION=v1.${{ github.run_number }} --dart-define=UPDATE_REPO=${{ github.repository }} --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+        with: { enablement: true }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: build/web }
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
   release:
     # Seul Windows est indispensable : Android est ajouté s'il est prêt,
     # l'iPhone n'est jamais attendu (bonus).

@@ -587,3 +587,22 @@
   `memoire_souvenirs`, `memoire_effacer_souvenir`, `clicky_capacites_perso`. Page `ui/clicky/memory_page.dart`
   (Réglages de Smily → Sa personnalité → Sa mémoire ; réglage `dreams`, bouclier d'appel). Tests
   `test/v181_jeux_appels_memoire_test.dart`.
+- **Version web (v1.63, iPhone sans PC)** : `lib/web/` = **appli à part** (`flutter build web -t lib/web/main.dart`,
+  `--no-web-resources-cdn`), car l'appli PC ne compile pas pour le web (win32/FFI/dart:io). **Ne rien importer dans
+  `lib/web/` qui touche à `dart:io`, `dart:ffi`, `dart:isolate`** (sinon la construction web casse) ; partagé et
+  compatible : `core/online/online.dart` + `spaces.dart` (plus de `dart:io`), `ui/spaces/*` (`defaultTargetPlatform`,
+  `SpaceActions.openAccount` réglé par chaque appli : `OnlinePage.open` dans `main.dart`), `ui/hud/hud.dart`,
+  `ui/theme.dart`. Publiée par le job `web` du workflow sur **GitHub Pages** (https://shideyx.github.io/mon-hub/, Settings
+  → Pages → Source « GitHub Actions » à activer une fois), seulement `SUPABASE_*`/`APP_VERSION`/`UPDATE_REPO` dedans.
+  `web/smily.js` (notifications par `smily_sw.js`, partage, .ics, `#lien=`) ↔ `web/phone_bridge*.dart` (export
+  conditionnel, `dart:js_interop`). `phone_actions.dart` : `PhoneAction` + `PhoneRules` (sans IA : appeler `tel:`, SMS
+  **préparé** `sms:num&body=`, itinéraire Plans, `shortcuts://run-shortcut`, applis par lien, Spotify, minuteur dans
+  l'appli, rappel = .ics avec alarme, contacts retenus ; `tools` = fonctions Gemini, `fromTool`) ; chaque action est un
+  **bouton** à toucher (rien ne part seul). `PhoneLinkCode` (`MONHUB-TEL:` dans `#lien=`, jamais envoyé au site :
+  prénom, clé Gemini, serveur, ≤ 30 souvenirs, ≤ 1 800 caractères) ← `ui/web_version_card.dart` (QR dans
+  `PhoneSetupPage`). `account_copy.dart` lit (sans écrire) la copie `SyncBox` du compte en ligne (`p:hub.name`,
+  `s:mod.claude.gemini.key`, `f:memoire.json`). `web_smily.dart` (`WebSmily` : règles puis Gemini `gemini-flash-latest`
+  avec `PhoneRules.tools`, `geminiOverride` pour les tests, minuteurs, notification des messages d'espaces quand
+  l'appli est cachée). Écrans `web_app.dart` (bienvenue 3 choix, onglets Smily / Espaces / Téléphone / Réglages).
+  Notifications quand l'appli est **fermée** : pas encore (il faudra un envoi « push » depuis le Supabase de la
+  personne ; `smily_sw.js` sait déjà les afficher). Tests `test/v182_web_test.dart`.

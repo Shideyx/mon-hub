@@ -211,7 +211,10 @@ class ClickySkills {
       Skill('« Pourquoi mon PC rame ? »', tryIt: 'Pourquoi mon PC rame ?'),
       Skill('« Montre le bureau », « Mets Chrome à gauche », « Range mes téléchargements »'),
     ]),
-    SkillGroup('📱', 'Ton téléphone', Color(0xFF0EA5E9), [
+    SkillGroup('📱', 'Ton téléphone', Color(0xFF0EA5E9), isNew: true, [
+      Skill('Smily sur l\'iPhone sans PC : Réglages → Mes appareils → Ajouter mon iPhone → Version web (QR code).'),
+      Skill('Là-bas il appelle, prépare tes SMS, lance un itinéraire, un minuteur, un rappel dans l\'agenda, ta '
+          'musique et tes Raccourcis iPhone.'),
       Skill('Réglages → Mes appareils → Mon téléphone : un QR code à scanner une fois.'),
       Skill('Photos vers le PC sans câble, fichiers, presse-papier partagé, télécommande du PC depuis ton lit.'),
       Skill('« Envoie le PDF de mon exposé sur mon téléphone »'),

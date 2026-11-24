@@ -6,15 +6,17 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/online/online.dart';
 import '../../core/online/spaces.dart';
 import '../hud/hud.dart';
-import '../online/online_page.dart';
 
 /// Les boîtes « Créer un espace », « Rejoindre », « Écrire à quelqu'un ».
 class SpaceActions {
   SpaceActions._();
 
+  /// La page « Compte en ligne » (celle du PC, ou celle de la version web).
+  static Future<void> Function(BuildContext context) openAccount = (_) async {};
+
   static Future<bool> _needOnline(BuildContext context) async {
     if (Spaces.instance.available) return true;
-    await OnlinePage.open(context);
+    await openAccount(context);
     return Spaces.instance.available;
   }
 
@@ -273,7 +275,7 @@ class SpacesPage extends StatelessWidget {
                       ? 'Les espaces partagés passent par Mon Hub en ligne : règle-le une fois (5 minutes), puis invite '
                             'tes amis avec un code.'
                       : 'Connecte ton compte en ligne pour créer des espaces, rejoindre ceux de tes amis et discuter.',
-                  action: HudButton(label: 'Compte en ligne', primary: true, onPressed: () => OnlinePage.open(context)),
+                  action: HudButton(label: 'Compte en ligne', primary: true, onPressed: () => SpaceActions.openAccount(context)),
                 ),
               )
             else ...[

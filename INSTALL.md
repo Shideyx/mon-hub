@@ -4,7 +4,7 @@ Liens de téléchargement (toujours la dernière version) :
 
 - **PC Windows** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Windows.zip
 - **Téléphone Android** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Android.apk
-- **iPhone** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-iOS.ipa (à installer depuis un PC, voir plus bas)
+- **iPhone** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-iOS.ipa (à installer depuis un PC, voir plus bas) — ou **sans PC** : https://shideyx.github.io/mon-hub/ (version web)
 - **Extension Claude (PC)** : https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Claude.mcpb
 
 ## 1. Sur le PC (Windows 10 ou 11)
@@ -24,7 +24,20 @@ Liens de téléchargement (toujours la dernière version) :
 4. Si Play Protect affiche un avertissement : **Plus de détails** → **Installer quand même**.
 5. Au premier lancement, **autorise les notifications** pour recevoir les alertes.
 
-## 2 bis. Sur iPhone (iPhone 12 et plus récents, iOS 15+)
+## 2 bis. Sur iPhone **sans PC** : la version web (le plus simple)
+
+1. Sur le PC : **Réglages → Mes appareils → Ajouter mon iPhone → Version web → Afficher le QR code**.
+2. Vise le QR code avec l'appareil photo de l'iPhone : Mon Hub s'ouvre dans Safari, déjà relié (ton prénom, le cerveau
+   de Smily, ses souvenirs). Pas de PC sous la main ? Ouvre simplement https://shideyx.github.io/mon-hub/ dans Safari.
+3. Dans Safari : **Partager → Sur l'écran d'accueil → Ajouter**. Mon Hub s'ouvre maintenant comme une appli et se met à
+   jour tout seul.
+4. Onglet **Téléphone → Activer les notifications** (iOS 16.4 ou plus).
+5. Même compte que le PC (espaces, messages) : **Réglages → Mon compte en ligne**, même adresse et même mot de passe.
+
+Smily y appelle, prépare tes SMS (tu appuies sur Envoyer), lance un itinéraire, un minuteur, un rappel dans
+l'agenda, ta musique, tes applis et tes **Raccourcis** iPhone (« lance le raccourci Mode nuit »).
+
+## 2 ter. Sur iPhone, l'appli complète (iPhone 12 et plus récents, iOS 15+, avec un PC)
 
 Apple n'autorise que l'App Store, sauf pour les applis « installées par le développeur ». On passe donc par **Sideloadly** (gratuit) depuis le PC, avec ton identifiant Apple :
 
