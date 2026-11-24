@@ -71,6 +71,7 @@ import 'quick.dart';
 import 'smily.dart';
 import 'announce.dart';
 import 'game_coach.dart';
+import 'robots.dart';
 import 'identity.dart';
 import 'ollama.dart';
 import 'pointer.dart';
@@ -2129,6 +2130,46 @@ class ClickyController extends ChangeNotifier {
     unawaited(feel(f.$1, text: f.$2));
   }
 
+  /// Une phrase d'un robot (« mets de la musique », « j'ai quoi demain »)
+  /// faite **sans IA** ; pas comprise : Gemini (gratuit), **jamais Claude**.
+  /// Renvoie ce qu'il faut dire (null : rien, ou fait par Nexo partout).
+  Future<String?> robotPhrase(String phrase) async {
+    if (handledElsewhere) {
+      await ClickyDesktop.ask(phrase);
+      return null;
+    }
+    final tools = _tools;
+    Future<Object?> run(HubTool t, Map<String, dynamic> a) async {
+      if (ClaudeBridge.isWriteAction(t) && !await confirmAction(t, a)) throw 'D\'accord, je ne touche à rien.';
+      return t.run(a);
+    }
+
+    final r = await QuickAnswers.answer(
+      phrase,
+      tools: {for (final t in tools) t.name},
+      call: (name, args) async {
+        final t = tools.where((x) => x.name == name).firstOrNull;
+        return t == null ? null : run(t, args);
+      },
+    );
+    if (r != null) {
+      final media = r.media;
+      if (media != null && DriveRunner.supported) Win.mediaKey(media);
+      return r.text;
+    }
+    if (!await AiText.hasGemini()) return null;
+    final g = await GeminiAgent.ask(
+      question: phrase,
+      system:
+          '${clickyPersona(callName, helpOnly: helpOnly)}\n${PromptShield.rule}\nC\'est un de tes robots qui te demande '
+          'ceci. Fais-le avec les fonctions, puis dis-le en une phrase courte. Si c\'est impossible sans voir l\'écran, '
+          'réponds seulement : ${GeminiAgent.handOff}',
+      tools: ToolRouter.pick(phrase, tools),
+      run: run,
+    );
+    return GeminiAgent.handsOff(g) ? null : g;
+  }
+
   /// Ctrl + Alt + M : coupe ou rallume le micro (dans toutes les applis).
   Future<void> toggleMute() async {
     final m = await CallShield.instance.mute('toggle');
@@ -2797,6 +2838,8 @@ class ClickyController extends ChangeNotifier {
 
   /// Temps d'écran, recherche partout, anniversaires (dans Mon Hub).
   List<HubTool> get lifeTools => [
+    // Ses petits robots (automatisations sans IA, sans jetons).
+    ...Robots.instance.tools(),
     // Ses yeux et ses oreilles : la mémoire de l'écran, ce qu'il voit et
     // entend en ce moment.
     ...ClickySenses.instance.tools(explain: _explainScreen),

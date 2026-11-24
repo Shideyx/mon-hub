@@ -21,6 +21,7 @@ import 'core/game_pal.dart';
 import 'core/screen_time.dart';
 import 'ui/clicky/autonomy.dart';
 import 'ui/clicky/live_captions.dart';
+import 'ui/clicky/robots.dart';
 import 'ui/clicky/senses.dart';
 import 'ui/clicky/pc_watch.dart';
 import 'ui/clicky/watchers.dart';
@@ -476,6 +477,9 @@ class _HubAppState extends State<HubApp> {
               CallShield.instance.tick();
               // Mode caméra privée : demander / recouper.
               await CameraGuard.instance.privateTick(callNow());
+              // Les robots de Nexo : une heure, une appli qui s'ouvre, un jeu,
+              // ton retour, le temps d'écran (sans IA, sans jetons).
+              await Robots.instance.tick(app: '$exe $title', idleSeconds: Win.idleSeconds(), game: GamePal.instance.current);
               // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
               await ClickySenses.instance.tick(
                 exe: exe,
@@ -558,6 +562,8 @@ class _HubAppState extends State<HubApp> {
           }
           // « Préviens-moi quand… » (note, devoir, message de quelqu'un).
           unawaited(Watchers.instance.onNotification(note).catchError((Object _) {}));
+          // Les robots de Nexo (un message de Léa, une note…).
+          unawaited(Robots.instance.onNotification(note).catchError((Object _) {}));
           // Une question sur Discord : « je te prépare une réponse ? ».
           final idea = Replies.on && Win.supportedHere && Win.idleSeconds() < 120 ? Replies.ideaFor(note) : null;
           if (idea != null) {
@@ -629,6 +635,41 @@ class _HubAppState extends State<HubApp> {
             if (muted != null) await ClickyController.instance.think(muted, aloud: false);
           });
         }
+        // Ses petits robots : ce qu'ils disent passe par Nexo (une bulle), ce
+        // qu'ils font aussi (phrases sans IA), et il demande avant ce qui
+        // dérange (avec Oui / Non).
+        final nexo = ClickyController.instance;
+        Robots.instance
+          ..say = ((t) => unawaited(nexo.think(t, aloud: false)))
+          ..quick = nexo.robotPhrase
+          ..notify = ((title, body) => unawaited(
+            n.post(
+              HubNotification(
+                id: 'robot:${DateTime.now().millisecondsSinceEpoch}',
+                title: title,
+                body: body,
+                moduleId: 'claude',
+              ),
+            ),
+          ))
+          ..protocol = ((name) async {
+            await nexo.hubTools.where((t) => t.name == 'carnet_protocole').firstOrNull?.run({
+              'action': 'lancer',
+              'nom': name,
+            });
+          })
+          ..propose = ((r, text) {
+            final install = r.id.startsWith('installer:');
+            return nexo.proposeIdea(
+              ClickyIdea(
+                tool: install ? 'robot_installer' : 'robot_lancer',
+                args: install ? {'modele': r.id.substring('installer:'.length)} : {'id': r.id},
+                say: text,
+                why: 'robot « ${r.name} »',
+              ),
+            );
+          });
+        Perf.later(3, Robots.instance.load);
         // Alertes de Nexo (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(

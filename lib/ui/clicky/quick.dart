@@ -7,6 +7,7 @@ import 'tutor.dart' show normalize;
 import 'patience.dart';
 import 'watchers.dart' show WatchParse;
 import 'game_coach.dart' show CoachRules;
+import 'robots.dart' show RobotRules;
 import '../../core/cam_blur.dart';
 import '../../core/birthdays.dart';
 
@@ -313,6 +314,35 @@ class QuickAnswers {
       if (q.split(' ').length > 3) q = q.split(' ').skip(1).take(3).join(' ');
       final r = await call('memoire_effacer_souvenir', {'quoi': q});
       if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+
+    // ---- Les robots de Nexo (« crée un robot : quand j'ouvre Discord, coupe mon
+    // micro », « tous les jours à 19 h, j'ai quoi demain », « mes robots ») ----
+    if (has('robot_creer') && RobotRules.looksLikeRobot(n)) {
+      final r = RobotRules.parse(raw);
+      if (r != null) {
+        final res = await call('robot_creer', {
+          'nom': r.name,
+          'declencheur': r.trigger,
+          'valeur': r.value,
+          'jours': r.days.join(','),
+          'actions': r.actions.join('|'),
+        });
+        if (res is Map && res['resume'] != null) {
+          return QuickReply('🤖 ${res['resume']} Il ne coûte aucun jeton. (« mes robots » pour les voir.)');
+        }
+      }
+    }
+    if (has('robot_liste') && RegExp(r'^(?:mes robots|quels sont mes robots|montre(?: moi)? mes robots|liste (?:de )?mes robots)$').hasMatch(n)) {
+      final res = await call('robot_liste', {});
+      final list = res is Map ? (res['robots'] as List? ?? const []) : const [];
+      if (list.isEmpty) return const QuickReply('Tu n\'as pas encore de robot. Dis par exemple « crée un robot : tous les jours à 19 h, j\'ai quoi à faire pour demain ».');
+      final on = [for (final x in list) if (x is Map && x['allume'] == true) x];
+      return QuickReply(
+        '🤖 ${on.length} robot${on.length > 1 ? 's' : ''} allumé${on.length > 1 ? 's' : ''} : '
+        '${[for (final x in on.take(5)) '${x['nom']} (${x['quand']})'].join(' ; ')}'
+        '${on.length > 5 ? '… et ${on.length - 5} autres' : ''}. Tout est dans Réglages de Nexo → Ses robots.',
+      );
     }
 
     // ---- Le coach de jeu en direct (« coach-moi », « arrête le coach ») ----
