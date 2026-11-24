@@ -54,7 +54,7 @@ void main() {
   group('Perf : ce que le mode léger coupe', () {
     tearDown(() => Perf.level = null);
 
-    test('mode léger : Clicky reste dans la fenêtre, rien de lourd', () {
+    test('mode léger : Smily reste dans la fenêtre, rien de lourd', () {
       Perf.level = PerfLevel.light;
       expect(Perf.light, isTrue);
       expect(Perf.everywhere, isFalse);

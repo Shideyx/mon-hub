@@ -46,10 +46,9 @@ class Birthdays extends ChangeNotifier {
   }
 
   /// Ceux ajoutés à la main.
-  List<Birthday> get saved => [
-    for (final j in (_file.value['liste'] as List? ?? const []))
-      ?Birthday.fromJson(j),
-  ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  List<Birthday> get saved =>
+      [for (final j in (_file.value['liste'] as List? ?? const [])) ?Birthday.fromJson(j)]
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   Future<void> add(Birthday b) async {
     await _file.update((m) {
@@ -97,17 +96,43 @@ class Birthdays extends ChangeNotifier {
   }
 
   static const months = [
-    'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre',
+    'janvier',
+    'fevrier',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'aout',
+    'septembre',
+    'octobre',
+    'novembre',
+    'decembre',
   ];
   static const _monthsFr = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ];
 
   /// Le nom dans un titre d'agenda (« Anniversaire de Léa », « Tom's
   /// birthday », « 🎂 Mamie »), sinon null.
   static String? nameInTitle(String title, {String calendar = ''}) {
     final t = title.trim();
-    final m = RegExp(r"^(?:🎂\s*)?(?:joyeux |bon )?anniversaire (?:de |d['’]\s?|à |a )(.+?)\s*(?:🎂|🎉)?$", caseSensitive: false).firstMatch(t) ??
+    final m =
+        RegExp(
+          r"^(?:🎂\s*)?(?:joyeux |bon )?anniversaire (?:de |d['’]\s?|à |a )(.+?)\s*(?:🎂|🎉)?$",
+          caseSensitive: false,
+        ).firstMatch(t) ??
         RegExp(r"^(.+?)['’]s birthday$", caseSensitive: false).firstMatch(t) ??
         RegExp(r'^🎂\s*(.+)$').firstMatch(t) ??
         RegExp(r'^anniv(?:ersaire)?\s*[:\-–]\s*(.+)$', caseSensitive: false).firstMatch(t);
@@ -134,7 +159,9 @@ class Birthdays extends ChangeNotifier {
   /// « Léa le 12 mars », « 12/03/2010 », « le 3 avril 2011 » → (mois, jour, année).
   static (int, int, int?)? parseDate(String text) {
     final t = key(text).replaceAll(RegExp(r'\b1er\b'), '1');
-    final m = RegExp(r'\b(\d{1,2})\s*(?:er)?\s+(' + months.join('|') + r'|fevr?|janv?|avr|juil|sept?|oct|nov|dec)\.?(?:\s+(\d{4}))?\b').firstMatch(t);
+    final m = RegExp(
+      r'\b(\d{1,2})\s*(?:er)?\s+(' + months.join('|') + r'|fevr?|janv?|avr|juil|sept?|oct|nov|dec)\.?(?:\s+(\d{4}))?\b',
+    ).firstMatch(t);
     if (m != null) {
       final day = int.parse(m[1]!);
       final word = m[2]!;
@@ -200,7 +227,8 @@ class Birthdays extends ChangeNotifier {
     return 'le ${d.day == 1 ? '1er' : d.day} ${_monthsFr[d.month - 1]}';
   }
 
-  static String dateText(Birthday b) => '${b.day == 1 ? '1er' : b.day} ${_monthsFr[b.month - 1]}${b.year == null ? '' : ' ${b.year}'}';
+  static String dateText(Birthday b) =>
+      '${b.day == 1 ? '1er' : b.day} ${_monthsFr[b.month - 1]}${b.year == null ? '' : ' ${b.year}'}';
 
   /// « Aujourd'hui : Léa (15 ans) 🎂 ; demain : Tom ; le 3 décembre : Mamie. »
   static String say(List<(Birthday, DateTime)> up, DateTime now) {

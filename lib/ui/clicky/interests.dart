@@ -1,4 +1,4 @@
-// **Veille sur ce que tu aimes** (v1.58) : deux fois par jour, Clicky regarde
+// **Veille sur ce que tu aimes** (v1.58) : deux fois par jour, Smily regarde
 // les artistes de tes titres likés (Spotify ou Deezer) et te prévient quand
 // l'un d'eux sort un nouveau son (API publique de Deezer, sans compte ni
 // clé : seuls les noms d'artistes sont cherchés).
@@ -116,13 +116,17 @@ class ArtistWatch {
       for (final a in artists) {
         var id = ids[a.toLowerCase()];
         if (id == null) {
-          final r = await c.get(Uri.parse('https://api.deezer.com/search/artist?q=${Uri.encodeQueryComponent(a)}&limit=1')).timeout(const Duration(seconds: 10));
+          final r = await c
+              .get(Uri.parse('https://api.deezer.com/search/artist?q=${Uri.encodeQueryComponent(a)}&limit=1'))
+              .timeout(const Duration(seconds: 10));
           final first = ((jsonDecode(r.body) as Map)['data'] as List?)?.firstOrNull;
           if (first is! Map) continue;
           id = first['id'];
           ids[a.toLowerCase()] = id;
         }
-        final r = await c.get(Uri.parse('https://api.deezer.com/artist/$id/albums?limit=10')).timeout(const Duration(seconds: 10));
+        final r = await c
+            .get(Uri.parse('https://api.deezer.com/artist/$id/albums?limit=10'))
+            .timeout(const Duration(seconds: 10));
         final albums = ((jsonDecode(r.body) as Map)['data'] as List?) ?? const [];
         for (final al in fresh(albums, seen, n)) {
           seen.add('${al['id']}');

@@ -42,10 +42,19 @@ void main() {
     });
 
     test('les accessoires de la vraie météo', () {
-      expect(ClickyLife.weatherAccessory({'temperature': 2.0, 'maintenant': '2 °C, ciel couvert', 'icone': '☁️'})!.$1, '🧣');
-      expect(ClickyLife.weatherAccessory({'temperature': 2.0, 'maintenant': '2 °C, ciel couvert'})!.$2, contains('2 °C'));
+      expect(
+        ClickyLife.weatherAccessory({'temperature': 2.0, 'maintenant': '2 °C, ciel couvert', 'icone': '☁️'})!.$1,
+        '🧣',
+      );
+      expect(
+        ClickyLife.weatherAccessory({'temperature': 2.0, 'maintenant': '2 °C, ciel couvert'})!.$2,
+        contains('2 °C'),
+      );
       expect(ClickyLife.weatherAccessory({'temperature': 12.0, 'maintenant': '12 °C, pluie modérée'})!.$1, '☂️');
-      expect(ClickyLife.weatherAccessory({'temperature': -1.0, 'maintenant': '-1 °C, chute de neige', 'icone': '❄️'})!.$1, '⛄');
+      expect(
+        ClickyLife.weatherAccessory({'temperature': -1.0, 'maintenant': '-1 °C, chute de neige', 'icone': '❄️'})!.$1,
+        '⛄',
+      );
       expect(ClickyLife.weatherAccessory({'temperature': 31.0, 'maintenant': '31 °C, ciel dégagé'})!.$1, '😎');
       expect(ClickyLife.weatherAccessory({'temperature': 15.0, 'maintenant': '15 °C, ciel dégagé'}), isNull);
     });
@@ -225,8 +234,10 @@ void main() {
       final prompt = ClickyLife.dreamPrompt(name: 'Sam', app: 'Roblox');
       expect(prompt, contains('Roblox'));
       expect(prompt, contains('J\'ai rêvé'));
-      expect(ClickyLife.cleanDream('« J\'ai rêvé que ton clavier jouait du piano tout seul. »'),
-          'J\'ai rêvé que ton clavier jouait du piano tout seul.');
+      expect(
+        ClickyLife.cleanDream('« J\'ai rêvé que ton clavier jouait du piano tout seul. »'),
+        'J\'ai rêvé que ton clavier jouait du piano tout seul.',
+      );
       expect(ClickyLife.cleanDream('Bonjour !'), isNull);
       expect(ClickyLife.cleanDream('Voici un rêve : j\'ai rêvé de toi, longtemps, très longtemps.'), isNull);
     });
@@ -259,7 +270,7 @@ void main() {
     test('ses réponses sur lui, sans IA', () async {
       final life = ClickyLife();
       final now = DateTime(2026, 11, 22, 23, 40);
-      expect(life.answer('Clicky, tu dors ?', now: now), contains('sieste'));
+      expect(life.answer('Smily, tu dors ?', now: now), contains('sieste'));
       life.fallAsleep();
       expect(life.answer('tu dors ?', now: now), contains('pixels'));
       life.wake();
@@ -272,10 +283,7 @@ void main() {
       expect(life.answer('t\'es fatigué ?', now: now), contains('bâille'));
       String? pace;
       bool? dance;
-      expect(
-        life.answer('sois plus discret', now: now, setPace: (p) async => pace = p),
-        contains('tout petit'),
-      );
+      expect(life.answer('sois plus discret', now: now, setPace: (p) async => pace = p), contains('tout petit'));
       expect(pace, 'discret');
       expect(life.discreet, isTrue);
       expect(life.answer('arrête de danser', now: now, setDance: (v) async => dance = v), contains('sage'));

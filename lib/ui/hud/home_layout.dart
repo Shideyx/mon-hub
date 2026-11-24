@@ -100,9 +100,7 @@ class HomeLayout extends ChangeNotifier {
     try {
       final raw = ModuleStore.prefs.getString(_key);
       if (raw == null) return null;
-      return [
-        for (final j in jsonDecode(raw) as List) ?HomeBlock.fromJson(j),
-      ];
+      return [for (final j in jsonDecode(raw) as List) ?HomeBlock.fromJson(j)];
     } catch (_) {
       return null;
     }
@@ -167,7 +165,10 @@ class HomeLayout extends ChangeNotifier {
   Future<void> resize(List<HomeBlock> current, String id, int span) =>
       save([for (final b in current) b.id == id ? b.withSpan(span) : b]);
 
-  Future<void> remove(List<HomeBlock> current, String id) => save([for (final b in current) if (b.id != id) b]);
+  Future<void> remove(List<HomeBlock> current, String id) => save([
+    for (final b in current)
+      if (b.id != id) b,
+  ]);
 
   Future<void> add(List<HomeBlock> current, String id, {int span = 1}) =>
       save([...current.where((b) => b.id != id), HomeBlock(id, span)]);

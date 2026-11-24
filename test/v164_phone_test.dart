@@ -68,7 +68,8 @@ void main() {
           commands.add(action);
           return action == 'volup' ? 'Son +' : null;
         })
-        ..loadAsset = ((p) async => p == 'phone/index.html' ? Uint8List.fromList(utf8.encode('<h1>Mon PC</h1>')) : null);
+        ..loadAsset = ((p) async =>
+            p == 'phone/index.html' ? Uint8List.fromList(utf8.encode('<h1>Mon PC</h1>')) : null);
       await link.start();
     });
 
@@ -78,7 +79,12 @@ void main() {
       PhoneLink.lanOverride = null;
     });
 
-    Future<(int, String)> call(String path, {String method = 'GET', List<int>? body, Map<String, String>? headers}) async {
+    Future<(int, String)> call(
+      String path, {
+      String method = 'GET',
+      List<int>? body,
+      Map<String, String>? headers,
+    }) async {
       final req = await client.openUrl(method, Uri.parse('http://127.0.0.1:${link.boundPort}$path'));
       req.followRedirects = false;
       headers?.forEach(req.headers.set);
@@ -131,7 +137,9 @@ void main() {
     });
 
     test('télécommande', () async {
-      final ok = jsonDecode((await call('${base()}api/commande', method: 'POST', body: utf8.encode('{"action":"volup"}'))).$2);
+      final ok = jsonDecode(
+        (await call('${base()}api/commande', method: 'POST', body: utf8.encode('{"action":"volup"}'))).$2,
+      );
       expect(ok, {'ok': true, 'message': 'Son +'});
       final ko = jsonDecode((await call('${base()}api/commande', method: 'POST', body: utf8.encode('pas du json'))).$2);
       expect(ko['ok'], isFalse);

@@ -6,7 +6,7 @@ import '../../modules/carnet/carnet_store.dart';
 import 'assistant.dart';
 import 'school_bag.dart';
 
-/// Les propositions de Clicky, en bas à gauche de Mon Hub (au-dessus de
+/// Les propositions de Smily, en bas à gauche de Mon Hub (au-dessus de
 /// toutes les pages). Mon Hub en dessous n'est jamais reconstruit.
 class AssistantLayer extends StatelessWidget {
   const AssistantLayer({super.key, required this.child, this.enabled = true});
@@ -65,7 +65,7 @@ class AssistantLayer extends StatelessWidget {
   }
 }
 
-/// Une proposition : ce que Clicky a remarqué, et deux boutons.
+/// Une proposition : ce que Smily a remarqué, et deux boutons.
 class ProposalCard extends StatefulWidget {
   const ProposalCard({super.key, required this.proposal});
   final Proposal proposal;
@@ -81,7 +81,7 @@ class _ProposalCardState extends State<ProposalCard> {
     setState(() => busy = true);
     final a = Assistant.instance;
     final r = await a.answer(widget.proposal, yes);
-    if (r != null && r.isNotEmpty) a.notify?.call('Clicky', r);
+    if (r != null && r.isNotEmpty) a.notify?.call('Smily', r);
   }
 
   @override
@@ -134,7 +134,7 @@ class _ProposalCardState extends State<ProposalCard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Clicky',
+                              'Smily',
                               style: theme.textTheme.labelSmall?.copyWith(color: p.color, fontWeight: FontWeight.w800),
                             ),
                             Text(p.title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
@@ -184,7 +184,11 @@ class _ProposalCardState extends State<ProposalCard> {
                         style: FilledButton.styleFrom(backgroundColor: p.color),
                         onPressed: busy ? null : () => _answer(true),
                         child: busy
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
                             : Text(p.accept),
                       ),
                     ],
@@ -271,7 +275,7 @@ class _AssistantPageState extends State<AssistantPage> {
               Card(
                 child: SwitchListTile(
                   secondary: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
-                  title: const Text('Clicky prend les devants', style: TextStyle(fontWeight: FontWeight.w800)),
+                  title: const Text('Smily prend les devants', style: TextStyle(fontWeight: FontWeight.w800)),
                   subtitle: const Text(
                     'Il surveille ton agenda, tes devoirs et tes messages et te propose des choses. Il ne fait rien '
                     'sans ton accord, et tout reste sur ton PC.',
@@ -295,7 +299,9 @@ class _AssistantPageState extends State<AssistantPage> {
               SwitchListTile(
                 secondary: const CircleAvatar(child: Icon(Icons.tips_and_updates_rounded)),
                 title: const Text('Idées de Gemini'),
-                subtitle: const Text('Une fois par jour, Gemini (gratuit, ta clé) cherche ce que les règles n\'ont pas vu.'),
+                subtitle: const Text(
+                  'Une fois par jour, Gemini (gratuit, ta clé) cherche ce que les règles n\'ont pas vu.',
+                ),
                 value: a.store.getJson<bool>('initiativesAi') != false,
                 onChanged: a.consent && a.on('initiatives') ? (v) => a.store.setJson('initiativesAi', v) : null,
               ),
@@ -366,20 +372,29 @@ class _AssistantPageState extends State<AssistantPage> {
                   for (final g in goals)
                     InputChip(
                       avatar: Icon(g.done ? Icons.emoji_events_rounded : Icons.flag_rounded, size: 18),
-                      label: Text(g.text, style: g.done ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
+                      label: Text(
+                        g.text,
+                        style: g.done ? const TextStyle(decoration: TextDecoration.lineThrough) : null,
+                      ),
                       selected: g.done,
                       onPressed: () => Carnet.instance.change('goals', g.id, {'done': !g.done}),
                       onDeleted: () => Carnet.instance.remove('goals', g.id),
                     ),
                   if (goals.isEmpty)
-                    Text('Dis-le à Clicky (« mon objectif est de… ») ou écris-le ici.', style: theme.textTheme.bodySmall),
+                    Text(
+                      'Dis-le à Smily (« mon objectif est de… ») ou écris-le ici.',
+                      style: theme.textTheme.bodySmall,
+                    ),
                 ],
               ),
               const Divider(height: 32),
-              Text('Mes projets et décisions', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                'Mes projets et décisions',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 4),
               Text(
-                'Clicky les retient quand tu en parles (« j\'ai décidé de… », « mon projet… ») et s\'en sert pour t\'aider.',
+                'Smily les retient quand tu en parles (« j\'ai décidé de… », « mon projet… ») et s\'en sert pour t\'aider.',
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
@@ -389,7 +404,10 @@ class _AssistantPageState extends State<AssistantPage> {
                 children: [
                   for (final m in memory)
                     InputChip(
-                      avatar: Icon(m.data['kind'] == 'projet' ? Icons.rocket_launch_rounded : Icons.gavel_rounded, size: 18),
+                      avatar: Icon(
+                        m.data['kind'] == 'projet' ? Icons.rocket_launch_rounded : Icons.gavel_rounded,
+                        size: 18,
+                      ),
                       label: Text(m.text),
                       onDeleted: () => Carnet.instance.remove('memory', m.id),
                     ),
@@ -409,8 +427,10 @@ class _BagDialog extends StatefulWidget {
   const _BagDialog({required this.a});
   final Assistant a;
 
-  static Future<void> show(BuildContext context, Assistant a) =>
-      showDialog<void>(context: context, builder: (_) => _BagDialog(a: a));
+  static Future<void> show(BuildContext context, Assistant a) => showDialog<void>(
+    context: context,
+    builder: (_) => _BagDialog(a: a),
+  );
 
   @override
   State<_BagDialog> createState() => _BagDialogState();
@@ -440,13 +460,18 @@ class _BagDialogState extends State<_BagDialog> {
             icon: const Icon(Icons.schedule_rounded),
             label: Text('Rappel à ${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')}'),
             onPressed: () async {
-              final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60));
+              final t = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60),
+              );
               if (t != null) setState(() => minutes = t.hour * 60 + t.minute);
             },
           ),
           const SizedBox(height: 12),
-          const Text('Tes affaires par matière (une matière par ligne). Sans rien, Clicky utilise les habituelles : '
-              'tenue de sport pour l\'EPS, calculatrice pour les maths…'),
+          const Text(
+            'Tes affaires par matière (une matière par ligne). Sans rien, Smily utilise les habituelles : '
+            'tenue de sport pour l\'EPS, calculatrice pour les maths…',
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: text,

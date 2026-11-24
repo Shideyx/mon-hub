@@ -1,5 +1,6 @@
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
+
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
@@ -120,8 +121,8 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
       final ext = type.contains('ogg') || url.contains('.ogg')
           ? 'ogg'
           : type.contains('mpeg') || url.contains('.mp3')
-              ? 'mp3'
-              : 'm4a';
+          ? 'mp3'
+          : 'm4a';
       final f = File('${Directory.systemTemp.path}${Platform.pathSeparator}monhub-vocal-${url.hashCode.abs()}.$ext');
       await f.writeAsBytes(r.bodyBytes);
       return _cache[url] = f.path;
@@ -138,8 +139,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
     } catch (_) {}
   }
 
-  static String _fmt(Duration d) =>
-      '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+  static String _fmt(Duration d) => '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -300,10 +300,7 @@ class ReactionChips extends StatelessWidget {
                 title: Text(n),
               ),
             if (names.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Les noms ne sont pas disponibles.'),
-              ),
+              const Padding(padding: EdgeInsets.all(16), child: Text('Les noms ne sont pas disponibles.')),
           ],
         ),
       ),
@@ -335,10 +332,7 @@ class ReactionChips extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: scheme.outlineVariant),
                     ),
-                    child: Text(
-                      r.total > 1 ? '${r.emoji} ${r.total}' : r.emoji,
-                      style: const TextStyle(fontSize: 13),
-                    ),
+                    child: Text(r.total > 1 ? '${r.emoji} ${r.total}' : r.emoji, style: const TextStyle(fontSize: 13)),
                   ),
                 ),
               ),
@@ -360,7 +354,8 @@ class WebAudio extends StatelessWidget {
     final a = const HtmlEscape(HtmlEscapeMode.attribute).convert(url);
     return InAppWebView(
       initialData: InAppWebViewInitialData(
-        data: '<!doctype html><html><body style="margin:0;background:transparent">'
+        data:
+            '<!doctype html><html><body style="margin:0;background:transparent">'
             '<audio src="$a" controls style="width:100%"></audio></body></html>',
       ),
       initialSettings: InAppWebViewSettings(transparentBackground: true, mediaPlaybackRequiresUserGesture: false),

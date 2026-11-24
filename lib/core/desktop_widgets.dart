@@ -62,14 +62,21 @@ class DesktopWidgets extends ChangeNotifier {
 
   /// Remet le widget dans Mon Hub (sa fenêtre se ferme).
   Future<void> attach(String id) async {
-    await ModuleStore.prefs.setStringList(_key, [for (final x in ids) if (x != id) x]);
+    await ModuleStore.prefs.setStringList(_key, [
+      for (final x in ids)
+        if (x != id) x,
+    ]);
     notifyListeners();
     await send(id, 'quit');
   }
 
   static Future<bool> running(String id) async {
     try {
-      final s = await Socket.connect(InternetAddress.loopbackIPv4, port(id), timeout: const Duration(milliseconds: 300));
+      final s = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        port(id),
+        timeout: const Duration(milliseconds: 300),
+      );
       s.destroy();
       return true;
     } catch (_) {
@@ -79,7 +86,11 @@ class DesktopWidgets extends ChangeNotifier {
 
   static Future<bool> send(String id, String cmd) async {
     try {
-      final s = await Socket.connect(InternetAddress.loopbackIPv4, port(id), timeout: const Duration(milliseconds: 300));
+      final s = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        port(id),
+        timeout: const Duration(milliseconds: 300),
+      );
       s.write('$cmd\n');
       await s.flush();
       s.destroy();

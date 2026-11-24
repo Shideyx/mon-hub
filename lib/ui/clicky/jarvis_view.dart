@@ -25,7 +25,7 @@ class _FocusPillState extends State<FocusPill> {
     super.initState();
     f.addListener(_changed);
     unawaited(f.sync());
-    // Relit la séance (lancée peut-être par Clicky partout) et le temps
+    // Relit la séance (lancée peut-être par Smily partout) et le temps
     // restant : un coup d'œil toutes les 20 s, rien de plus.
     _t = Timer.periodic(const Duration(seconds: 20), (_) async {
       await f.sync();
@@ -93,7 +93,7 @@ class _FocusPillState extends State<FocusPill> {
   }
 }
 
-/// La pastille « Clicky travaille… » pendant une tâche « fais-le à ma
+/// La pastille « Smily travaille… » pendant une tâche « fais-le à ma
 /// place » (un clic : où il en est, et l'arrêter).
 class TaskPill extends StatelessWidget {
   const TaskPill({super.key});
@@ -107,7 +107,7 @@ class TaskPill extends StatelessWidget {
         listenable: BackgroundTasks.instance,
         builder: (c, _) => AlertDialog(
           icon: const Icon(Icons.engineering_rounded),
-          title: const Text('Clicky travaille pour toi'),
+          title: const Text('Smily travaille pour toi'),
           content: SizedBox(
             width: 460,
             child: Column(
@@ -160,10 +160,14 @@ class TaskPill extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    'Clicky travaille : $goal${step.isEmpty ? '' : ' · $step'}',
+                    'Smily travaille : $goal${step.isEmpty ? '' : ' · $step'}',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 ],

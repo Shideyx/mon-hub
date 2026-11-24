@@ -32,7 +32,9 @@ class _Mod extends HubModule {
 void main() {
   // L'ancien accueil (cartes arrondies qu'on échangeait en les glissant) a
   // été remplacé en v1.60 par l'accueil HUD : mêmes gestes, en blocs.
-  testWidgets('accueil HUD : un clic ouvre le module, « Personnaliser » permet de glisser un bloc avant un autre', (tester) async {
+  testWidgets('accueil HUD : un clic ouvre le module, « Personnaliser » permet de glisser un bloc avant un autre', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1600, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -68,7 +70,10 @@ void main() {
     await tester.pump();
     await g.up();
     await tester.pump(const Duration(milliseconds: 300));
-    final order = HomeLayout.instance.blocks(modules: const ['a', 'b'], specialsHere: const {}).map((x) => x.id).toList();
+    final order = HomeLayout.instance
+        .blocks(modules: const ['a', 'b'], specialsHere: const {})
+        .map((x) => x.id)
+        .toList();
     expect(order.indexOf('mod:b') < order.indexOf('mod:a'), isTrue, reason: '$order');
     // En mode personnalisation, un clic n'ouvre rien.
     expect(opened, ['a']);

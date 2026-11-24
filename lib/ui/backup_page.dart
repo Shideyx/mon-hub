@@ -97,7 +97,13 @@ class _WorkBackupPageState extends State<WorkBackupPage> {
                               final n = await b.runNow();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(n == 0 ? 'Tout est déjà à jour ✓' : '$n fichier${n > 1 ? 's' : ''} sauvegardé${n > 1 ? 's' : ''} ✓')),
+                                  SnackBar(
+                                    content: Text(
+                                      n == 0
+                                          ? 'Tout est déjà à jour ✓'
+                                          : '$n fichier${n > 1 ? 's' : ''} sauvegardé${n > 1 ? 's' : ''} ✓',
+                                    ),
+                                  ),
                                 );
                               }
                             },
@@ -120,7 +126,10 @@ class _WorkBackupPageState extends State<WorkBackupPage> {
                     trailing: IconButton(
                       tooltip: 'Retirer',
                       icon: const Icon(Icons.close_rounded),
-                      onPressed: () => b.setFolders([for (final x in b.folders) if (x != f) x]),
+                      onPressed: () => b.setFolders([
+                        for (final x in b.folders)
+                          if (x != f) x,
+                      ]),
                     ),
                   ),
                 Align(

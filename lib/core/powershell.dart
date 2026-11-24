@@ -13,9 +13,7 @@ class PowerShell {
   /// Remplace la première ligne `param(...)` du script par des variables.
   static String withParams(String script, Map<String, String> params) {
     final body = script.replaceFirst(RegExp(r'^\s*param\([^\n]*\)\s*\n'), '');
-    final head = [
-      for (final e in params.entries) "\$${e.key} = '${e.value.replaceAll("'", "''")}'",
-    ];
+    final head = [for (final e in params.entries) "\$${e.key} = '${e.value.replaceAll("'", "''")}'"];
     return '${head.join('\n')}\n$body';
   }
 
@@ -41,23 +39,15 @@ class PowerShell {
 
   /// Lance un script qui reste ouvert (entrées / sorties branchées).
   static Future<Process> start(String script, [Map<String, String> params = const {}]) =>
-      Process.start(
-        'powershell.exe',
-        args(script, params),
-        mode: ProcessStartMode.detachedWithStdio,
-      );
+      Process.start('powershell.exe', args(script, params), mode: ProcessStartMode.detachedWithStdio);
 
   /// Lance un script et attend sa réponse.
   static Future<ProcessResult> run(
     String script, [
     Map<String, String> params = const {},
     Duration timeout = const Duration(seconds: 25),
-  ]) => Process.run(
-    'powershell.exe',
-    args(script, params),
-    stdoutEncoding: utf8,
-    stderrEncoding: utf8,
-  ).timeout(timeout);
+  ]) =>
+      Process.run('powershell.exe', args(script, params), stdoutEncoding: utf8, stderrEncoding: utf8).timeout(timeout);
 
   /// Première ligne utile d'une erreur PowerShell (pour l'afficher).
   static String firstError(String stderr) {

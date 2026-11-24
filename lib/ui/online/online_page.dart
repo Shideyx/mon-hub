@@ -13,7 +13,7 @@ import '../../core/online/spaces.dart';
 import '../hud/hud.dart';
 
 /// Réglages → **Compte en ligne** : le serveur (ton projet Supabase), ton
-/// compte (même compte sur tous tes appareils), ton profil et Clicky.
+/// compte (même compte sur tous tes appareils), ton profil et Smily.
 class OnlinePage extends StatefulWidget {
   const OnlinePage({super.key});
 
@@ -81,7 +81,9 @@ class _OnlinePageState extends State<OnlinePage> {
     }
     final u = OnlineServer.cleanUrl(_url.text);
     if (u == null) throw 'L\'adresse du projet ressemble à https://abcdefgh.supabase.co';
-    if (!OnlineServer.looksLikeKey(_key.text)) throw 'Colle la clé « anon public » (une longue suite de lettres avec des points).';
+    if (!OnlineServer.looksLikeKey(_key.text)) {
+      throw 'Colle la clé « anon public » (une longue suite de lettres avec des points).';
+    }
     await Online.instance.setServer(OnlineServer(u, _key.text.trim()));
   });
 
@@ -128,14 +130,11 @@ class _OnlinePageState extends State<OnlinePage> {
                         const SizedBox(height: 12),
                         Text(_error!, style: TextStyle(color: c.bad)),
                       ],
-                      if (_info != null) ...[
-                        const SizedBox(height: 12),
-                        Text(_info!, style: TextStyle(color: c.ok)),
-                      ],
+                      if (_info != null) ...[const SizedBox(height: 12), Text(_info!, style: TextStyle(color: c.ok))],
                       const SizedBox(height: 16),
                       Text(
                         'Vie privée : la copie de ton compte est chiffrée sur ton appareil avec ton mot de passe — le '
-                        'serveur ne peut pas la lire, et ne reçoit jamais ton mot de passe. Ce que Clicky voit à l\'écran, '
+                        'serveur ne peut pas la lire, et ne reçoit jamais ton mot de passe. Ce que Smily voit à l\'écran, '
                         'ton temps d\'écran et tes guetteurs restent sur ton PC. Seul ce que tu mets dans un espace '
                         'partagé est visible par ses membres.',
                         style: TextStyle(color: c.dim, fontSize: 12, height: 1.45),
@@ -206,13 +205,19 @@ class _OnlinePageState extends State<OnlinePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 34, child: Text(n, style: hudTitle(context, size: 20, color: c.accentText))),
+          SizedBox(
+            width: 34,
+            child: Text(n, style: hudTitle(context, size: 20, color: c.accentText)),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(text, style: const TextStyle(height: 1.4)),
-                if (actions.isNotEmpty) ...[const SizedBox(height: 8), Wrap(spacing: 8, runSpacing: 8, children: actions)],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: actions),
+                ],
               ],
             ),
           ),
@@ -234,14 +239,22 @@ class _OnlinePageState extends State<OnlinePage> {
           const SizedBox(height: 8),
           TextField(
             controller: _code,
-            decoration: const InputDecoration(labelText: 'J\'ai un code (MONHUB-SERVEUR:…)', prefixIcon: Icon(Icons.vpn_key_rounded)),
+            decoration: const InputDecoration(
+              labelText: 'J\'ai un code (MONHUB-SERVEUR:…)',
+              prefixIcon: Icon(Icons.vpn_key_rounded),
+            ),
             onSubmitted: (_) => _saveServer(),
           ),
           const SizedBox(height: 18),
           Text('Sinon, crée le tien (gratuit) :', style: hudLabel(context)),
           const SizedBox(height: 12),
           step('01', 'Crée un compte puis un projet sur supabase.com (le nom que tu veux, région « Europe »).', [
-            HudButton(label: 'Ouvrir Supabase', icon: Icons.open_in_new_rounded, compact: true, onPressed: () => Browser.open('https://supabase.com/dashboard/new')),
+            HudButton(
+              label: 'Ouvrir Supabase',
+              icon: Icons.open_in_new_rounded,
+              compact: true,
+              onPressed: () => Browser.open('https://supabase.com/dashboard/new'),
+            ),
           ]),
           step('02', 'Copie le script de la base, puis dans ton projet : SQL Editor → colle → Run.', [
             HudButton(
@@ -262,12 +275,21 @@ class _OnlinePageState extends State<OnlinePage> {
               onPressed: () => Browser.open('https://supabase.com/dashboard/project/_/sql/new'),
             ),
           ]),
-          step('03', 'Plus simple : Authentication → Sign In / Providers → Email → décoche « Confirm email » (sinon il '
-              'faudra cliquer un lien reçu par mail à la création du compte).'),
-          step('04', 'Project Settings → API (ou « Connect ») : copie « Project URL » et la clé « anon public », colle-les ici.'),
+          step(
+            '03',
+            'Plus simple : Authentication → Sign In / Providers → Email → décoche « Confirm email » (sinon il '
+                'faudra cliquer un lien reçu par mail à la création du compte).',
+          ),
+          step(
+            '04',
+            'Project Settings → API (ou « Connect ») : copie « Project URL » et la clé « anon public », colle-les ici.',
+          ),
           TextField(
             controller: _url,
-            decoration: const InputDecoration(labelText: 'Project URL (https://….supabase.co)', prefixIcon: Icon(Icons.link_rounded)),
+            decoration: const InputDecoration(
+              labelText: 'Project URL (https://….supabase.co)',
+              prefixIcon: Icon(Icons.link_rounded),
+            ),
           ),
           const SizedBox(height: 10),
           TextField(
@@ -305,20 +327,35 @@ class _OnlinePageState extends State<OnlinePage> {
               controller: _email,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
-              decoration: const InputDecoration(labelText: 'Adresse mail', prefixIcon: Icon(Icons.alternate_email_rounded)),
+              decoration: const InputDecoration(
+                labelText: 'Adresse mail',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+              ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _pass,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Mot de passe de Mon Hub', prefixIcon: Icon(Icons.lock_rounded)),
+              decoration: const InputDecoration(
+                labelText: 'Mot de passe de Mon Hub',
+                prefixIcon: Icon(Icons.lock_rounded),
+              ),
               onSubmitted: (_) => _putOnline(),
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                HudButton(label: 'Mettre en ligne', primary: true, icon: Icons.cloud_upload_rounded, onPressed: _busy ? null : _putOnline),
-                if (_busy) const Padding(padding: EdgeInsets.only(left: 12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+                HudButton(
+                  label: 'Mettre en ligne',
+                  primary: true,
+                  icon: Icons.cloud_upload_rounded,
+                  onPressed: _busy ? null : _putOnline,
+                ),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
               ],
             ),
           ],
@@ -343,7 +380,10 @@ class _OnlinePageState extends State<OnlinePage> {
                           ? 'Synchronisation…'
                           : sync.needsPassword
                           ? 'Ton mot de passe a changé ailleurs : Réglages → Mes appareils pour le retaper.'
-                          : sync.error ?? (last == null ? 'Pas encore synchronisé.' : 'Synchronisé à ${last.hour}h${last.minute.toString().padLeft(2, '0')} — tout ton compte, chiffré.'))
+                          : sync.error ??
+                                (last == null
+                                    ? 'Pas encore synchronisé.'
+                                    : 'Synchronisé à ${last.hour}h${last.minute.toString().padLeft(2, '0')} — tout ton compte, chiffré.'))
                     : 'Connecté, mais ton compte n\'est pas encore copié en ligne.',
                 style: TextStyle(color: sync.error != null ? c.bad : c.muted),
               ),
@@ -353,7 +393,12 @@ class _OnlinePageState extends State<OnlinePage> {
                 runSpacing: 8,
                 children: [
                   if (sync.online)
-                    HudButton(label: 'Synchroniser maintenant', icon: Icons.sync_rounded, compact: true, onPressed: sync.busy ? null : () => sync.syncNow())
+                    HudButton(
+                      label: 'Synchroniser maintenant',
+                      icon: Icons.sync_rounded,
+                      compact: true,
+                      onPressed: sync.busy ? null : () => sync.syncNow(),
+                    )
                   else
                     HudButton(
                       label: 'Copier mon compte en ligne',
@@ -378,7 +423,10 @@ class _OnlinePageState extends State<OnlinePage> {
             children: [
               Text('[03] MON PROFIL (CE QUE LES AUTRES VOIENT)', style: hudLabel(context)),
               const SizedBox(height: 10),
-              TextField(controller: _name, decoration: const InputDecoration(labelText: 'Nom affiché', prefixIcon: Icon(Icons.badge_rounded))),
+              TextField(
+                controller: _name,
+                decoration: const InputDecoration(labelText: 'Nom affiché', prefixIcon: Icon(Icons.badge_rounded)),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _handle,
@@ -415,10 +463,10 @@ class _OnlinePageState extends State<OnlinePage> {
               await ClickyChat.setWithOthers(v);
               if (mounted) setState(() {});
             },
-            title: const Text('Mon Clicky peut parler avec les Clicky des autres'),
+            title: const Text('Mon Smily peut parler avec les Smily des autres'),
             subtitle: Text(
               'Dans les espaces qui l\'autorisent. Il ne fait aucune action et ne dit rien de privé ; au plus '
-              '${ClickyChat.perDay} réponses par jour. « @clicky … » dans tes messages : ton Clicky répond toujours.',
+              '${ClickyChat.perDay} réponses par jour. « @clicky … » dans tes messages : ton Smily répond toujours.',
               style: TextStyle(color: c.muted, fontSize: 12),
             ),
           ),

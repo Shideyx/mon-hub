@@ -91,9 +91,7 @@ class News {
 
   /// « Tue, 17 Nov 2026 06:12:00 +0100 ».
   static DateTime? _rfc822(String s) {
-    final m = RegExp(
-      r'(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2})(?::(\d{2}))? ?([+-]\d{4}|GMT|UT|Z)?',
-    ).firstMatch(s);
+    final m = RegExp(r'(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2})(?::(\d{2}))? ?([+-]\d{4}|GMT|UT|Z)?').firstMatch(s);
     if (m == null) return DateTime.tryParse(s);
     final mo = _months[m.group(2)!.toLowerCase()];
     if (mo == null) return null;
@@ -109,10 +107,7 @@ class News {
     if (z != null && (z.startsWith('+') || z.startsWith('-'))) {
       final sign = z.startsWith('-') ? -1 : 1;
       d = d.subtract(
-        Duration(
-          hours: sign * int.parse(z.substring(1, 3)),
-          minutes: sign * int.parse(z.substring(3, 5)),
-        ),
+        Duration(hours: sign * int.parse(z.substring(1, 3)), minutes: sign * int.parse(z.substring(3, 5))),
       );
     }
     return d.toLocal();
@@ -145,10 +140,7 @@ class News {
     final seen = <String>{};
     final unique = [
       for (final n in all)
-        if (seen.add(
-          n.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').padRight(40).substring(0, 40),
-        ))
-          n,
+        if (seen.add(n.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').padRight(40).substring(0, 40))) n,
     ];
     if (unique.isEmpty) throw 'Actualités indisponibles (pas d\'internet ?)';
     _cache[z] = (DateTime.now(), unique);

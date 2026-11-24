@@ -9,10 +9,9 @@ import 'widgets.dart';
 
 /// Un message d'une conversation enregistrée.
 class ChatMsg {
-  ChatMsg({required this.mine, required this.text, DateTime? at, this.note})
-    : at = at ?? DateTime.now();
+  ChatMsg({required this.mine, required this.text, DateTime? at, this.note}) : at = at ?? DateTime.now();
 
-  /// Écrit par toi (sinon : par Claude / Clicky).
+  /// Écrit par toi (sinon : par Claude / Smily).
   final bool mine;
   final String text;
   final DateTime at;
@@ -20,12 +19,7 @@ class ChatMsg {
   /// Complément affiché en petit (tableau dessiné, appli, pièce jointe…).
   final String? note;
 
-  Map<String, dynamic> toJson() => {
-    'm': mine,
-    't': text,
-    'a': at.millisecondsSinceEpoch,
-    'n': ?note,
-  };
+  Map<String, dynamic> toJson() => {'m': mine, 't': text, 'a': at.millisecondsSinceEpoch, 'n': ?note};
 
   factory ChatMsg.fromJson(Map j) => ChatMsg(
     mine: j['m'] == true,
@@ -54,7 +48,7 @@ class ChatThread {
   final DateTime created;
   DateTime updated;
 
-  /// Appli au premier plan (Clicky) : la mémoire est rangée par appli.
+  /// Appli au premier plan (Smily) : la mémoire est rangée par appli.
   String app;
   bool pinned;
   final List<ChatMsg> messages;
@@ -111,7 +105,7 @@ class ChatThread {
 }
 
 /// Historique des conversations (une liste par source : discussion Claude,
-/// Clicky). Gardé dans les fichiers du compte, partagé avec Clicky partout.
+/// Smily). Gardé dans les fichiers du compte, partagé avec Smily partout.
 class ChatHistory extends ChangeNotifier {
   ChatHistory(String file, {this.maxThreads = 300, this.maxMessages = 400})
     : _file = JsonFile<List<ChatThread>>(
@@ -131,7 +125,7 @@ class ChatHistory extends ChangeNotifier {
   /// Discussion directe avec Claude (module Claude).
   static final claude = ChatHistory('claude-chats.json');
 
-  /// Échanges avec Clicky.
+  /// Échanges avec Smily.
   static final clicky = ChatHistory('clicky-history.json');
 
   List<ChatThread> get threads {
@@ -148,8 +142,7 @@ class ChatHistory extends ChangeNotifier {
     return threads;
   }
 
-  ChatThread? byId(String? id) =>
-      id == null ? null : _file.value.where((t) => t.id == id).firstOrNull;
+  ChatThread? byId(String? id) => id == null ? null : _file.value.where((t) => t.id == id).firstOrNull;
 
   /// Ajoute un message (crée la conversation au besoin).
   Future<ChatThread> add(String threadId, ChatMsg msg, {String app = ''}) async {
@@ -170,8 +163,7 @@ class ChatHistory extends ChangeNotifier {
       // On garde les plus récentes (les épinglées restent).
       if (list.length > maxThreads) {
         list.sort((a, b) => b.updated.compareTo(a.updated));
-        final keep = list.where((x) => x.pinned).toSet()
-          ..addAll(list.where((x) => !x.pinned).take(maxThreads));
+        final keep = list.where((x) => x.pinned).toSet()..addAll(list.where((x) => !x.pinned).take(maxThreads));
         list.retainWhere(keep.contains);
       }
       return list;
@@ -277,12 +269,7 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
   }
 
   Future<void> _rename(ChatThread t) async {
-    final r = await askFields(
-      context,
-      title: 'Renommer la conversation',
-      labels: const ['Titre'],
-      initial: [t.label],
-    );
+    final r = await askFields(context, title: 'Renommer la conversation', labels: const ['Titre'], initial: [t.label]);
     final v = r?.first.trim();
     if (v != null && v.isNotEmpty) await widget.history.rename(t.id, v);
   }
@@ -367,9 +354,7 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
                     case 'rename':
                       await _rename(t);
                     case 'copy':
-                      await Clipboard.setData(
-                        ClipboardData(text: ChatHistory.export(t, other: widget.otherName)),
-                      );
+                      await Clipboard.setData(ClipboardData(text: ChatHistory.export(t, other: widget.otherName)));
                       if (context.mounted) {
                         ScaffoldMessenger.of(context)
                             .showSnackBar(const SnackBar(content: Text('Conversation copiée')));
@@ -444,12 +429,7 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
 
 /// Lecture d'une conversation enregistrée (bulles).
 class ChatThreadView extends StatelessWidget {
-  const ChatThreadView({
-    super.key,
-    required this.thread,
-    required this.color,
-    this.otherName = 'Claude',
-  });
+  const ChatThreadView({super.key, required this.thread, required this.color, this.otherName = 'Claude'});
 
   final ChatThread thread;
   final Color color;

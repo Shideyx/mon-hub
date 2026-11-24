@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-/// La voix de Clicky : la synthèse vocale de Google Gemini, avec une clé
+/// La voix de Smily : la synthèse vocale de Google Gemini, avec une clé
 /// gratuite d'AI Studio (quota gratuit limité par jour). C'est la seule voix
 /// (la voix Microsoft / Edge a été retirée à la demande de la personne).
 class GeminiVoice {
@@ -48,9 +48,7 @@ class GeminiVoice {
     if (key.trim().isEmpty) throw 'Ajoute ta clé Gemini gratuite (aistudio.google.com)';
     final r = await (client ?? http.Client())
         .post(
-          Uri.parse(
-            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
-          ),
+          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
           headers: {'content-type': 'application/json', 'x-goog-api-key': key.trim()},
           body: jsonEncode({
             'contents': [
@@ -74,8 +72,7 @@ class GeminiVoice {
     if (r.statusCode == 429) throw 'Quota gratuit de Gemini atteint pour aujourd\'hui';
     if (r.statusCode >= 400) throw 'Gemini : erreur ${r.statusCode}';
     final j = jsonDecode(r.body) as Map;
-    final parts =
-        (((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
+    final parts = (((j['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
     final data = ((parts?.firstOrNull as Map?)?['inlineData'] as Map?)?['data'] as String?;
     if (data == null) throw 'Gemini n\'a pas renvoyé de son';
     return wav(base64Decode(data));

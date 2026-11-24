@@ -19,7 +19,7 @@ class Repair {
   /// Ce que la personne lira : « Ton micro était bloqué ».
   final String title;
 
-  /// Ce que Clicky a fait, dit simplement : « je l'ai relancé ».
+  /// Ce que Smily a fait, dit simplement : « je l'ai relancé ».
   final String fixed;
 
   /// L'action de Mon Hub à lancer (null : réparé ici même).
@@ -62,77 +62,86 @@ class RepairRules {
   ///
   /// [log] = le journal des erreurs, [freezes] et [clickyRestarts] viennent
   /// du journal aussi, [diskFreeGb] du disque C:.
-  static List<Repair> diagnose(
-    String log, {
-    DateTime? now,
-    double diskFreeGb = 100,
-    bool light = false,
-  }) {
+  static List<Repair> diagnose(String log, {DateTime? now, double diskFreeGb = 100, bool light = false}) {
     final lines = recentLines(log, now: now);
     final out = <Repair>[];
 
     // Le micro : écoute bloquée, processus détaché, reconnaissance vocale en
     // échec.
-    if (_count(lines, RegExp(r'Process is detached|micro|SmartEars|reconnaissance vocale', caseSensitive: false)) >= 2) {
-      out.add(const Repair(
-        id: 'micro',
-        title: 'Ton micro restait bloqué',
-        fixed: 'je l\'ai relancé',
-        tool: 'clicky_reparer_micro',
-      ));
+    if (_count(lines, RegExp(r'Process is detached|micro|SmartEars|reconnaissance vocale', caseSensitive: false)) >=
+        2) {
+      out.add(
+        const Repair(
+          id: 'micro',
+          title: 'Ton micro restait bloqué',
+          fixed: 'je l\'ai relancé',
+          tool: 'clicky_reparer_micro',
+        ),
+      );
     }
 
     // Les certificats (antivirus, réseau du lycée) : plus rien ne se
     // télécharge.
     if (_count(lines, RegExp(r'CERTIFICATE_VERIFY_FAILED|HandshakeException', caseSensitive: false)) >= 1) {
-      out.add(const Repair(
-        id: 'certificats',
-        title: 'Les connexions sécurisées échouaient',
-        fixed: 'j\'ai réinstallé les certificats de ton PC',
-      ));
+      out.add(
+        const Repair(
+          id: 'certificats',
+          title: 'Les connexions sécurisées échouaient',
+          fixed: 'j\'ai réinstallé les certificats de ton PC',
+        ),
+      );
     }
 
     // L'appli fige (noté par le guetteur de gels) : le mode léger la calme.
     if (!light && _count(lines, RegExp(r'fig[ée]e?', caseSensitive: false)) >= 3) {
-      out.add(const Repair(
-        id: 'gels',
-        title: 'Mon Hub figeait de temps en temps',
-        fixed: 'je suis passé en mode léger pour que tout reste fluide',
-      ));
+      out.add(
+        const Repair(
+          id: 'gels',
+          title: 'Mon Hub figeait de temps en temps',
+          fixed: 'je suis passé en mode léger pour que tout reste fluide',
+        ),
+      );
     }
 
-    // Clicky partout se ferme en boucle : il reste dans la fenêtre.
-    if (!light && _count(lines, RegExp(r"Clicky partout s'est ferm", caseSensitive: false)) >= 3) {
-      out.add(const Repair(
-        id: 'clicky-partout',
-        title: 'Clicky partout n\'arrivait pas à tenir ouvert',
-        fixed: 'je l\'ai ramené dans la fenêtre de Mon Hub (mode léger)',
-      ));
+    // Smily partout se ferme en boucle : il reste dans la fenêtre.
+    if (!light && _count(lines, RegExp(r"Smily partout s'est ferm", caseSensitive: false)) >= 3) {
+      out.add(
+        const Repair(
+          id: 'clicky-partout',
+          title: 'Smily partout n\'arrivait pas à tenir ouvert',
+          fixed: 'je l\'ai ramené dans la fenêtre de Mon Hub (mode léger)',
+        ),
+      );
     }
 
     // Plus de place : rien ne s'enregistre plus.
     if (diskFreeGb > 0 && diskFreeGb < 2) {
-      out.add(const Repair(
-        id: 'disque',
-        title: 'Ton disque C: est presque plein',
-        fixed: 'j\'ai préparé un rangement de tes téléchargements (rien n\'est supprimé)',
-        tool: 'pc_ranger_apercu',
-      ));
+      out.add(
+        const Repair(
+          id: 'disque',
+          title: 'Ton disque C: est presque plein',
+          fixed: 'j\'ai préparé un rangement de tes téléchargements (rien n\'est supprimé)',
+          tool: 'pc_ranger_apercu',
+        ),
+      );
     }
 
     // Un fichier de données abîmé (coupure de courant pendant une écriture).
-    if (_count(lines, RegExp(r'FormatException.*json|Unexpected (?:character|end of input)', caseSensitive: false)) >= 2) {
-      out.add(const Repair(
-        id: 'donnees',
-        title: 'Un de tes fichiers de données était abîmé',
-        fixed: 'je l\'ai remis d\'aplomb avec la copie de ton compte',
-      ));
+    if (_count(lines, RegExp(r'FormatException.*json|Unexpected (?:character|end of input)', caseSensitive: false)) >=
+        2) {
+      out.add(
+        const Repair(
+          id: 'donnees',
+          title: 'Un de tes fichiers de données était abîmé',
+          fixed: 'je l\'ai remis d\'aplomb avec la copie de ton compte',
+        ),
+      );
     }
 
     return out;
   }
 
-  /// Ce que Clicky dit après s'être réparé.
+  /// Ce que Smily dit après s'être réparé.
   static String say(List<Repair> done) {
     if (done.isEmpty) return 'Tout va bien, je n\'ai rien eu à réparer.';
     if (done.length == 1) return '${done.first.title} : ${done.first.fixed}.';
@@ -140,11 +149,11 @@ class RepairRules {
   }
 }
 
-/// **Clicky se répare tout seul.**
+/// **Smily se répare tout seul.**
 ///
 /// Il relit son journal d'erreurs (qui ne quitte jamais le PC), repère les
 /// pannes qu'il sait corriger, et les corrige : micro bloqué, certificats
-/// cassés, appli qui fige, Clicky partout qui n'arrive pas à tenir, disque
+/// cassés, appli qui fige, Smily partout qui n'arrive pas à tenir, disque
 /// plein, fichier de données abîmé.
 ///
 /// Il ne supprime jamais rien, et il dit toujours ce qu'il a fait.
@@ -198,11 +207,7 @@ class SelfRepair {
     if (!supported) return const [];
     if (manual) await forget();
     final log = ErrorLog.read();
-    final found = RepairRules.diagnose(
-      log,
-      diskFreeGb: diskFreeGb ?? 100,
-      light: Perf.light,
-    );
+    final found = RepairRules.diagnose(log, diskFreeGb: diskFreeGb ?? 100, light: Perf.light);
     final skip = manual ? <String>{} : _already;
     final done = <Repair>[];
     for (final r in found) {
@@ -215,10 +220,7 @@ class SelfRepair {
     lastRun = DateTime.now();
     lastDone = done;
     if (done.isNotEmpty) {
-      tell?.call(
-        '🔧 Clicky s\'est réparé tout seul',
-        RepairRules.say(done),
-      );
+      tell?.call('🔧 Smily s\'est réparé tout seul', RepairRules.say(done));
     }
     return done;
   }

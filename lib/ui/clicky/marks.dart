@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'holo.dart';
 
-/// Annotations que Clicky dessine sur l'écran pendant qu'il explique, comme
+/// Annotations que Smily dessine sur l'écran pendant qu'il explique, comme
 /// un prof au tableau :
 ///
 /// * `[ARROW:x1,y1->x2,y2]` : flèche animée d'un point à un autre ;
@@ -35,14 +35,8 @@ class ClickyMark {
   final int screen;
 
   /// Même annotation, ramenée dans un autre repère.
-  ClickyMark map(Offset Function(Offset p) f, double scale) => ClickyMark(
-    kind,
-    f(a),
-    b: b == null ? null : f(b!),
-    size: size * scale,
-    text: text,
-    screen: screen,
-  );
+  ClickyMark map(Offset Function(Offset p) f, double scale) =>
+      ClickyMark(kind, f(a), b: b == null ? null : f(b!), size: size * scale, text: text, screen: screen);
 
   Rect get bounds {
     switch (kind) {
@@ -86,19 +80,10 @@ class ClickyMark {
       }
 
       if (kind.startsWith('ARROW') || kind.startsWith('FL')) {
-        final r = RegExp('^$_num\\s*,\\s*$_num\\s*(?:->|→|=>|;)\\s*$_num\\s*,\\s*$_num')
-            .firstMatch(body);
+        final r = RegExp('^$_num\\s*,\\s*$_num\\s*(?:->|→|=>|;)\\s*$_num\\s*,\\s*$_num').firstMatch(body);
         if (r == null) continue;
         final rest = body.substring(r.end).replaceFirst(RegExp(r'^\s*:'), '').trim();
-        out.add(
-          ClickyMark(
-            MarkKind.arrow,
-            pt(r[1]!, r[2]!)!,
-            b: pt(r[3]!, r[4]!),
-            text: rest,
-            screen: screen,
-          ),
-        );
+        out.add(ClickyMark(MarkKind.arrow, pt(r[1]!, r[2]!)!, b: pt(r[3]!, r[4]!), text: rest, screen: screen));
       } else if (kind.startsWith('CIRCLE') || kind.startsWith('CERCLE')) {
         final r = RegExp('^$_num\\s*,\\s*$_num\\s*,\\s*$_num').firstMatch(body);
         if (r == null) continue;
@@ -145,17 +130,18 @@ List<String> splitSteps(String raw) {
   return parts.isEmpty ? [raw.trim()] : parts;
 }
 
-/// Retire toutes les balises de Clicky (même à moitié écrites) du texte
+/// Retire toutes les balises de Smily (même à moitié écrites) du texte
 /// affiché ou lu à voix haute pendant qu'il s'écrit.
-String stripClickyTags(String t) => HoloScene.strip(t)
-    .replaceAll(RegExp(r'\[POINT:\s*[^\]]*\]', caseSensitive: false), '')
-    .replaceAll(ClickyMark.tagRe, '')
-    .replaceAll(RegExp(r'\[ACTIONS\][\s\S]*?(\[/ACTIONS\]|$)', caseSensitive: false), '')
-    .replaceAll(RegExp(r'\[AGIR\][\s\S]*?(\[/AGIR\]|$)', caseSensitive: false), '')
-    .replaceAll(stepRe, '\n')
-    .replaceFirst(RegExp(r'\[[^\]]*$'), '')
-    .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
-    .trim();
+String stripClickyTags(String t) =>
+    HoloScene.strip(t)
+        .replaceAll(RegExp(r'\[POINT:\s*[^\]]*\]', caseSensitive: false), '')
+        .replaceAll(ClickyMark.tagRe, '')
+        .replaceAll(RegExp(r'\[ACTIONS\][\s\S]*?(\[/ACTIONS\]|$)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\[AGIR\][\s\S]*?(\[/AGIR\]|$)', caseSensitive: false), '')
+        .replaceAll(stepRe, '\n')
+        .replaceFirst(RegExp(r'\[[^\]]*$'), '')
+        .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
+        .trim();
 
 /// Dessine les annotations (elles se tracent, puis s'effacent).
 class ClickyMarksView extends StatefulWidget {
@@ -172,7 +158,7 @@ class ClickyMarksView extends StatefulWidget {
   final List<ClickyMark> marks;
   final Color color;
 
-  /// Décalage à soustraire (fenêtre de Clicky partout).
+  /// Décalage à soustraire (fenêtre de Smily partout).
   final Offset offset;
 
   /// Temps d'affichage avant l'effacement.
@@ -184,18 +170,11 @@ class ClickyMarksView extends StatefulWidget {
 }
 
 class _ClickyMarksViewState extends State<ClickyMarksView> with TickerProviderStateMixin {
-  late final AnimationController _draw = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..forward();
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  )..repeat(reverse: true);
-  late final AnimationController _fade = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 600),
-  );
+  late final AnimationController _draw = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    ..forward();
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
+  late final AnimationController _fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
   Timer? _timer;
 
   @override

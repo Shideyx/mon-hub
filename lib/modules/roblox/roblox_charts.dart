@@ -16,8 +16,7 @@ String fmtInt(num n) {
 /// Nombre court : 1,2 k · 3,4 M · 1,1 Md.
 String fmtShort(num n) {
   final a = n.abs();
-  String f(double v, String u) =>
-      '${(v >= 100 ? v.toStringAsFixed(0) : v.toStringAsFixed(1)).replaceAll('.', ',')} $u';
+  String f(double v, String u) => '${(v >= 100 ? v.toStringAsFixed(0) : v.toStringAsFixed(1)).replaceAll('.', ',')} $u';
   if (a >= 1e9) return f(n / 1e9, 'Md');
   if (a >= 1e6) return f(n / 1e6, 'M');
   if (a >= 1e4) return f(n / 1e3, 'k');
@@ -124,10 +123,7 @@ class _LineChartState extends State<LineChart> {
         child: Container(
           width: w,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: scheme.inverseSurface,
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(color: scheme.inverseSurface, borderRadius: BorderRadius.circular(8)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -135,11 +131,7 @@ class _LineChartState extends State<LineChart> {
               Text(fmtWhen(t), style: TextStyle(color: scheme.onInverseSurface, fontSize: 11)),
               Text(
                 fmtInt(v),
-                style: TextStyle(
-                  color: scheme.onInverseSurface,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: scheme.onInverseSurface, fontWeight: FontWeight.w700, fontSize: 14),
               ),
             ],
           ),
@@ -204,8 +196,10 @@ class _LinePainter extends CustomPainter {
   final String Function(num) format;
 
   void _text(Canvas c, String s, Offset o, {bool right = false}) {
-    final tp = TextPainter(text: TextSpan(text: s, style: label), textDirection: TextDirection.ltr)
-      ..layout();
+    final tp = TextPainter(
+      text: TextSpan(text: s, style: label),
+      textDirection: TextDirection.ltr,
+    )..layout();
     tp.paint(c, right ? o - Offset(tp.width, tp.height / 2) : o);
   }
 
@@ -226,8 +220,10 @@ class _LinePainter extends CustomPainter {
     final sameDay = last.difference(first).inHours < 24;
     _text(canvas, fmtWhen(first, withDay: !sameDay), Offset(_Geo.left, size.height - 14));
     final endLabel = fmtWhen(last, withDay: !sameDay);
-    final tp = TextPainter(text: TextSpan(text: endLabel, style: label), textDirection: TextDirection.ltr)
-      ..layout();
+    final tp = TextPainter(
+      text: TextSpan(text: endLabel, style: label),
+      textDirection: TextDirection.ltr,
+    )..layout();
     tp.paint(canvas, Offset(size.width - 4 - tp.width, size.height - 14));
 
     final path = Path();
@@ -348,8 +344,10 @@ class _BarChartState extends State<BarChart> {
             children: [
               Text(bars.first.$1, style: label),
               if (hover != null)
-                Text('${bars[hover!].$1} · ${fmtInt(bars[hover!].$2)}',
-                    style: label.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  '${bars[hover!].$1} · ${fmtInt(bars[hover!].$2)}',
+                  style: label.copyWith(fontWeight: FontWeight.w700),
+                ),
               Text(bars.last.$1, style: label),
             ],
           ),

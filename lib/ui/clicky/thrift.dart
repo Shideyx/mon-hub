@@ -1,7 +1,7 @@
 import '../../core/claude_api.dart';
 import '../../core/tool_router.dart';
 
-/// Clicky économe : Claude seulement pour les demandes qui en valent la
+/// Smily économe : Claude seulement pour les demandes qui en valent la
 /// peine. Le reste passe par des réponses sans IA (`quick.dart`), Gemini
 /// (gratuit) ou une version « légère » de Claude.
 ///

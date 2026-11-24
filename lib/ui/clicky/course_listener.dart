@@ -12,7 +12,7 @@ import '../../core/hub_files.dart';
 import '../../modules/docs/docs_module.dart';
 import 'whisper.dart';
 
-/// Un cours écouté par Clicky : la transcription, puis le compte rendu.
+/// Un cours écouté par Smily : la transcription, puis le compte rendu.
 class CourseNote {
   CourseNote({
     required this.id,
@@ -44,6 +44,7 @@ class CourseNote {
 
   String get transcript => parts.where((p) => p.trim().isNotEmpty).join('\n\n');
   bool get done => summary.trim().isNotEmpty;
+
   /// Durée (un cours interrompu — Mon Hub fermé — compte ses morceaux).
   Duration get length =>
       (end ?? (parts.isEmpty ? DateTime.now() : start.add(CourseListener.segment * parts.length))).difference(start);
@@ -72,7 +73,7 @@ class CourseNote {
   );
 }
 
-/// Clicky **écoute un cours en entier** puis en fait un compte rendu.
+/// Smily **écoute un cours en entier** puis en fait un compte rendu.
 ///
 /// Le micro enregistre par morceaux de 4 minutes ; chaque morceau est
 /// transcrit pendant que le cours continue (Whisper sur le PC s'il est
@@ -150,8 +151,8 @@ class CourseListener extends ChangeNotifier {
   }
 
   static const noEngine =
-      'Pour écouter un cours, il me faut Whisper (sur ton PC, gratuit, rien ne sort : Réglages de Clicky → '
-      'Écoute → Installer Whisper) ou ta clé Gemini gratuite (Réglages de Clicky → Voix).';
+      'Pour écouter un cours, il me faut Whisper (sur ton PC, gratuit, rien ne sort : Réglages de Smily → '
+      'Écoute → Installer Whisper) ou ta clé Gemini gratuite (Réglages de Smily → Voix).';
 
   /// Commence l'écoute. Renvoie un message d'erreur, ou null si c'est parti.
   /// [liveDoc] : les notes s'écrivent en direct dans un nouveau Google Doc
@@ -341,7 +342,7 @@ class CourseListener extends ChangeNotifier {
       final title = 'Notes — ${note.title} — ${d.day}/${d.month}/${d.year}';
       final id = await GoogleDocs.create(
         title,
-        '# ${note.title} — ${d.day}/${d.month}/${d.year}\n\n*Notes prises en direct par Clicky pendant le cours.*\n',
+        '# ${note.title} — ${d.day}/${d.month}/${d.year}\n\n*Notes prises en direct par Smily pendant le cours.*\n',
       );
       note.docId = id;
       await _put(note);
@@ -406,8 +407,7 @@ class CourseListener extends ChangeNotifier {
 
   /// Enregistre ce compte rendu (par son id : le fichier a pu être relu
   /// entre-temps, par la synchro du compte par exemple).
-  Future<void> _put(CourseNote note) =>
-      notes.update((l) => [...l.where((n) => n.id != note.id), note]);
+  Future<void> _put(CourseNote note) => notes.update((l) => [...l.where((n) => n.id != note.id), note]);
 
   Future<void> delete(CourseNote note) async {
     await notes.update((l) => l..removeWhere((n) => n.id == note.id));
@@ -451,7 +451,7 @@ class CourseListener extends ChangeNotifier {
     try {
       note.summary = await AiText.ask(
         prompt(note),
-        system: 'Tu es Clicky, un assistant qui aide un lycéen à réviser. Réponds en français.',
+        system: 'Tu es Smily, un assistant qui aide un lycéen à réviser. Réponds en français.',
       );
       await _put(note);
     } catch (e) {

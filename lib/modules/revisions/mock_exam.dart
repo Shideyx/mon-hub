@@ -124,9 +124,13 @@ class MockExam {
   /// La correction des réponses rédigées (les QCM se corrigent tout seuls).
   String gradePrompt(List<String> answers) {
     final b = StringBuffer()
-      ..writeln('Corrige cette copie de contrôle blanc ($title), avec bienveillance mais justement, comme un professeur.')
-      ..writeln('Pour chaque question rédigée, donne les points obtenus (par demi-point) et un commentaire court qui dit '
-          'ce qui manque ou ce qui est faux.')
+      ..writeln(
+        'Corrige cette copie de contrôle blanc ($title), avec bienveillance mais justement, comme un professeur.',
+      )
+      ..writeln(
+        'Pour chaque question rédigée, donne les points obtenus (par demi-point) et un commentaire court qui dit '
+        'ce qui manque ou ce qui est faux.',
+      )
       ..writeln();
     for (var i = 0; i < questions.length; i++) {
       final q = questions[i];
@@ -137,8 +141,10 @@ class MockExam {
         ..writeln('Réponse de l\'élève : ${answers[i].trim().isEmpty ? '(pas de réponse)' : answers[i]}')
         ..writeln();
     }
-    b.writeln('Réponds uniquement avec ce JSON : {"questions": [{"numero": 5, "points": 2.5, "commentaire": "…"}], '
-        '"conseil": "ce qu\'il faut revoir en priorité, en 2 ou 3 phrases"}');
+    b.writeln(
+      'Réponds uniquement avec ce JSON : {"questions": [{"numero": 5, "points": 2.5, "commentaire": "…"}], '
+      '"conseil": "ce qu\'il faut revoir en priorité, en 2 ou 3 phrases"}',
+    );
     return b.toString();
   }
 
@@ -157,11 +163,23 @@ class MockExam {
       final q = questions[i];
       if (q.isChoice) {
         final ok = answers[i] == '${q.answer}';
-        marks.add(ExamMark(ok ? q.points : 0, q.points, ok ? 'Bonne réponse.' : 'La bonne réponse était : ${q.choices[q.answer]}.'));
+        marks.add(
+          ExamMark(
+            ok ? q.points : 0,
+            q.points,
+            ok ? 'Bonne réponse.' : 'La bonne réponse était : ${q.choices[q.answer]}.',
+          ),
+        );
       } else {
         final g = byNumber[i + 1];
         final got = ((g?['points'] as num?)?.toDouble() ?? 0).clamp(0, q.points).toDouble();
-        marks.add(ExamMark(got, q.points, '${g?['commentaire'] ?? (answers[i].trim().isEmpty ? 'Pas de réponse.' : 'Pas de correction disponible.')}'));
+        marks.add(
+          ExamMark(
+            got,
+            q.points,
+            '${g?['commentaire'] ?? (answers[i].trim().isEmpty ? 'Pas de réponse.' : 'Pas de correction disponible.')}',
+          ),
+        );
       }
     }
     final advice = j is Map ? '${j['conseil'] ?? ''}' : '';
@@ -222,8 +240,10 @@ class _MockExamPageState extends State<MockExamPage> {
       advice = '';
     });
     try {
-      if (!await AiText.available()) throw 'Il faut une IA : ta clé Gemini gratuite ou Claude (Réglages de Clicky).';
-      final e = MockExam.parse(await AiText.ask(MockExam.prompt(widget.subject, widget.material), system: MockExam.system));
+      if (!await AiText.available()) throw 'Il faut une IA : ta clé Gemini gratuite ou Claude (Réglages de Smily).';
+      final e = MockExam.parse(
+        await AiText.ask(MockExam.prompt(widget.subject, widget.material), system: MockExam.system),
+      );
       if (e == null) throw 'L\'IA n\'a pas réussi à faire le sujet : réessaie.';
       if (!mounted) return;
       for (final f in _fields) {
@@ -315,9 +335,16 @@ class _MockExamPageState extends State<MockExamPage> {
                     const SizedBox(height: 16),
                     if (marks == null)
                       FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: widget.color, padding: const EdgeInsets.symmetric(vertical: 14)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: widget.color,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
                         icon: grading
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
                             : const Icon(Icons.assignment_turned_in_rounded),
                         label: Text(grading ? 'Correction en cours…' : 'Rendre ma copie'),
                         onPressed: grading ? null : _submit,
@@ -387,13 +414,18 @@ class _MockExamPageState extends State<MockExamPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text('${i + 1}. ${q.text}', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    '${i + 1}. ${q.text}',
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   mk == null ? '${fmt(q.points)} pt${q.points > 1 ? 's' : ''}' : '${fmt(mk.got)}/${fmt(mk.max)}',
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: mk == null ? null : (mk.got >= mk.max ? Colors.green : (mk.got == 0 ? Colors.red : Colors.orange)),
+                    color: mk == null
+                        ? null
+                        : (mk.got >= mk.max ? Colors.green : (mk.got == 0 ? Colors.red : Colors.orange)),
                     fontWeight: FontWeight.w800,
                   ),
                 ),

@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/hub_files.dart';
 import '../widgets.dart';
 
-/// Une notion vue avec Clicky (une question et sa réponse).
+/// Une notion vue avec Smily (une question et sa réponse).
 class JournalEntry {
   JournalEntry({
     required this.id,
@@ -53,16 +53,14 @@ class JournalEntry {
       topic: '${j['t'] ?? ''}',
       app: '${j['app'] ?? ''}',
       level: (j['l'] as num?)?.toInt() ?? 0,
-      due: DateTime.fromMillisecondsSinceEpoch(
-        (j['d'] as num?)?.toInt() ?? at.millisecondsSinceEpoch,
-      ),
+      due: DateTime.fromMillisecondsSinceEpoch((j['d'] as num?)?.toInt() ?? at.millisecondsSinceEpoch),
       reviews: (j['r'] as num?)?.toInt() ?? 0,
     );
   }
 }
 
-/// Journal des connaissances : chaque question posée à Clicky y est notée,
-/// et Clicky te propose de **réviser** au bon moment (répétition espacée :
+/// Journal des connaissances : chaque question posée à Smily y est notée,
+/// et Smily te propose de **réviser** au bon moment (répétition espacée :
 /// 1 → 3 → 7 → 14 → 30 → 60 → 120 jours).
 class Journal extends ChangeNotifier {
   Journal._();
@@ -111,12 +109,7 @@ class Journal extends ChangeNotifier {
     return !RegExp(r'^(merci|ok|oui|non|ouvre|lance|stop|salut|bonjour)\b').hasMatch(n);
   }
 
-  Future<void> add({
-    required String question,
-    required String answer,
-    String? board,
-    String app = '',
-  }) async {
+  Future<void> add({required String question, required String answer, String? board, String app = ''}) async {
     if (!worthKeeping(question, answer)) return;
     final now = DateTime.now();
     await _file.update(
@@ -203,7 +196,7 @@ class JournalView extends StatefulWidget {
   const JournalView({super.key, required this.color, this.onQuiz});
   final Color color;
 
-  /// Lance un quiz avec Clicky sur les notions à réviser.
+  /// Lance un quiz avec Smily sur les notions à réviser.
   final void Function(List<JournalEntry> entries)? onQuiz;
 
   @override
@@ -244,9 +237,7 @@ class _JournalViewState extends State<JournalView> {
                       ? 'Rien à réviser pour l\'instant 🎉'
                       : '${due.length} notion${due.length > 1 ? 's' : ''} à réviser',
                 ),
-                subtitle: Text(
-                  '${j.entries.length} notions dans ton journal · ${j.today().length} aujourd\'hui',
-                ),
+                subtitle: Text('${j.entries.length} notions dans ton journal · ${j.today().length} aujourd\'hui'),
                 trailing: due.isEmpty || widget.onQuiz == null
                     ? null
                     : FilledButton.icon(
@@ -266,11 +257,7 @@ class _JournalViewState extends State<JournalView> {
                   ('week', 'Cette semaine'),
                   ('all', 'Tout'),
                 ])
-                  ChoiceChip(
-                    label: Text(l),
-                    selected: filter == k,
-                    onSelected: (_) => setState(() => filter = k),
-                  ),
+                  ChoiceChip(label: Text(l), selected: filter == k, onSelected: (_) => setState(() => filter = k)),
               ],
             ),
             const SizedBox(height: 8),
@@ -278,7 +265,7 @@ class _JournalViewState extends State<JournalView> {
               const Padding(
                 padding: EdgeInsets.all(24),
                 child: EmptyHint(
-                  'Pose des questions à Clicky : chaque notion apprise est notée ici pour la réviser plus tard.',
+                  'Pose des questions à Smily : chaque notion apprise est notée ici pour la réviser plus tard.',
                   icon: Icons.menu_book_rounded,
                 ),
               ),
@@ -291,16 +278,14 @@ class _JournalViewState extends State<JournalView> {
                     child: Text('${e.level + 1}', style: TextStyle(color: widget.color)),
                   ),
                   title: Text(e.topic, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    '${dayLabel(e.at)} · prochaine révision : ${dayLabel(e.due).toLowerCase()}',
-                  ),
+                  subtitle: Text('${dayLabel(e.at)} · prochaine révision : ${dayLabel(e.due).toLowerCase()}'),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   expandedCrossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Question', style: text.labelMedium),
                     SelectableText(e.question),
                     const SizedBox(height: 8),
-                    Text('Ce que Clicky a expliqué', style: text.labelMedium),
+                    Text('Ce que Smily a expliqué', style: text.labelMedium),
                     SelectableText(e.answer),
                     const SizedBox(height: 8),
                     Wrap(

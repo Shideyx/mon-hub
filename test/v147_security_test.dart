@@ -130,8 +130,14 @@ void main() {
     });
 
     test('écritures qui relancent un programme plus tard : toujours demandées', () {
-      expect(PcControl.riskyWrite(r'C:\Users\moi\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\a.txt'), isTrue);
-      expect(PcControl.riskyWrite(r'C:\Users\moi\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1'), isTrue);
+      expect(
+        PcControl.riskyWrite(r'C:\Users\moi\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\a.txt'),
+        isTrue,
+      );
+      expect(
+        PcControl.riskyWrite(r'C:\Users\moi\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+        isTrue,
+      );
       expect(PcControl.riskyWrite(r'C:\Users\moi\Desktop\lancer.bat'), isTrue);
       expect(PcControl.riskyWrite(r'C:\Users\moi\Documents\liste.txt'), isFalse);
     });
@@ -206,7 +212,10 @@ void main() {
     final info = UpdateInfo.fromRelease({
       'tag_name': 'v1.99',
       'assets': [
-        {'name': 'MonHub-Windows.zip', 'browser_download_url': 'https://github.com/$repo/releases/download/v1.99/MonHub-Windows.zip'},
+        {
+          'name': 'MonHub-Windows.zip',
+          'browser_download_url': 'https://github.com/$repo/releases/download/v1.99/MonHub-Windows.zip',
+        },
       ],
     });
     expect(info?.sha256, isNull);
@@ -236,13 +245,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    Future<(int, Map)> send(
-      String path,
-      Object body, {
-      String? key,
-      String? origin,
-      String? host,
-    }) async {
+    Future<(int, Map)> send(String path, Object body, {String? key, String? origin, String? host}) async {
       final req = await client.post('127.0.0.1', bridge.port!, path);
       if (key != null) req.headers.set('authorization', 'Bearer $key');
       if (origin != null) req.headers.set('origin', origin);
@@ -267,7 +270,10 @@ void main() {
     });
 
     test('une page web (Origin) ou un faux nom d\'hôte : refusé, même avec la clé', () async {
-      expect((await send('/call', {'name': 'agenda_lire'}, key: bridge.key, origin: 'https://site-piege.example')).$1, 403);
+      expect(
+        (await send('/call', {'name': 'agenda_lire'}, key: bridge.key, origin: 'https://site-piege.example')).$1,
+        403,
+      );
       expect((await send('/call', {'name': 'agenda_lire'}, key: bridge.key, host: 'site-piege.example')).$1, 403);
       expect(ran, isEmpty);
     });
@@ -310,7 +316,7 @@ void main() {
       PromptShield.reset();
     });
 
-    test('Clicky économe : seulement les actions du groupe demandé', () async {
+    test('Smily économe : seulement les actions du groupe demandé', () async {
       final req = await client.post('127.0.0.1', bridge.port!, '/mcp?groupes=agenda');
       req.headers.set('authorization', 'Bearer ${bridge.key}');
       req.headers.contentType = ContentType.json;
@@ -324,7 +330,7 @@ void main() {
     });
   });
 
-  group('Clicky économe', () {
+  group('Smily économe', () {
     test('les bons groupes d\'actions', () {
       expect(ToolRouter.groupsFor('Quels sont mes devoirs pour demain ?'), containsAll(['ecole', 'agenda']));
       expect(ToolRouter.groupsFor('mets de la musique'), contains('musique'));

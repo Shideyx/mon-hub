@@ -44,7 +44,7 @@ void main() {
     }
 
     expect(rest('Fais-le à ma place : crée un Google Form pour le sondage'), 'crée un Google Form pour le sondage');
-    expect(rest('Clicky, fais ça pour moi, range mes devoirs dans un doc'), 'range mes devoirs dans un doc');
+    expect(rest('Smily, fais ça pour moi, range mes devoirs dans un doc'), 'range mes devoirs dans un doc');
     expect(rest('en arrière-plan, prépare ma fiche d\'histoire'), 'prépare ma fiche d\'histoire');
     expect(rest('fais à ma place'), '');
     expect(rest('comment je fais pour moi-même'), isNull);
@@ -71,7 +71,7 @@ void main() {
     gate.complete('Devoir rendu ✓');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(b.current, isNull);
-    expect(done.single, startsWith('Clicky a fini'));
+    expect(done.single, startsWith('Smily a fini'));
     expect(BrowserLink.instance.trusted, isFalse);
     // Arrêter une tâche.
     b.runner = (_) => Completer<String>().future;

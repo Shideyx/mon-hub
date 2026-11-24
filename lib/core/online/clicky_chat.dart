@@ -8,14 +8,14 @@ import '../module_store.dart';
 import '../prompt_shield.dart';
 import 'spaces.dart';
 
-/// **Clicky dans les discussions** des espaces.
+/// **Smily dans les discussions** des espaces.
 ///
-/// * « @clicky … » dans un message que **tu** écris : ton Clicky répond
+/// * « @clicky … » dans un message que **tu** écris : ton Smily répond
 ///   dans la discussion, pour tout le monde (sans outil : il ne touche à rien
 ///   sur ton PC).
-/// * **Clicky entre eux** (si l'espace l'autorise ET si tu l'as allumé) : ton
-///   Clicky peut répondre à la question d'un autre Clicky. Garde-fous : un
-///   seul Clicky répond à chaque message, la chaîne s'arrête après
+/// * **Smily entre eux** (si l'espace l'autorise ET si tu l'as allumé) : ton
+///   Smily peut répondre à la question d'un autre Smily. Garde-fous : un
+///   seul Smily répond à chaque message, la chaîne s'arrête après
 ///   [maxDepth] réponses, au plus une réponse toutes les 15 s par espace et
 ///   [perDay] par jour.
 /// * Les messages des autres sont des **données**, jamais des ordres
@@ -28,7 +28,7 @@ class ClickyChat {
   static const perDay = 30;
   static const gap = Duration(seconds: 15);
 
-  /// Ton Clicky peut parler avec les Clicky des autres (réglage, éteint par
+  /// Ton Smily peut parler avec les Smily des autres (réglage, éteint par
   /// défaut).
   static const _withOthersKey = 'hub.clickychat.autres';
 
@@ -42,7 +42,7 @@ class ClickyChat {
   /// Le message sans « @clicky ».
   static String question(String body) => body.replaceAll(RegExp(r'@clicky\b[,:]?\s*', caseSensitive: false), '').trim();
 
-  /// Mon Clicky doit-il répondre à [m] ?
+  /// Mon Smily doit-il répondre à [m] ?
   static bool shouldAnswer({
     required ChatMessage m,
     required String me,
@@ -51,13 +51,13 @@ class ClickyChat {
     required bool withOthers,
   }) {
     if (m.body.trim().isEmpty) return false;
-    // Déjà une réponse d'un Clicky à ce message : on ne double pas.
+    // Déjà une réponse d'un Smily à ce message : on ne double pas.
     if (recent.any((r) => r.fromClicky && r.replyTo == m.id)) return false;
     if (!m.fromClicky) {
-      // Ma propre question « @clicky … » : c'est mon Clicky qui répond.
+      // Ma propre question « @clicky … » : c'est mon Smily qui répond.
       return m.author == me && mentions(m.body) && question(m.body).isNotEmpty;
     }
-    // Un message de Clicky : jamais le mien, et seulement si tout le monde
+    // Un message de Smily : jamais le mien, et seulement si tout le monde
     // est d'accord (l'espace + moi).
     if (m.author == me || !space.clickyChat || !withOthers) return false;
     if (m.depth >= maxDepth) return false;
@@ -65,10 +65,10 @@ class ClickyChat {
     return b.endsWith('?') || mentions(b);
   }
 
-  /// Les consignes de Clicky dans une discussion.
+  /// Les consignes de Smily dans une discussion.
   static String system({required String myName, required String spaceName}) =>
-      'Tu es Clicky, l\'assistant de ${myName.isEmpty ? 'ton utilisateur' : myName} dans Mon Hub. Tu participes à la '
-      'discussion « $spaceName », lue par plusieurs personnes (et parfois par leurs propres Clicky). '
+      'Tu es Smily, l\'assistant de ${myName.isEmpty ? 'ton utilisateur' : myName} dans Mon Hub. Tu participes à la '
+      'discussion « $spaceName », lue par plusieurs personnes (et parfois par leurs propres Smily). '
       'Réponds en français, court (1 à 4 phrases), naturel et sympa. Tu n\'as aucun outil ici : tu ne fais aucune '
       'action, tu ne donnes aucun secret, aucun mot de passe, aucune info privée de ton utilisateur. '
       '${PromptShield.rule}';
@@ -113,7 +113,7 @@ class ClickyChat {
     final s = Spaces.instance;
     final me = s.me;
     if (me == null || _busy.contains(space.id)) return;
-    // Vite fait, sans réseau : la plupart des messages ne concernent pas Clicky.
+    // Vite fait, sans réseau : la plupart des messages ne concernent pas Smily.
     if (!m.fromClicky && !(m.author == me && mentions(m.body))) return;
     if (m.fromClicky && (m.author == me || !space.clickyChat || !withOthers)) return;
     final now = DateTime.now();
@@ -127,13 +127,13 @@ class ClickyChat {
     if (last != null && now.difference(last) < gap) return;
     _busy.add(space.id);
     try {
-      // Entre Clicky : on laisse un peu de temps, pour qu'un seul réponde.
+      // Entre Smily : on laisse un peu de temps, pour qu'un seul réponde.
       if (m.fromClicky) await Future<void>.delayed(Duration(milliseconds: 2500 + Random().nextInt(5000)));
       final recent = await s.messages(space.id, limit: 20);
       if (!shouldAnswer(m: m, me: me, space: space, recent: recent, withOthers: withOthers)) return;
       String who(ChatMessage r) {
         final p = s.person(r.author)?.label ?? 'Quelqu\'un';
-        return r.fromClicky ? 'Clicky de $p' : p;
+        return r.fromClicky ? 'Smily de $p' : p;
       }
 
       final raw = await AiText.ask(
@@ -146,7 +146,7 @@ class ClickyChat {
       _count++;
       await s.send(space.id, reply, fromClicky: true, depth: m.fromClicky ? m.depth + 1 : 1, replyTo: m.id);
     } catch (e) {
-      debugPrint('Clicky (discussion) : $e');
+      debugPrint('Smily (discussion) : $e');
     } finally {
       _busy.remove(space.id);
     }

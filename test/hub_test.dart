@@ -81,11 +81,9 @@ void main() {
     expect(find.text('Aujourd\'hui'), findsOneWidget);
   });
 
-  testWidgets('sans Clicky configuré, rien de Clicky ne s\'affiche et l\'appli marche', (
-    tester,
-  ) async {
+  testWidgets('sans Smily configuré, rien de Smily ne s\'affiche et l\'appli marche', (tester) async {
     SharedPreferences.setMockInitialValues({
-      // Cerveau « clé API » sans clé : Clicky n'est pas configuré.
+      // Cerveau « clé API » sans clé : Smily n'est pas configuré.
       'mod.claude.clicky.provider': '"claude"',
     });
     await ModuleStore.init();
@@ -93,7 +91,7 @@ void main() {
     await tester.pumpWidget(HubApp(controller: hub, notifications: NotificationCenter(hub)));
     await tester.pump(const Duration(milliseconds: 100));
     expect(ClickyController.instance.ready, isFalse);
-    expect(find.byTooltip('Clicky (maintiens Ctrl + Alt pour parler)'), findsNothing);
+    expect(find.byTooltip('Smily (maintiens Ctrl + Alt pour parler)'), findsNothing);
     // Ctrl + Alt ne fait rien.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);

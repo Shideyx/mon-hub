@@ -11,7 +11,7 @@ import 'claude_api.dart';
 /// Une demande simple à l'IA, sans outils : corriger un texte, résumer,
 /// créer des cartes de révision… Utilise ce que tu as déjà : ta clé Gemini
 /// gratuite (rapide, lit aussi les photos et les PDF), sinon le cerveau de
-/// Clicky (abonnement Claude, clé API ou Ollama sur le PC).
+/// Smily (abonnement Claude, clé API ou Ollama sur le PC).
 class AiText {
   AiText._();
 
@@ -38,7 +38,7 @@ class AiText {
   /// un PDF en base64 (Gemini seulement).
   static Future<String> ask(
     String prompt, {
-    String system = 'Tu es Clicky, un assistant qui aide un lycéen. Réponds en français.',
+    String system = 'Tu es Smily, un assistant qui aide un lycéen. Réponds en français.',
     List<String> images = const [],
     String? pdf,
     bool geminiOnly = false,
@@ -55,7 +55,7 @@ class AiText {
       try {
         return await _gemini(key, prompt, system, images, pdf);
       } catch (e) {
-        // Quota épuisé ou panne : on essaie le cerveau de Clicky.
+        // Quota épuisé ou panne : on essaie le cerveau de Smily.
         if (pdf != null) rethrow;
       }
     }

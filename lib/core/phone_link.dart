@@ -190,9 +190,8 @@ class PhoneLink extends ChangeNotifier {
       var bestScore = -1;
       for (final i in all) {
         final name = i.name.toLowerCase();
-        final virtual = RegExp(
-          r'vethernet|virtual|vmware|vbox|hyper-v|wsl|docker|loopback|tailscale|zerotier|vpn',
-        ).hasMatch(name);
+        final virtual = RegExp(r'vethernet|virtual|vmware|vbox|hyper-v|wsl|docker|loopback|tailscale|zerotier|vpn')
+            .hasMatch(name);
         for (final a in i.addresses) {
           if (!isPrivate(a.address)) continue;
           var score = virtual ? 0 : 1;
@@ -411,7 +410,9 @@ class PhoneLink extends ChangeNotifier {
       final k = _pendingNames.length;
       notify?.call(
         k == 1 ? '📱 Reçu du téléphone' : '📱 $k fichiers reçus du téléphone',
-        k == 1 ? '${_pendingNames.first} → Téléchargements › Depuis mon téléphone' : 'Dans Téléchargements › Depuis mon téléphone',
+        k == 1
+            ? '${_pendingNames.first} → Téléchargements › Depuis mon téléphone'
+            : 'Dans Téléchargements › Depuis mon téléphone',
       );
       _pendingNames.clear();
     });

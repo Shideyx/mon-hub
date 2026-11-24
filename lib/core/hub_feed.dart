@@ -29,7 +29,7 @@ class FeedItem {
   /// Les modules d'où vient l'info (affichés en petit : « Agenda + Révisions »).
   final List<String> from;
 
-  /// Plus c'est haut, plus c'est important (le premier est dit par Clicky).
+  /// Plus c'est haut, plus c'est important (le premier est dit par Smily).
   final int priority;
 }
 
@@ -48,7 +48,7 @@ class HubFeed extends ChangeNotifier {
   DateTime? updatedAt;
   bool _busy = false;
 
-  /// L'info la plus importante (Clicky peut la dire).
+  /// L'info la plus importante (Smily peut la dire).
   FeedItem? get top => items.firstOrNull;
 
   /// Relit les modules (au plus une fois toutes les 3 minutes, sauf [force]).
@@ -105,7 +105,8 @@ class HubFeed extends ChangeNotifier {
 
   static DateTime? _date(Object? v) => v is DateTime ? v : DateTime.tryParse('${v ?? ''}');
 
-  static String _hour(DateTime d) => d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
+  static String _hour(DateTime d) =>
+      d.minute == 0 ? '${d.hour} h' : '${d.hour} h ${d.minute.toString().padLeft(2, '0')}';
 
   static String _when(DateTime d, DateTime now) {
     final days = DateTime(d.year, d.month, d.day).difference(DateTime(now.year, now.month, now.day)).inDays;
@@ -145,7 +146,10 @@ class HubFeed extends ChangeNotifier {
           moduleId: 'schedule',
           icon: Icons.schedule_rounded,
           title: soon <= 60 ? '${e['titre']} dans $soon min' : '${e['titre']} ${_when(d, now)} à ${_hour(d)}',
-          detail: [if ('${e['lieu'] ?? ''}'.isNotEmpty) '${e['lieu']}', '${e['source'] ?? ''}'].where((x) => x.isNotEmpty).join(' · '),
+          detail: [
+            if ('${e['lieu'] ?? ''}'.isNotEmpty) '${e['lieu']}',
+            '${e['source'] ?? ''}',
+          ].where((x) => x.isNotEmpty).join(' · '),
           action: 'Agenda',
           from: const ['schedule'],
           priority: soon <= 30 ? 90 : 40,
@@ -166,7 +170,9 @@ class HubFeed extends ChangeNotifier {
     if (tests.isNotEmpty) {
       final (h, d) = tests.first;
       final subject = '${h['matiere'] ?? ''}'.trim();
-      final deck = decks.where((p) => subject.isNotEmpty && '${p['nom']}'.toLowerCase().contains(subject.toLowerCase())).firstOrNull;
+      final deck = decks
+          .where((p) => subject.isNotEmpty && '${p['nom']}'.toLowerCase().contains(subject.toLowerCase()))
+          .firstOrNull;
       out.add(
         FeedItem(
           id: 'test:$subject:${d.toIso8601String()}',
@@ -267,7 +273,7 @@ class HubFeed extends ChangeNotifier {
     return out;
   }
 
-  /// Ce que Clicky peut dire de l'info la plus importante (sans IA).
+  /// Ce que Smily peut dire de l'info la plus importante (sans IA).
   static String? say(FeedItem? i) {
     if (i == null || i.priority < 50) return null;
     return switch (i.moduleId) {

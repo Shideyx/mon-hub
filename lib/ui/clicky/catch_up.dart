@@ -54,46 +54,74 @@ class CatchUp {
   }) {
     final from = now.subtract(since);
     final parts = <String>[];
-    final unread = [for (final d in dms) if (d['non_lu'] == true && d['de_moi'] != true) d];
+    final unread = [
+      for (final d in dms)
+        if (d['non_lu'] == true && d['de_moi'] != true) d,
+    ];
     if (unread.isNotEmpty) {
       final shown = [
         for (final d in unread.take(3))
           '${d['nom']}${'${d['dernier'] ?? ''}'.contains(' : ') ? ' (« ${_short('${d['dernier']}'.split(' : ').skip(1).join(' : '), 45)} »)' : ''}',
       ];
-      parts.add('${unread.length} message${unread.length > 1 ? 's' : ''} privé${unread.length > 1 ? 's' : ''} sur Discord : '
-          '${_list(shown)}${unread.length > 3 ? '…' : ''}');
+      parts.add(
+        '${unread.length} message${unread.length > 1 ? 's' : ''} privé${unread.length > 1 ? 's' : ''} sur Discord : '
+        '${_list(shown)}${unread.length > 3 ? '…' : ''}',
+      );
     }
-    final ment = [for (final m in mentions) if ((_date(m['date']) ?? now).isAfter(from)) m];
+    final ment = [
+      for (final m in mentions)
+        if ((_date(m['date']) ?? now).isAfter(from)) m,
+    ];
     if (ment.isNotEmpty) {
       final servers = {for (final m in ment) '${m['serveur'] ?? 'un serveur'}'}.toList();
       final last = ment.first;
-      parts.add('${ment.length} mention${ment.length > 1 ? 's' : ''} sur ${_list(servers.take(3).toList())}'
-          ' (${last['de']} : « ${_short('${last['texte'] ?? ''}', 45)} »)');
+      parts.add(
+        '${ment.length} mention${ment.length > 1 ? 's' : ''} sur ${_list(servers.take(3).toList())}'
+        ' (${last['de']} : « ${_short('${last['texte'] ?? ''}', 45)} »)',
+      );
     }
-    final newMails = [for (final m in mails) if (m['lu'] == false && (_date(m['date']) ?? now).isAfter(from)) m];
-    final important = [for (final m in newMails) if (importantMail(m)) m];
+    final newMails = [
+      for (final m in mails)
+        if (m['lu'] == false && (_date(m['date']) ?? now).isAfter(from)) m,
+    ];
+    final important = [
+      for (final m in newMails)
+        if (importantMail(m)) m,
+    ];
     if (important.isNotEmpty) {
       String who(Map m) => '${m['de'] ?? ''}'.split('<').first.trim();
-      parts.add('${important.length} mail${important.length > 1 ? 's' : ''} important${important.length > 1 ? 's' : ''} : '
-          '${_list([for (final m in important.take(3)) '${who(m)} (« ${_short('${m['objet']}', 40)} »)'])}');
+      parts.add(
+        '${important.length} mail${important.length > 1 ? 's' : ''} important${important.length > 1 ? 's' : ''} : '
+        '${_list([for (final m in important.take(3)) '${who(m)} (« ${_short('${m['objet']}', 40)} »)'])}',
+      );
     }
     final pubs = newMails.length - important.length;
-    if (pubs > 0 && parts.isNotEmpty) parts.add('$pubs pub${pubs > 1 ? 's' : ''} ou newsletter${pubs > 1 ? 's' : ''} sans importance');
-    final ed = [for (final m in school) if (m['lu'] == false) m];
+    if (pubs > 0 && parts.isNotEmpty) {
+      parts.add('$pubs pub${pubs > 1 ? 's' : ''} ou newsletter${pubs > 1 ? 's' : ''} sans importance');
+    }
+    final ed = [
+      for (final m in school)
+        if (m['lu'] == false) m,
+    ];
     if (ed.isNotEmpty) {
-      parts.add('${ed.length} message${ed.length > 1 ? 's' : ''} École Directe (${_list([for (final m in ed.take(2)) '${m['de']}'])})');
+      parts.add(
+        '${ed.length} message${ed.length > 1 ? 's' : ''} École Directe (${_list([for (final m in ed.take(2)) '${m['de']}'])})',
+      );
     }
     if (parts.isEmpty) return '';
     // Qui attend une réponse depuis longtemps.
     final waiting = [
       for (final d in unread)
-        if (_date(d['date']) case final at? when now.difference(at) >= const Duration(hours: 2)) (d, now.difference(at)),
+        if (_date(d['date']) case final at? when now.difference(at) >= const Duration(hours: 2))
+          (d, now.difference(at)),
     ];
-    final wait = waiting.isEmpty ? '' : ' ${waiting.first.$1['nom']} attend ta réponse depuis ${_ago(waiting.first.$2)}.';
+    final wait = waiting.isEmpty
+        ? ''
+        : ' ${waiting.first.$1['nom']} attend ta réponse depuis ${_ago(waiting.first.$2)}.';
     return 'Pendant ton absence : ${parts.join(' ; ')}.$wait';
   }
 
-  /// Une seule phrase courte (pour le « re-bonjour » de Clicky).
+  /// Une seule phrase courte (pour le « re-bonjour » de Smily).
   static String short(String full) {
     if (full.isEmpty) return '';
     final body = full.replaceFirst('Pendant ton absence : ', '');
@@ -122,6 +150,13 @@ class CatchUp {
       get('mails_lister', {'nombre': 30}),
       get('ecole_messages'),
     ]);
-    return build(dms: _maps(r[0]), mentions: _maps(r[1]), mails: _maps(r[2]), school: _maps(r[3]), now: DateTime.now(), since: since);
+    return build(
+      dms: _maps(r[0]),
+      mentions: _maps(r[1]),
+      mails: _maps(r[2]),
+      school: _maps(r[3]),
+      now: DateTime.now(),
+      since: since,
+    );
   }
 }

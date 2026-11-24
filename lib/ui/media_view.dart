@@ -117,7 +117,8 @@ class MediaThumb extends StatelessWidget {
                   fit: fit,
                   // Décodée à la taille affichée (pas en 4K) : défilement fluide.
                   cacheWidth: (width * 2 * MediaQuery.devicePixelRatioOf(context)).round(),
-                  errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)),
+                  errorBuilder: (_, _, _) =>
+                      const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)),
                 ),
               if (m.isVideo)
                 Center(
@@ -216,7 +217,8 @@ class _MediaViewerState extends State<MediaViewer> {
                         loadingBuilder: (c, child, prog) => prog == null
                             ? child
                             : const Center(child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white54)),
-                        errorBuilder: (_, _, _) => const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 60),
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 60),
                       ),
                     ),
                   );
@@ -236,8 +238,10 @@ class _MediaViewerState extends State<MediaViewer> {
                 Positioned(
                   top: 20,
                   right: 20,
-                  child: Text('${i + 1} / ${widget.items.length}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  child: Text(
+                    '${i + 1} / ${widget.items.length}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
                 ),
                 if (i > 0)
                   Align(
@@ -274,8 +278,12 @@ class _MediaViewerState extends State<MediaViewer> {
                         end: Alignment.bottomCenter,
                       ),
                     ),
-                    child: Text(widget.caption!, maxLines: 4, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white)),
+                    child: Text(
+                      widget.caption!,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
                 ),
             ],

@@ -303,12 +303,7 @@ class EcoleDirecteModule extends HubModule {
           body: '${g.value}/${g.outOf}${g.title.isEmpty ? '' : ' · ${g.title}'}',
         ),
       for (final m in messages)
-        if (!m.read)
-          HubNotification(
-            id: 'msg:${m.id}',
-            title: '📨 École Directe · ${m.from}',
-            body: m.subject,
-          ),
+        if (!m.read) HubNotification(id: 'msg:${m.id}', title: '📨 École Directe · ${m.from}', body: m.subject),
       for (final h in homework)
         HubNotification(
           id: 'devoir:${h.id}',
@@ -369,7 +364,10 @@ class EcoleDirecteModule extends HubModule {
         }
         final subject = GradeMath.matchSubject(q, {for (final g in period) g.subject});
         if (subject == null) return {'ok': false, 'message': 'Pas de note en « $q » ce trimestre.'};
-        final mine = [for (final g in period) if (g.subject == subject) g];
+        final mine = [
+          for (final g in period)
+            if (g.subject == subject) g,
+        ];
         final avg = GradeMath.average(mine);
         final target = (a['objectif'] as num?)?.toDouble();
         final coef = (a['coef'] as num?)?.toDouble() ?? 1;
@@ -442,14 +440,21 @@ class EcoleDirecteModule extends HubModule {
               for (final f in h.files) f,
         ];
         if (candidates.isEmpty) throw 'Aucun fichier joint aux devoirs de « ${a['matiere']} »';
-        final f = candidates.where((f) => wanted.isNotEmpty && f.name.toLowerCase().contains(wanted)).firstOrNull ??
+        final f =
+            candidates.where((f) => wanted.isNotEmpty && f.name.toLowerCase().contains(wanted)).firstOrNull ??
             candidates.first;
         final bytes = await withSession(() => client.attachment(f));
         final full = '${a['mode'] ?? ''}'.toLowerCase().startsWith('enonc');
         final summary = await FileViewer.summarize(f.name, Uint8List.fromList(bytes), full: full);
-        return {'fichier': f.name, full ? 'enonce' : 'essentiel': summary, if (candidates.length > 1) 'autres_fichiers': [
-          for (final x in candidates) if (x != f) x.name,
-        ]};
+        return {
+          'fichier': f.name,
+          full ? 'enonce' : 'essentiel': summary,
+          if (candidates.length > 1)
+            'autres_fichiers': [
+              for (final x in candidates)
+                if (x != f) x.name,
+            ],
+        };
       },
     ),
     HubTool(
@@ -488,10 +493,16 @@ class EcoleDirecteModule extends HubModule {
           return {
             'fichiers_du_cloud': [
               for (final f in all.allFiles.take(200))
-                {'id': f.id, 'nom': f.name, if (f.size > 0) 'taille': fileSize(f.size), if (f.date != null) 'date': f.date},
+                {
+                  'id': f.id,
+                  'nom': f.name,
+                  if (f.size > 0) 'taille': fileSize(f.size),
+                  if (f.date != null) 'date': f.date,
+                },
             ],
             'documents': [
-              for (final d in docs.take(60)) {'id': d.id, 'nom': d.title, 'type': d.category, if (d.date != null) 'date': d.date},
+              for (final d in docs.take(60))
+                {'id': d.id, 'nom': d.title, 'type': d.category, if (d.date != null) 'date': d.date},
             ],
           };
         }
@@ -513,7 +524,8 @@ class EcoleDirecteModule extends HubModule {
     ),
     HubTool(
       name: 'ecole_espaces_travail',
-      description: 'Mes espaces de travail École Directe (classes, clubs, projets) : titre, description, '
+      description:
+          'Mes espaces de travail École Directe (classes, clubs, projets) : titre, description, '
           'membre ou non, et les fichiers de leur cloud.',
       run: (_) async {
         final list = await withSession(client.workspaces);
@@ -542,16 +554,11 @@ class EcoleDirecteModule extends HubModule {
       description:
           'Télécharge un fichier de mon cloud École Directe dans Téléchargements\\École Directe '
           '(id donné par ecole_cloud) et renvoie où il est.',
-      params: {
-        'id': ('string', 'id du fichier'),
-        'nom': ('string', 'nom du fichier'),
-      },
+      params: {'id': ('string', 'id du fichier'), 'nom': ('string', 'nom du fichier')},
       required: ['id'],
       run: (a) async {
         final id = '${a['id']}';
-        final name = '${a['nom'] ?? ''}'.trim().isEmpty
-            ? id.split(RegExp(r'[\\/]')).last
-            : '${a['nom']}'.trim();
+        final name = '${a['nom'] ?? ''}'.trim().isEmpty ? id.split(RegExp(r'[\\/]')).last : '${a['nom']}'.trim();
         final f = EdCloudNode(id: id, name: name, folder: false);
         final bytes = await withSession(() => client.cloudFile(f));
         return 'Enregistré : ${await saveDownload(name, bytes)}';
@@ -619,9 +626,7 @@ class EcoleDirecteModule extends HubModule {
                 ),
               ),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Plus tard')),
-            ],
+            actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Plus tard'))],
           ),
         );
       } finally {
@@ -691,10 +696,7 @@ class EcoleDirecteModule extends HubModule {
               return EmptyHint(lastError!, action: ('Réessayer', retry));
             }
             final now = DateTime.now();
-            final next = (snap.data ?? [])
-                .where((l) => l.end.isAfter(now) && !l.cancelled)
-                .take(7)
-                .toList();
+            final next = (snap.data ?? []).where((l) => l.end.isAfter(now) && !l.cancelled).take(7).toList();
             if (snap.connectionState == ConnectionState.waiting && next.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
@@ -769,8 +771,7 @@ class EcoleDirecteModule extends HubModule {
                 Widget wrap(List<Widget> children, String empty) => ListView(
                   children: [
                     if (lastError != null) ErrorBanner(lastError!),
-                    if (waiting && children.isEmpty)
-                      const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
+                    if (waiting && children.isEmpty) const Padding(padding: EdgeInsets.all(32), child: LoadingHint()),
                     ...children,
                     if (!waiting && children.isEmpty)
                       Padding(padding: const EdgeInsets.all(32), child: EmptyHint(empty)),
@@ -796,10 +797,7 @@ class EcoleDirecteModule extends HubModule {
 
   Widget _dayHeader(BuildContext context, String d) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-    child: Text(
-      d,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-    ),
+    child: Text(d, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
   );
 
   List<Widget> _lessonTiles(BuildContext context) {
@@ -815,21 +813,11 @@ class EcoleDirecteModule extends HubModule {
         ListTile(
           leading: SizedBox(
             width: 52,
-            child: Text(
-              '${hhmm(l.start)}\n${hhmm(l.end)}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
+            child: Text('${hhmm(l.start)}\n${hhmm(l.end)}', style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
-          title: Text(
-            l.subject,
-            style: l.cancelled ? const TextStyle(decoration: TextDecoration.lineThrough) : null,
-          ),
+          title: Text(l.subject, style: l.cancelled ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
           subtitle: Text(
-            [
-              if (l.cancelled) 'ANNULÉ',
-              if (l.room.isNotEmpty) l.room,
-              if (l.teacher.isNotEmpty) l.teacher,
-            ].join(' · '),
+            [if (l.cancelled) 'ANNULÉ', if (l.room.isNotEmpty) l.room, if (l.teacher.isNotEmpty) l.teacher].join(' · '),
           ),
         ),
       );
@@ -852,9 +840,7 @@ class EcoleDirecteModule extends HubModule {
           child: ExpansionTile(
             shape: const Border(),
             leading: Icon(
-              h.done
-                  ? Icons.check_circle_rounded
-                  : (h.isTest ? Icons.warning_rounded : Icons.circle_outlined),
+              h.done ? Icons.check_circle_rounded : (h.isTest ? Icons.warning_rounded : Icons.circle_outlined),
               color: h.done ? Colors.green : (h.isTest ? Colors.orange : color),
             ),
             title: Text(h.subject, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -902,13 +888,8 @@ class EcoleDirecteModule extends HubModule {
       ListTile(
         leading: HubAvatar(label: g.subject, color: color, size: 38),
         title: Text(g.subject),
-        subtitle: Text(
-          [if (g.title.isNotEmpty) g.title, if (g.date != null) dayLabel(g.date!)].join(' · '),
-        ),
-        trailing: Text(
-          '${g.value}/${g.outOf}',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-        ),
+        subtitle: Text([if (g.title.isNotEmpty) g.title, if (g.date != null) dayLabel(g.date!)].join(' · ')),
+        trailing: Text('${g.value}/${g.outOf}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
       ),
   ];
 }
@@ -960,16 +941,8 @@ class _MessagesTabState extends State<_MessagesTab> {
             children: [
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(
-                    value: 'received',
-                    icon: Icon(Icons.inbox_rounded),
-                    label: Text('Reçus'),
-                  ),
-                  ButtonSegment(
-                    value: 'sent',
-                    icon: Icon(Icons.send_rounded),
-                    label: Text('Envoyés'),
-                  ),
+                  ButtonSegment(value: 'received', icon: Icon(Icons.inbox_rounded), label: Text('Reçus')),
+                  ButtonSegment(value: 'sent', icon: Icon(Icons.send_rounded), label: Text('Envoyés')),
                 ],
                 selected: {folder},
                 onSelectionChanged: (v) => setState(() => folder = v.first),
@@ -988,12 +961,7 @@ class _MessagesTabState extends State<_MessagesTab> {
     );
   }
 
-  Widget _list(
-    BuildContext context,
-    List<EdMessage> msgs, {
-    String? error,
-    bool waiting = false,
-  }) => RefreshIndicator(
+  Widget _list(BuildContext context, List<EdMessage> msgs, {String? error, bool waiting = false}) => RefreshIndicator(
     onRefresh: _refresh,
     child: ListView(
       children: [
@@ -1007,17 +975,13 @@ class _MessagesTabState extends State<_MessagesTab> {
         for (final msg in msgs)
           ListTile(
             leading: HubAvatar(label: msg.from, color: msg.read ? Colors.blueGrey : m.color),
-            title: Text(
-              msg.from,
-              style: TextStyle(fontWeight: msg.read ? FontWeight.w500 : FontWeight.w800),
-            ),
+            title: Text(msg.from, style: TextStyle(fontWeight: msg.read ? FontWeight.w500 : FontWeight.w800)),
             subtitle: Text(msg.subject, maxLines: 1, overflow: TextOverflow.ellipsis),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (msg.date != null)
-                  Text(timeAgo(msg.date!), style: Theme.of(context).textTheme.labelSmall),
+                if (msg.date != null) Text(timeAgo(msg.date!), style: Theme.of(context).textTheme.labelSmall),
                 if (msg.hasFiles) const Icon(Icons.attach_file_rounded, size: 16),
               ],
             ),
@@ -1025,7 +989,9 @@ class _MessagesTabState extends State<_MessagesTab> {
               msg.read = true;
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => _MessagePage(module: m, message: msg)),
+                MaterialPageRoute(
+                  builder: (_) => _MessagePage(module: m, message: msg),
+                ),
               );
               m.store.changed();
               if (mounted) setState(() {});
@@ -1061,10 +1027,7 @@ class _MessagePageState extends State<_MessagePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Enregistré : ${loc.path}'),
-            action: SnackBarAction(
-              label: 'Ouvrir',
-              onPressed: () => launchUrl(Uri.file(loc.path)),
-            ),
+            action: SnackBarAction(label: 'Ouvrir', onPressed: () => launchUrl(Uri.file(loc.path))),
           ),
         );
       }
@@ -1085,16 +1048,9 @@ class _MessagePageState extends State<_MessagePage> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text(
-                  msg.subject,
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
+                Text(msg.subject, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 if (msg.date != null)
-                  Text(
-                    '${dayLabel(msg.date!)} à ${hhmm(msg.date!)}',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
+                  Text('${dayLabel(msg.date!)} à ${hhmm(msg.date!)}', style: Theme.of(context).textTheme.labelMedium),
                 const Divider(height: 28),
                 FutureBuilder(
                   future: content,
@@ -1107,9 +1063,7 @@ class _MessagePageState extends State<_MessagePage> {
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('Réessayer'),
                             onPressed: () => setState(() {
-                              content = m.withSession(
-                                () => m.client.message(msg.id, sent: msg.sent),
-                              );
+                              content = m.withSession(() => m.client.message(msg.id, sent: msg.sent));
                             }),
                           ),
                         ],
@@ -1120,10 +1074,7 @@ class _MessagePageState extends State<_MessagePage> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SelectableText(
-                          d.text.isEmpty ? '(message vide)' : d.text,
-                          style: const TextStyle(height: 1.5),
-                        ),
+                        SelectableText(d.text.isEmpty ? '(message vide)' : d.text, style: const TextStyle(height: 1.5)),
                         if (d.files.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Text('Pièces jointes', style: Theme.of(context).textTheme.titleSmall),
@@ -1138,11 +1089,8 @@ class _MessagePageState extends State<_MessagePage> {
                                 icon: const Icon(Icons.download_rounded),
                                 onPressed: () => _download(f),
                               ),
-                              onTap: () => FileViewer.open(
-                                context,
-                                f.name,
-                                () => m.withSession(() => m.client.attachment(f)),
-                              ),
+                              onTap: () =>
+                                  FileViewer.open(context, f.name, () => m.withSession(() => m.client.attachment(f))),
                             ),
                         ],
                       ],
@@ -1160,8 +1108,7 @@ class _MessagePageState extends State<_MessagePage> {
                 onSend: (text) async {
                   await m.withSession(() => m.client.reply(msg, text));
                   if (c.mounted) {
-                    ScaffoldMessenger.of(c)
-                        .showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
+                    ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Réponse envoyée ✉️')));
                   }
                 },
               ),
@@ -1171,7 +1118,6 @@ class _MessagePageState extends State<_MessagePage> {
     );
   }
 }
-
 
 /// Taille lisible (« 1,2 Mo »).
 String fileSize(int bytes) {
@@ -1253,9 +1199,8 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
     }
   }
 
-  Widget _busyOr(String id, Widget w) => _downloading == id
-      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-      : w;
+  Widget _busyOr(String id, Widget w) =>
+      _downloading == id ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : w;
 
   Widget _fileTile(EdCloudNode f, {double indent = 0, bool showPath = false}) {
     final text = Theme.of(context).textTheme;
@@ -1333,7 +1278,9 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
       final root = snap.data!;
       if (query.isNotEmpty) {
         final hits = root.allFiles.where((f) => f.name.toLowerCase().contains(query)).toList();
-        if (hits.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('Aucun fichier ne correspond.'));
+        if (hits.isEmpty) {
+          return const Padding(padding: EdgeInsets.all(16), child: Text('Aucun fichier ne correspond.'));
+        }
         return Column(children: [for (final f in hits) _fileTile(f, showPath: true)]);
       }
       if (root.children.isEmpty) {
@@ -1350,10 +1297,7 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
         Icon(icon, color: m.color),
         const SizedBox(width: 8),
         Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-        if (sub != null) ...[
-          const SizedBox(width: 8),
-          Text(sub, style: Theme.of(context).textTheme.labelSmall),
-        ],
+        if (sub != null) ...[const SizedBox(width: 8), Text(sub, style: Theme.of(context).textTheme.labelSmall)],
       ],
     ),
   );
@@ -1390,7 +1334,10 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
               FutureBuilder(
                 future: _spaces,
                 builder: (context, snap) {
-                  final spaces = [for (final w in snap.data ?? const <EdWorkspace>[]) if (w.hasCloud && w.member) w];
+                  final spaces = [
+                    for (final w in snap.data ?? const <EdWorkspace>[])
+                      if (w.hasCloud && w.member) w,
+                  ];
                   if (spaces.isEmpty) return const SizedBox.shrink();
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1409,9 +1356,7 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
                               });
                             }
                           },
-                          children: [
-                            if (_spaceClouds[w.id] != null) _cloudBlock(_spaceClouds[w.id]!, q),
-                          ],
+                          children: [if (_spaceClouds[w.id] != null) _cloudBlock(_spaceClouds[w.id]!, q)],
                         ),
                     ],
                   );
@@ -1498,7 +1443,6 @@ class _CloudTabState extends State<_CloudTab> with AutomaticKeepAliveClientMixin
   }
 }
 
-
 /// Les espaces de travail : ceux dont tu es membre en premier, avec leur
 /// description et leur cloud.
 class _WorkspacesTab extends StatefulWidget {
@@ -1529,11 +1473,15 @@ class _WorkspacesTabState extends State<_WorkspacesTab> with AutomaticKeepAliveC
         builder: (context, snap) {
           if (snap.hasError) return ListView(children: [ErrorBanner('${snap.error}')]);
           if (!snap.hasData) return const LoadingHint();
-          final list = [...snap.data!]..sort((a, b) => a.member == b.member ? a.title.compareTo(b.title) : (a.member ? -1 : 1));
+          final list = [...snap.data!]
+            ..sort((a, b) => a.member == b.member ? a.title.compareTo(b.title) : (a.member ? -1 : 1));
           if (list.isEmpty) {
             return ListView(
               children: const [
-                Padding(padding: EdgeInsets.all(32), child: EmptyHint('Aucun espace de travail', icon: Icons.groups_rounded)),
+                Padding(
+                  padding: EdgeInsets.all(32),
+                  child: EmptyHint('Aucun espace de travail', icon: Icons.groups_rounded),
+                ),
               ],
             );
           }
@@ -1564,7 +1512,9 @@ class _WorkspacesTabState extends State<_WorkspacesTab> with AutomaticKeepAliveC
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute<void>(builder: (_) => _WorkspacePage(module: m, space: w)),
+                      MaterialPageRoute<void>(
+                        builder: (_) => _WorkspacePage(module: m, space: w),
+                      ),
                     ),
                   ),
                 ),
@@ -1588,7 +1538,9 @@ class _WorkspacePage extends StatefulWidget {
 class _WorkspacePageState extends State<_WorkspacePage> {
   EcoleDirecteModule get m => widget.module;
   EdWorkspace get w => widget.space;
-  late Future<EdCloudNode>? cloud = w.member && w.hasCloud ? m.withSession(() => m.client.cloudAll(owner: 'W/${w.id}')) : null;
+  late Future<EdCloudNode>? cloud = w.member && w.hasCloud
+      ? m.withSession(() => m.client.cloudAll(owner: 'W/${w.id}'))
+      : null;
   bool joined = false;
   String? busy;
 

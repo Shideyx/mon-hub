@@ -53,7 +53,7 @@ import 'ui/widget_window.dart';
 import 'ui/search_page.dart';
 
 Future<void> main(List<String> args) async {
-  // « hub.exe --clicky » : Clicky partout (Windows), voir clicky_desktop.dart.
+  // « hub.exe --clicky » : Smily partout (Windows), voir clicky_desktop.dart.
   if (args.contains('--clicky')) return runClickyDesktop();
   // « hub.exe --widget=musique » : un widget détaché sur le bureau.
   final widget = args.where((a) => a.startsWith('--widget=')).firstOrNull;
@@ -76,7 +76,7 @@ Future<void> main(List<String> args) async {
   final updater = Updater.instance..beforeInstall = ClickyDesktop.stop;
   var paused = false;
   updater.addListener(() {
-    // Clicky partout se met en pause pendant la mise à jour.
+    // Smily partout se met en pause pendant la mise à jour.
     if (updater.showing && !paused) {
       paused = true;
       unawaited(ClickyDesktop.stop());
@@ -91,7 +91,7 @@ Future<void> main(List<String> args) async {
   runApp(const HubApp());
 }
 
-/// Une fois : « Clicky peut maintenant voir ton écran et entendre ton PC ».
+/// Une fois : « Smily peut maintenant voir ton écran et entendre ton PC ».
 Future<void> _announceSenses(NotificationCenter n) async {
   const key = 'app.sens.annonce';
   if (ModuleStore.global.getBool(key) == true) return;
@@ -101,10 +101,10 @@ Future<void> _announceSenses(NotificationCenter n) async {
   await n.post(
     HubNotification(
       id: 'sens:annonce',
-      title: '👀 Nouveau : Clicky peut voir ton écran et entendre ton PC',
+      title: '👀 Nouveau : Smily peut voir ton écran et entendre ton PC',
       body:
           'En continu, mais tout reste sur ton PC (jamais tes messages, ta banque ni pendant un appel). '
-          'À allumer dans Réglages de Clicky → Ses yeux et ses oreilles.',
+          'À allumer dans Réglages de Smily → Ses yeux et ses oreilles.',
       moduleId: 'claude',
     ),
   );
@@ -219,8 +219,8 @@ class _HubAppState extends State<HubApp> {
   }
 
   /// Mon Hub en ligne : reprend la session du compte, puis les espaces, les
-  /// discussions (notification quand on t'écrit) et Clicky dans les
-  /// discussions (« @clicky », Clicky entre eux).
+  /// discussions (notification quand on t'écrit) et Smily dans les
+  /// discussions (« @clicky », Smily entre eux).
   Future<void> _startOnline(NotificationCenter n) async {
     Online.instance.addListener(_onlineChanged);
     Spaces.instance.onMessage = (space, m) {
@@ -229,7 +229,7 @@ class _HubAppState extends State<HubApp> {
       unawaited(ClickyChat.instance.handle(space, m, myName: myName));
       if (m.author == sp.me || sp.viewing == space.id) return;
       final who = sp.person(m.author)?.label ?? 'Quelqu\'un';
-      final from = m.fromClicky ? 'Clicky de $who' : who;
+      final from = m.fromClicky ? 'Smily de $who' : who;
       unawaited(
         n.post(
           HubNotification(
@@ -303,7 +303,7 @@ class _HubAppState extends State<HubApp> {
         // Tes travaux (Documents, Bureau) copiés dans ton Drive : lourd, donc
         // jamais en mode léger.
         if (Perf.heavy) Perf.later(4, WorkBackup.instance.start);
-        // L'extension Chrome de Mon Hub (Clicky dans le navigateur).
+        // L'extension Chrome de Mon Hub (Smily dans le navigateur).
         Perf.later(3, BrowserLink.instance.start);
         // Les hologrammes ont été retirés (v1.60) : on efface la « vision des
         // mains » qu'ils avaient téléchargée (~ 30 Mo), une fois.
@@ -354,7 +354,7 @@ class _HubAppState extends State<HubApp> {
               );
             });
           Perf.later(3, PcWatch.instance.start);
-          // Une appli allume la caméra : Clicky le dit tout de suite.
+          // Une appli allume la caméra : Smily le dit tout de suite.
           CameraGuard.instance.warn = (title, body) {
             unawaited(
               n.post(HubNotification(id: 'camera:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
@@ -402,7 +402,7 @@ class _HubAppState extends State<HubApp> {
         if (Platform.isIOS || Platform.isAndroid) unawaited(_phoneUpdateNotice(n));
         // Ctrl + Espace (ici) ou Ctrl + Alt + Espace (partout) : la recherche.
         HubHome.instance.onSearchText = (text) => unawaited(SearchPage.show(text));
-        // Première ouverture du compte : la visite guidée de Clicky.
+        // Première ouverture du compte : la visite guidée de Smily.
         unawaited(_tutorial());
         unawaited(n.start());
         // Appels Discord reçus dans Mon Hub (Discord officiel caché).
@@ -417,14 +417,18 @@ class _HubAppState extends State<HubApp> {
           ..awayChecks.add(() => phone.active && phone.shown);
         phone.addListener(HubHome.instance.refresh);
         hub.available.whereType<DiscordModule>().firstOrNull?.syncPhone();
-        // Quand Claude Code (Clicky) veut agir, Mon Hub demande la permission.
+        // Quand Claude Code (Smily) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
-        // Les outils de Clicky (contrôle du PC, réparation du micro) aussi
+        // Les outils de Smily (contrôle du PC, réparation du micro) aussi
         // pour Claude Code.
         ClaudeBridge.appTools = () => ClickyController.instance.localTools;
-        // Clicky réagit aux nouvelles (une bonne note, un cours annulé…).
+        // Smily réagit aux nouvelles (une bonne note, un cours annulé…).
         NotificationCenter.onAny = (note) {
           ClickyController.instance.reactTo(note);
+          // Un nouveau devoir : il peut le faire pendant ton absence.
+          if (note.id.startsWith('devoir:')) {
+            unawaited(ClickyController.instance.onNewHomework(note.id, note.title).catchError((Object _) {}));
+          }
           // « Préviens-moi quand… » (note, devoir, message de quelqu'un).
           unawaited(Watchers.instance.onNotification(note).catchError((Object _) {}));
           // Une question sur Discord : « je te prépare une réponse ? ».
@@ -451,7 +455,7 @@ class _HubAppState extends State<HubApp> {
             unawaited(ClickyController.instance.think(body, aloud: false));
           };
         Perf.later(6, ArtistWatch.instance.start);
-        // Les guetteurs : notification + Clicky le dit.
+        // Les guetteurs : notification + Smily le dit.
         Watchers.instance.alert = (title, body) {
           unawaited(
             n.post(HubNotification(id: 'guetteur:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
@@ -459,7 +463,7 @@ class _HubAppState extends State<HubApp> {
           unawaited(ClickyController.instance.think(body));
         };
         Perf.later(2, Watchers.instance.start);
-        // Clicky se répare tout seul : il relit son journal d'erreurs et
+        // Smily se répare tout seul : il relit son journal d'erreurs et
         // corrige ce qu'il sait corriger (micro bloqué, certificats cassés,
         // appli qui fige, disque plein), puis il le dit.
         SelfRepair.instance
@@ -473,12 +477,19 @@ class _HubAppState extends State<HubApp> {
           })
           ..tell = ((title, body) {
             unawaited(
-              n.post(HubNotification(id: 'repare:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body, moduleId: 'claude')),
+              n.post(
+                HubNotification(
+                  id: 'repare:${DateTime.now().millisecondsSinceEpoch}',
+                  title: title,
+                  body: body,
+                  moduleId: 'claude',
+                ),
+              ),
             );
             unawaited(ClickyController.instance.think(body, aloud: false));
           });
         Perf.later(7, () => SelfRepair.instance.run(diskFreeGb: SelfRepair.diskFreeGb()));
-        // Alertes de Clicky (agent terminé…).
+        // Alertes de Smily (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(
             id: 'clicky:${DateTime.now().millisecondsSinceEpoch}',
@@ -510,7 +521,7 @@ class _HubAppState extends State<HubApp> {
       // Compte déjà là : on laisse l'appli s'ouvrir tranquillement.
       await Future<void>.delayed(const Duration(seconds: 4));
     }
-    // Puis Clicky demande le compte Google (Drive, Docs, agenda), une fois.
+    // Puis Smily demande le compte Google (Drive, Docs, agenda), une fois.
     // S'il vient d'ouvrir les réglages du cerveau, ce sera au prochain
     // démarrage.
     if (brain) return;
@@ -518,11 +529,11 @@ class _HubAppState extends State<HubApp> {
     if (ctx != null && ctx.mounted) await GoogleWelcome.maybeShow(ctx);
   }
 
-  /// Windows : Clicky au-dessus de tout l'écran (petit programme à part).
+  /// Windows : Smily au-dessus de tout l'écran (petit programme à part).
   Future<void> _startClicky() async {
-    // Clicky est un bonus : s'il échoue, le reste de l'appli continue.
+    // Smily est un bonus : s'il échoue, le reste de l'appli continue.
     try {
-      // Réglages de ce compte partagés avec Clicky partout, qu'on relance
+      // Réglages de ce compte partagés avec Smily partout, qu'on relance
       // pour qu'il reprenne le bon compte.
       await ClickyController.instance.shareOptions();
       await ClickyDesktop.restart();
@@ -531,7 +542,7 @@ class _HubAppState extends State<HubApp> {
       // Les widgets laissés sur le bureau se rouvrent.
       unawaited(DesktopWidgets.instance.launchAll());
     } catch (e) {
-      debugPrint('Clicky : $e');
+      debugPrint('Smily : $e');
     }
   }
 
@@ -543,7 +554,7 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       navigatorObservers: [HubHome.instance.observer],
-      // Clicky, le compagnon Claude, au-dessus de toutes les pages.
+      // Smily, le compagnon Claude, au-dessus de toutes les pages.
       builder: (context, child) => UpdateGate(
         child: ClickyLayer(
           hub: hub,
@@ -557,7 +568,7 @@ class _HubAppState extends State<HubApp> {
                 // Les propositions de l'assistant personnel (en bas à gauche).
                 child: AssistantLayer(
                   enabled: hub != null,
-                  // La pastille « Clicky écoute le cours » (en haut, au milieu).
+                  // La pastille « Smily écoute le cours » (en haut, au milieu).
                   child: CourseRecLayer(child: child ?? const SizedBox.shrink()),
                 ),
               ),

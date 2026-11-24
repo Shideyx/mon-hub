@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:material_ui/material_ui.dart';
+
 import '../core/browser.dart';
 import '../core/scam_shield.dart';
 import '../core/freeze_watch.dart';
@@ -133,10 +134,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
       if (hit == null) return false;
       _finish(
         widget.returnAllCookies
-            ? all
-                  .where((c) => clean(c.value).isNotEmpty)
-                  .map((c) => '${c.name}=${clean(c.value)}')
-                  .join('; ')
+            ? all.where((c) => clean(c.value).isNotEmpty).map((c) => '${c.name}=${clean(c.value)}').join('; ')
             : clean(hit.value),
       );
       return true;
@@ -212,10 +210,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
               ),
               initialUserScripts: widget.captureAuthorizationHeader
                   ? UnmodifiableListView([
-                      UserScript(
-                        source: _hookScript,
-                        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-                      ),
+                      UserScript(source: _hookScript, injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START),
                     ])
                   : null,
               onWebViewCreated: (c) {
@@ -314,9 +309,11 @@ class _HubWebViewState extends State<HubWebView> {
     FreezeWatch.note('ouvre la page ${Uri.tryParse(widget.url)?.host ?? ''}');
     if (_wantsUa && _engineUa == null) {
       // La première fois, on attend la version du moteur (quelques ms).
-      unawaited(_loadEngineUa().then((_) {
-        if (mounted) setState(() => _settings = _makeSettings());
-      }));
+      unawaited(
+        _loadEngineUa().then((_) {
+          if (mounted) setState(() => _settings = _makeSettings());
+        }),
+      );
     }
   }
 
@@ -331,7 +328,8 @@ class _HubWebViewState extends State<HubWebView> {
       if (c == null || !mounted) return;
       try {
         final n = await c.evaluateJavascript(
-          source: "(function(){var b=document.body;if(!b)return 0;"
+          source:
+              "(function(){var b=document.body;if(!b)return 0;"
               "if(b.querySelector('img,svg,canvas,video,input,button,iframe,[contenteditable]'))return 1;"
               "return (b.textContent||'').trim().length>0?1:0;})()",
         );
@@ -433,10 +431,8 @@ class _HubWebViewState extends State<HubWebView> {
                 );
                 return true;
               },
-              onPermissionRequest: (_, req) async => PermissionResponse(
-                resources: req.resources,
-                action: PermissionResponseAction.GRANT,
-              ),
+              onPermissionRequest: (_, req) async =>
+                  PermissionResponse(resources: req.resources, action: PermissionResponseAction.GRANT),
             ),
           Positioned(
             top: 0,
@@ -478,9 +474,7 @@ class _HubWebViewState extends State<HubWebView> {
                       const Text('La page reste blanche ?'),
                       FilledButton.tonal(onPressed: _reload, child: const Text('Recharger')),
                       TextButton(
-                        onPressed: () => Browser.open(
-                          widget.url,
-                        ),
+                        onPressed: () => Browser.open(widget.url),
                         child: const Text('Ouvrir dans le navigateur'),
                       ),
                     ],

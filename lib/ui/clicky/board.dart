@@ -4,8 +4,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Le « tableau » de Clicky : quand tu ne comprends pas, ou quand tu veux
-/// apprendre quelque chose, Clicky dessine son explication (étapes, schéma
+/// Le « tableau » de Smily : quand tu ne comprends pas, ou quand tu veux
+/// apprendre quelque chose, Smily dessine son explication (étapes, schéma
 /// fléché, cycle, comparaison, frise, graphique, formule, vocabulaire, à
 /// retenir) et peut finir par un petit quiz.
 ///
@@ -64,7 +64,7 @@ class ClickyBoard {
     return ClickyBoard(title: str(d['titre'] ?? d['title']), blocks: blocks);
   }
 
-  /// Titre lisible (pour la mémoire de Clicky).
+  /// Titre lisible (pour la mémoire de Smily).
   String get summary => title.isNotEmpty ? title : 'tableau visuel';
 
   bool get hasQuiz => blocks.any((b) => b.type == 'quiz');
@@ -202,7 +202,7 @@ class ClickyBoardView extends StatelessWidget {
   final ClickyBoard board;
   final VoidCallback onClose;
 
-  /// Pose une nouvelle question à Clicky (boutons « Je n'ai pas compris »…).
+  /// Pose une nouvelle question à Smily (boutons « Je n'ai pas compris »…).
   final void Function(String question) onAsk;
   final bool busy;
 
@@ -230,11 +230,8 @@ class ClickyBoardView extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    board.title.isEmpty ? 'Le tableau de Clicky' : board.title,
-                    style: text.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    board.title.isEmpty ? 'Le tableau de Smily' : board.title,
+                    style: text.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -256,10 +253,8 @@ class ClickyBoardView extends StatelessWidget {
               painter: _PaperPainter(dark: Theme.of(context).brightness == Brightness.dark),
               child: Theme(
                 data: Theme.of(context).copyWith(
-                  textTheme: Theme.of(context).textTheme.apply(
-                    fontFamily: sketchFont,
-                    fontFamilyFallback: sketchFallback,
-                  ),
+                  textTheme: Theme.of(context).textTheme
+                      .apply(fontFamily: sketchFont, fontFamilyFallback: sketchFallback),
                 ),
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
@@ -304,9 +299,7 @@ class ClickyBoardView extends StatelessWidget {
                   label: 'Un autre exemple',
                   onTap: busy
                       ? null
-                      : () => onAsk(
-                          'Donne-moi un autre exemple résolu pas à pas sur $topic, avec un tableau.',
-                        ),
+                      : () => onAsk('Donne-moi un autre exemple résolu pas à pas sur $topic, avec un tableau.'),
                 ),
                 _Chip(
                   icon: Icons.quiz_outlined,
@@ -323,9 +316,8 @@ class ClickyBoardView extends StatelessWidget {
                   label: 'Plus loin',
                   onTap: busy
                       ? null
-                      : () => onAsk(
-                          'J\'ai compris $topic ! Apprends-moi la suite, un cran plus loin, avec un tableau.',
-                        ),
+                      : () =>
+                            onAsk('J\'ai compris $topic ! Apprends-moi la suite, un cran plus loin, avec un tableau.'),
                 ),
               ],
             ),
@@ -380,10 +372,7 @@ Widget _heading(BuildContext context, String t) => t.isEmpty
     ? const SizedBox.shrink()
     : Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          t,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-        ),
+        child: Text(t, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
       );
 
 class _Note extends StatelessWidget {
@@ -451,11 +440,7 @@ class _Steps extends StatelessWidget {
                         backgroundColor: _blue,
                         child: Text(
                           '${i + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                         ),
                       ),
                       if (i < items.length - 1)
@@ -474,8 +459,7 @@ class _Steps extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (t.isNotEmpty)
-                            Text(t, style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                          if (t.isNotEmpty) Text(t, style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                           if (d.isNotEmpty)
                             Text(
                               d,
@@ -506,9 +490,7 @@ class _Schema extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final g = SchemaGraph.from(
-      b.type == 'cycle' ? BoardBlock(b.type, {...b.data, 'forme': 'cycle'}) : b,
-    );
+    final g = SchemaGraph.from(b.type == 'cycle' ? BoardBlock(b.type, {...b.data, 'forme': 'cycle'}) : b);
     if (g.nodes.isEmpty) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     return Column(
@@ -532,11 +514,7 @@ class _Schema extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                         labelBg: scheme.surface,
                         labelStyle: DefaultTextStyle.of(context).style.merge(
-                          TextStyle(
-                            fontSize: 11.5,
-                            color: scheme.onSurfaceVariant,
-                            fontStyle: FontStyle.italic,
-                          ),
+                          TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic),
                         ),
                         center: g.cycle ? Offset(w / 2, height / 2) : null,
                       ),
@@ -558,11 +536,7 @@ class _Schema extends StatelessWidget {
                           textAlign: TextAlign.center,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                          ),
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.15),
                         ),
                       ),
                     ),
@@ -721,8 +695,7 @@ class _EdgePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _EdgePainter old) =>
-      old.g != g || old.color != color || old.rects != rects;
+  bool shouldRepaint(covariant _EdgePainter old) => old.g != g || old.color != color || old.rects != rects;
 }
 
 class _Compare extends StatelessWidget {
@@ -760,10 +733,7 @@ class _Compare extends StatelessWidget {
                         padding: const EdgeInsets.all(8),
                         child: Text(
                           c,
-                          style: text.labelLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: text.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
                         ),
                       ),
                   ],
@@ -779,9 +749,7 @@ class _Compare extends StatelessWidget {
                         padding: const EdgeInsets.all(8),
                         child: Text(
                           pad(rows[i])[k],
-                          style: k == 0
-                              ? text.bodyMedium?.copyWith(fontWeight: FontWeight.w600)
-                              : text.bodyMedium,
+                          style: k == 0 ? text.bodyMedium?.copyWith(fontWeight: FontWeight.w600) : text.bodyMedium,
                         ),
                       ),
                   ],
@@ -874,8 +842,7 @@ class _Bars extends StatelessWidget {
         if (v is Map)
           (
             str(v['label'] ?? v['nom']),
-            (v['valeur'] is num ? v['valeur'] as num : num.tryParse(str(v['valeur'])) ?? 0)
-                .toDouble(),
+            (v['valeur'] is num ? v['valeur'] as num : num.tryParse(str(v['valeur'])) ?? 0).toDouble(),
           ),
     ];
     if (values.isEmpty) return const SizedBox.shrink();
@@ -891,12 +858,7 @@ class _Bars extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 96,
-                  child: Text(
-                    label,
-                    style: text.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(label, style: text.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
                 ),
                 Expanded(
                   child: LayoutBuilder(
@@ -1064,7 +1026,7 @@ class _Vocab extends StatelessWidget {
   }
 }
 
-/// Une question à choix : on clique, Clicky dit si c'est juste et pourquoi.
+/// Une question à choix : on clique, Smily dit si c'est juste et pourquoi.
 class _Quiz extends StatefulWidget {
   const _Quiz(this.b, {required this.onAsk});
   final BoardBlock b;
@@ -1084,9 +1046,7 @@ class _QuizState extends State<_Quiz> {
     final scheme = Theme.of(context).colorScheme;
     final choices = [for (final c in b.l('choix')) str(c)];
     final rep = b.data['reponse'];
-    final answer = rep is num
-        ? rep.toInt()
-        : int.tryParse(str(rep)) ?? choices.indexWhere((c) => c == str(rep));
+    final answer = rep is num ? rep.toInt() : int.tryParse(str(rep)) ?? choices.indexWhere((c) => c == str(rep));
     final done = picked != null;
     final right = done && picked == answer;
     return Container(
@@ -1103,10 +1063,7 @@ class _QuizState extends State<_Quiz> {
               const Icon(Icons.quiz_rounded, size: 18, color: _blue),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  b.s('question'),
-                  style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
+                child: Text(b.s('question'), style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -1138,10 +1095,7 @@ class _QuizState extends State<_Quiz> {
                 onPressed: done ? null : () => setState(() => picked = i),
                 child: Row(
                   children: [
-                    Text(
-                      '${String.fromCharCode(65 + i)}.  ',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                    Text('${String.fromCharCode(65 + i)}.  ', style: const TextStyle(fontWeight: FontWeight.w700)),
                     Expanded(
                       child: Text(choices[i], style: TextStyle(color: scheme.onSurface)),
                     ),
@@ -1156,10 +1110,7 @@ class _QuizState extends State<_Quiz> {
           if (done) ...[
             Text(
               right ? 'Bravo, c\'est juste !' : 'Pas tout à fait…',
-              style: text.titleSmall?.copyWith(
-                color: right ? Colors.green : Colors.red,
-                fontWeight: FontWeight.w700,
-              ),
+              style: text.titleSmall?.copyWith(color: right ? Colors.green : Colors.red, fontWeight: FontWeight.w700),
             ),
             if (b.s('explication').isNotEmpty)
               Padding(
@@ -1180,10 +1131,7 @@ class _QuizState extends State<_Quiz> {
                       ),
                       child: const Text('Pourquoi ?'),
                     ),
-                  TextButton(
-                    onPressed: () => setState(() => picked = null),
-                    child: const Text('Recommencer'),
-                  ),
+                  TextButton(onPressed: () => setState(() => picked = null), child: const Text('Recommencer')),
                 ],
               ),
             ),
@@ -1193,7 +1141,6 @@ class _QuizState extends State<_Quiz> {
     );
   }
 }
-
 
 /// Écriture « à la main » (polices installées avec Windows, puis Mac).
 const sketchFont = 'Segoe Print';

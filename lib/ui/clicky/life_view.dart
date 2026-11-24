@@ -7,7 +7,7 @@ import 'life.dart';
 /// Polices des émojis en couleur (Windows, Apple, Android/Linux).
 const emojiFonts = ['Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji'];
 
-/// Le curseur de Clicky **qui vit** (il garde son look de curseur) :
+/// Le curseur de Smily **qui vit** (il garde son look de curseur) :
 /// * à côté de lui, l'émoji de ce qu'il ressent (😵‍💫, 🥰, 🤩…), qui
 ///   apparaît d'un petit rebond puis s'en va ;
 /// * 💤 qui flotte doucement quand il dort (et lui, penché, un peu pâle) ;
@@ -141,7 +141,8 @@ class _ClickyLifeBodyState extends State<ClickyLifeBody> with TickerProviderStat
                     tween: Tween(begin: 0.2, end: 1),
                     duration: const Duration(milliseconds: 420),
                     curve: Curves.elasticOut,
-                    builder: (context, s, child) => Transform.scale(scale: s, alignment: Alignment.bottomLeft, child: child),
+                    builder: (context, s, child) =>
+                        Transform.scale(scale: s, alignment: Alignment.bottomLeft, child: child),
                     child: Text(shown, style: const TextStyle(fontSize: 16, fontFamilyFallback: emojiFonts)),
                   ),
           ),

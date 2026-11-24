@@ -34,7 +34,7 @@ class GoogleDocs {
 
   static String edit(String id) => 'https://docs.google.com/document/d/$id/edit';
 
-  /// La connexion Google (API) est prête : Clicky peut lire et écrire.
+  /// La connexion Google (API) est prête : Smily peut lire et écrire.
   static bool get connected => GoogleAuth.available && GoogleAuth.driveAccount != null;
 
   static String account() {
@@ -128,10 +128,7 @@ class GoogleDocs {
         body: {
           'requests': [
             {
-              'insertText': {
-                'endOfSegmentLocation': <String, dynamic>{},
-                'text': '\n$plain',
-              },
+              'insertText': {'endOfSegmentLocation': <String, dynamic>{}, 'text': '\n$plain'},
             },
           ],
         },
@@ -164,7 +161,7 @@ class GoogleDocs {
 }
 
 /// Documents : **le vrai Google Docs**, avec ton Drive, dans Mon Hub (et
-/// Clicky qui peut créer, lire, compléter et exporter tes Google Docs).
+/// Smily qui peut créer, lire, compléter et exporter tes Google Docs).
 class DocsModule extends HubModule {
   @override
   String get id => 'documents';
@@ -197,7 +194,12 @@ class DocsModule extends HubModule {
       return;
     }
     unawaited(
-      Navigator.push(ctx, MaterialPageRoute<void>(builder: (_) => GoogleDocsPage(module: this, url: url))),
+      Navigator.push(
+        ctx,
+        MaterialPageRoute<void>(
+          builder: (_) => GoogleDocsPage(module: this, url: url),
+        ),
+      ),
     );
   }
 
@@ -294,10 +296,7 @@ class DocsModule extends HubModule {
     HubTool(
       name: 'doc_exporter',
       description: 'Enregistre un Google Doc en fichier Word (.docx) ou PDF dans Documents\\Mon Hub sur le PC.',
-      params: {
-        'id': ('string', 'id ou titre du Google Doc'),
-        'format': ('string', '« docx » ou « pdf »'),
-      },
+      params: {'id': ('string', 'id ou titre du Google Doc'), 'format': ('string', '« docx » ou « pdf »')},
       required: ['id'],
       run: (a) async {
         final f = await GoogleDocs.find('${a['id']}');
@@ -363,8 +362,12 @@ class _DocsSummaryState extends State<_DocsSummary> {
                     children: [
                       Expanded(child: child),
                       const SizedBox(height: 6),
-                      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                       Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall),
                     ],
                   ),
@@ -444,9 +447,8 @@ class _Thumb extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: FutureBuilder(
         future: GoogleDocs.thumbnail(link),
-        builder: (context, snap) => snap.data == null
-            ? blank
-            : Image.memory(snap.data!, fit: BoxFit.cover, alignment: Alignment.topCenter),
+        builder: (context, snap) =>
+            snap.data == null ? blank : Image.memory(snap.data!, fit: BoxFit.cover, alignment: Alignment.topCenter),
       ),
     );
   }
@@ -532,11 +534,7 @@ class _GoogleDocsPageState extends State<GoogleDocsPage> {
             onPressed: () => _go(GoogleDocs.home),
           ),
           if (!_window) ...[
-            IconButton(
-              tooltip: 'Recharger',
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: () => _c?.reload(),
-            ),
+            IconButton(tooltip: 'Recharger', icon: const Icon(Icons.refresh_rounded), onPressed: () => _c?.reload()),
             IconButton(
               tooltip: 'Ouvrir dans sa propre fenêtre (plus fluide)',
               icon: const Icon(Icons.open_in_new_rounded),
@@ -581,22 +579,22 @@ class _GoogleDocsPageState extends State<GoogleDocsPage> {
                     action: ('Ouvrir Google Docs', () => Browser.open(widget.url)),
                   )
                 : _window
-                    ? _WindowMode(
-                        onReopen: () => Browser.openAppWindow(widget.url),
-                        onInside: () async {
-                          await m.setOwnWindow(false);
-                          if (mounted) setState(() => _window = false);
-                        },
-                      )
-                    : HubWebView(
-                        url: widget.url,
-                        desktopUserAgent: true,
-                        // Le bouton flottant cachait « Partager » de Google
-                        // Docs : « Recharger » est dans la barre du haut.
-                        reloadButton: false,
-                        sameSiteInPlace: true,
-                        onController: (c) => _c = c,
-                      ),
+                ? _WindowMode(
+                    onReopen: () => Browser.openAppWindow(widget.url),
+                    onInside: () async {
+                      await m.setOwnWindow(false);
+                      if (mounted) setState(() => _window = false);
+                    },
+                  )
+                : HubWebView(
+                    url: widget.url,
+                    desktopUserAgent: true,
+                    // Le bouton flottant cachait « Partager » de Google
+                    // Docs : « Recharger » est dans la barre du haut.
+                    reloadButton: false,
+                    sameSiteInPlace: true,
+                    onController: (c) => _c = c,
+                  ),
           ),
         ],
       ),
@@ -666,7 +664,9 @@ class _OldDocsBannerState extends State<_OldDocsBanner> {
     setState(() => busy = true);
     var n = 0;
     try {
-      final dir = google ? null : Directory('${(await DocsModule.exportFolder()).path}${Platform.pathSeparator}Anciens documents');
+      final dir = google
+          ? null
+          : Directory('${(await DocsModule.exportFolder()).path}${Platform.pathSeparator}Anciens documents');
       await dir?.create(recursive: true);
       for (final d in [...store.docs]) {
         final ops = await store.read(d.id);
@@ -682,10 +682,14 @@ class _OldDocsBannerState extends State<_OldDocsBanner> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(google
-                ? '$n document${n > 1 ? 's' : ''} envoyé${n > 1 ? 's' : ''} sur Google Docs'
-                : '$n document${n > 1 ? 's' : ''} enregistré${n > 1 ? 's' : ''} dans ${dir!.path}'),
-            action: dir == null ? null : SnackBarAction(label: 'Ouvrir', onPressed: () => Browser.open(dir.uri.toString())),
+            content: Text(
+              google
+                  ? '$n document${n > 1 ? 's' : ''} envoyé${n > 1 ? 's' : ''} sur Google Docs'
+                  : '$n document${n > 1 ? 's' : ''} enregistré${n > 1 ? 's' : ''} dans ${dir!.path}',
+            ),
+            action: dir == null
+                ? null
+                : SnackBarAction(label: 'Ouvrir', onPressed: () => Browser.open(dir.uri.toString())),
           ),
         );
       }
@@ -707,20 +711,30 @@ class _OldDocsBannerState extends State<_OldDocsBanner> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: DocStore.instance,
     builder: (context, _) {
-        final n = DocStore.instance.docs.length;
-        if (n == 0) return const SizedBox.shrink();
-        return MaterialBanner(
-          leading: const Icon(Icons.history_edu_rounded),
-          content: Text('Tu as $n document${n > 1 ? 's' : ''} de l\'ancien Word de Mon Hub.'),
-          actions: [
-            if (busy) const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
-            TextButton(onPressed: busy ? null : () => _move(google: false), child: const Text('Les enregistrer en .docx')),
-            if (GoogleDocs.connected)
-              FilledButton(onPressed: busy ? null : () => _move(google: true), child: const Text('Les envoyer sur Google Docs'))
-            else
-              TextButton(onPressed: () => GoogleSetupPage.open(context), child: const Text('Connecter Google')),
-          ],
-        );
+      final n = DocStore.instance.docs.length;
+      if (n == 0) return const SizedBox.shrink();
+      return MaterialBanner(
+        leading: const Icon(Icons.history_edu_rounded),
+        content: Text('Tu as $n document${n > 1 ? 's' : ''} de l\'ancien Word de Mon Hub.'),
+        actions: [
+          if (busy)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          TextButton(
+            onPressed: busy ? null : () => _move(google: false),
+            child: const Text('Les enregistrer en .docx'),
+          ),
+          if (GoogleDocs.connected)
+            FilledButton(
+              onPressed: busy ? null : () => _move(google: true),
+              child: const Text('Les envoyer sur Google Docs'),
+            )
+          else
+            TextButton(onPressed: () => GoogleSetupPage.open(context), child: const Text('Connecter Google')),
+        ],
+      );
     },
   );
 }

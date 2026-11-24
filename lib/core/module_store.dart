@@ -39,15 +39,13 @@ class ModuleStore extends ChangeNotifier {
     };
   }
 
-  static Future<void> writeSecretRaw(String key, String value) =>
-      secure.write(key: '$profile$key', value: value);
+  static Future<void> writeSecretRaw(String key, String value) => secure.write(key: '$profile$key', value: value);
 
   static Future<String?> readSecretRaw(String key) => secure.read(key: '$profile$key');
 
   static Future<void> deleteSecretRaw(String key) => secure.delete(key: '$profile$key');
 
-  static bool _owns(String fullKey) =>
-      profile.isEmpty ? !fullKey.startsWith('p.') : fullKey.startsWith(profile);
+  static bool _owns(String fullKey) => profile.isEmpty ? !fullKey.startsWith('p.') : fullKey.startsWith(profile);
 
   String _moduleId = '';
   void bind(String moduleId) => _moduleId = moduleId;
@@ -93,8 +91,7 @@ class ProfilePrefs {
   final String _ns;
 
   String _k(String k) => '$_ns$k';
-  bool _mine(String full) =>
-      _ns.isEmpty ? !full.startsWith('p.') && !full.startsWith('app.') : full.startsWith(_ns);
+  bool _mine(String full) => _ns.isEmpty ? !full.startsWith('p.') && !full.startsWith('app.') : full.startsWith(_ns);
 
   Set<String> getKeys() => {
     for (final k in _p.getKeys())

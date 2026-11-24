@@ -66,15 +66,20 @@ class _Counter extends StatefulWidget {
 class _CounterState extends State<_Counter> {
   int n = 0;
   @override
-  Widget build(BuildContext context) =>
-      TextButton(onPressed: () => setState(() => n++), child: Text('compteur $n'));
+  Widget build(BuildContext context) => TextButton(onPressed: () => setState(() => n++), child: Text('compteur $n'));
 }
 
 void layerTests() {
   testWidgets('Discord caché : Mon Hub garde son état, sonnerie et fenêtre d\'appel', (tester) async {
     final p = DiscordPhone.instance;
     DiscordPhone.testWebView = (_) => const ColoredBox(color: Colors.indigo, child: Text('DISCORD'));
-    await tester.pumpWidget(const MaterialApp(home: DiscordPhoneLayer(child: Scaffold(body: Center(child: _Counter())))));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DiscordPhoneLayer(
+          child: Scaffold(body: Center(child: _Counter())),
+        ),
+      ),
+    );
     await tester.tap(find.text('compteur 0'));
     await tester.pump();
     expect(find.text('compteur 1'), findsOneWidget);

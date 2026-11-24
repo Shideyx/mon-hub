@@ -104,7 +104,7 @@ class _SecurityPageState extends State<SecurityPage> {
                       subtitle: Text(
                         'Mon Hub vérifie les liens et fichiers reçus sur Discord et par mail (faux Nitro ou Robux gratuits, '
                         'sites sosies, espions d\'adresse IP, « teste mon jeu » avec un .exe) et te prévient. Un faux site ne '
-                        's\'ouvre pas sans ton accord. Demande aussi à Clicky : « ce lien est sûr ? » (après l\'avoir copié).',
+                        's\'ouvre pas sans ton accord. Demande aussi à Smily : « ce lien est sûr ? » (après l\'avoir copié).',
                       ),
                     ),
                   ),
@@ -312,7 +312,7 @@ class _CameraCardState extends State<CameraCard> {
                   title: Text('Caméra et micro', style: TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(
                     'Coupe la caméra quand tu ne t\'en sers pas : même une appli piratée ne peut plus filmer. '
-                    'Tu peux aussi demander à Clicky : « coupe ma caméra ».',
+                    'Tu peux aussi demander à Smily : « coupe ma caméra ».',
                   ),
                 ),
                 SwitchListTile(
@@ -334,7 +334,7 @@ class _CameraCardState extends State<CameraCard> {
                   subtitle: Text(
                     mic.active.isNotEmpty
                         ? 'Utilisé en ce moment par ${mic.active.map((u) => u.app).join(', ')}'
-                        : 'Coupe-le si tu ne t\'en sers pas (Clicky non plus ne t\'entendra plus).',
+                        : 'Coupe-le si tu ne t\'en sers pas (Smily non plus ne t\'entendra plus).',
                   ),
                   value: mic.blocked,
                   onChanged: _busy ? null : (v) => unawaited(_toggle(v, mic: true)),

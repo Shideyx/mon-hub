@@ -113,8 +113,7 @@ class HoloScene {
     };
   }
 
-  static double _num(Object? v, double d) =>
-      v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? d;
+  static double _num(Object? v, double d) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? d;
 
   static HoloScene? parse(String src) {
     var s = src.trim();
@@ -237,11 +236,7 @@ List<(List<double>, List<double>)> holoSegments(HoloObject o) {
           for (var i = 0; i <= 24; i++)
             () {
               final b = i * 2 * math.pi / 24;
-              return [
-                0.5 * math.sin(b) * math.cos(a),
-                0.5 * math.cos(b),
-                0.5 * math.sin(b) * math.sin(a),
-              ];
+              return [0.5 * math.sin(b) * math.cos(a), 0.5 * math.cos(b), 0.5 * math.sin(b) * math.sin(a)];
             }(),
         ]);
       }
@@ -291,11 +286,7 @@ List<(List<double>, List<double>)> holoSegments(HoloObject o) {
     case 'helice':
       List<List<double>> strand(double phase) => [
         for (var i = 0; i <= 80; i++)
-          [
-            0.3 * math.cos(i / 80 * 6 * math.pi + phase),
-            -0.5 + i / 80,
-            0.3 * math.sin(i / 80 * 6 * math.pi + phase),
-          ],
+          [0.3 * math.cos(i / 80 * 6 * math.pi + phase), -0.5 + i / 80, 0.3 * math.sin(i / 80 * 6 * math.pi + phase)],
       ];
       final s1 = strand(0), s2 = strand(math.pi);
       poly(s1);
@@ -335,10 +326,8 @@ class HoloView extends StatefulWidget {
 }
 
 class _HoloViewState extends State<HoloView> with TickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 14),
-  )..repeat();
+  late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(seconds: 14))
+    ..repeat();
   late final AnimationController _appear = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
@@ -387,12 +376,7 @@ class _HoloViewState extends State<HoloView> with TickerProviderStateMixin {
                 'HOLOGRAMME · ${widget.scene.title.toUpperCase()}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: hudCyan,
-                  fontSize: 11,
-                  letterSpacing: 2,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: hudCyan, fontSize: 11, letterSpacing: 2, fontWeight: FontWeight.w700),
               ),
             ),
             if (widget.onClose != null)
@@ -421,13 +405,7 @@ class _HoloViewState extends State<HoloView> with TickerProviderStateMixin {
 }
 
 class _HoloPainter extends CustomPainter {
-  _HoloPainter(
-    this.scene, {
-    required this.yaw,
-    required this.pitch,
-    required this.appear,
-    required this.scan,
-  });
+  _HoloPainter(this.scene, {required this.yaw, required this.pitch, required this.appear, required this.scan});
   final HoloScene scene;
   final double yaw, pitch, appear, scan;
 
@@ -509,12 +487,7 @@ class _HoloPainter extends CustomPainter {
         final tp = TextPainter(
           text: TextSpan(
             text: o.label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-            ),
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: 140);
@@ -531,10 +504,7 @@ class _HoloPainter extends CustomPainter {
     }
     // Ligne de balayage.
     final y = s.height * ((scan * 3) % 1);
-    canvas.drawRect(
-      Rect.fromLTWH(0, y, s.width, 2),
-      Paint()..color = hudCyan.withValues(alpha: 0.12),
-    );
+    canvas.drawRect(Rect.fromLTWH(0, y, s.width, 2), Paint()..color = hudCyan.withValues(alpha: 0.12));
   }
 
   @override

@@ -1038,7 +1038,9 @@ class _TextReaderPageState extends State<TextReaderPage> {
                     label: const Text('Lire sur le site'),
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => WebBookPage(module: widget.module, book: widget.book)),
+                      MaterialPageRoute(
+                        builder: (_) => WebBookPage(module: widget.module, book: widget.book),
+                      ),
                     ),
                   ),
               ],

@@ -85,8 +85,7 @@ class EdClient {
     'Origin': 'https://www.ecoledirecte.com',
     'Referer': 'https://www.ecoledirecte.com/',
     'User-Agent': _ua,
-    if (_cookies.isNotEmpty)
-      'Cookie': _cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
+    if (_cookies.isNotEmpty) 'Cookie': _cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
     if (gtk && (_gtk ?? _cookies['GTK']) != null) 'X-Gtk': (_gtk ?? _cookies['GTK'])!,
     'X-Token': ?token,
     '2fa-token': ?_twoFa,
@@ -212,19 +211,10 @@ class EdClient {
     List<Map<String, dynamic>> faList() => [
       for (final f in answered) {...f, 'uniq': false},
     ];
-    Map<String, dynamic> credentials() => {
-      'identifiant': user.trim(),
-      'motdepasse': password,
-      'isReLogin': false,
-    };
+    Map<String, dynamic> credentials() => {'identifiant': user.trim(), 'motdepasse': password, 'isReLogin': false};
 
     await _bootstrapGtk();
-    var r = await _post(
-      '/login.awp',
-      {...credentials(), 'uuid': uuid, 'fa': faList()},
-      gtk: true,
-      session: false,
-    );
+    var r = await _post('/login.awp', {...credentials(), 'uuid': uuid, 'fa': faList()}, gtk: true, session: false);
     if (r['code'] == 505 && answered.isNotEmpty) {
       // Les facteurs gardés ne sont plus valables : on recommence sans.
       return login(user, password, answerQuestion: answerQuestion);
@@ -325,10 +315,7 @@ class EdClient {
     s = s.replaceAll(RegExp(r'\s*\n\s*'), ' ');
     s = s.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
     s = s.replaceAll(RegExp(r'<li\b[^>]*>', caseSensitive: false), '$block• ');
-    s = s.replaceAll(
-      RegExp(r'</?(p|div|li|tr|h[1-6]|ul|ol|table|blockquote)\b[^>]*>', caseSensitive: false),
-      block,
-    );
+    s = s.replaceAll(RegExp(r'</?(p|div|li|tr|h[1-6]|ul|ol|table|blockquote)\b[^>]*>', caseSensitive: false), block);
     s = s.replaceAll(RegExp(r'</t[dh]\s*>', caseSensitive: false), '  ');
     s = s.replaceAll(RegExp(r'<[^>]*>'), '');
     s = decodeEntities(s);
@@ -337,26 +324,77 @@ class EdClient {
       return htmlToText(s.replaceAll(block, '<br>'));
     }
     s = s.replaceAll(RegExp('[ \\t]*$block[$block \\t]*'), '\n');
-    final lines = [
-      for (final l in s.split('\n')) l.replaceAll(RegExp(r'[ \t ]+'), ' ').trim(),
-    ];
+    final lines = [for (final l in s.split('\n')) l.replaceAll(RegExp(r'[ \t ]+'), ' ').trim()];
     return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
   }
 
   static final Map<String, String> _entities = () {
     final m = <String, String>{
-      'nbsp': ' ', 'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'",
-      'rsquo': '’', 'lsquo': '‘', 'rdquo': '”', 'ldquo': '“',
-      'laquo': '«', 'raquo': '»', 'hellip': '…', 'ndash': '–', 'mdash': '—',
-      'euro': '€', 'deg': '°', 'bull': '•', 'middot': '·', 'copy': '©', 'reg': '®',
-      'trade': '™', 'times': '×', 'divide': '÷', 'sup2': '²', 'sup3': '³',
-      'frac12': '½', 'frac14': '¼', 'frac34': '¾', 'para': '¶', 'sect': '§',
-      'oelig': 'œ', 'OElig': 'Œ', 'aelig': 'æ', 'AElig': 'Æ', 'ccedil': 'ç',
-      'Ccedil': 'Ç', 'szlig': 'ß', 'iexcl': '¡', 'iquest': '¿', 'pound': '£',
-      'cent': '¢', 'yen': '¥', 'plusmn': '±', 'micro': 'µ', 'shy': '', 'zwnj': '',
-      'zwj': '', 'lrm': '', 'rlm': '', 'thinsp': ' ', 'ensp': ' ', 'emsp': ' ',
-      'rarr': '→', 'larr': '←', 'harr': '↔', 'uarr': '↑', 'darr': '↓',
-      'le': '≤', 'ge': '≥', 'ne': '≠', 'infin': '∞', 'check': '✓', 'ordm': 'º', 'ordf': 'ª',
+      'nbsp': ' ',
+      'amp': '&',
+      'lt': '<',
+      'gt': '>',
+      'quot': '"',
+      'apos': "'",
+      'rsquo': '’',
+      'lsquo': '‘',
+      'rdquo': '”',
+      'ldquo': '“',
+      'laquo': '«',
+      'raquo': '»',
+      'hellip': '…',
+      'ndash': '–',
+      'mdash': '—',
+      'euro': '€',
+      'deg': '°',
+      'bull': '•',
+      'middot': '·',
+      'copy': '©',
+      'reg': '®',
+      'trade': '™',
+      'times': '×',
+      'divide': '÷',
+      'sup2': '²',
+      'sup3': '³',
+      'frac12': '½',
+      'frac14': '¼',
+      'frac34': '¾',
+      'para': '¶',
+      'sect': '§',
+      'oelig': 'œ',
+      'OElig': 'Œ',
+      'aelig': 'æ',
+      'AElig': 'Æ',
+      'ccedil': 'ç',
+      'Ccedil': 'Ç',
+      'szlig': 'ß',
+      'iexcl': '¡',
+      'iquest': '¿',
+      'pound': '£',
+      'cent': '¢',
+      'yen': '¥',
+      'plusmn': '±',
+      'micro': 'µ',
+      'shy': '',
+      'zwnj': '',
+      'zwj': '',
+      'lrm': '',
+      'rlm': '',
+      'thinsp': ' ',
+      'ensp': ' ',
+      'emsp': ' ',
+      'rarr': '→',
+      'larr': '←',
+      'harr': '↔',
+      'uarr': '↑',
+      'darr': '↓',
+      'le': '≤',
+      'ge': '≥',
+      'ne': '≠',
+      'infin': '∞',
+      'check': '✓',
+      'ordm': 'º',
+      'ordf': 'ª',
     };
     // Lettres accentuées : agrave, Eacute, ocirc, uuml, ntilde…
     const marks = {
@@ -383,24 +421,33 @@ class EdClient {
   }();
 
   /// Remplace les entités HTML (`&eacute;`, `&#233;`, `&#xE9;`…).
-  static String decodeEntities(String s) => s.replaceAllMapped(
-    RegExp(r'&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,8});'),
-    (m) {
-      final e = m[1]!;
-      if (e.startsWith('#')) {
-        final hex = e.length > 1 && (e[1] == 'x' || e[1] == 'X');
-        final code = int.tryParse(hex ? e.substring(2) : e.substring(1), radix: hex ? 16 : 10);
-        if (code == null || code == 0 || code > 0x10FFFF) return m[0]!;
-        // Windows-1252 glissé dans le HTML (&#146; = ’).
-        const cp1252 = {
-          128: '€', 130: '‚', 132: '„', 133: '…', 145: '‘', 146: '’',
-          147: '“', 148: '”', 149: '•', 150: '–', 151: '—', 156: 'œ', 140: 'Œ',
-        };
-        return cp1252[code] ?? String.fromCharCode(code);
-      }
-      return _entities[e] ?? _entities[e.toLowerCase()] ?? m[0]!;
-    },
-  );
+  static String decodeEntities(String s) =>
+      s.replaceAllMapped(RegExp(r'&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,8});'), (m) {
+        final e = m[1]!;
+        if (e.startsWith('#')) {
+          final hex = e.length > 1 && (e[1] == 'x' || e[1] == 'X');
+          final code = int.tryParse(hex ? e.substring(2) : e.substring(1), radix: hex ? 16 : 10);
+          if (code == null || code == 0 || code > 0x10FFFF) return m[0]!;
+          // Windows-1252 glissé dans le HTML (&#146; = ’).
+          const cp1252 = {
+            128: '€',
+            130: '‚',
+            132: '„',
+            133: '…',
+            145: '‘',
+            146: '’',
+            147: '“',
+            148: '”',
+            149: '•',
+            150: '–',
+            151: '—',
+            156: 'œ',
+            140: 'Œ',
+          };
+          return cp1252[code] ?? String.fromCharCode(code);
+        }
+        return _entities[e] ?? _entities[e.toLowerCase()] ?? m[0]!;
+      });
 
   /// Octets → texte : UTF-8, sinon l'ancien encodage Windows (Latin-1).
   static String decodeBytes(List<int> bytes) => _utf8(bytes) ?? latin1.decode(bytes, allowInvalid: true);
@@ -428,9 +475,7 @@ class EdClient {
     final compact = s.replaceAll(RegExp(r'\s+'), '');
     if (compact.length >= 8 && RegExp(r'^[A-Za-z0-9+/_-]+={0,2}$').hasMatch(compact)) {
       try {
-        final bytes = base64.decode(
-          base64.normalize(compact.replaceAll('-', '+').replaceAll('_', '/')),
-        );
+        final bytes = base64.decode(base64.normalize(compact.replaceAll('-', '+').replaceAll('_', '/')));
         // Un vrai contenu codé : du HTML, ou un texte UTF-8 propre assez
         // long (un mot comme « Rappeler » n'est pas du base64).
         final u = _utf8(bytes);
@@ -507,15 +552,12 @@ class EdClient {
   /// Contenu d'un message (texte) et ses pièces jointes.
   Future<EdMessageContent> message(int id, {bool sent = false}) async {
     final mode = sent ? 'expediteur' : 'destinataire';
-    var r = await _post('$_mailbox/messages/$id.awp?verbe=get&mode=$mode', {
-      'anneeMessages': _year,
-    });
+    var r = await _post('$_mailbox/messages/$id.awp?verbe=get&mode=$mode', {'anneeMessages': _year});
     if (r['code'] != 200 || r['data'] is! Map) {
       // Message d'une autre année scolaire, ou rangé de l'autre côté.
-      r = await _post(
-        '$_mailbox/messages/$id.awp?verbe=get&mode=${sent ? 'destinataire' : 'expediteur'}',
-        {'anneeMessages': _year},
-      );
+      r = await _post('$_mailbox/messages/$id.awp?verbe=get&mode=${sent ? 'destinataire' : 'expediteur'}', {
+        'anneeMessages': _year,
+      });
     }
     if (r['code'] != 200 || r['data'] is! Map) {
       throw 'Message indisponible (${explain(r)})';
@@ -599,7 +641,9 @@ class EdClient {
     final r = await _post('/E/$accountId/espacestravail.awp?verbe=get', {});
     if (r['code'] != 200) throw 'Espaces de travail indisponibles (${explain(r)})';
     final data = r['data'];
-    final list = data is List ? data : (data is Map ? (data['espacesTravail'] ?? data['espaces'] ?? const []) : const []);
+    final list = data is List
+        ? data
+        : (data is Map ? (data['espacesTravail'] ?? data['espaces'] ?? const []) : const []);
     return [
       for (final w in list as List)
         if (w is Map && w['id'] != null) EdWorkspace.fromJson(w.cast<String, dynamic>()),
@@ -652,17 +696,14 @@ class EdClient {
   }
 
   /// Télécharge un fichier du cloud.
-  Future<List<int>> cloudFile(EdCloudNode f) =>
-      attachment(EdAttachment(0, f.name, 'CLOUD'), fileId: f.id);
+  Future<List<int>> cloudFile(EdCloudNode f) => attachment(EdAttachment(0, f.name, 'CLOUD'), fileId: f.id);
 
   /// Répond à l'expéditeur d'un message.
   Future<void> reply(EdMessage original, String text) async {
     final f = original.sender;
     if (f['id'] == null) throw 'Impossible de répondre à ce message';
     final html = '<p>${const HtmlEscape().convert(text).replaceAll('\n', '<br>')}</p>';
-    final subject = original.subject.toLowerCase().startsWith('re')
-        ? original.subject
-        : 'RE : ${original.subject}';
+    final subject = original.subject.toLowerCase().startsWith('re') ? original.subject : 'RE : ${original.subject}';
     final r = await _post('$_mailbox/messages.awp?verbe=post', {
       'message': {
         'groupesDestinataires': [
@@ -789,11 +830,11 @@ class EdMessage {
   static String _name(Map f) {
     final n = f['name'];
     if (n is String && n.trim().isNotEmpty) return n.trim();
-    return [f['civilite'], f['prenom'], f['nom']]
-        .whereType<String>()
-        .where((s) => s.trim().isNotEmpty)
-        .join(' ')
-        .trim();
+    return [
+      f['civilite'],
+      f['prenom'],
+      f['nom'],
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).join(' ').trim();
   }
 
   factory EdMessage.fromJson(Map<String, dynamic> j, {bool sent = false}) {
@@ -888,7 +929,10 @@ class EdCloudNode {
   /// ou un seul nœud.
   static EdCloudNode parse(Object? data, {String fallbackId = ''}) {
     if (data is List) {
-      final nodes = [for (final e in data) if (e is Map) EdCloudNode.fromJson(e.cast<String, dynamic>())];
+      final nodes = [
+        for (final e in data)
+          if (e is Map) EdCloudNode.fromJson(e.cast<String, dynamic>()),
+      ];
       if (nodes.length == 1 && nodes.first.folder) return nodes.first;
       return EdCloudNode(id: fallbackId, name: 'Cloud', folder: true, children: nodes);
     }
@@ -917,14 +961,15 @@ class EdCloudNode {
       folder: folder,
       size: (j['taille'] as num?)?.toInt() ?? int.tryParse('${j['taille'] ?? ''}') ?? 0,
       date: DateTime.tryParse('${j['date'] ?? ''}'.replaceFirst(' ', 'T')),
-      children: [
-        if (kids is List)
-          for (final k in kids)
-            if (k is Map) EdCloudNode.fromJson(k.cast<String, dynamic>()),
-      ]..sort((a, b) {
-          if (a.folder != b.folder) return a.folder ? -1 : 1;
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        }),
+      children:
+          [
+            if (kids is List)
+              for (final k in kids)
+                if (k is Map) EdCloudNode.fromJson(k.cast<String, dynamic>()),
+          ]..sort((a, b) {
+            if (a.folder != b.folder) return a.folder ? -1 : 1;
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          }),
       loaded: folder ? (j['isLoaded'] != false || (kids is List && kids.isNotEmpty)) : true,
     );
   }
@@ -1102,15 +1147,7 @@ class EdGrade {
 }
 
 class EdLesson {
-  EdLesson(
-    this.subject,
-    this.start,
-    this.end,
-    this.room,
-    this.teacher,
-    this.cancelled, [
-    this.color,
-  ]);
+  EdLesson(this.subject, this.start, this.end, this.room, this.teacher, this.cancelled, [this.color]);
   final String subject;
   final DateTime start;
   final DateTime end;
@@ -1122,9 +1159,7 @@ class EdLesson {
   final String? color;
 
   factory EdLesson.fromJson(Map<String, dynamic> j) => EdLesson(
-    (j['matiere'] as String?)?.isNotEmpty == true
-        ? j['matiere'] as String
-        : (j['text'] as String? ?? 'Cours'),
+    (j['matiere'] as String?)?.isNotEmpty == true ? j['matiere'] as String : (j['text'] as String? ?? 'Cours'),
     DateTime.parse((j['start_date'] as String).replaceFirst(' ', 'T')),
     DateTime.parse((j['end_date'] as String).replaceFirst(' ', 'T')),
     j['salle'] as String? ?? '',

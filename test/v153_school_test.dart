@@ -5,13 +5,38 @@ import 'package:hub/ui/clicky/quick.dart';
 import 'package:hub/ui/clicky/school_bag.dart';
 import 'package:hub/ui/clicky/text_fix.dart';
 
-EdGrade g(String subject, String v, {String outOf = '20', double coef = 1, String period = 'A002', DateTime? date, bool counts = true}) =>
-    EdGrade('$subject$v${date?.day}', subject, v, outOf, 'devoir', date ?? DateTime(2026, 11, 2), coef: coef, period: period, counts: counts);
+EdGrade g(
+  String subject,
+  String v, {
+  String outOf = '20',
+  double coef = 1,
+  String period = 'A002',
+  DateTime? date,
+  bool counts = true,
+}) => EdGrade(
+  '$subject$v${date?.day}',
+  subject,
+  v,
+  outOf,
+  'devoir',
+  date ?? DateTime(2026, 11, 2),
+  coef: coef,
+  period: period,
+  counts: counts,
+);
 
 void main() {
   group('notes', () {
     test('coefficients, notes sur 10, notes qui ne comptent pas', () {
-      final j = EdGrade.fromJson({'id': 1, 'libelleMatiere': 'MATHEMATIQUES', 'valeur': '12,5', 'noteSur': '20', 'coef': '2.00', 'codePeriode': 'A002', 'nonSignificatif': false});
+      final j = EdGrade.fromJson({
+        'id': 1,
+        'libelleMatiere': 'MATHEMATIQUES',
+        'valeur': '12,5',
+        'noteSur': '20',
+        'coef': '2.00',
+        'codePeriode': 'A002',
+        'nonSignificatif': false,
+      });
       expect(j.coef, 2);
       expect(GradeMath.on20(j), 12.5);
       expect(GradeMath.on20(g('M', '7', outOf: '10')), 14);
@@ -33,7 +58,14 @@ void main() {
     });
 
     test('retrouver la matière dite à l\'oral', () {
-      const subjects = ['MATHEMATIQUES', 'SCIENCES VIE & TERRE', 'PHYSIQUE-CHIMIE', 'ANGLAIS LV1', 'ED.PHYSIQUE & SPORT.', 'HISTOIRE-GEOGRAPHIE'];
+      const subjects = [
+        'MATHEMATIQUES',
+        'SCIENCES VIE & TERRE',
+        'PHYSIQUE-CHIMIE',
+        'ANGLAIS LV1',
+        'ED.PHYSIQUE & SPORT.',
+        'HISTOIRE-GEOGRAPHIE',
+      ];
       expect(GradeMath.matchSubject('maths', subjects), 'MATHEMATIQUES');
       expect(GradeMath.matchSubject('SVT', subjects), 'SCIENCES VIE & TERRE');
       expect(GradeMath.matchSubject('physique', subjects), 'PHYSIQUE-CHIMIE');
@@ -81,7 +113,10 @@ void main() {
       calls.clear();
       expect(await ask('Il me faut combien en maths pour avoir 14 ?'), 'Il te faut 14/20.');
       expect(calls.last, 'ecole_moyenne {matiere: maths, objectif: 14.0}');
-      expect(await ask('quelle note il me faut au prochain contrôle de physique pour avoir 12,5 de moyenne'), 'Il te faut 14/20.');
+      expect(
+        await ask('quelle note il me faut au prochain contrôle de physique pour avoir 12,5 de moyenne'),
+        'Il te faut 14/20.',
+      );
       expect(calls.last, 'ecole_moyenne {matiere: physique, objectif: 12.5}');
       expect(await ask('c\'est quoi ma moyenne en maths'), contains('est de 11'));
       expect(await ask('ma moyenne générale'), contains('13,2'));
@@ -95,14 +130,29 @@ void main() {
 
   group('prépare ton sac', () {
     final day = DateTime(2026, 11, 19);
-    Map lesson(String t, int h) => {'titre': t, 'debut': DateTime(2026, 11, 19, h), 'fin': DateTime(2026, 11, 19, h + 1), 'source': 'École Directe'};
+    Map lesson(String t, int h) => {
+      'titre': t,
+      'debut': DateTime(2026, 11, 19, h),
+      'fin': DateTime(2026, 11, 19, h + 1),
+      'source': 'École Directe',
+    };
     final events = [
       lesson('MATHEMATIQUES', 8),
       lesson('ED.PHYSIQUE & SPORT.', 10),
       lesson('ANGLAIS LV1', 14),
       lesson('MATHEMATIQUES', 15),
-      {'titre': 'Dentiste', 'debut': DateTime(2026, 11, 19, 17), 'fin': DateTime(2026, 11, 19, 18), 'source': 'Mes évènements'},
-      {'titre': 'HISTOIRE-GEOGRAPHIE', 'debut': DateTime(2026, 11, 20, 8), 'fin': DateTime(2026, 11, 20, 9), 'source': 'École Directe'},
+      {
+        'titre': 'Dentiste',
+        'debut': DateTime(2026, 11, 19, 17),
+        'fin': DateTime(2026, 11, 19, 18),
+        'source': 'Mes évènements',
+      },
+      {
+        'titre': 'HISTOIRE-GEOGRAPHIE',
+        'debut': DateTime(2026, 11, 20, 8),
+        'fin': DateTime(2026, 11, 20, 9),
+        'source': 'École Directe',
+      },
     ];
     final homework = [
       {'pour_le': DateTime(2026, 11, 19), 'matiere': 'MATHEMATIQUES', 'contenu': 'DM', 'fait': false},
@@ -125,8 +175,13 @@ void main() {
     });
 
     test('tes affaires à toi remplacent les habituelles', () {
-      final custom = SchoolBag.parseCustom('EPS : kimono, gourde\nMaths: compas ; calculatrice\nligne sans deux points');
-      expect(custom, {'EPS': ['kimono', 'gourde'], 'Maths': ['compas', 'calculatrice']});
+      final custom = SchoolBag.parseCustom(
+        'EPS : kimono, gourde\nMaths: compas ; calculatrice\nligne sans deux points',
+      );
+      expect(custom, {
+        'EPS': ['kimono', 'gourde'],
+        'Maths': ['compas', 'calculatrice'],
+      });
       expect(SchoolBag.itemsFor('ED.PHYSIQUE & SPORT.', custom), ['kimono', 'gourde']);
       expect(SchoolBag.itemsFor('ED.PHYSIQUE & SPORT.'), ['ta tenue de sport', 'tes baskets', 'une gourde']);
       expect(SchoolBag.itemsFor('EPS', custom), ['kimono', 'gourde']);
@@ -140,7 +195,11 @@ void main() {
         tools: const {'assistant_sac'},
       );
       expect(r?.text, 'Demain, tu as Maths.');
-      final r2 = await QuickAnswers.answer('prépare mon sac', call: (n, a) async => 'ok', tools: const {'assistant_sac'});
+      final r2 = await QuickAnswers.answer(
+        'prépare mon sac',
+        call: (n, a) async => 'ok',
+        tools: const {'assistant_sac'},
+      );
       expect(r2?.text, 'ok');
     });
   });
@@ -175,10 +234,14 @@ void main() {
         },
         tools: const {'clicky_corriger_selection'},
       ))?.text;
-      expect(await ask('Clicky, corrige ce que j\'ai surligné'), 'Corrigé ✓');
+      expect(await ask('Smily, corrige ce que j\'ai surligné'), 'Corrigé ✓');
       expect(await ask('traduis la sélection en anglais'), 'Corrigé ✓');
       expect(await ask('reformule mon texte'), 'Corrigé ✓');
-      expect(calls, ['clicky_corriger_selection corriger', 'clicky_corriger_selection traduire:anglais', 'clicky_corriger_selection reformuler']);
+      expect(calls, [
+        'clicky_corriger_selection corriger',
+        'clicky_corriger_selection traduire:anglais',
+        'clicky_corriger_selection reformuler',
+      ]);
       expect(await ask('corrige mon exercice de maths'), isNull);
     });
   });

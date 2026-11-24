@@ -28,10 +28,7 @@ class McpServer {
   factory McpServer.fromJson(Map j) => McpServer('${j['id']}', '${j['name']}', '${j['url']}');
 
   String get slug {
-    final s = name
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
-        .replaceAll(RegExp(r'^_|_$'), '');
+    final s = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_|_$'), '');
     return s.isEmpty ? 'srv' : (s.length > 16 ? s.substring(0, 16) : s);
   }
 
@@ -40,8 +37,7 @@ class McpServer {
     final u = Uri.tryParse(url.trim());
     if (u == null || !u.hasAuthority) return false;
     if (u.scheme == 'https') return true;
-    return u.scheme == 'http' &&
-        (u.host == 'localhost' || u.host == '127.0.0.1' || u.host == '::1');
+    return u.scheme == 'http' && (u.host == 'localhost' || u.host == '127.0.0.1' || u.host == '::1');
   }
 }
 
@@ -74,8 +70,7 @@ class McpClient {
       if (!line.startsWith('data:')) continue;
       try {
         final j = jsonDecode(line.substring(5).trim());
-        if (j is Map<String, dynamic> &&
-            (j['id'] == id || j.containsKey('result') || j.containsKey('error'))) {
+        if (j is Map<String, dynamic> && (j['id'] == id || j.containsKey('result') || j.containsKey('error'))) {
           if (j['id'] == null || j['id'] == id) return j;
         }
       } catch (_) {}
@@ -89,12 +84,7 @@ class McpClient {
         .post(
           Uri.parse(url),
           headers: _headers,
-          body: jsonEncode({
-            'jsonrpc': '2.0',
-            if (!notify) 'id': id,
-            'method': method,
-            'params': ?params,
-          }),
+          body: jsonEncode({'jsonrpc': '2.0', if (!notify) 'id': id, 'method': method, 'params': ?params}),
         )
         .timeout(const Duration(seconds: 40));
     final s = r.headers['mcp-session-id'];
@@ -230,7 +220,7 @@ class VoiceSkill {
   final String phrase;
 
   /// 'url' (ouvrir un site), 'app' (lancer un programme Windows), 'say'
-  /// (Clicky dit une phrase), 'ask' (une question toute faite à Clicky).
+  /// (Smily dit une phrase), 'ask' (une question toute faite à Smily).
   final String kind;
   final String value;
 
@@ -238,7 +228,7 @@ class VoiceSkill {
     'url': 'Ouvrir un site',
     'app': 'Lancer un programme',
     'say': 'Dire une phrase',
-    'ask': 'Poser une question à Clicky',
+    'ask': 'Poser une question à Smily',
   };
 
   Map<String, dynamic> toJson() => {'p': phrase, 'k': kind, 'v': value};
@@ -262,7 +252,7 @@ class VoiceSkill {
   /// phrase), s'il y en a un.
   static (VoiceSkill, String)? match(String said, [List<VoiceSkill>? list]) {
     var n = normalize(said);
-    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?clicky ?'), '').trim();
+    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|simile) ?'), '').trim();
     for (final s in list ?? all) {
       final p = normalize(s.phrase);
       if (p.isEmpty) continue;

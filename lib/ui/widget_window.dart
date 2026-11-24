@@ -129,15 +129,7 @@ class _WidgetWindowState extends State<_WidgetWindow> {
     final h = _hwnd;
     if (h == null) return;
     setState(() => _onTop = !_onTop);
-    SetWindowPos(
-      h,
-      _onTop ? HWND_TOPMOST : HWND_NOTOPMOST,
-      0,
-      0,
-      0,
-      0,
-      SET_WINDOW_POS_FLAGS(SWP_NOMOVE | SWP_NOSIZE),
-    );
+    SetWindowPos(h, _onTop ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS(SWP_NOMOVE | SWP_NOSIZE));
   }
 
   @override
@@ -206,7 +198,10 @@ class _WidgetWindowState extends State<_WidgetWindow> {
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                     child: Card(
                       clipBehavior: Clip.antiAlias,
-                      child: KeyedSubtree(key: ValueKey(_refresh), child: Builder(builder: m.buildSummary)),
+                      child: KeyedSubtree(
+                        key: ValueKey(_refresh),
+                        child: Builder(builder: m.buildSummary),
+                      ),
                     ),
                   ),
                 ),

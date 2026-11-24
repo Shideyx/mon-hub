@@ -27,7 +27,7 @@ class ScreenTime extends ChangeNotifier {
   int _ticks = 0;
   bool _loaded = false;
 
-  /// Prévenir (notification + Clicky) quand une limite est atteinte.
+  /// Prévenir (notification + Smily) quand une limite est atteinte.
   void Function(String title, String body)? alert;
 
   Map<String, dynamic> get _data => _file.value;
@@ -89,22 +89,60 @@ class ScreenTime extends ChangeNotifier {
 
   /// Les sites reconnus dans le titre d'un onglet.
   static const _sites = [
-    ('youtube', 'YouTube'), ('instagram', 'Instagram'), ('tiktok', 'TikTok'), ('netflix', 'Netflix'),
-    ('twitch', 'Twitch'), ('discord', 'Discord'), ('roblox', 'Roblox'), ('google docs', 'Google Docs'),
-    ('google slides', 'Google Slides'), ('ecole directe', 'École Directe'), ('ecoledirecte', 'École Directe'),
-    ('pronote', 'Pronote'), ('gmail', 'Gmail'), ('chatgpt', 'ChatGPT'), ('claude', 'Claude'), ('x.com', 'X'),
-    ('reddit', 'Reddit'), ('snapchat', 'Snapchat'), ('crunchyroll', 'Crunchyroll'), ('disney+', 'Disney+'),
-    ('prime video', 'Prime Video'), ('wikipedia', 'Wikipédia'), ('classroom', 'Google Classroom'),
+    ('youtube', 'YouTube'),
+    ('instagram', 'Instagram'),
+    ('tiktok', 'TikTok'),
+    ('netflix', 'Netflix'),
+    ('twitch', 'Twitch'),
+    ('discord', 'Discord'),
+    ('roblox', 'Roblox'),
+    ('google docs', 'Google Docs'),
+    ('google slides', 'Google Slides'),
+    ('ecole directe', 'École Directe'),
+    ('ecoledirecte', 'École Directe'),
+    ('pronote', 'Pronote'),
+    ('gmail', 'Gmail'),
+    ('chatgpt', 'ChatGPT'),
+    ('claude', 'Claude'),
+    ('x.com', 'X'),
+    ('reddit', 'Reddit'),
+    ('snapchat', 'Snapchat'),
+    ('crunchyroll', 'Crunchyroll'),
+    ('disney+', 'Disney+'),
+    ('prime video', 'Prime Video'),
+    ('wikipedia', 'Wikipédia'),
+    ('classroom', 'Google Classroom'),
   ];
 
   static const _names = {
-    'robloxplayerbeta': 'Roblox', 'robloxstudiobeta': 'Roblox Studio', 'discord': 'Discord', 'spotify': 'Spotify',
-    'code': 'VS Code', 'hub': 'Mon Hub', 'winword': 'Word', 'excel': 'Excel', 'powerpnt': 'PowerPoint',
-    'javaw': 'Minecraft', 'minecraft': 'Minecraft', 'fortniteclient-win64-shipping': 'Fortnite',
-    'valorant-win64-shipping': 'Valorant', 'leagueclient': 'League of Legends', 'league of legends': 'League of Legends',
-    'steam': 'Steam', 'steamwebhelper': 'Steam', 'explorer': 'Explorateur', 'vlc': 'VLC', 'obs64': 'OBS',
-    'rocketleague': 'Rocket League', 'gta5': 'GTA V', 'cs2': 'Counter-Strike 2', 'r5apex': 'Apex Legends',
-    'overwatch': 'Overwatch', 'genshinimpact': 'Genshin Impact', 'whatsapp': 'WhatsApp', 'notepad': 'Bloc-notes',
+    'robloxplayerbeta': 'Roblox',
+    'robloxstudiobeta': 'Roblox Studio',
+    'discord': 'Discord',
+    'spotify': 'Spotify',
+    'code': 'VS Code',
+    'hub': 'Mon Hub',
+    'winword': 'Word',
+    'excel': 'Excel',
+    'powerpnt': 'PowerPoint',
+    'javaw': 'Minecraft',
+    'minecraft': 'Minecraft',
+    'fortniteclient-win64-shipping': 'Fortnite',
+    'valorant-win64-shipping': 'Valorant',
+    'leagueclient': 'League of Legends',
+    'league of legends': 'League of Legends',
+    'steam': 'Steam',
+    'steamwebhelper': 'Steam',
+    'explorer': 'Explorateur',
+    'vlc': 'VLC',
+    'obs64': 'OBS',
+    'rocketleague': 'Rocket League',
+    'gta5': 'GTA V',
+    'cs2': 'Counter-Strike 2',
+    'r5apex': 'Apex Legends',
+    'overwatch': 'Overwatch',
+    'genshinimpact': 'Genshin Impact',
+    'whatsapp': 'WhatsApp',
+    'notepad': 'Bloc-notes',
   };
 
   /// Toutes les applis et tous les sites qu'on sait nommer.
@@ -138,8 +176,18 @@ class ScreenTime extends ChangeNotifier {
 
   /// Retrouve l'appli dont on parle (« yt » → YouTube, « minecraft » …).
   static String? matchApp(String said, Iterable<String> names) {
-    const alias = {'yt': 'youtube', 'insta': 'instagram', 'mc': 'minecraft', 'lol': 'leagueoflegends', 'ed': 'ecoledirecte',
-      'gta': 'gtav', 'cs': 'counterstrike2', 'vscode': 'vscode', 'fortnite': 'fortnite', 'tiktok': 'tiktok'};
+    const alias = {
+      'yt': 'youtube',
+      'insta': 'instagram',
+      'mc': 'minecraft',
+      'lol': 'leagueoflegends',
+      'ed': 'ecoledirecte',
+      'gta': 'gtav',
+      'cs': 'counterstrike2',
+      'vscode': 'vscode',
+      'fortnite': 'fortnite',
+      'tiktok': 'tiktok',
+    };
     var q = _plain(said);
     if (q.isEmpty) return null;
     q = alias[q] ?? q;
@@ -225,7 +273,8 @@ class ScreenTime extends ChangeNotifier {
     return r == 0 ? '$h h' : '$h h ${r.toString().padLeft(2, '0')}';
   }
 
-  static List<MapEntry<String, int>> sorted(Map<String, int> m) => m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+  static List<MapEntry<String, int>> sorted(Map<String, int> m) =>
+      m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
   /// « Aujourd'hui : 3 h 20 sur l'écran, surtout Roblox (1 h 30)… ».
   static String summary(Map<String, int> m, {String when = 'Aujourd\'hui'}) {
@@ -255,7 +304,7 @@ class Sleep {
 }
 
 /// **Mode jeu** : quand un jeu est en plein écran, Mon Hub se fait léger
-/// (notifications gardées pour la fin, rien de lourd en fond, Clicky
+/// (notifications gardées pour la fin, rien de lourd en fond, Smily
 /// discret) ; à la fin, le bilan de la partie.
 class GameMode extends ChangeNotifier {
   GameMode._();
@@ -320,7 +369,8 @@ class GameMode extends ChangeNotifier {
     _seen = 0;
     if (active && ++_gone >= 2) {
       final mins = n.difference(since ?? n).inMinutes;
-      final text = 'Fin de ta partie de $game (${ScreenTime.say(mins * 60)}).'
+      final text =
+          'Fin de ta partie de $game (${ScreenTime.say(mins * 60)}).'
           '${held == 0 ? '' : ' Pendant ce temps, $held notification${held > 1 ? 's sont arrivées' : ' est arrivée'} : elles t\'attendent dans Mon Hub.'}';
       _reset();
       notifyListeners();

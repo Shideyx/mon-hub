@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+
 import '../core/browser.dart';
 
 import 'voice_note.dart';
@@ -11,18 +12,13 @@ export 'voice_note.dart' show Reaction, VoiceNotePlayer;
 Future<void> openLink(BuildContext context, String url) async {
   final ok = await Browser.open(url);
   if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Impossible d\'ouvrir $url')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Impossible d\'ouvrir $url')));
   }
 }
 
 void showError(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('$error'),
-      backgroundColor: Theme.of(context).colorScheme.error,
-    ),
-  );
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text('$error'), backgroundColor: Theme.of(context).colorScheme.error));
 }
 
 class EmptyHint extends StatelessWidget {
@@ -43,9 +39,11 @@ class EmptyHint extends StatelessWidget {
           children: [
             Icon(icon, color: scheme.onSurfaceVariant.withValues(alpha: 0.7), size: 28),
             const SizedBox(height: 8),
-            Text(text,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant)),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: scheme.onSurfaceVariant),
+            ),
             if (action != null) ...[
               const SizedBox(height: 12),
               FilledButton.tonal(onPressed: action!.$2, child: Text(action!.$1)),
@@ -64,25 +62,20 @@ class LoadingHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, box) {
-          final roomy = box.maxWidth.isFinite && box.maxWidth >= 200 && box.maxHeight >= 90;
-          if (!roomy) {
-            return const Center(
-              child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
-            );
-          }
-          return Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: const ShimmerLines(lines: 4),
-              ),
-            ),
-          );
-        },
+    builder: (context, box) {
+      final roomy = box.maxWidth.isFinite && box.maxWidth >= 200 && box.maxHeight >= 90;
+      if (!roomy) {
+        return const Center(child: SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5)));
+      }
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: const ShimmerLines(lines: 4)),
+        ),
       );
+    },
+  );
 }
 
 class ErrorBanner extends StatelessWidget {
@@ -95,15 +88,16 @@ class ErrorBanner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(14),
+      decoration: BoxDecoration(color: scheme.errorContainer, borderRadius: BorderRadius.circular(14)),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: scheme.onErrorContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(color: scheme.onErrorContainer)),
+          ),
+        ],
       ),
-      child: Row(children: [
-        Icon(Icons.error_outline_rounded, color: scheme.onErrorContainer),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: TextStyle(color: scheme.onErrorContainer))),
-      ]),
     );
   }
 }
@@ -138,11 +132,7 @@ class HubAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: url == null
           ? initial
-          : Image.network(url!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => initial),
+          : Image.network(url!, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => initial),
     );
   }
 }
@@ -154,10 +144,10 @@ class Dot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
 class ChatBubble extends StatelessWidget {
@@ -220,8 +210,10 @@ class ChatBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (author != null)
-                Text(author!,
-                    style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+                Text(
+                  author!,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
+                ),
               for (final url in images)
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -231,18 +223,18 @@ class ChatBubble extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 280, maxWidth: 320),
-                        child: Image.network(url,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (c, child, p) => p == null
-                                ? child
-                                : const SizedBox(width: 200, height: 150, child: LoadingHint()),
-                            errorBuilder: (_, _, _) => Icon(Icons.broken_image_rounded, color: fg)),
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (c, child, p) =>
+                              p == null ? child : const SizedBox(width: 200, height: 150, child: LoadingHint()),
+                          errorBuilder: (_, _, _) => Icon(Icons.broken_image_rounded, color: fg),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              if (extra != null)
-                Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: extra),
+              if (extra != null) Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: extra),
               if (text.isNotEmpty) Text(text, style: TextStyle(color: fg)),
               const SizedBox(height: 2),
               Text(time, style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 10)),
@@ -251,9 +243,7 @@ class ChatBubble extends StatelessWidget {
         ),
       ),
     );
-    final tappable = onDoubleTap == null
-        ? bubble
-        : GestureDetector(onDoubleTap: onDoubleTap, child: bubble);
+    final tappable = onDoubleTap == null ? bubble : GestureDetector(onDoubleTap: onDoubleTap, child: bubble);
     if (reactions.isEmpty) return tappable;
     return Column(
       crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -279,8 +269,7 @@ Future<List<String>?> askFields(
   Set<int> obscure = const {},
 }) {
   final ctrls = [
-    for (var i = 0; i < labels.length; i++)
-      TextEditingController(text: initial != null ? initial[i] : ''),
+    for (var i = 0; i < labels.length; i++) TextEditingController(text: initial != null ? initial[i] : ''),
   ];
   return showDialog<List<String>>(
     context: context,
@@ -293,11 +282,7 @@ Future<List<String>?> askFields(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (message != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(message),
-                ),
+              if (message != null) Padding(padding: const EdgeInsets.only(bottom: 16), child: Text(message)),
               for (var i = 0; i < labels.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -328,8 +313,18 @@ String hhmm(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
 
 const frDays = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const frMonths = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
 ];
 
 String dayLabel(DateTime d) {
@@ -353,13 +348,7 @@ String timeAgo(DateTime d) {
 
 /// Zone de saisie + bouton d'envoi, en bas d'une conversation.
 class ChatComposer extends StatefulWidget {
-  const ChatComposer({
-    super.key,
-    required this.onSend,
-    required this.color,
-    this.hint = 'Message…',
-    this.onAttach,
-  });
+  const ChatComposer({super.key, required this.onSend, required this.color, this.hint = 'Message…', this.onAttach});
 
   final Future<void> Function(String text) onSend;
 
@@ -425,8 +414,7 @@ class _ChatComposerState extends State<ChatComposer> {
                 onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
                   hintText: widget.hint,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                 ),
               ),
             ),
@@ -437,7 +425,8 @@ class _ChatComposerState extends State<ChatComposer> {
               icon: sending
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
                   : const Icon(Icons.send_rounded, color: Colors.white),
             ),
           ],
@@ -449,26 +438,26 @@ class _ChatComposerState extends State<ChatComposer> {
 
 /// Affiche une photo en plein écran (zoom avec les doigts / la molette).
 Future<void> showPhoto(BuildContext context, String url) => Navigator.push(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (c) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            actions: [
-              IconButton(
-                tooltip: 'Ouvrir / enregistrer',
-                icon: const Icon(Icons.open_in_new_rounded),
-                onPressed: () => openLink(c, url),
-              ),
-            ],
+  context,
+  MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (c) => Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            tooltip: 'Ouvrir / enregistrer',
+            icon: const Icon(Icons.open_in_new_rounded),
+            onPressed: () => openLink(c, url),
           ),
-          body: InteractiveViewer(
-            maxScale: 6,
-            child: Center(child: Image.network(url, fit: BoxFit.contain)),
-          ),
-        ),
+        ],
       ),
-    );
+      body: InteractiveViewer(
+        maxScale: 6,
+        child: Center(child: Image.network(url, fit: BoxFit.contain)),
+      ),
+    ),
+  ),
+);

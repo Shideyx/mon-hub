@@ -1,4 +1,4 @@
-// **Les yeux et les oreilles de Clicky** (v1.58) : il voit ton écran et
+// **Les yeux et les oreilles de Smily** (v1.58) : il voit ton écran et
 // entend le son de ton PC **en continu**, mais tout se passe sur le PC :
 // - les yeux : quand la fenêtre au premier plan change, il en lit le texte
 //   (lecture de texte de Windows, sans internet) ;
@@ -56,9 +56,30 @@ class SenseRules {
   );
 
   static const _privateExe = {
-    'hub', 'discord', 'whatsapp', 'telegram', 'signal', 'teams', 'ms-teams', 'outlook', 'olk', 'hxoutlook', 'keepass',
-    'keepassxc', 'bitwarden', '1password', 'zoom', 'skype', 'slack', 'messenger', 'lockapp', 'logonui', 'consent',
-    'credentialuibroker', 'thunderbird', 'mailspring',
+    'hub',
+    'discord',
+    'whatsapp',
+    'telegram',
+    'signal',
+    'teams',
+    'ms-teams',
+    'outlook',
+    'olk',
+    'hxoutlook',
+    'keepass',
+    'keepassxc',
+    'bitwarden',
+    '1password',
+    'zoom',
+    'skype',
+    'slack',
+    'messenger',
+    'lockapp',
+    'logonui',
+    'consent',
+    'credentialuibroker',
+    'thunderbird',
+    'mailspring',
   };
 
   /// Fenêtre qu'il ne regarde **jamais** (messageries, mails, banque, mots
@@ -71,8 +92,22 @@ class SenseRules {
 
   /// Programmes d'appel : pendant qu'ils font du son, il n'écoute pas.
   static const callExes = {
-    'discord', 'teams', 'ms-teams', 'zoom', 'skype', 'whatsapp', 'telegram', 'signal', 'slack', 'webex', 'ciscowebex',
-    'facetime', 'messenger', 'phoneexperiencehost', 'yourphone', 'hub',
+    'discord',
+    'teams',
+    'ms-teams',
+    'zoom',
+    'skype',
+    'whatsapp',
+    'telegram',
+    'signal',
+    'slack',
+    'webex',
+    'ciscowebex',
+    'facetime',
+    'messenger',
+    'phoneexperiencehost',
+    'yourphone',
+    'hub',
   };
 
   static const browsers = {'chrome', 'msedge', 'firefox', 'opera', 'brave', 'vivaldi', 'arc', 'msedgewebview2'};
@@ -148,10 +183,8 @@ class SenseRules {
   }
 
   /// Ce qu'il a entendu, nettoyé ([Musique], (applaudissements)…).
-  static String cleanHeard(String raw) => raw
-      .replaceAll(RegExp(r'\[[^\]]*\]|\([^)]*\)|♪'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
+  static String cleanHeard(String raw) =>
+      raw.replaceAll(RegExp(r'\[[^\]]*\]|\([^)]*\)|♪'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 
   static final _errorWords = RegExp(
     r'\b(?:error|erreur|exception|traceback|failed|failure|echec|echoue|introuvable|not found|syntaxerror|typeerror|'
@@ -187,8 +220,47 @@ class SenseRules {
     return null;
   }
 
-  static const _en = {'the', 'and', 'you', 'is', 'are', 'what', 'this', 'that', 'with', 'have', 'it', 'of', 'to', 'we', 'they', 'was', 'for', 'not'};
-  static const _fr = {'le', 'la', 'les', 'et', 'est', 'une', 'des', 'que', 'qui', 'pas', 'pour', 'dans', 'on', 'je', 'tu', 'nous', 'vous', 'du', 'ce'};
+  static const _en = {
+    'the',
+    'and',
+    'you',
+    'is',
+    'are',
+    'what',
+    'this',
+    'that',
+    'with',
+    'have',
+    'it',
+    'of',
+    'to',
+    'we',
+    'they',
+    'was',
+    'for',
+    'not',
+  };
+  static const _fr = {
+    'le',
+    'la',
+    'les',
+    'et',
+    'est',
+    'une',
+    'des',
+    'que',
+    'qui',
+    'pas',
+    'pour',
+    'dans',
+    'on',
+    'je',
+    'tu',
+    'nous',
+    'vous',
+    'du',
+    'ce',
+  };
 
   /// C'est de l'anglais (ce qu'il entend dans la vidéo).
   static bool english(String text) {
@@ -217,14 +289,39 @@ class SenseRules {
 
   /// Les applis et sites qui font perdre du temps.
   static const distractions = {
-    'YouTube', 'Roblox', 'TikTok', 'Instagram', 'Netflix', 'Twitch', 'Snapchat', 'Reddit', 'X', 'Crunchyroll',
-    'Disney+', 'Prime Video', 'Minecraft', 'Fortnite', 'Valorant', 'League of Legends', 'Steam', 'Rocket League', 'GTA V',
-    'Counter-Strike 2', 'Apex Legends', 'Overwatch', 'Genshin Impact', 'Discord',
+    'YouTube',
+    'Roblox',
+    'TikTok',
+    'Instagram',
+    'Netflix',
+    'Twitch',
+    'Snapchat',
+    'Reddit',
+    'X',
+    'Crunchyroll',
+    'Disney+',
+    'Prime Video',
+    'Minecraft',
+    'Fortnite',
+    'Valorant',
+    'League of Legends',
+    'Steam',
+    'Rocket League',
+    'GTA V',
+    'Counter-Strike 2',
+    'Apex Legends',
+    'Overwatch',
+    'Genshin Impact',
+    'Discord',
   };
 
   /// Minutes de distraction sur les [window] dernières minutes (tours de
   /// 15 s), et l'appli la plus présente.
-  static (int, String) distraction(List<(DateTime, String)> ticks, DateTime now, {Duration window = const Duration(minutes: 50)}) {
+  static (int, String) distraction(
+    List<(DateTime, String)> ticks,
+    DateTime now, {
+    Duration window = const Duration(minutes: 50),
+  }) {
     final by = <String, int>{};
     for (final (at, app) in ticks) {
       if (now.difference(at) > window || !distractions.contains(app)) continue;
@@ -258,11 +355,16 @@ class SenseRules {
       return d != null && d.year == tomorrow.year && d.month == tomorrow.month && d.day == tomorrow.day;
     }
 
-    final due = [for (final h in homework) if (h['fait'] != true && isTomorrow(h['pour_le'])) h];
+    final due = [
+      for (final h in homework)
+        if (h['fait'] != true && isTomorrow(h['pour_le'])) h,
+    ];
     if (due.isEmpty) return null;
     due.sort((a, b) => (b['controle'] == true ? 1 : 0).compareTo(a['controle'] == true ? 1 : 0));
     final h = due.first;
-    final what = h['controle'] == true ? 'un contrôle de ${pretty('${h['matiere']}')}' : 'le devoir de ${pretty('${h['matiere']}')}';
+    final what = h['controle'] == true
+        ? 'un contrôle de ${pretty('${h['matiere']}')}'
+        : 'le devoir de ${pretty('${h['matiere']}')}';
     return 'Ça fait $minutes minutes de $app, et t\'as $what pour demain. On fait 25 minutes et je te laisse tranquille ?';
   }
 }
@@ -432,8 +534,7 @@ class ClickySenses extends ChangeNotifier {
     final app = ScreenTime.appName(exe, title);
     if (idle < 120 && title.trim().isNotEmpty) {
       _apps.add((n, app));
-      if (!SenseRules.privateWindow(exe, title) &&
-          (_titles.isEmpty || _titles.last.$3 != title)) {
+      if (!SenseRules.privateWindow(exe, title) && (_titles.isEmpty || _titles.last.$3 != title)) {
         _titles.add((n, app, title));
       }
     }
@@ -475,7 +576,10 @@ class ClickySenses extends ChangeNotifier {
       _lastOcr = n;
       seeing = title;
       seeingText = text;
-      await ScreenMemory.instance.add(ScreenMoment(at: n, app: app, title: title, text: text), now: n);
+      await ScreenMemory.instance.add(
+        ScreenMoment(at: n, app: app, title: title, text: text),
+        now: n,
+      );
       await _onScreen(exe, app, title, text, n);
       notifyListeners();
     } catch (_) {
@@ -536,13 +640,10 @@ class ClickySenses extends ChangeNotifier {
   void _startEars() {
     if (_sub != null) return;
     _pcm.clear();
-    _sub = LoopbackCapture.start().listen(
-      (pcm) {
-        _pcm.add(pcm);
-        if (_pcm.length >= _chunkBytes) unawaited(_chunk());
-      },
-      onError: (Object _) => unawaited(_stopEars()),
-    );
+    _sub = LoopbackCapture.start().listen((pcm) {
+      _pcm.add(pcm);
+      if (_pcm.length >= _chunkBytes) unawaited(_chunk());
+    }, onError: (Object _) => unawaited(_stopEars()));
   }
 
   Future<void> _stopEars() async {
@@ -567,7 +668,9 @@ class ClickySenses extends ChangeNotifier {
     final f = File('$dir${Platform.pathSeparator}clicky-sens.wav');
     try {
       await f.writeAsBytes(LiveCaptions.wav(bytes), flush: true);
-      final text = SenseRules.cleanHeard(await Whisper.transcribe(f.path, lang: 'auto', timeout: const Duration(seconds: 60)));
+      final text = SenseRules.cleanHeard(
+        await Whisper.transcribe(f.path, lang: 'auto', timeout: const Duration(seconds: 60)),
+      );
       if (text.length < 8 || _sub == null) return;
       heard.add((n, title, text));
       heard.removeWhere((e) => n.difference(e.$1) > const Duration(minutes: 10));
@@ -589,7 +692,10 @@ class ClickySenses extends ChangeNotifier {
   /// Ce qui a été dit ces [last] dernières minutes.
   String heardText({Duration last = const Duration(minutes: 2), DateTime? now}) {
     final n = now ?? DateTime.now();
-    return [for (final (at, _, t) in heard) if (n.difference(at) <= last) t].join(' ');
+    return [
+      for (final (at, _, t) in heard)
+        if (n.difference(at) <= last) t,
+    ].join(' ');
   }
 
   // --------------------------------------------------------- Initiatives
@@ -632,7 +738,9 @@ class ClickySenses extends ChangeNotifier {
         ClickyIdea(
           say: 'Je vois une erreur dans $app. Je te l\'explique ?',
           tool: 'clicky_expliquer_ecran',
-          args: const {'question': 'Explique-moi l\'erreur qui est à mon écran et comment la corriger, étape par étape.'},
+          args: const {
+            'question': 'Explique-moi l\'erreur qui est à mon écran et comment la corriger, étape par étape.',
+          },
           why: 'erreur à l\'écran',
         ),
         'erreur|$title',
@@ -697,7 +805,10 @@ class ClickySenses extends ChangeNotifier {
     final h = Habits.upcoming(Habits.find(st.hours, n), n, SenseRules.distractions);
     if (h == null) return;
     final hw = await call!('ecole_devoirs', const {});
-    final line = Habits.nudge(h, [for (final x in (hw is List ? hw : const [])) if (x is Map) x], n);
+    final line = Habits.nudge(h, [
+      for (final x in (hw is List ? hw : const []))
+        if (x is Map) x,
+    ], n);
     if (line == null) return;
     if (await _propose(
       ClickyIdea(say: line, tool: 'clicky_concentration', args: const {'minutes': 20}, why: 'habitude + devoir demain'),
@@ -719,7 +830,10 @@ class ClickySenses extends ChangeNotifier {
     final line = SenseRules.procrastinationLine(
       minutes: mins,
       app: app,
-      homework: [for (final h in (hw is List ? hw : const [])) if (h is Map) h],
+      homework: [
+        for (final h in (hw is List ? hw : const []))
+          if (h is Map) h,
+      ],
       now: n,
     );
     if (line == null) return;
@@ -741,13 +855,14 @@ class ClickySenses extends ChangeNotifier {
     encode: (v) => v,
   );
 
-  /// Ce qu'il voit et entend en ce moment, pour Clicky partout (petit
+  /// Ce qu'il voit et entend en ce moment, pour Smily partout (petit
   /// fichier, réécrit toutes les minutes).
   Future<void> _writeRecent(DateTime n) async {
     String cut(String s, int max) => s.length > max ? '${s.substring(0, max)}…' : s;
     await _recent.save({
       'at': n.millisecondsSinceEpoch,
-      if (screenOn) 'fenetres': [for (final (at, app, t) in _titles.reversed.take(6)) '${ScreenMemory.hm(at)} $app : $t'],
+      if (screenOn)
+        'fenetres': [for (final (at, app, t) in _titles.reversed.take(6)) '${ScreenMemory.hm(at)} $app : $t'],
       if (screenOn && seeingText.isNotEmpty) 'fenetre': seeing,
       if (screenOn && seeingText.isNotEmpty) 'ecran': cut(seeingText, 700),
       if (soundOn) 'entendu': cut(heardText(now: n), 700),
@@ -787,13 +902,13 @@ class ClickySenses extends ChangeNotifier {
 
   // --------------------------------------------------------------- Outils
 
-  /// Les actions de Clicky sur sa mémoire et ses sens. [explain] : il
+  /// Les actions de Smily sur sa mémoire et ses sens. [explain] : il
   /// ouvre sa boîte et répond sur ce qu'il y a à l'écran.
   List<HubTool> tools({required void Function(String question) explain}) => [
     HubTool(
       name: 'memoire_ecran',
       description:
-          'La mémoire de l\'écran (« tu te souviens ? ») : ce que Clicky a vu à l\'écran et entendu dans les vidéos ces 7 '
+          'La mémoire de l\'écran (« tu te souviens ? ») : ce que Smily a vu à l\'écran et entendu dans les vidéos ces 7 '
           'derniers jours. texte = ce qu\'on cherche (« le site sur les volcans ») ; quand = un moment (« hier vers 16 h », '
           '« mardi », « tout à l\'heure ») ; les deux peuvent se combiner.',
       params: {
@@ -811,7 +926,7 @@ class ClickySenses extends ChangeNotifier {
           return {
             'resume': screenOn || soundOn
                 ? 'Je n\'ai encore rien vu : ça se remplit au fil de ta journée.'
-                : 'Je ne regarde pas ton écran pour l\'instant (Réglages de Clicky → Ses yeux et ses oreilles).',
+                : 'Je ne regarde pas ton écran pour l\'instant (Réglages de Smily → Ses yeux et ses oreilles).',
           };
         }
         if (ScreenMemory.words(q).isEmpty && w != null) {
@@ -830,7 +945,7 @@ class ClickySenses extends ChangeNotifier {
     ),
     HubTool(
       name: 'memoire_oublier',
-      description: 'Oublie ce que Clicky a vu et entendu ces N dernières minutes (0 = tout effacer).',
+      description: 'Oublie ce que Smily a vu et entendu ces N dernières minutes (0 = tout effacer).',
       params: {'minutes': ('integer', 'Minutes à oublier (0 = tout)')},
       run: (a) async {
         final m = (a['minutes'] as num?)?.toInt() ?? 15;
@@ -844,7 +959,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'sens_etat',
       description:
-          'Ce que Clicky voit et entend en ce moment (fenêtre lue, son du PC, ce qui vient d\'être dit dans la vidéo, '
+          'Ce que Smily voit et entend en ce moment (fenêtre lue, son du PC, ce qui vient d\'être dit dans la vidéo, '
           'notes « à retenir »), et si ses yeux et ses oreilles sont allumés.',
       run: (_) async => {
         'yeux': screenOn ? (paused ? 'en pause' : 'allumés') : 'éteints',
@@ -858,7 +973,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'sens_regler',
       description:
-          'Allume ou éteint les yeux (voir l\'écran en continu) et les oreilles (entendre le son du PC) de Clicky, ou les '
+          'Allume ou éteint les yeux (voir l\'écran en continu) et les oreilles (entendre le son du PC) de Smily, ou les '
           'met en pause.',
       params: {
         'ecran': ('boolean', 'Voir l\'écran en continu'),
@@ -880,7 +995,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'clicky_habitudes',
       description:
-          'Ce que Clicky a remarqué sur tes habitudes (temps d\'écran par heure, sur ce PC) : « le mercredi vers 14 h, c\'est '
+          'Ce que Smily a remarqué sur tes habitudes (temps d\'écran par heure, sur ce PC) : « le mercredi vers 14 h, c\'est '
           'Roblox », ton heure la plus active, l\'heure où tu quittes le PC le soir, ton appli n° 1.',
       run: (_) async {
         final st = ScreenTime.instance;
@@ -897,7 +1012,8 @@ class ClickySenses extends ChangeNotifier {
     ),
     HubTool(
       name: 'clicky_expliquer_ecran',
-      description: 'Clicky ouvre sa boîte, regarde l\'écran et répond à une question dessus (« explique cette erreur »).',
+      description:
+          'Smily ouvre sa boîte, regarde l\'écran et répond à une question dessus (« explique cette erreur »).',
       params: {'question': ('string', 'La question sur l\'écran')},
       run: (a) async {
         final q = '${a['question'] ?? ''}'.trim();

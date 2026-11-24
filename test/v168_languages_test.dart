@@ -65,11 +65,13 @@ void main() {
   group('Interprète', () {
     test('consignes et réglages de Gemini Live', () {
       expect(Interpreter.system('espagnol'), contains('français et le espagnol'));
-      final setup = GeminiLive(key: 'k', system: 's', tools: const [], language: null, autoVad: true).setupMessage('m')['setup'] as Map;
+      final setup =
+          GeminiLive(key: 'k', system: 's', tools: const [], language: null, autoVad: true).setupMessage('m')['setup']
+              as Map;
       expect(setup.containsKey('realtimeInputConfig'), isFalse);
       expect(setup.containsKey('tools'), isFalse);
       expect(((setup['generationConfig'] as Map)['speechConfig'] as Map).containsKey('languageCode'), isFalse);
-      // Clicky garde ses réglages habituels.
+      // Smily garde ses réglages habituels.
       final clicky = GeminiLive(key: 'k', system: 's', tools: const []).setupMessage('m')['setup'] as Map;
       expect(clicky['realtimeInputConfig'], isNotNull);
       expect(((clicky['generationConfig'] as Map)['speechConfig'] as Map)['languageCode'], 'fr-FR');
@@ -84,7 +86,7 @@ void main() {
     });
   });
 
-  group('Clicky', () {
+  group('Smily', () {
     test('phrases sans IA', () async {
       final calls = <String>[];
       Future<Object?> fake(String name, Map<String, dynamic> a) async {

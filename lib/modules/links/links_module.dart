@@ -45,70 +45,62 @@ class LinksModule extends HubModule {
   List<LinkPreset> get links {
     final saved = store.getJson<List<dynamic>>('links');
     if (saved == null) return presets;
-    return saved
-        .map((e) => LinkPreset(e['label'] as String, e['url'] as String))
-        .toList();
+    return saved.map((e) => LinkPreset(e['label'] as String, e['url'] as String)).toList();
   }
 
-  Future<void> _save(List<LinkPreset> l) => store.setJson(
-      'links', l.map((e) => {'label': e.label, 'url': e.url}).toList());
+  Future<void> _save(List<LinkPreset> l) =>
+      store.setJson('links', l.map((e) => {'label': e.label, 'url': e.url}).toList());
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) => Padding(
-          padding: const EdgeInsets.all(12),
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final l in links)
-                  ActionChip(
-                    avatar: Icon(Icons.open_in_new, size: 16, color: color),
-                    label: Text(l.label),
-                    onPressed: () => openLink(context, l.url),
-                  ),
-              ],
-            ),
-          ),
+    listenable: store,
+    builder: (context, _) => Padding(
+      padding: const EdgeInsets.all(12),
+      child: SingleChildScrollView(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final l in links)
+              ActionChip(
+                avatar: Icon(Icons.open_in_new, size: 16, color: color),
+                label: Text(l.label),
+                onPressed: () => openLink(context, l.url),
+              ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   @override
   Widget buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(name)),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _edit(context, null),
-          child: const Icon(Icons.add),
-        ),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) {
-            final l = links;
-            if (l.isEmpty) return const EmptyHint('Aucun raccourci');
-            return ReorderableListView.builder(
-              itemCount: l.length,
-              onReorderItem: (a, b) {
-                final list = [...l];
-                list.insert(b, list.removeAt(a));
-                _save(list);
-              },
-              itemBuilder: (context, i) => ListTile(
-                key: ValueKey('${l[i].label}$i'),
-                leading: Icon(icon, color: color),
-                title: Text(l[i].label),
-                subtitle: Text(l[i].url, overflow: TextOverflow.ellipsis),
-                onTap: () => openLink(context, l[i].url),
-                trailing: IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _edit(context, i),
-                ),
-              ),
-            );
+    appBar: AppBar(title: Text(name)),
+    floatingActionButton: FloatingActionButton(onPressed: () => _edit(context, null), child: const Icon(Icons.add)),
+    body: ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final l = links;
+        if (l.isEmpty) return const EmptyHint('Aucun raccourci');
+        return ReorderableListView.builder(
+          itemCount: l.length,
+          onReorderItem: (a, b) {
+            final list = [...l];
+            list.insert(b, list.removeAt(a));
+            _save(list);
           },
-        ),
-      );
+          itemBuilder: (context, i) => ListTile(
+            key: ValueKey('${l[i].label}$i'),
+            leading: Icon(icon, color: color),
+            title: Text(l[i].label),
+            subtitle: Text(l[i].url, overflow: TextOverflow.ellipsis),
+            onTap: () => openLink(context, l[i].url),
+            trailing: IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(context, i)),
+          ),
+        );
+      },
+    ),
+  );
 
   Future<void> _edit(BuildContext context, int? index) async {
     final list = [...links];

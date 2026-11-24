@@ -42,10 +42,7 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
               ),
               TextField(
                 controller: date,
-                decoration: InputDecoration(
-                  labelText: 'Date (12 mars, ou 12/03/2011 pour l\'âge)',
-                  errorText: error,
-                ),
+                decoration: InputDecoration(labelText: 'Date (12 mars, ou 12/03/2011 pour l\'âge)', errorText: error),
                 onSubmitted: (_) => Navigator.pop(context, true),
               ),
             ],
@@ -106,7 +103,7 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                       subtitle: Text(
                         assistant.consent
                             ? 'La veille au soir (19 h) et le jour même, avec un petit message tout prêt.'
-                            : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Clicky).',
+                            : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Smily).',
                       ),
                       value: assistant.on('anniversaires'),
                       onChanged: assistant.consent ? (v) => assistant.setOn('anniversaires', v) : null,
@@ -114,7 +111,7 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                   ),
                   Text(
                     'Ceux de Google Agenda (calendrier « Anniversaires » de tes contacts) arrivent tout seuls. '
-                    'Tu peux aussi dire à Clicky : « l\'anniversaire de Léa c\'est le 12 mars ». Ta liste est '
+                    'Tu peux aussi dire à Smily : « l\'anniversaire de Léa c\'est le 12 mars ». Ta liste est '
                     'synchronisée sur tes appareils.',
                     style: theme.textTheme.bodySmall,
                   ),
@@ -131,16 +128,20 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: const Color(0x22E5487B),
-                          child: Text(x.name.characters.first.toUpperCase(),
-                              style: const TextStyle(color: Color(0xFFE5487B), fontWeight: FontWeight.w800)),
+                          child: Text(
+                            x.name.characters.first.toUpperCase(),
+                            style: const TextStyle(color: Color(0xFFE5487B), fontWeight: FontWeight.w800),
+                          ),
                         ),
                         title: Text(x.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        subtitle: Text([
-                          Birthdays.dateText(Birthday(x.name, x.month, x.day)),
-                          _left(d, now),
-                          if (Birthdays.age(x, d) case final a?) '$a ans',
-                          if (x.fromAgenda) 'Google Agenda',
-                        ].join(' · ')),
+                        subtitle: Text(
+                          [
+                            Birthdays.dateText(Birthday(x.name, x.month, x.day)),
+                            _left(d, now),
+                            if (Birthdays.age(x, d) case final a?) '$a ans',
+                            if (x.fromAgenda) 'Google Agenda',
+                          ].join(' · '),
+                        ),
                         trailing: Wrap(
                           children: [
                             IconButton(
@@ -149,9 +150,9 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                               onPressed: () async {
                                 await Clipboard.setData(ClipboardData(text: Birthdays.wish(x, d)));
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Message copié : colle-le où tu veux.')),
-                                  );
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(const SnackBar(content: Text('Message copié : colle-le où tu veux.')));
                                 }
                               },
                             ),

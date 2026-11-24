@@ -233,15 +233,20 @@ class ScheduleModule extends HubModule {
           if (cal['selected'] == false || cal['hidden'] == true) continue;
           final hex = '${cal['backgroundColor'] ?? '#4285F4'}'.replaceAll('#', '');
           final color = Color(0xFF000000 | (int.tryParse(hex, radix: 16) ?? 0x4285F4));
-          final q = Uri(queryParameters: {
-            'timeMin': from.toUtc().toIso8601String(),
-            'timeMax': to.toUtc().toIso8601String(),
-            'singleEvents': 'true',
-            'orderBy': 'startTime',
-            'maxResults': '250',
-          }).query;
-          final ev = await GoogleAuth.api(email, 'GET',
-              '$base/calendars/${Uri.encodeComponent(cal['id'] as String)}/events?$q');
+          final q = Uri(
+            queryParameters: {
+              'timeMin': from.toUtc().toIso8601String(),
+              'timeMax': to.toUtc().toIso8601String(),
+              'singleEvents': 'true',
+              'orderBy': 'startTime',
+              'maxResults': '250',
+            },
+          ).query;
+          final ev = await GoogleAuth.api(
+            email,
+            'GET',
+            '$base/calendars/${Uri.encodeComponent(cal['id'] as String)}/events?$q',
+          );
           for (final e in (ev['items'] as List? ?? [])) {
             if (e['status'] == 'cancelled') continue;
             final s = e['start'] as Map? ?? {};
@@ -250,16 +255,18 @@ class ScheduleModule extends HubModule {
             final start = DateTime.tryParse('${s['dateTime'] ?? s['date']}')?.toLocal();
             final end = DateTime.tryParse('${en['dateTime'] ?? en['date']}')?.toLocal();
             if (start == null || end == null) continue;
-            out.add(AgendaItem(
-              title: e['summary'] as String? ?? '(sans titre)',
-              start: start,
-              end: end,
-              source: AgendaSource.google,
-              color: color,
-              place: e['location'] as String? ?? '',
-              detail: cal['summary'] as String? ?? '',
-              allDay: allDay,
-            ));
+            out.add(
+              AgendaItem(
+                title: e['summary'] as String? ?? '(sans titre)',
+                start: start,
+                end: end,
+                source: AgendaSource.google,
+                color: color,
+                place: e['location'] as String? ?? '',
+                detail: cal['summary'] as String? ?? '',
+                allDay: allDay,
+              ),
+            );
           }
         }
       } catch (e) {
@@ -274,16 +281,19 @@ class ScheduleModule extends HubModule {
   Future<void> addToGoogle(PersonalEvent e) async {
     final email = GoogleAuth.accounts.first;
     String t(DateTime d) => d.toIso8601String().substring(0, 19);
-    await GoogleAuth.api(email, 'POST',
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        body: {
-          'summary': e.title,
-          if (e.place.isNotEmpty) 'location': e.place,
-          if (e.note.isNotEmpty) 'description': e.note,
-          'start': {'dateTime': t(e.start), 'timeZone': _tz},
-          'end': {'dateTime': t(e.end), 'timeZone': _tz},
-          if (e.weekly) 'recurrence': ['RRULE:FREQ=WEEKLY'],
-        });
+    await GoogleAuth.api(
+      email,
+      'POST',
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      body: {
+        'summary': e.title,
+        if (e.place.isNotEmpty) 'location': e.place,
+        if (e.note.isNotEmpty) 'description': e.note,
+        'start': {'dateTime': t(e.start), 'timeZone': _tz},
+        'end': {'dateTime': t(e.end), 'timeZone': _tz},
+        if (e.weekly) 'recurrence': ['RRULE:FREQ=WEEKLY'],
+      },
+    );
     _gCache.clear();
     store.changed();
   }
@@ -427,138 +437,140 @@ class ScheduleModule extends HubModule {
 
   @override
   List<HubTool> get tools => [
-        HubTool(
-          name: 'agenda_lire',
-          description: 'Liste les cours (École Directe), évènements Google Agenda et '
-              'évènements perso, entre deux dates.',
-          params: {
-            'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
-            'jours': ('integer', 'Nombre de jours (défaut 7)'),
-          },
-          run: (a) async {
-            final now = DateTime.now();
-            final from = DateTime.tryParse('${a['debut'] ?? ''}') ??
-                DateTime(now.year, now.month, now.day);
-            final days = (a['jours'] as num?)?.toInt() ?? 7;
-            final items = await itemsBetween(from, from.add(Duration(days: days)));
-            return [
-              for (final e in items)
-                {
-                  'titre': e.title,
-                  'debut': e.start,
-                  'fin': e.end,
-                  'source': e.source.label,
-                  if (e.place.isNotEmpty) 'lieu': e.place,
-                  if (e.detail.isNotEmpty) 'detail': e.detail,
-                  if (e.cancelled) 'annule': true,
-                  if (e.personal != null) 'id': e.personal!.id,
-                },
-            ];
-          },
+    HubTool(
+      name: 'agenda_lire',
+      description:
+          'Liste les cours (École Directe), évènements Google Agenda et '
+          'évènements perso, entre deux dates.',
+      params: {
+        'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
+        'jours': ('integer', 'Nombre de jours (défaut 7)'),
+      },
+      run: (a) async {
+        final now = DateTime.now();
+        final from = DateTime.tryParse('${a['debut'] ?? ''}') ?? DateTime(now.year, now.month, now.day);
+        final days = (a['jours'] as num?)?.toInt() ?? 7;
+        final items = await itemsBetween(from, from.add(Duration(days: days)));
+        return [
+          for (final e in items)
+            {
+              'titre': e.title,
+              'debut': e.start,
+              'fin': e.end,
+              'source': e.source.label,
+              if (e.place.isNotEmpty) 'lieu': e.place,
+              if (e.detail.isNotEmpty) 'detail': e.detail,
+              if (e.cancelled) 'annule': true,
+              if (e.personal != null) 'id': e.personal!.id,
+            },
+        ];
+      },
+    ),
+    HubTool(
+      name: 'agenda_ajouter',
+      description: 'Ajoute un évènement perso dans l\'agenda de Mon Hub.',
+      params: {
+        'titre': ('string', 'Titre'),
+        'debut': ('string', 'Date et heure de début, ex. 2026-11-20T17:00'),
+        'fin': ('string', 'Date et heure de fin (défaut : 1 h après)'),
+        'lieu': ('string', 'Lieu (facultatif)'),
+        'note': ('string', 'Note (facultatif)'),
+        'chaque_semaine': ('boolean', 'Répéter chaque semaine'),
+      },
+      required: ['titre', 'debut'],
+      run: (a) async {
+        final start = DateTime.parse(a['debut'] as String);
+        final end = DateTime.tryParse('${a['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
+        final e = PersonalEvent(
+          id: '${DateTime.now().microsecondsSinceEpoch}',
+          title: a['titre'] as String,
+          start: start,
+          end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
+          place: a['lieu'] as String? ?? '',
+          note: a['note'] as String? ?? '',
+          weekly: a['chaque_semaine'] == true,
+        );
+        await savePersonal(e);
+        return {'ok': true, 'id': e.id};
+      },
+    ),
+    HubTool(
+      name: 'agenda_creneaux_libres',
+      description:
+          'Secrétaire : les créneaux libres (sans cours ni évènement) jour par jour, '
+          'pour placer des révisions, devoirs, sport, rendez-vous…',
+      params: {
+        'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
+        'jours': ('integer', 'Nombre de jours (défaut 7)'),
+        'de': ('integer', 'Heure de début de journée (défaut 8)'),
+        'a': ('integer', 'Heure de fin de journée (défaut 21)'),
+        'minimum': ('integer', 'Durée minimale d\'un créneau en minutes (défaut 30)'),
+      },
+      run: (a) async {
+        final now = DateTime.now();
+        final from = DateTime.tryParse('${a['debut'] ?? ''}') ?? DateTime(now.year, now.month, now.day);
+        final days = ((a['jours'] as num?)?.toInt() ?? 7).clamp(1, 31);
+        final items = await itemsBetween(from, from.add(Duration(days: days)));
+        return freeSlots(
+          items.where((e) => !e.cancelled).map((e) => (e.start, e.end)).toList(),
+          from: from,
+          days: days,
+          dayStart: ((a['de'] as num?)?.toInt() ?? 8).clamp(0, 23),
+          dayEnd: ((a['a'] as num?)?.toInt() ?? 21).clamp(1, 24),
+          minimum: Duration(minutes: ((a['minimum'] as num?)?.toInt() ?? 30).clamp(10, 600)),
+          notBefore: now,
+        );
+      },
+    ),
+    HubTool(
+      name: 'agenda_ajouter_plan',
+      description:
+          'Secrétaire : enregistre tout un emploi du temps d\'un coup (révisions, devoirs, '
+          'activités…) dans l\'agenda de Mon Hub. Propose d\'abord le planning à la personne.',
+      params: {
+        'plan': (
+          'string',
+          'Liste JSON d\'évènements : [{"titre":"Révision maths","debut":"2026-11-20T17:00",'
+              '"fin":"2026-11-20T18:00","lieu":"","note":"","chaque_semaine":false}]',
         ),
-        HubTool(
-          name: 'agenda_ajouter',
-          description: 'Ajoute un évènement perso dans l\'agenda de Mon Hub.',
-          params: {
-            'titre': ('string', 'Titre'),
-            'debut': ('string', 'Date et heure de début, ex. 2026-11-20T17:00'),
-            'fin': ('string', 'Date et heure de fin (défaut : 1 h après)'),
-            'lieu': ('string', 'Lieu (facultatif)'),
-            'note': ('string', 'Note (facultatif)'),
-            'chaque_semaine': ('boolean', 'Répéter chaque semaine'),
-          },
-          required: ['titre', 'debut'],
-          run: (a) async {
-            final start = DateTime.parse(a['debut'] as String);
-            final end = DateTime.tryParse('${a['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
-            final e = PersonalEvent(
-              id: '${DateTime.now().microsecondsSinceEpoch}',
-              title: a['titre'] as String,
-              start: start,
-              end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
-              place: a['lieu'] as String? ?? '',
-              note: a['note'] as String? ?? '',
-              weekly: a['chaque_semaine'] == true,
-            );
-            await savePersonal(e);
-            return {'ok': true, 'id': e.id};
-          },
-        ),
-        HubTool(
-          name: 'agenda_creneaux_libres',
-          description: 'Secrétaire : les créneaux libres (sans cours ni évènement) jour par jour, '
-              'pour placer des révisions, devoirs, sport, rendez-vous…',
-          params: {
-            'debut': ('string', 'Date de début AAAA-MM-JJ (défaut : aujourd\'hui)'),
-            'jours': ('integer', 'Nombre de jours (défaut 7)'),
-            'de': ('integer', 'Heure de début de journée (défaut 8)'),
-            'a': ('integer', 'Heure de fin de journée (défaut 21)'),
-            'minimum': ('integer', 'Durée minimale d\'un créneau en minutes (défaut 30)'),
-          },
-          run: (a) async {
-            final now = DateTime.now();
-            final from = DateTime.tryParse('${a['debut'] ?? ''}') ?? DateTime(now.year, now.month, now.day);
-            final days = ((a['jours'] as num?)?.toInt() ?? 7).clamp(1, 31);
-            final items = await itemsBetween(from, from.add(Duration(days: days)));
-            return freeSlots(
-              items.where((e) => !e.cancelled).map((e) => (e.start, e.end)).toList(),
-              from: from,
-              days: days,
-              dayStart: ((a['de'] as num?)?.toInt() ?? 8).clamp(0, 23),
-              dayEnd: ((a['a'] as num?)?.toInt() ?? 21).clamp(1, 24),
-              minimum: Duration(minutes: ((a['minimum'] as num?)?.toInt() ?? 30).clamp(10, 600)),
-              notBefore: now,
-            );
-          },
-        ),
-        HubTool(
-          name: 'agenda_ajouter_plan',
-          description: 'Secrétaire : enregistre tout un emploi du temps d\'un coup (révisions, devoirs, '
-              'activités…) dans l\'agenda de Mon Hub. Propose d\'abord le planning à la personne.',
-          params: {
-            'plan': (
-              'string',
-              'Liste JSON d\'évènements : [{"titre":"Révision maths","debut":"2026-11-20T17:00",'
-                  '"fin":"2026-11-20T18:00","lieu":"","note":"","chaque_semaine":false}]',
-            ),
-          },
-          required: ['plan'],
-          run: (a) async {
-            final raw = a['plan'];
-            final list = raw is List ? raw : jsonDecode('$raw') as List;
-            final ids = <String>[];
-            var n = 0;
-            for (final x in list) {
-              if (x is! Map) continue;
-              final start = DateTime.tryParse('${x['debut'] ?? ''}');
-              if (start == null || '${x['titre'] ?? ''}'.trim().isEmpty) continue;
-              final end = DateTime.tryParse('${x['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
-              final e = PersonalEvent(
-                id: '${DateTime.now().microsecondsSinceEpoch}${n++}',
-                title: '${x['titre']}'.trim(),
-                start: start,
-                end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
-                place: '${x['lieu'] ?? ''}',
-                note: '${x['note'] ?? ''}',
-                weekly: x['chaque_semaine'] == true,
-              );
-              await savePersonal(e);
-              ids.add(e.id);
-            }
-            return {'ajoutes': ids.length, 'ids': ids};
-          },
-        ),
-        HubTool(
-          name: 'agenda_supprimer',
-          description: 'Supprime un évènement perso (id donné par agenda_lire).',
-          params: {'id': ('string', 'Identifiant de l\'évènement')},
-          required: ['id'],
-          run: (a) async {
-            await deletePersonal(a['id'] as String);
-            return {'ok': true};
-          },
-        ),
-      ];
+      },
+      required: ['plan'],
+      run: (a) async {
+        final raw = a['plan'];
+        final list = raw is List ? raw : jsonDecode('$raw') as List;
+        final ids = <String>[];
+        var n = 0;
+        for (final x in list) {
+          if (x is! Map) continue;
+          final start = DateTime.tryParse('${x['debut'] ?? ''}');
+          if (start == null || '${x['titre'] ?? ''}'.trim().isEmpty) continue;
+          final end = DateTime.tryParse('${x['fin'] ?? ''}') ?? start.add(const Duration(hours: 1));
+          final e = PersonalEvent(
+            id: '${DateTime.now().microsecondsSinceEpoch}${n++}',
+            title: '${x['titre']}'.trim(),
+            start: start,
+            end: end.isAfter(start) ? end : start.add(const Duration(hours: 1)),
+            place: '${x['lieu'] ?? ''}',
+            note: '${x['note'] ?? ''}',
+            weekly: x['chaque_semaine'] == true,
+          );
+          await savePersonal(e);
+          ids.add(e.id);
+        }
+        return {'ajoutes': ids.length, 'ids': ids};
+      },
+    ),
+    HubTool(
+      name: 'agenda_supprimer',
+      description: 'Supprime un évènement perso (id donné par agenda_lire).',
+      params: {'id': ('string', 'Identifiant de l\'évènement')},
+      required: ['id'],
+      run: (a) async {
+        await deletePersonal(a['id'] as String);
+        return {'ok': true};
+      },
+    ),
+  ];
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
@@ -572,22 +584,12 @@ class ScheduleModule extends HubModule {
           return const Center(child: CircularProgressIndicator());
         }
         if (items.isEmpty) {
-          return const EmptyHint(
-            'Rien de prévu. Touche pour ajouter un évènement',
-            icon: Icons.add_rounded,
-          );
+          return const EmptyHint('Rien de prévu. Touche pour ajouter un évènement', icon: Icons.add_rounded);
         }
         return NextUpSummary(
           items: [
             for (final e in items)
-              NextItem(
-                title: e.title,
-                start: e.start,
-                end: e.end,
-                color: e.color,
-                place: e.place,
-                allDay: e.allDay,
-              ),
+              NextItem(title: e.title, start: e.start, end: e.end, color: e.color, place: e.place, allDay: e.allDay),
           ],
         );
       },
@@ -735,11 +737,7 @@ class _AgendaPageState extends State<AgendaPage> {
       appBar: AppBar(
         title: Text(m.name),
         actions: [
-          IconButton(
-            tooltip: 'Actualiser',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _refresh,
-          ),
+          IconButton(tooltip: 'Actualiser', icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
           IconButton(
             tooltip: 'Google Agenda',
             icon: const Icon(Icons.add_link_rounded),
@@ -768,11 +766,7 @@ class _AgendaPageState extends State<AgendaPage> {
                       onPressed: () => _shift(-7),
                     ),
                     Expanded(
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      child: Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     TextButton(
                       onPressed: () => setState(() {
@@ -808,8 +802,7 @@ class _AgendaPageState extends State<AgendaPage> {
                   ],
                 ),
               ),
-              if (!wide)
-                _DayStrip(week: week, selected: _day, onPick: (d) => setState(() => _day = d)),
+              if (!wide) _DayStrip(week: week, selected: _day, onPick: (d) => setState(() => _day = d)),
               const SizedBox(height: 4),
               Expanded(
                 child: FutureBuilder(
@@ -820,14 +813,11 @@ class _AgendaPageState extends State<AgendaPage> {
                       if (m.ecole?.lastError case final e? when !hide.contains(AgendaSource.ecole))
                         'École Directe : $e',
                       if (m.icsError case final e? when !hide.contains(AgendaSource.google)) e,
-                      if (m.googleError case final e? when !hide.contains(AgendaSource.google))
-                        e,
+                      if (m.googleError case final e? when !hide.contains(AgendaSource.google)) e,
                     ];
                     final days = wide
                         ? [for (var i = 0; i < 7; i++) week.add(Duration(days: i))]
-                              .where(
-                                (d) => d.weekday <= 5 || items.any((e) => _sameDay(e.start, d)),
-                              )
+                              .where((d) => d.weekday <= 5 || items.any((e) => _sameDay(e.start, d)))
                               .toList()
                         : [_day];
                     return Column(
@@ -841,8 +831,7 @@ class _AgendaPageState extends State<AgendaPage> {
                             items: items,
                             showHeaders: wide,
                             onTap: (e) => _details(context, e),
-                            onEmptyTap: (start) =>
-                                editPersonalEvent(context, m, day: start, startTime: start),
+                            onEmptyTap: (start) => editPersonalEvent(context, m, day: start, startTime: start),
                           ),
                         ),
                       ],
@@ -957,10 +946,7 @@ class _DayStrip extends StatelessWidget {
                         children: [
                           Text(
                             frDays[i].substring(0, 3),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: sel ? cs.onPrimary : cs.onSurfaceVariant,
-                            ),
+                            style: TextStyle(fontSize: 12, color: sel ? cs.onPrimary : cs.onSurfaceVariant),
                           ),
                           Text(
                             '${d.day}',
@@ -1078,10 +1064,7 @@ class _Timeline extends StatelessWidget {
                           Positioned(
                             top: (h - first) * _hourH - 7,
                             right: 8,
-                            child: Text(
-                              '${two(h)}h',
-                              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-                            ),
+                            child: Text('${two(h)}h', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
                           ),
                       ],
                     ),
@@ -1104,9 +1087,7 @@ class _Timeline extends StatelessWidget {
                               height: height,
                               decoration: BoxDecoration(
                                 border: Border(left: BorderSide(color: cs.outlineVariant)),
-                                color: _sameDay(d, now)
-                                    ? cs.primaryContainer.withValues(alpha: 0.18)
-                                    : null,
+                                color: _sameDay(d, now) ? cs.primaryContainer.withValues(alpha: 0.18) : null,
                               ),
                               child: Stack(
                                 clipBehavior: Clip.none,
@@ -1150,8 +1131,7 @@ class _Timeline extends StatelessWidget {
   }
 
   static bool _coversDay(AgendaItem e, DateTime d) =>
-      !e.start.isAfter(DateTime(d.year, d.month, d.day, 23, 59)) &&
-      e.end.isAfter(DateTime(d.year, d.month, d.day));
+      !e.start.isAfter(DateTime(d.year, d.month, d.day, 23, 59)) && e.end.isAfter(DateTime(d.year, d.month, d.day));
 
   static double _y(DateTime t, int first) => (t.hour - first + t.minute / 60) * _hourH;
 
@@ -1199,10 +1179,7 @@ class _Block extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = item;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final bg = Color.alphaBlend(
-      e.color.withValues(alpha: dark ? 0.32 : 0.16),
-      Theme.of(context).colorScheme.surface,
-    );
+    final bg = Color.alphaBlend(e.color.withValues(alpha: dark ? 0.32 : 0.16), Theme.of(context).colorScheme.surface);
     final strike = e.cancelled ? TextDecoration.lineThrough : null;
     return Material(
       color: bg,
@@ -1235,11 +1212,7 @@ class _Block extends StatelessWidget {
                           e.cancelled ? 'ANNULÉ · ${e.title}' : e.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
-                            decoration: strike,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, decoration: strike),
                         ),
                       ),
                     ],
@@ -1354,8 +1327,7 @@ class _EventEditorState extends State<_EventEditor> {
     final t = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: cur.hour, minute: cur.minute),
-      builder: (c, child) =>
-          MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
+      builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
     );
     if (t == null) return;
     setState(() {
@@ -1372,8 +1344,7 @@ class _EventEditorState extends State<_EventEditor> {
 
   void _save() {
     if (_title.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Donne un titre à l\'évènement')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Donne un titre à l\'évènement')));
       return;
     }
     e
@@ -1402,10 +1373,7 @@ class _EventEditorState extends State<_EventEditor> {
               controller: _title,
               autofocus: widget.isNew,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Titre',
-                hintText: 'Ex. Entraînement de foot, révisions…',
-              ),
+              decoration: const InputDecoration(labelText: 'Titre', hintText: 'Ex. Entraînement de foot, révisions…'),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -1441,20 +1409,14 @@ class _EventEditorState extends State<_EventEditor> {
               ),
             TextField(
               controller: _place,
-              decoration: const InputDecoration(
-                labelText: 'Lieu (facultatif)',
-                prefixIcon: Icon(Icons.place_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Lieu (facultatif)', prefixIcon: Icon(Icons.place_outlined)),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _note,
               minLines: 1,
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Note (facultatif)',
-                prefixIcon: Icon(Icons.notes_rounded),
-              ),
+              decoration: const InputDecoration(labelText: 'Note (facultatif)', prefixIcon: Icon(Icons.notes_rounded)),
             ),
             const SizedBox(height: 16),
             Text('Couleur', style: TextStyle(color: cs.onSurfaceVariant)),
@@ -1470,9 +1432,7 @@ class _EventEditorState extends State<_EventEditor> {
                     child: CircleAvatar(
                       radius: 16,
                       backgroundColor: personalColors[i],
-                      child: e.color == i
-                          ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
-                          : null,
+                      child: e.color == i ? const Icon(Icons.check_rounded, color: Colors.white, size: 18) : null,
                     ),
                   ),
               ],
@@ -1491,10 +1451,7 @@ class _EventEditorState extends State<_EventEditor> {
                     },
                   ),
                 const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Annuler'),
-                ),
+                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
                 const SizedBox(width: 8),
                 FilledButton(onPressed: _save, child: const Text('Enregistrer')),
               ],
@@ -1505,7 +1462,6 @@ class _EventEditorState extends State<_EventEditor> {
     );
   }
 }
-
 
 /// Créneaux libres jour par jour entre [dayStart] h et [dayEnd] h, en
 /// retirant les moments occupés [busy] (cours, évènements).

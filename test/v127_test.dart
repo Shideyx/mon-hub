@@ -14,7 +14,10 @@ void main() {
     test('ressemblance des titres', () {
       expect(BookFinder.titleSimilarity('Le Petit Prince', 'Le petit prince'), 1);
       expect(BookFinder.titleSimilarity('l\'étranger', 'L\'Étranger'), 1);
-      expect(BookFinder.titleSimilarity('Harry Potter école des sorciers', "Harry Potter à l'école des sorciers"), greaterThan(0.9));
+      expect(
+        BookFinder.titleSimilarity('Harry Potter école des sorciers', "Harry Potter à l'école des sorciers"),
+        greaterThan(0.9),
+      );
       // Une faute de frappe.
       expect(BookFinder.titleSimilarity('Les Miserbles', 'Les Misérables'), greaterThan(0.7));
       // Sous-titre en plus.
@@ -28,7 +31,11 @@ void main() {
           return http.Response(
             jsonEncode({
               'docs': [
-                {'title': 'Le Petit Prince illustré pour adultes', 'author_name': ['X'], 'edition_count': 1},
+                {
+                  'title': 'Le Petit Prince illustré pour adultes',
+                  'author_name': ['X'],
+                  'edition_count': 1,
+                },
                 {
                   'title': 'Le Petit Prince',
                   'author_name': ['Antoine de Saint-Exupéry'],
@@ -74,7 +81,10 @@ void main() {
           req.url.host == 'openlibrary.org'
               ? jsonEncode({
                   'docs': [
-                    {'title': 'Cuisine facile', 'author_name': ['Y']},
+                    {
+                      'title': 'Cuisine facile',
+                      'author_name': ['Y'],
+                    },
                   ],
                 })
               : jsonEncode({'items': []}),
@@ -86,8 +96,10 @@ void main() {
   });
 
   test('Whisper : texte nettoyé', () {
-    expect(Whisper.clean('[00:00:00.000 --> 00:00:02.000]  Bonjour Clicky,\n quelle heure est-il ?\n'),
-        'Bonjour Clicky, quelle heure est-il ?');
+    expect(
+      Whisper.clean('[00:00:00.000 --> 00:00:02.000]  Bonjour Smily,\n quelle heure est-il ?\n'),
+      'Bonjour Smily, quelle heure est-il ?',
+    );
     expect(Whisper.clean(' [Musique]\n'), '');
   });
 

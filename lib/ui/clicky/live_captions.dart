@@ -88,7 +88,10 @@ class LiveCaptions {
     var t = answer.trim().replaceAll(RegExp(r'^```\w*|```$'), '').trim();
     t = t.replaceAll(RegExp(r'^(?:sous-titres?|subtitles?)\s*:\s*', caseSensitive: false), '');
     final low = t.toLowerCase();
-    if (t.isEmpty || low.contains('(rien)') || low == 'rien' || RegExp(r'^\[?(musique|music|silence|bruit)\]?\.?$').hasMatch(low)) {
+    if (t.isEmpty ||
+        low.contains('(rien)') ||
+        low == 'rien' ||
+        RegExp(r'^\[?(musique|music|silence|bruit)\]?\.?$').hasMatch(low)) {
       return null;
     }
     return t.length > 400 ? '${t.substring(0, 400)}…' : t;
@@ -227,7 +230,7 @@ class _CaptionsViewState extends State<_CaptionsView> {
         text = LiveCaptions.clean(await Whisper.transcribe(f.path, lang: 'auto', timeout: const Duration(seconds: 30)));
         _status = 'Sans clé Gemini : texte dans la langue d\'origine';
       } else {
-        _status = 'Il me faut ta clé Gemini gratuite (Réglages de Clicky → Voix) ou Whisper.';
+        _status = 'Il me faut ta clé Gemini gratuite (Réglages de Smily → Voix) ou Whisper.';
       }
       if (text != null && mounted) {
         setState(() {
@@ -255,9 +258,19 @@ class _CaptionsViewState extends State<_CaptionsView> {
           children: [
             Row(
               children: [
-                Icon(Icons.graphic_eq_rounded, size: 18, color: Color.lerp(Colors.white38, const Color(0xFF8B5CF6), _level.clamp(0.0, 1.0))),
+                Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 18,
+                  color: Color.lerp(Colors.white38, const Color(0xFF8B5CF6), _level.clamp(0.0, 1.0)),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: Text(_status, style: const TextStyle(fontSize: 12, color: Colors.white60), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                  child: Text(
+                    _status,
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 DropdownButton<String>(
                   value: _target,
                   isDense: true,
@@ -276,14 +289,22 @@ class _CaptionsViewState extends State<_CaptionsView> {
                   onPressed: () => setState(() => _paused = !_paused),
                   icon: Icon(_paused ? Icons.play_arrow_rounded : Icons.pause_rounded),
                 ),
-                IconButton(tooltip: 'Fermer', iconSize: 18, onPressed: () => exit(0), icon: const Icon(Icons.close_rounded)),
+                IconButton(
+                  tooltip: 'Fermer',
+                  iconSize: 18,
+                  onPressed: () => exit(0),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
             Expanded(
               child: Center(
                 child: _lines.isEmpty
-                    ? const Text('Lance une vidéo, une série ou un jeu : les sous-titres s\'écrivent ici.',
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: Colors.white54))
+                    ? const Text(
+                        'Lance une vidéo, une série ou un jeu : les sous-titres s\'écrivent ici.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 18, color: Colors.white54),
+                      )
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [

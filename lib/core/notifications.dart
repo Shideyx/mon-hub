@@ -13,13 +13,8 @@ import '../ui/clicky/jarvis.dart';
 
 /// Une alerte produite par un module (nouveau mail, nouveau message…).
 class HubNotification {
-  HubNotification({
-    required this.id,
-    required this.title,
-    required this.body,
-    this.moduleId = '',
-    DateTime? at,
-  }) : at = at ?? DateTime.now();
+  HubNotification({required this.id, required this.title, required this.body, this.moduleId = '', DateTime? at})
+    : at = at ?? DateTime.now();
 
   /// Identifiant stable : une même alerte n'est jamais montrée deux fois.
   final String id;
@@ -89,8 +84,37 @@ class NotificationCenter extends ChangeNotifier {
   Timer? _digestTimer;
 
   /// Ce qui passe toujours tout de suite (un appel qui sonne…).
-  static bool urgent(HubNotification n) =>
-      n.moduleId.isEmpty || n.id.startsWith('discord-appel') || n.id.startsWith('annule:') || n.id.startsWith('arnaque:');
+  /// Ce qui peut attendre le résumé : les nouvelles agréables mais pas
+  /// pressées (abonnements, colis, jeux gratuits, promos, veille musicale,
+  /// bilans, temps d'écran, synchro…).
+  ///
+  /// Tout le reste part **tout de suite** : une note, un devoir, un message,
+  /// un cours annulé, une arnaque, un appel, un guetteur. Avant, tout était
+  /// regroupé toutes les 30 minutes et les notes arrivaient une demi-heure
+  /// trop tard.
+  static const groupable = [
+    'abo:',
+    'colis:',
+    'epic',
+    'steam',
+    'jeux',
+    'veille:',
+    'rbx',
+    'bilan-notes',
+    'revisions-',
+    'prep-',
+    'quiz',
+    'temps:',
+    'anniv',
+    'sync:',
+    'maj-',
+  ];
+
+  static bool urgent(HubNotification n) {
+    if (n.moduleId.isEmpty) return true;
+    if (n.id.startsWith('discord-appel') || n.id.startsWith('annule:') || n.id.startsWith('arnaque:')) return true;
+    return !groupable.any(n.id.startsWith);
+  }
 
   /// Le résumé : « 3 messages Discord, 1 mail… » puis quelques lignes.
   static HubNotification digestOf(List<HubNotification> items, Map<String, String> names, {DateTime? at}) {
@@ -144,7 +168,7 @@ class NotificationCenter extends ChangeNotifier {
 
   /// Publie une alerte : historique (cloche), bandeau dans la fenêtre et
   /// notification du système.
-  /// Chaque alerte publiée (Clicky y réagit : un émoji, une phrase pour une
+  /// Chaque alerte publiée (Smily y réagit : un émoji, une phrase pour une
   /// note). Branché par Mon Hub.
   static void Function(HubNotification n)? onAny;
 

@@ -102,7 +102,8 @@ class MoneyModule extends HubModule {
       } catch (_) {}
     }
     final id = data.steam;
-    if (id.isNotEmpty && (force || data.lastSteam == null || now.difference(data.lastSteam!) > const Duration(hours: 12))) {
+    if (id.isNotEmpty &&
+        (force || data.lastSteam == null || now.difference(data.lastSteam!) > const Duration(hours: 12))) {
       try {
         data.deals = await GameDeals.steamDeals(id);
         data.lastSteam = now;
@@ -210,7 +211,8 @@ class MoneyModule extends HubModule {
     ),
     HubTool(
       name: 'argent_jeux',
-      description: 'Jeux gratuits sur l\'Epic Games Store (maintenant et bientôt) et promos de la liste de souhaits Steam.',
+      description:
+          'Jeux gratuits sur l\'Epic Games Store (maintenant et bientôt) et promos de la liste de souhaits Steam.',
       run: (a) async {
         await refreshGames();
         return {
@@ -324,14 +326,27 @@ class _MoneyPageState extends State<_MoneyPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Service (ex. Netflix)')),
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Service (ex. Netflix)'),
+              ),
               TextField(
                 controller: price,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'Prix (€)'),
               ),
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Payé une fois par an'), value: yearly, onChanged: (v) => set(() => yearly = v)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Essai gratuit'), value: trial, onChanged: (v) => set(() => trial = v)),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Payé une fois par an'),
+                value: yearly,
+                onChanged: (v) => set(() => yearly = v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Essai gratuit'),
+                value: trial,
+                onChanged: (v) => set(() => trial = v),
+              ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(next == null ? 'Prochain prélèvement : ?' : 'Prochain prélèvement : ${_date(next!)}'),
@@ -372,7 +387,8 @@ class _MoneyPageState extends State<_MoneyPage> {
 
   Widget _subs() {
     final now = DateTime.now();
-    final list = [...data.subs]..sort((a, b) => (a.nextFrom(now) ?? DateTime(9999)).compareTo(b.nextFrom(now) ?? DateTime(9999)));
+    final list = [...data.subs]
+      ..sort((a, b) => (a.nextFrom(now) ?? DateTime(9999)).compareTo(b.nextFrom(now) ?? DateTime(9999)));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -380,7 +396,9 @@ class _MoneyPageState extends State<_MoneyPage> {
           child: ListTile(
             leading: const Icon(Icons.autorenew_rounded),
             title: Text('${MoneyRules.euros(data.monthly)} par mois'),
-            subtitle: Text('soit ${MoneyRules.euros(data.monthly * 12)} par an · rappel la veille de chaque prélèvement'),
+            subtitle: Text(
+              'soit ${MoneyRules.euros(data.monthly * 12)} par an · rappel la veille de chaque prélèvement',
+            ),
           ),
         ),
         Wrap(
@@ -388,28 +406,43 @@ class _MoneyPageState extends State<_MoneyPage> {
           children: [
             FilledButton.icon(
               onPressed: _busy ? null : _scan,
-              icon: _busy ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.mark_email_read_rounded),
+              icon: _busy
+                  ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.mark_email_read_rounded),
               label: const Text('Chercher dans mes mails'),
             ),
-            OutlinedButton.icon(onPressed: () => _editSub(), icon: const Icon(Icons.add_rounded), label: const Text('Ajouter à la main')),
+            OutlinedButton.icon(
+              onPressed: () => _editSub(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ajouter à la main'),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         if (list.isEmpty)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Aucun abonnement trouvé pour l\'instant. Je lis tes mails de Spotify, Netflix, Deezer, Disney+, '
-                'Game Pass, Nitro, Apple, Google Play… et je te préviens la veille de chaque prélèvement ou fin d\'essai.'),
+            child: Text(
+              'Aucun abonnement trouvé pour l\'instant. Je lis tes mails de Spotify, Netflix, Deezer, Disney+, '
+              'Game Pass, Nitro, Apple, Google Play… et je te préviens la veille de chaque prélèvement ou fin d\'essai.',
+            ),
           ),
         for (final s in list)
           Card(
             child: ListTile(
               leading: CircleAvatar(child: Text(s.service.characters.first)),
               title: Text(s.service + (s.trial ? ' · essai gratuit' : '') + (s.cancelled ? ' · résilié' : '')),
-              subtitle: Text([
-                if (s.price != null) '${MoneyRules.euros(s.price!)}${s.yearly ? ' / an' : ' / mois'}',
-                if (s.nextFrom(now) case final d?) '${s.cancelled ? 'jusqu\'au' : s.trial ? 'payant le' : 'prochain le'} ${_date(d)}',
-              ].join(' · ')),
+              subtitle: Text(
+                [
+                  if (s.price != null) '${MoneyRules.euros(s.price!)}${s.yearly ? ' / an' : ' / mois'}',
+                  if (s.nextFrom(now) case final d?)
+                    '${s.cancelled
+                        ? 'jusqu\'au'
+                        : s.trial
+                        ? 'payant le'
+                        : 'prochain le'} ${_date(d)}',
+                ].join(' · '),
+              ),
               trailing: Wrap(
                 children: [
                   if (s.cancelUrl.isNotEmpty && !s.cancelled)
@@ -437,7 +470,11 @@ class _MoneyPageState extends State<_MoneyPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Suivre un colis'),
-        content: TextField(controller: c, autofocus: true, decoration: const InputDecoration(labelText: 'Numéro de suivi')),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Numéro de suivi'),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('Ajouter')),
@@ -447,7 +484,14 @@ class _MoneyPageState extends State<_MoneyPage> {
     if (n == null || n.isEmpty) return;
     final f = MoneyRules.parcel(fromEmail: '', fromName: 'colis', subject: 'colis expédié', text: n.toUpperCase());
     data.applyParcel(
-      f ?? ParcelFinding(carrier: 'Colis', number: n, status: 'expedie', link: 'https://www.google.com/search?q=suivi+colis+$n', shop: 'Colis'),
+      f ??
+          ParcelFinding(
+            carrier: 'Colis',
+            number: n,
+            status: 'expedie',
+            link: 'https://www.google.com/search?q=suivi+colis+$n',
+            shop: 'Colis',
+          ),
     );
     await data.save();
   }
@@ -466,28 +510,31 @@ class _MoneyPageState extends State<_MoneyPage> {
               icon: const Icon(Icons.mark_email_read_rounded),
               label: const Text('Chercher dans mes mails'),
             ),
-            OutlinedButton.icon(onPressed: _addParcel, icon: const Icon(Icons.add_rounded), label: const Text('Ajouter un numéro')),
+            OutlinedButton.icon(
+              onPressed: _addParcel,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ajouter un numéro'),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         if (list.isEmpty)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Aucun colis en cours. Quand une boutique ou un transporteur t\'écrit (Colissimo, Chronopost, '
-                'Mondial Relay, UPS, DHL, Amazon…), je le suis et te préviens quand il arrive ou qu\'il est à retirer.'),
+            child: Text(
+              'Aucun colis en cours. Quand une boutique ou un transporteur t\'écrit (Colissimo, Chronopost, '
+              'Mondial Relay, UPS, DHL, Amazon…), je le suis et te préviens quand il arrive ou qu\'il est à retirer.',
+            ),
           ),
         for (final p in list)
           Card(
             child: ListTile(
-              leading: Icon(
-                switch (p.status) {
-                  'livre' => Icons.check_circle_rounded,
-                  'a_retirer' => Icons.storefront_rounded,
-                  'en_livraison' => Icons.local_shipping_rounded,
-                  _ => Icons.inventory_2_rounded,
-                },
-                color: p.status == 'a_retirer' ? Colors.orange : null,
-              ),
+              leading: Icon(switch (p.status) {
+                'livre' => Icons.check_circle_rounded,
+                'a_retirer' => Icons.storefront_rounded,
+                'en_livraison' => Icons.local_shipping_rounded,
+                _ => Icons.inventory_2_rounded,
+              }, color: p.status == 'a_retirer' ? Colors.orange : null),
               title: Text('${p.shop} · ${MoneyRules.statusLabels[p.status] ?? p.status}'),
               subtitle: Text([p.carrier, if (p.number.isNotEmpty) p.number].join(' · ')),
               trailing: Wrap(
@@ -519,9 +566,15 @@ class _MoneyPageState extends State<_MoneyPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Colle le lien de ton profil Steam (ex. https://steamcommunity.com/id/monpseudo). Ta liste de souhaits '
-                'doit être publique (Steam → Modifier le profil → Paramètres de confidentialité).'),
-            TextField(controller: c, autofocus: true, decoration: const InputDecoration(labelText: 'Profil Steam')),
+            const Text(
+              'Colle le lien de ton profil Steam (ex. https://steamcommunity.com/id/monpseudo). Ta liste de souhaits '
+              'doit être publique (Steam → Modifier le profil → Paramètres de confidentialité).',
+            ),
+            TextField(
+              controller: c,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Profil Steam'),
+            ),
           ],
         ),
         actions: [
@@ -539,7 +592,8 @@ class _MoneyPageState extends State<_MoneyPage> {
     if (!mounted) return;
     if (id == null) {
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil Steam introuvable : vérifie le lien.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Profil Steam introuvable : vérifie le lien.')));
       return;
     }
     data.steam = id;
@@ -565,7 +619,11 @@ class _MoneyPageState extends State<_MoneyPage> {
               if (g.image.isNotEmpty)
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: Image.network(g.image, fit: BoxFit.cover, errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black12)),
+                  child: Image.network(
+                    g.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black12),
+                  ),
                 ),
               Padding(
                 padding: const EdgeInsets.all(10),
@@ -617,16 +675,26 @@ class _MoneyPageState extends State<_MoneyPage> {
         Row(
           children: [
             Expanded(child: Text('Promos de ma liste de souhaits Steam', style: theme.textTheme.titleMedium)),
-            TextButton.icon(onPressed: _busy ? null : _steam, icon: const Icon(Icons.link_rounded), label: Text(data.steam.isEmpty ? 'Relier Steam' : 'Changer')),
+            TextButton.icon(
+              onPressed: _busy ? null : _steam,
+              icon: const Icon(Icons.link_rounded),
+              label: Text(data.steam.isEmpty ? 'Relier Steam' : 'Changer'),
+            ),
           ],
         ),
         if (data.steam.isEmpty)
-          const Text('Relie ton profil Steam : je te préviens quand un jeu de ta liste de souhaits est en promo (-20 % ou plus).')
+          const Text(
+            'Relie ton profil Steam : je te préviens quand un jeu de ta liste de souhaits est en promo (-20 % ou plus).',
+          )
         else if (data.deals.isEmpty)
           const Text('Aucun jeu de ta liste en promo pour l\'instant.'),
         for (final d in data.deals)
           ListTile(
-            leading: CircleAvatar(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white, child: Text('-${d.discount}')),
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+              child: Text('-${d.discount}'),
+            ),
             title: Text(d.name),
             subtitle: Text('${d.price} au lieu de ${d.before}'),
             onTap: () => Browser.open(d.url),

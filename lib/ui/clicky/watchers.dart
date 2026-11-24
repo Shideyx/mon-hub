@@ -1,5 +1,5 @@
-// **« Préviens-moi quand… »** (v1.58) : Clicky surveille un truc pour toi et
-// te prévient dès que ça arrive (notification + Clicky le dit) :
+// **« Préviens-moi quand… »** (v1.58) : Smily surveille un truc pour toi et
+// te prévient dès que ça arrive (notification + Smily le dit) :
 // - « …quand j'ai ma note de maths », « …quand j'ai un nouveau devoir » ;
 // - « …quand Lucas m'écrit », « …quand je reçois un mail de Pronote » ;
 // - « …quand cette page change » (lien copié ou dans la phrase), « …quand le
@@ -31,7 +31,15 @@ import 'tutor.dart' show normalize;
 
 /// Une chose surveillée.
 class Watch {
-  Watch({required this.id, required this.kind, this.query = '', required this.label, required this.at, this.snapshot = '', this.mail = false});
+  Watch({
+    required this.id,
+    required this.kind,
+    this.query = '',
+    required this.label,
+    required this.at,
+    this.snapshot = '',
+    this.mail = false,
+  });
 
   final String id;
 
@@ -85,7 +93,10 @@ class WatchParse {
     r'^(?:dis|fais) moi (?:signe )?(?:des que|quand|lorsque) (.+)$|^tu me (?:dis|previens|fais signe) (?:des que|quand) (.+)$',
   );
 
-  static final _blocked = RegExp(r'instagram|facebook|discord|ecoledirecte|pronote|bank|banque|paypal|\bgouv\b|ameli|impots', caseSensitive: false);
+  static final _blocked = RegExp(
+    r'instagram|facebook|discord|ecoledirecte|pronote|bank|banque|paypal|\bgouv\b|ameli|impots',
+    caseSensitive: false,
+  );
 
   /// Ce qu'il faut surveiller dans [rest] (la fin de la phrase), ou un
   /// message d'explication (String). [raw] : la phrase d'origine (noms avec
@@ -97,50 +108,79 @@ class WatchParse {
     String orig(String frag) => raw.isEmpty ? frag : QuickAnswers.original(raw, frag);
 
     // La note.
-    final note = RegExp(r"^(?:j ai |j aurai |il y a |tu vois )?(?:ma |une |la |mes )?(?:nouvelles? )?notes?(?: (?:de|en|d|du))? ?(.*?)(?: (?:tombe|arrive|est la|sort|est publiee))?$").firstMatch(n);
+    final note = RegExp(
+      r"^(?:j ai |j aurai |il y a |tu vois )?(?:ma |une |la |mes )?(?:nouvelles? )?notes?(?: (?:de|en|d|du))? ?(.*?)(?: (?:tombe|arrive|est la|sort|est publiee))?$",
+    ).firstMatch(n);
     if (note != null && RegExp(r'\bnotes?\b').hasMatch(n)) {
       final subject = note[1]!.trim();
-      return Watch(id: id, kind: 'note', query: subject, label: subject.isEmpty ? 'une nouvelle note' : 'ta note de $subject', at: at);
+      return Watch(
+        id: id,
+        kind: 'note',
+        query: subject,
+        label: subject.isEmpty ? 'une nouvelle note' : 'ta note de $subject',
+        at: at,
+      );
     }
     // Un devoir.
-    final hw = RegExp(r'^(?:j ai |il y a )?(?:un |des )?(?:nouveaux? )?devoirs?(?: (?:en|de|d|du|pour) (.+))?$').firstMatch(n);
+    final hw = RegExp(r'^(?:j ai |il y a )?(?:un |des )?(?:nouveaux? )?devoirs?(?: (?:en|de|d|du|pour) (.+))?$')
+        .firstMatch(n);
     if (hw != null) {
       final s = (hw[1] ?? '').trim();
-      return Watch(id: id, kind: 'devoir', query: s, label: s.isEmpty ? 'un nouveau devoir' : 'un nouveau devoir de $s', at: at);
+      return Watch(
+        id: id,
+        kind: 'devoir',
+        query: s,
+        label: s.isEmpty ? 'un nouveau devoir' : 'un nouveau devoir de $s',
+        at: at,
+      );
     }
     // Internet, un téléchargement.
-    if (RegExp(r'internet|wifi|wi fi|connexion|reseau').hasMatch(n) && RegExp(r'revient|remarche|marche|reviens|retour|de nouveau|est la').hasMatch(n)) {
+    if (RegExp(r'internet|wifi|wi fi|connexion|reseau').hasMatch(n) &&
+        RegExp(r'revient|remarche|marche|reviens|retour|de nouveau|est la').hasMatch(n)) {
       return Watch(id: id, kind: 'internet', label: 'le retour d\'internet', at: at, snapshot: '');
     }
     if (RegExp(r'telechargement|telecharge').hasMatch(n) && RegExp(r'fini|termine|telecharge').hasMatch(n)) {
       return Watch(id: id, kind: 'telechargement', label: 'la fin de ton téléchargement', at: at);
     }
     // Un mail, un message de quelqu'un.
-    final mail = RegExp(r'^(?:je recois|j ai|tu vois|il y a) un (?:nouveau )?(?:mail|email|e mail|courriel) (?:de|d|du) (.+)$').firstMatch(n);
+    final mail = RegExp(
+      r'^(?:je recois|j ai|tu vois|il y a) un (?:nouveau )?(?:mail|email|e mail|courriel) (?:de|d|du) (.+)$',
+    ).firstMatch(n);
     if (mail != null) {
       final who = orig(mail[1]!.trim());
       return Watch(id: id, kind: 'message', query: who, label: 'un mail de $who', at: at, mail: true);
     }
-    final msg = RegExp(r"^(.{2,40}?) (?:m ecrit|me repond|m a repondu|m envoie (?:un |des )?(?:message|messages|msg|mp|dm)|me parle|m a ecrit|repond)(?: sur discord)?$").firstMatch(n) ??
+    final msg =
+        RegExp(
+          r"^(.{2,40}?) (?:m ecrit|me repond|m a repondu|m envoie (?:un |des )?(?:message|messages|msg|mp|dm)|me parle|m a ecrit|repond)(?: sur discord)?$",
+        ).firstMatch(n) ??
         RegExp(r'^(?:je recois|j ai) un (?:message|msg|mp|dm) (?:de|d) (.{2,40})$').firstMatch(n);
     if (msg != null) {
-      final who = orig(msg[1]!.trim().replaceFirst(RegExp(r'^(?:mon pote |ma pote |mon ami |mon amie |le prof |la prof )'), ''));
+      final who = orig(
+        msg[1]!.trim().replaceFirst(RegExp(r'^(?:mon pote |ma pote |mon ami |mon amie |le prof |la prof )'), ''),
+      );
       return Watch(id: id, kind: 'message', query: who, label: 'un message de $who', at: at);
     }
     // Une page qui change, un prix qui baisse.
     final links = ScamShield.links(raw.isEmpty ? rest : raw);
-    final url = links.isNotEmpty ? links.first : (RegExp(r'cette page|ce site|ce lien|ce jeu|la page|le site|le lien|copie').hasMatch(n) ? clipUrl : null);
+    final url = links.isNotEmpty
+        ? links.first
+        : (RegExp(r'cette page|ce site|ce lien|ce jeu|la page|le site|le lien|copie').hasMatch(n) ? clipUrl : null);
     final price = RegExp(r'\b(?:prix|promo|solde|baisse|moins cher|reduc)').hasMatch(n);
     final change = RegExp(r'\b(?:change|bouge|evolue|est mis a jour|se met a jour|nouveaute|nouveau)').hasMatch(n);
     if (price || change) {
       if (url == null) return 'Copie d\'abord le lien de la page (clic droit → Copier le lien), puis redis-le-moi.';
       final u = url.startsWith('http') ? url : 'https://$url';
       final host = Uri.tryParse(u)?.host ?? '';
-      if (_blocked.hasMatch(host)) return 'Je ne surveille pas ce site-là tout seul (comptes, messageries, banque) : c\'est plus sûr.';
+      if (_blocked.hasMatch(host)) {
+        return 'Je ne surveille pas ce site-là tout seul (comptes, messageries, banque) : c\'est plus sûr.';
+      }
       if (!u.startsWith('https://')) return 'Je ne surveille que les pages sécurisées (https).';
       if (price) {
         final steam = steamApp(u);
-        if (steam == null) return 'Pour les prix, je sais suivre les jeux Steam : copie le lien du jeu sur store.steampowered.com.';
+        if (steam == null) {
+          return 'Pour les prix, je sais suivre les jeux Steam : copie le lien du jeu sur store.steampowered.com.';
+        }
         return Watch(id: id, kind: 'prix', query: u, label: 'le prix de ce jeu Steam', at: at);
       }
       return Watch(id: id, kind: 'page', query: u, label: 'la page $host', at: at);
@@ -160,14 +200,18 @@ class WatchParse {
       case 'note':
         if (!n.id.startsWith('note:')) return null;
         final subject = n.title.replaceFirst(RegExp(r'^.*?Nouvelle note en\s*'), '').trim();
-        if (w.query.isNotEmpty && GradeMath.matchSubject(w.query, [subject]) == null && !_fold(subject).contains(_fold(w.query))) {
+        if (w.query.isNotEmpty &&
+            GradeMath.matchSubject(w.query, [subject]) == null &&
+            !_fold(subject).contains(_fold(w.query))) {
           return null;
         }
         return '📝 Ta note est tombée en ${_pretty(subject)} : ${n.body}';
       case 'devoir':
         if (!n.id.startsWith('devoir:')) return null;
         final subject = n.title.replaceFirst(RegExp(r'^.*? en\s*'), '').trim();
-        if (w.query.isNotEmpty && GradeMath.matchSubject(w.query, [subject]) == null && !_fold(subject).contains(_fold(w.query))) {
+        if (w.query.isNotEmpty &&
+            GradeMath.matchSubject(w.query, [subject]) == null &&
+            !_fold(subject).contains(_fold(w.query))) {
           return null;
         }
         return '📚 Nouveau : ${n.title.replaceFirst(RegExp(r'^\S+\s'), '')} (${n.body.toLowerCase()})';
@@ -189,11 +233,17 @@ class WatchParse {
 
   /// Le texte visible d'une page (sans balises), pour voir s'il change.
   static String visibleText(String html) => html
-      .replaceAll(RegExp(r'<script[\s\S]*?</script>|<style[\s\S]*?</style>|<noscript[\s\S]*?</noscript>', caseSensitive: false), ' ')
+      .replaceAll(
+        RegExp(r'<script[\s\S]*?</script>|<style[\s\S]*?</style>|<noscript[\s\S]*?</noscript>', caseSensitive: false),
+        ' ',
+      )
       .replaceAll(RegExp(r'<[^>]+>'), ' ')
       .replaceAll(RegExp(r'&nbsp;|&#160;'), ' ')
       // Les heures et nombres qui bougent tout le temps (compteurs, « il y a 3 min »).
-      .replaceAll(RegExp(r'\d{1,2}:\d{2}(?::\d{2})?|il y a \d+ \w+|\b\d+ (?:vues?|views|likes?)\b', caseSensitive: false), ' ')
+      .replaceAll(
+        RegExp(r'\d{1,2}:\d{2}(?::\d{2})?|il y a \d+ \w+|\b\d+ (?:vues?|views|likes?)\b', caseSensitive: false),
+        ' ',
+      )
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }
@@ -210,7 +260,7 @@ class Watchers extends ChangeNotifier {
     encode: (v) => [for (final w in v) w.toJson()],
   );
 
-  /// Branché par Mon Hub : prévenir (notification + Clicky le dit).
+  /// Branché par Mon Hub : prévenir (notification + Smily le dit).
   void Function(String title, String body)? alert;
 
   /// Requêtes web (tests).
@@ -236,10 +286,12 @@ class Watchers extends ChangeNotifier {
     await _file.save();
     notifyListeners();
     return switch (w.kind) {
-      'internet' => w.snapshot == 'off'
-          ? 'D\'accord : je te préviens dès qu\'internet revient.'
-          : 'Internet marche en ce moment : je te préviendrai s\'il coupe puis revient.',
-      'page' || 'prix' => 'D\'accord : je regarde ${w.label} toutes les 30 minutes et je te préviens dès que ça change.',
+      'internet' =>
+        w.snapshot == 'off'
+            ? 'D\'accord : je te préviens dès qu\'internet revient.'
+            : 'Internet marche en ce moment : je te préviendrai s\'il coupe puis revient.',
+      'page' ||
+      'prix' => 'D\'accord : je regarde ${w.label} toutes les 30 minutes et je te préviens dès que ça change.',
       _ => 'D\'accord : je te préviens dès que j\'ai ${w.label}.',
     };
   }
@@ -325,7 +377,11 @@ class Watchers extends ChangeNotifier {
         final appId = WatchParse.steamApp(w.query);
         if (appId == null) return;
         final r = await c
-            .get(Uri.parse('https://store.steampowered.com/api/appdetails?appids=$appId&cc=fr&filters=price_overview,basic'))
+            .get(
+              Uri.parse(
+                'https://store.steampowered.com/api/appdetails?appids=$appId&cc=fr&filters=price_overview,basic',
+              ),
+            )
             .timeout(const Duration(seconds: 15));
         final j = jsonDecode(utf8.decode(r.bodyBytes, allowMalformed: true)) as Map;
         final data = ((j[appId] as Map?)?['data'] as Map?) ?? const {};
@@ -339,11 +395,16 @@ class Watchers extends ChangeNotifier {
           w.snapshot = '$cents|$shown';
           await _file.save();
         } else if (cents < before) {
-          await _fire(w, '💸 $name est passé de ${w.snapshot.split('|').last} à $shown (−${p['discount_percent'] ?? '?'} %) !');
+          await _fire(
+            w,
+            '💸 $name est passé de ${w.snapshot.split('|').last} à $shown (−${p['discount_percent'] ?? '?'} %) !',
+          );
         }
         return;
       }
-      final r = await c.get(Uri.parse(w.query), headers: const {'user-agent': 'Mozilla/5.0'}).timeout(const Duration(seconds: 15));
+      final r = await c
+          .get(Uri.parse(w.query), headers: const {'user-agent': 'Mozilla/5.0'})
+          .timeout(const Duration(seconds: 15));
       if (r.statusCode != 200 || r.bodyBytes.length > 3 * 1024 * 1024) return;
       final hash = sha1.convert(utf8.encode(WatchParse.visibleText(r.body))).toString();
       if (w.snapshot.isEmpty) {
@@ -388,7 +449,7 @@ class Watchers extends ChangeNotifier {
     ),
     HubTool(
       name: 'guetteur_liste',
-      description: 'Ce que Clicky surveille (« préviens-moi quand… »). supprimer = un mot de ce qu\'il faut arrêter de surveiller (ou « tout »).',
+      description: 'Ce que Smily surveille (« préviens-moi quand… »). supprimer = un mot de ce qu\'il faut arrêter de surveiller (ou « tout »).',
       params: {'supprimer': ('string', 'Ce qu\'il faut arrêter de surveiller (facultatif)')},
       run: (a) async {
         await load();
@@ -405,7 +466,7 @@ class Watchers extends ChangeNotifier {
 
 /// **Réponses toutes prêtes** : quelqu'un te pose une question sur Discord →
 /// « je te prépare une réponse ? » → une réponse courte, **copiée** dans le
-/// presse-papier, prête à coller. Clicky n'envoie jamais rien tout seul.
+/// presse-papier, prête à coller. Smily n'envoie jamais rien tout seul.
 class Replies {
   Replies._();
 
@@ -443,7 +504,8 @@ class Replies {
       'aucune info précise (heure, lieu, oui/non) : si la réponse dépend de la personne, propose une réponse qui laisse '
       'le choix (« je te dis ça vite », « ça dépend, tu pensais à quoi ? »). Rien d\'autre que la réponse, sans guillemets.';
 
-  static String clean(String raw) => raw.trim().replaceAll(RegExp(r'^["«“\s]+|["»”\s]+$'), '').replaceAll(RegExp(r'\s+'), ' ');
+  static String clean(String raw) =>
+      raw.trim().replaceAll(RegExp(r'^["«“\s]+|["»”\s]+$'), '').replaceAll(RegExp(r'\s+'), ' ');
 
   static List<HubTool> tools() => [
     HubTool(
@@ -451,10 +513,7 @@ class Replies {
       description:
           'Prépare une réponse courte à un message reçu (Discord…) et la copie dans le presse-papier, prête à coller. '
           'N\'envoie jamais rien.',
-      params: {
-        'qui': ('string', 'Qui a écrit'),
-        'message': ('string', 'Le message reçu'),
-      },
+      params: {'qui': ('string', 'Qui a écrit'), 'message': ('string', 'Le message reçu')},
       required: ['message'],
       run: (a) async {
         final who = '${a['qui'] ?? 'Quelqu\'un'}'.trim();

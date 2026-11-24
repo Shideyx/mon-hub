@@ -113,7 +113,7 @@ class GoogleAuth {
     'email',
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
-    // Ton Drive en entier : le lire, y ranger tes fichiers (Clicky), ouvrir
+    // Ton Drive en entier : le lire, y ranger tes fichiers (Smily), ouvrir
     // et enregistrer tes Google Docs dans le Word de Mon Hub.
     driveScope,
   ];
@@ -137,8 +137,7 @@ class GoogleAuth {
   static final ModuleStore store = ModuleStore()..bind('google');
 
   /// Comptes Google connectés (adresses).
-  static List<String> get accounts =>
-      (store.getJson<List<dynamic>>('accounts') ?? const []).cast<String>();
+  static List<String> get accounts => (store.getJson<List<dynamic>>('accounts') ?? const []).cast<String>();
 
   static final _tokens = <String, (String, DateTime)>{};
 
@@ -154,9 +153,7 @@ class GoogleAuth {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final redirect = 'http://127.0.0.1:${server.port}';
     final verifier = _rand(64);
-    final challenge = base64Url
-        .encode(sha256.convert(ascii.encode(verifier)).bytes)
-        .replaceAll('=', '');
+    final challenge = base64Url.encode(sha256.convert(ascii.encode(verifier)).bytes).replaceAll('=', '');
     final state = _rand(24);
     final url = Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
       'client_id': clientId,
@@ -174,37 +171,33 @@ class GoogleAuth {
       if (!await _openSignIn(url)) {
         throw 'Impossible d\'ouvrir le navigateur';
       }
-      final code =
-          await () async {
-            await for (final req in server) {
-              final q = req.uri.queryParameters;
-              // Une réponse sans le bon « state » ne vient pas de Google pour
-              // cette connexion : ignorée (elle ne peut ni connecter un autre
-              // compte, ni annuler la connexion en cours).
-              if (q['state'] != state) {
-                req.response.statusCode = 404;
-                await req.response.close();
-                continue;
-              }
-              final ok = q['code'] != null && q['state'] == state;
-              req.response.headers.contentType = ContentType.html;
-              req.response.write(
-                '<!doctype html><meta charset="utf-8"><title>Mon Hub</title>'
-                '<body style="font-family:system-ui;text-align:center;padding:60px">'
-                '<h2>${ok ? '✅ C\'est bon !' : '❌ Connexion annulée'}</h2>'
-                '<p>Tu peux fermer cette page et revenir dans Mon Hub.</p></body>',
-              );
-              await req.response.close();
-              if (!ok) {
-                throw q['error'] == 'access_denied' ? 'Connexion refusée' : 'Connexion annulée';
-              }
-              return q['code']!;
-            }
-            throw 'Connexion annulée';
-          }().timeout(
-            const Duration(minutes: 5),
-            onTimeout: () => throw 'Temps dépassé : recommence la connexion Google',
+      final code = await () async {
+        await for (final req in server) {
+          final q = req.uri.queryParameters;
+          // Une réponse sans le bon « state » ne vient pas de Google pour
+          // cette connexion : ignorée (elle ne peut ni connecter un autre
+          // compte, ni annuler la connexion en cours).
+          if (q['state'] != state) {
+            req.response.statusCode = 404;
+            await req.response.close();
+            continue;
+          }
+          final ok = q['code'] != null && q['state'] == state;
+          req.response.headers.contentType = ContentType.html;
+          req.response.write(
+            '<!doctype html><meta charset="utf-8"><title>Mon Hub</title>'
+            '<body style="font-family:system-ui;text-align:center;padding:60px">'
+            '<h2>${ok ? '✅ C\'est bon !' : '❌ Connexion annulée'}</h2>'
+            '<p>Tu peux fermer cette page et revenir dans Mon Hub.</p></body>',
           );
+          await req.response.close();
+          if (!ok) {
+            throw q['error'] == 'access_denied' ? 'Connexion refusée' : 'Connexion annulée';
+          }
+          return q['code']!;
+        }
+        throw 'Connexion annulée';
+      }().timeout(const Duration(minutes: 5), onTimeout: () => throw 'Temps dépassé : recommence la connexion Google');
 
       final r = await http.post(
         Uri.parse('https://oauth2.googleapis.com/token'),
@@ -228,10 +221,7 @@ class GoogleAuth {
       final refresh = j['refresh_token'] as String?;
       if (refresh != null) await store.writeSecret('refresh.$email', refresh);
       if (j['scope'] is String) await store.setJson('scopes.$email', j['scope']);
-      _tokens[email] = (
-        access,
-        DateTime.now().add(Duration(seconds: (j['expires_in'] as int) - 60)),
-      );
+      _tokens[email] = (access, DateTime.now().add(Duration(seconds: (j['expires_in'] as int) - 60)));
       await store.setJson('accounts', {...accounts, email}.toList());
       return email;
     } finally {
@@ -337,12 +327,7 @@ class GoogleAuth {
   }
 
   /// Appel à une API Google au nom de [email].
-  static Future<Map<String, dynamic>> api(
-    String email,
-    String method,
-    String url, {
-    Object? body,
-  }) async {
+  static Future<Map<String, dynamic>> api(String email, String method, String url, {Object? body}) async {
     final token = await accessToken(email);
     final req = http.Request(method, Uri.parse(url))..headers['Authorization'] = 'Bearer $token';
     if (body != null) {

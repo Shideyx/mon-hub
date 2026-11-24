@@ -1,4 +1,4 @@
-// Clicky a **sa vie à lui** (v1.57) : il garde son look de curseur, mais il
+// Smily a **sa vie à lui** (v1.57) : il garde son look de curseur, mais il
 // vit à côté de toi et le montre avec des émojis. Il a sommeil le soir, il
 // s'endort dans son coin quand tu pars (et se réveille en sursaut), il rêve
 // et te raconte ses rêves, il porte de petits « accessoires » selon la vraie
@@ -19,7 +19,7 @@ import 'package:flutter/foundation.dart';
 
 import 'tutor.dart' show normalize;
 
-/// Ce que Clicky vit en ce moment (émoji, accessoire, sommeil, danse).
+/// Ce que Smily vit en ce moment (émoji, accessoire, sommeil, danse).
 class ClickyLife extends ChangeNotifier {
   ClickyLife({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
   static final instance = ClickyLife();
@@ -101,8 +101,7 @@ class ClickyLife extends ChangeNotifier {
   }
 
   /// Un rêve à raconter ? (une fois par jour, après une vraie sieste).
-  bool dreamDue(Duration slept, DateTime now) =>
-      slept >= const Duration(minutes: 45) && dreamDay != _day(now);
+  bool dreamDue(Duration slept, DateTime now) => slept >= const Duration(minutes: 45) && dreamDay != _day(now);
 
   void dreamt(String text, DateTime now) {
     lastDream = text;
@@ -208,11 +207,7 @@ class ClickyLife extends ChangeNotifier {
 
   static String _day(DateTime d) => d.toIso8601String().substring(0, 10);
 
-  Map<String, dynamic> toJson() => {
-    'reve': lastDream,
-    'reveJour': dreamDay,
-    'sieste': lastSleep.inMinutes,
-  };
+  Map<String, dynamic> toJson() => {'reve': lastDream, 'reveJour': dreamDay, 'sieste': lastSleep.inMinutes};
 
   void restore(Object? j) {
     if (j is! Map) return;
@@ -244,7 +239,9 @@ class ClickyLife extends ChangeNotifier {
   static (String, String)? seasonAccessory(DateTime d) {
     final (m, day) = (d.month, d.day);
     if (m == 12 && day <= 26) return ('🎅', 'C\'est bientôt Noël : j\'ai sorti mon bonnet de Père Noël.');
-    if ((m == 12 && day == 31) || (m == 1 && day == 1)) return ('🥳', 'C\'est le Nouvel An ! Je fais la fête moi aussi.');
+    if ((m == 12 && day == 31) || (m == 1 && day == 1)) {
+      return ('🥳', 'C\'est le Nouvel An ! Je fais la fête moi aussi.');
+    }
     if (m == 10 && day == 31) return ('🎃', 'C\'est Halloween : je me suis déguisé en citrouille. Bouh !');
     if (m == 4 && day == 1) return ('🐟', 'Poisson d\'avril ! Tu as vu ce que j\'ai dans le dos ?');
     if (m == 6 && day == 21) return ('🎸', 'C\'est la fête de la musique : j\'ai sorti ma guitare.');
@@ -262,7 +259,10 @@ class ClickyLife extends ChangeNotifier {
     if (now.contains('neige') || icon.contains('❄') || icon.contains('🌨')) {
       return ('⛄', 'Il neige dehors ! Je me suis fait un petit bonhomme de neige.');
     }
-    if (RegExp(r'pluie|averse|bruine|orage').hasMatch(now) || icon.contains('🌧') || icon.contains('⛈') || icon.contains('🌦')) {
+    if (RegExp(r'pluie|averse|bruine|orage').hasMatch(now) ||
+        icon.contains('🌧') ||
+        icon.contains('⛈') ||
+        icon.contains('🌦')) {
       return ('☂️', 'Il pleut dehors, alors j\'ai pris mon parapluie.');
     }
     if (t != null && t <= 4) return ('🧣', 'Brr, il fait $deg dehors : j\'ai sorti mon écharpe.');
@@ -310,18 +310,17 @@ class ClickyLife extends ChangeNotifier {
   static const antics = ['🎶', '🫧', '🪐', '🤸', '🧐', '🎈'];
 
   /// Un rêve sans IA, avec ce qu'il a vécu hier (appli, musique, souvenir).
-  static String dreamFrom({
-    String app = '',
-    String artist = '',
-    String memory = '',
-    math.Random? random,
-  }) {
+  static String dreamFrom({String app = '', String artist = '', String memory = '', math.Random? random}) {
     final r = random ?? math.Random();
     final ideas = <String>[
-      if (app.isNotEmpty) 'J\'ai rêvé que j\'étais coincé dans $app et que tous les boutons faisaient « clic » en même temps. Bizarre.',
-      if (app.isNotEmpty) 'J\'ai rêvé que $app avait un bouton « dormir encore 5 minutes ». Je l\'ai cherché partout en me réveillant.',
-      if (artist.isNotEmpty) 'Cette nuit, $artist faisait un concert sur ton bureau. J\'étais au premier rang, entre la corbeille et tes téléchargements.',
-      if (memory.isNotEmpty) 'J\'ai rêvé de ce que tu m\'avais dit : « $memory ». Sauf que dans mon rêve, c\'est moi qui m\'en occupais.',
+      if (app.isNotEmpty)
+        'J\'ai rêvé que j\'étais coincé dans $app et que tous les boutons faisaient « clic » en même temps. Bizarre.',
+      if (app.isNotEmpty)
+        'J\'ai rêvé que $app avait un bouton « dormir encore 5 minutes ». Je l\'ai cherché partout en me réveillant.',
+      if (artist.isNotEmpty)
+        'Cette nuit, $artist faisait un concert sur ton bureau. J\'étais au premier rang, entre la corbeille et tes téléchargements.',
+      if (memory.isNotEmpty)
+        'J\'ai rêvé de ce que tu m\'avais dit : « $memory ». Sauf que dans mon rêve, c\'est moi qui m\'en occupais.',
       'J\'ai rêvé que ta souris s\'était transformée en vraie souris et qu\'elle me courait après. Je me suis réveillé en sursaut.',
       'J\'ai rêvé qu\'on faisait la course, ton curseur et moi. J\'ai gagné, évidemment.',
       'J\'ai rêvé que je devenais un fond d\'écran. C\'était reposant, mais on s\'ennuie vite.',
@@ -339,7 +338,7 @@ class ClickyLife extends ChangeNotifier {
       if (artist.isNotEmpty) 'il·elle écoutait $artist',
       if (memory.isNotEmpty) 'il·elle t\'a dit : « $memory »',
     ];
-    return 'Tu es Clicky, un petit curseur bleu vivant sur le PC de $who. Tu viens de te réveiller. '
+    return 'Tu es Smily, un petit curseur bleu vivant sur le PC de $who. Tu viens de te réveiller. '
         'Raconte en une ou deux phrases courtes (160 caractères au plus), à la première personne, au passé, un rêve '
         'drôle et un peu absurde que tu as fait${hints.isEmpty ? '' : ', inspiré de ceci : ${hints.join(' ; ')}'}. '
         'Commence par « J\'ai rêvé ». Pas d\'émoji, pas de guillemets autour, rien d\'autre que le rêve.';
@@ -361,8 +360,10 @@ class ClickyLife extends ChangeNotifier {
     Future<void> Function(String pace)? setPace,
     Future<void> Function(bool dance)? setDance,
   }) {
-    var n = normalize(said).replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?clicky ?'), '').trim();
-    n = n.replaceFirst(RegExp(r' clicky$'), '').trim();
+    var n = normalize(said)
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile)$'), '').trim();
     if (RegExp(r'^(?:tu dors|tu dormais|t es reveille|tu es reveille|reveille toi|debout)$').hasMatch(n)) {
       return asleep || now.difference(_wokeHint ?? DateTime(2000)).inMinutes < 2
           ? 'Hein ? Non non… je reposais juste mes pixels. Je suis là !'
@@ -374,22 +375,29 @@ class ClickyLife extends ChangeNotifier {
       final d = h >= 60 ? '${h ~/ 60} h${h % 60 == 0 ? '' : ' ${(h % 60).toString().padLeft(2, '0')}'}' : '$h minutes';
       return 'Comme un bébé curseur : $d dans mon coin, en bas de l\'écran. Et toi ?';
     }
-    if (RegExp(r'^(?:tu as|t as|as tu) reve(?: de quoi| cette nuit)?$|^(?:tu as reve|t as reve) de quoi$|^raconte(?: moi)? ton reve$|^c etait quoi ton reve$').hasMatch(n)) {
+    if (RegExp(
+      r'^(?:tu as|t as|as tu) reve(?: de quoi| cette nuit)?$|^(?:tu as reve|t as reve) de quoi$|^raconte(?: moi)? ton reve$|^c etait quoi ton reve$',
+    ).hasMatch(n)) {
       return lastDream.isEmpty ? 'Je ne m\'en souviens plus… ça m\'arrive souvent, comme à toi je crois.' : lastDream;
     }
-    const things = r'(?:echarpe|bonnet|parapluie|lunettes(?: de soleil)?|cafe|chapeau|citrouille|guitare|poisson|'
+    const things =
+        r'(?:echarpe|bonnet|parapluie|lunettes(?: de soleil)?|cafe|chapeau|citrouille|guitare|poisson|'
         r'bonhomme de neige|emoji|truc|accessoire)s?';
     if (RegExp(
       '^(?:tu as|t as|as tu) (?:froid|chaud)\$|'
       '^pourquoi (?:tu as|t as|tu portes|tu bois) (?:un|une|des|ton|ta|tes|ce|cette) $things(?: .*)?\$|'
       '^c est quoi (?:ton|ta|tes|ce|cet|cette) $things(?: a cote de toi)?\$',
     ).hasMatch(n)) {
-      if (accessory.isEmpty) return 'Non, ça va : il ne fait ni trop chaud ni trop froid. Rien de spécial sur moi aujourd\'hui.';
+      if (accessory.isEmpty) {
+        return 'Non, ça va : il ne fait ni trop chaud ni trop froid. Rien de spécial sur moi aujourd\'hui.';
+      }
       return '$accessory $accessoryWhy';
     }
     if (RegExp(r'^(?:tu es|t es) fatigue$|^(?:tu as|t as) sommeil$').hasMatch(n)) {
       final e = energyAt(now);
-      if (e <= 0.35) return 'Franchement, oui : à cette heure-ci je bâille toutes les deux minutes. Toi aussi tu devrais dormir, non ?';
+      if (e <= 0.35) {
+        return 'Franchement, oui : à cette heure-ci je bâille toutes les deux minutes. Toi aussi tu devrais dormir, non ?';
+      }
       if (e >= 0.8) return 'Pas du tout ! Je suis en pleine forme.';
       return 'Un peu, mais ça va. Je tiens le coup.';
     }
@@ -412,11 +420,14 @@ class ClickyLife extends ChangeNotifier {
       setDancing(false);
       return 'D\'accord, je reste sage. Dis « tu peux danser » si ça te manque.';
     }
-    if (RegExp(r'^(?:tu peux|tu as le droit de) (?:danser|redanser)(?: a nouveau)?$|^remets toi a danser$').hasMatch(n)) {
+    if (RegExp(r'^(?:tu peux|tu as le droit de) (?:danser|redanser)(?: a nouveau)?$|^remets toi a danser$')
+        .hasMatch(n)) {
       if (setDance != null) unawaited(setDance(true));
       return 'Youpi ! La prochaine fois que ta musique passe, je danse.';
     }
-    if (RegExp(r'^(?:sois|fais toi) (?:plus )?(?:discret|calme|petit)$|^calme toi$|^(?:tu es|t es) (?:saoulant|soulant|lourd|relou|insupportable)$|^arrete les emojis$').hasMatch(n)) {
+    if (RegExp(
+      r'^(?:sois|fais toi) (?:plus )?(?:discret|calme|petit)$|^calme toi$|^(?:tu es|t es) (?:saoulant|soulant|lourd|relou|insupportable)$|^arrete les emojis$',
+    ).hasMatch(n)) {
       pace = 'discret';
       if (setPace != null) unawaited(setPace('discret'));
       return 'Compris, je me fais tout petit : beaucoup moins de bulles et d\'émojis. Dis « tu peux être plus bavard » pour revenir comme avant.';
@@ -432,10 +443,13 @@ class ClickyLife extends ChangeNotifier {
   /// « J'habite à Lyon », « ma ville c'est Nantes » : la ville (sans
   /// accents, en minuscules), ou null.
   static String? cityFrom(String said) {
-    var n = normalize(said).replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?clicky ?'), '').trim();
-    n = n.replaceFirst(RegExp(r' (?:clicky|stp|svp|merci)$'), '').trim();
-    final m = RegExp(r'^(?:j habite|je vis|je reside|moi j habite) (?:a|au|aux|en|sur) (.{2,40})$|^ma ville (?:c est |est |s appelle )?(.{2,40})$')
-        .firstMatch(n);
+    var n = normalize(said)
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile|stp|svp|merci)$'), '').trim();
+    final m = RegExp(
+      r'^(?:j habite|je vis|je reside|moi j habite) (?:a|au|aux|en|sur) (.{2,40})$|^ma ville (?:c est |est |s appelle )?(.{2,40})$',
+    ).firstMatch(n);
     final c = (m?[1] ?? m?[2])?.trim();
     if (c == null || c.split(' ').length > 4) return null;
     if (RegExp(r'^(?:la maison|cote|chez|l etranger|la campagne|paris ou|quoi|ou)\b').hasMatch(c)) return null;
@@ -474,8 +488,7 @@ class WiggleDetector {
   });
 
   /// Souris secouée : la tête lui tourne.
-  factory WiggleDetector.shake() =>
-      WiggleDetector(minStep: 25, reversals: 5, windowMs: 900, minPath: 500);
+  factory WiggleDetector.shake() => WiggleDetector(minStep: 25, reversals: 5, windowMs: 900, minPath: 500);
 
   /// Petits allers-retours tout près de lui : une caresse.
   factory WiggleDetector.pet() =>
@@ -507,7 +520,10 @@ class WiggleDetector {
         strokes.add(d);
       }
     }
-    final big = [for (final s in strokes) if (s.abs() >= minStep && s.abs() <= maxStep) s];
+    final big = [
+      for (final s in strokes)
+        if (s.abs() >= minStep && s.abs() <= maxStep) s,
+    ];
     final path = big.fold<double>(0, (a, s) => a + s.abs());
     var turns = 0;
     for (var i = 1; i < big.length; i++) {

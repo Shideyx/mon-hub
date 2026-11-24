@@ -31,8 +31,7 @@ void main() {
     final log = <String>[];
     var gtkCount = 0;
     final client = MockClient((req) async {
-      Map<String, dynamic> data() =>
-          jsonDecode(Uri.splitQueryString(req.body)['data']!) as Map<String, dynamic>;
+      Map<String, dynamic> data() => jsonDecode(Uri.splitQueryString(req.body)['data']!) as Map<String, dynamic>;
       final h = {for (final e in req.headers.entries) e.key.toLowerCase(): e.value};
       if (req.method == 'GET') {
         gtkCount++;
@@ -40,9 +39,7 @@ void main() {
         return http.Response(
           '',
           200,
-          headers: {
-            'set-cookie': 'GTK=gtk$gtkCount; Path=/,other=1; expires=Wed, 21 Oct 2026 07:28:00 GMT',
-          },
+          headers: {'set-cookie': 'GTK=gtk$gtkCount; Path=/,other=1; expires=Wed, 21 Oct 2026 07:28:00 GMT'},
         );
       }
       if (req.url.path.endsWith('login.awp')) {
@@ -164,15 +161,10 @@ void main() {
       return http.Response(jsonEncode({'code': 505, 'message': 'Mot de passe invalide'}), 200);
     });
     final ed = EdClient(refuse, false);
-    await expectLater(
-      ed.login('a', 'b', answerQuestion: (_, _) async => null),
-      throwsA(isA<EdAuthError>()),
-    );
+    await expectLater(ed.login('a', 'b', answerQuestion: (_, _) async => null), throwsA(isA<EdAuthError>()));
     expect(calls, 2, reason: 'une seule tentative de connexion, pas de boucle');
 
-    final expired = MockClient(
-      (req) async => http.Response(jsonEncode({'code': 525, 'message': ''}), 200),
-    );
+    final expired = MockClient((req) async => http.Response(jsonEncode({'code': 525, 'message': ''}), 200));
     final ed2 = EdClient(expired, false)
       ..token = 'vieux'
       ..accountId = 1;

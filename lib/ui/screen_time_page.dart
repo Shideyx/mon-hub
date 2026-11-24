@@ -50,11 +50,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                   runSpacing: 6,
                   children: [
                     for (final a in apps.take(10))
-                      ChoiceChip(
-                        label: Text(a),
-                        selected: name.text == a,
-                        onSelected: (_) => set(() => name.text = a),
-                      ),
+                      ChoiceChip(label: Text(a), selected: name.text == a, onSelected: (_) => set(() => name.text = a)),
                   ],
                 ),
               if (app == null)
@@ -133,7 +129,10 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                     onSelectionChanged: (s) => setState(() => _week = s.first),
                   ),
                   const SizedBox(height: 12),
-                  Text(ScreenTime.say(total), style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    ScreenTime.say(total),
+                    style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
                   Text(_week ? 'sur l\'écran ces 7 derniers jours' : 'sur l\'écran aujourd\'hui'),
                   if (_week) ...[
                     const SizedBox(height: 12),
@@ -183,7 +182,9 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w700))),
+                                  Expanded(
+                                    child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  ),
                                   if (limits[e.key] case final l?)
                                     Padding(
                                       padding: const EdgeInsets.only(right: 8),
@@ -212,13 +213,15 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                       ),
                   const SizedBox(height: 20),
                   Text('Limites douces', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                  const Text('Clicky te prévient une fois par jour quand tu arrives à la limite. Rien n\'est bloqué.'),
+                  const Text('Smily te prévient une fois par jour quand tu arrives à la limite. Rien n\'est bloqué.'),
                   for (final e in limits.entries)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.hourglass_bottom_rounded),
                       title: Text(e.key),
-                      subtitle: Text('${ScreenTime.say(e.value * 60)} par jour · aujourd\'hui : ${ScreenTime.say(st.day(now)[e.key] ?? 0)}'),
+                      subtitle: Text(
+                        '${ScreenTime.say(e.value * 60)} par jour · aujourd\'hui : ${ScreenTime.say(st.day(now)[e.key] ?? 0)}',
+                      ),
                       onTap: () => _addLimit(const [], e.key),
                       trailing: IconButton(
                         tooltip: 'Enlever',
@@ -242,7 +245,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                     subtitle: Text(
                       assistant.consent
                           ? 'Le soir, d\'après ton premier cours du lendemain (École Directe).'
-                          : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Clicky).',
+                          : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Smily).',
                     ),
                     value: assistant.on('sommeil'),
                     onChanged: assistant.consent ? (v) => assistant.setOn('sommeil', v) : null,
@@ -291,7 +294,10 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Ce que Clicky a remarqué', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                            Text(
+                              'Ce que Smily a remarqué',
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                            ),
                             for (final s in seen)
                               ListTile(
                                 dense: true,
@@ -313,7 +319,7 @@ class _ScreenTimePageState extends State<ScreenTimePage> {
                       GameMode.instance.active
                           ? 'En ce moment : ${GameMode.instance.game}. Les notifications t\'attendent.'
                           : 'Quand un jeu est en plein écran : notifications gardées pour la fin, sauvegarde et synchro '
-                                'en pause, Clicky se cache. Bilan de la partie à la fin.',
+                                'en pause, Smily se cache. Bilan de la partie à la fin.',
                     ),
                     value: GameMode.enabled,
                     onChanged: (v) => GameMode.setEnabled(v).then((_) => setState(() {})),

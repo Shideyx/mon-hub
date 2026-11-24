@@ -37,11 +37,20 @@ void main() {
   testWidgets('le fil s\'affiche sans déborder et ouvre le bon module', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await ModuleStore.init();
-    final hub = HubController([_Mod('schedule', 'Agenda'), _Mod('revisions', 'Révisions'), _Mod('ecoledirecte', 'École')]);
+    final hub = HubController([
+      _Mod('schedule', 'Agenda'),
+      _Mod('revisions', 'Révisions'),
+      _Mod('ecoledirecte', 'École'),
+    ]);
     HubFeed.instance.items = HubFeed.build(
       now: DateTime(2026, 11, 18, 17),
       events: [
-        {'titre': 'Mathématiques avancées en salle de travaux pratiques', 'debut': DateTime(2026, 11, 18, 17, 20), 'source': 'École Directe', 'lieu': 'B12'},
+        {
+          'titre': 'Mathématiques avancées en salle de travaux pratiques',
+          'debut': DateTime(2026, 11, 18, 17, 20),
+          'source': 'École Directe',
+          'lieu': 'B12',
+        },
       ],
       homework: [
         {'pour_le': DateTime(2026, 11, 19), 'matiere': 'Physique-Chimie', 'controle': true},
@@ -51,7 +60,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(Brightness.light),
-        home: Scaffold(body: HubFeedStrip(controller: hub, onOpen: (m) => opened.add(m.id))),
+        home: Scaffold(
+          body: HubFeedStrip(controller: hub, onOpen: (m) => opened.add(m.id)),
+        ),
       ),
     );
     await tester.pump(const Duration(seconds: 1));
@@ -85,7 +96,7 @@ void main() {
       expect(HubFeed.say(t), isNotNull);
     });
 
-    test('cours dans 20 minutes : en premier, et Clicky peut le dire', () {
+    test('cours dans 20 minutes : en premier, et Smily peut le dire', () {
       final items = HubFeed.build(
         now: now,
         events: [
@@ -162,7 +173,7 @@ void main() {
       expect(CustomModules.load().single.url, 'https://web.whatsapp.com/');
       // Au prochain démarrage, il est toujours là.
       expect(CustomModules.build().single.name, 'WhatsApp');
-      // Clicky sait l'ouvrir.
+      // Smily sait l'ouvrir.
       expect(hub.enabled.single.tools.single.name, startsWith('perso_ouvrir_'));
       await CustomModules.remove(spec.id);
       hub.remove(spec.id);
@@ -171,7 +182,10 @@ void main() {
     });
 
     test('un fichier abîmé ou trafiqué ne casse rien', () async {
-      await ModuleStore.prefs.setString('hub.custom', '[{"id":"schedule","name":"x","url":"https://a.fr"},{"id":"perso_x","url":"file:///c:/"},"n\'importe quoi"]');
+      await ModuleStore.prefs.setString(
+        'hub.custom',
+        '[{"id":"schedule","name":"x","url":"https://a.fr"},{"id":"perso_x","url":"file:///c:/"},"n\'importe quoi"]',
+      );
       expect(CustomModules.load(), isEmpty);
       await ModuleStore.prefs.setString('hub.custom', 'pas du json');
       expect(CustomModules.load(), isEmpty);
@@ -182,7 +196,9 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: buildTheme(Brightness.light),
-          home: Scaffold(body: SizedBox(width: 400, height: 260, child: AddModuleCard(controller: hub))),
+          home: Scaffold(
+            body: SizedBox(width: 400, height: 260, child: AddModuleCard(controller: hub)),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -243,7 +259,7 @@ void main() {
     });
   });
 
-  group('animations de Clicky', () {
+  group('animations de Smily', () {
     test('le rebond revient toujours à la taille normale', () {
       expect(ClickyBounceMath.squash(0), (1.0, 1.0));
       expect(ClickyBounceMath.squash(1), (1.0, 1.0));

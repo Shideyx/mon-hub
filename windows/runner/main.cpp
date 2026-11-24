@@ -27,7 +27,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   project.set_dart_entrypoint_arguments(command_line_arguments);
 
-  // « hub.exe --clicky » : la petite fenêtre transparente de Clicky qui
+  // « hub.exe --clicky » : la petite fenêtre transparente de Smily qui
   // suit la souris au-dessus de toutes les applis (lancée par Mon Hub).
   bool clicky = false;
   // « hub.exe --widget=musique » : un widget de l'accueil détaché sur le
@@ -60,7 +60,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     origin = Win32Window::Point(80, 80);
     size = Win32Window::Size(460, 380);
   }
-  if (!window.Create(clicky ? L"Clicky" : L"Mon Hub", origin, size)) {
+  if (!window.Create(clicky ? L"Smily" : L"Mon Hub", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

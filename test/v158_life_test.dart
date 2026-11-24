@@ -9,15 +9,36 @@ void main() {
       final t = CatchUp.build(
         now: now,
         dms: [
-          {'nom': 'Léo', 'dernier': 'Léo : tu viens au match samedi ?', 'non_lu': true, 'de_moi': false, 'date': DateTime(2026, 11, 18, 14)},
+          {
+            'nom': 'Léo',
+            'dernier': 'Léo : tu viens au match samedi ?',
+            'non_lu': true,
+            'de_moi': false,
+            'date': DateTime(2026, 11, 18, 14),
+          },
           {'nom': 'Inès', 'dernier': 'Moi : ok', 'non_lu': false, 'de_moi': true, 'date': DateTime(2026, 11, 18, 17)},
         ],
         mentions: [
-          {'de': 'Hugo', 'serveur': 'Les Potes', 'texte': '@Erik t\'es là ce soir ?', 'date': DateTime(2026, 11, 18, 16)},
+          {
+            'de': 'Hugo',
+            'serveur': 'Les Potes',
+            'texte': '@Erik t\'es là ce soir ?',
+            'date': DateTime(2026, 11, 18, 16),
+          },
         ],
         mails: [
-          {'de': 'M. Durand <durand@lycee.fr>', 'objet': 'Sortie au musée', 'lu': false, 'date': DateTime(2026, 11, 18, 12)},
-          {'de': 'Zalando <newsletter@zalando.fr>', 'objet': '-50 % sur tout', 'lu': false, 'date': DateTime(2026, 11, 18, 11)},
+          {
+            'de': 'M. Durand <durand@lycee.fr>',
+            'objet': 'Sortie au musée',
+            'lu': false,
+            'date': DateTime(2026, 11, 18, 12),
+          },
+          {
+            'de': 'Zalando <newsletter@zalando.fr>',
+            'objet': '-50 % sur tout',
+            'lu': false,
+            'date': DateTime(2026, 11, 18, 11),
+          },
           {'de': 'Vieux <x@y.fr>', 'objet': 'Ancien', 'lu': false, 'date': DateTime(2026, 11, 10)},
         ],
         school: [

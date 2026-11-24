@@ -145,9 +145,7 @@ class _LoginPageState extends State<LoginPage> {
                             TextField(
                               controller: _pass,
                               obscureText: _hide,
-                              autofillHints: [
-                                _create ? AutofillHints.newPassword : AutofillHints.password,
-                              ],
+                              autofillHints: [_create ? AutofillHints.newPassword : AutofillHints.password],
                               textInputAction: _create ? TextInputAction.next : TextInputAction.done,
                               onSubmitted: (_) => _create ? null : _submit(),
                               decoration: InputDecoration(
@@ -155,9 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                                 prefixIcon: const Icon(Icons.lock_rounded),
                                 suffixIcon: IconButton(
                                   tooltip: _hide ? 'Afficher' : 'Masquer',
-                                  icon: Icon(
-                                    _hide ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                                  ),
+                                  icon: Icon(_hide ? Icons.visibility_rounded : Icons.visibility_off_rounded),
                                   onPressed: () => setState(() => _hide = !_hide),
                                 ),
                               ),
@@ -205,9 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                                 _error = null;
                               }),
                               child: Text(
-                                _create
-                                    ? 'J\'ai déjà un compte : me connecter'
-                                    : 'Nouveau ? Créer un compte',
+                                _create ? 'J\'ai déjà un compte : me connecter' : 'Nouveau ? Créer un compte',
                               ),
                             ),
                             FilledButton.tonalIcon(

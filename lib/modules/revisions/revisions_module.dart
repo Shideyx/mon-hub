@@ -34,7 +34,7 @@ import 'mock_exam.dart';
 /// - cartes qui reviennent juste avant que tu les oublies (FSRS, l'algorithme
 ///   d'Anki) ;
 /// - quiz QCM, réponse écrite, jeu d'association ;
-/// - Clicky crée les cartes à partir d'un cours (texte, document, photo, PDF) ;
+/// - Smily crée les cartes à partir d'un cours (texte, document, photo, PDF) ;
 /// - minuteur de concentration et série de jours 🔥 ;
 /// - plan de révision placé dans l'agenda avant chaque contrôle d'École
 ///   Directe.
@@ -101,7 +101,7 @@ class RevisionsModule extends HubModule {
     unawaited(Navigator.push(ctx, MaterialPageRoute<void>(builder: (_) => page())));
   }
 
-  // ------------------------------------------------------------ Clicky (IA)
+  // ------------------------------------------------------------ Smily (IA)
 
   static const _cardsSystem =
       'Tu crées des cartes de révision (flashcards) pour un lycéen français. Réponds uniquement en JSON.';
@@ -119,12 +119,14 @@ class RevisionsModule extends HubModule {
     return [
       for (final c in list)
         if (c is Map)
-          ('${c['q'] ?? c['question'] ?? c['recto'] ?? c['front'] ?? ''}'.trim(),
-              '${c['r'] ?? c['reponse'] ?? c['réponse'] ?? c['verso'] ?? c['back'] ?? ''}'.trim()),
+          (
+            '${c['q'] ?? c['question'] ?? c['recto'] ?? c['front'] ?? ''}'.trim(),
+            '${c['r'] ?? c['reponse'] ?? c['réponse'] ?? c['verso'] ?? c['back'] ?? ''}'.trim(),
+          ),
     ].where((c) => c.$1.isNotEmpty && c.$2.isNotEmpty).toList();
   }
 
-  /// Clicky fabrique des cartes à partir d'un cours.
+  /// Smily fabrique des cartes à partir d'un cours.
   Future<List<(String, String)>> generate({
     String text = '',
     List<String> images = const [],
@@ -132,7 +134,7 @@ class RevisionsModule extends HubModule {
     int count = 15,
   }) async {
     if (!await AiText.available()) {
-      throw 'Clicky a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
+      throw 'Smily a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
     }
     final what = text.trim().isNotEmpty
         ? 'ce cours :\n---\n${text.length > 30000 ? text.substring(0, 30000) : text}\n---'
@@ -141,7 +143,7 @@ class RevisionsModule extends HubModule {
         : 'ces photos de cours (lis bien tout le texte)';
     final out = await AiText.ask(cardsPrompt(count, what), system: _cardsSystem, images: images, pdf: pdf);
     final cards = parseCards(out);
-    if (cards.isEmpty) throw 'Clicky n\'a pas réussi à faire des cartes avec ce contenu';
+    if (cards.isEmpty) throw 'Smily n\'a pas réussi à faire des cartes avec ce contenu';
     return cards;
   }
 
@@ -159,7 +161,7 @@ class RevisionsModule extends HubModule {
   }
 
   static const _prepSystem =
-      'Tu es Clicky, le coach de révision d\'un lycéen français. Tu réponds uniquement en JSON valide.';
+      'Tu es Smily, le coach de révision d\'un lycéen français. Tu réponds uniquement en JSON valide.';
 
   static String prepPrompt(EdHomework t, String material) =>
       'Prépare la révision d\'un contrôle de ${t.subject} le ${frDays[t.due.weekday - 1]} ${t.due.day} '
@@ -176,7 +178,7 @@ class RevisionsModule extends HubModule {
   /// Ce que la réponse de l'IA contient : (titre, fiche, cartes, quiz).
   static (String, String, List<(String, String)>, List<QuizQuestion>) parsePrep(String text) {
     final j = AiText.json(text);
-    if (j is! Map) throw 'Clicky n\'a pas réussi à préparer ce contrôle';
+    if (j is! Map) throw 'Smily n\'a pas réussi à préparer ce contrôle';
     final cards = parseCards(jsonEncode(j['cartes'] ?? const []));
     final quiz = [
       for (final q in (j['quiz'] as List?) ?? const [])
@@ -191,14 +193,14 @@ class RevisionsModule extends HubModule {
           ),
     ];
     final sheet = '${j['fiche'] ?? ''}'.trim();
-    if (sheet.isEmpty && cards.isEmpty) throw 'Clicky n\'a pas réussi à préparer ce contrôle';
+    if (sheet.isEmpty && cards.isEmpty) throw 'Smily n\'a pas réussi à préparer ce contrôle';
     return ('${j['titre'] ?? ''}'.trim(), sheet, cards, quiz);
   }
 
   /// Fiche + cartes + quiz pour un contrôle (dans un paquet à part).
   Future<Deck> prepareTest(EdHomework t) async {
     if (!await AiText.available()) {
-      throw 'Clicky a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
+      throw 'Smily a besoin d\'un cerveau : clé Gemini gratuite ou Claude (module Claude → Réglages).';
     }
     // Les cours de la personne sur Google Docs, s'il y en a pour la matière.
     final material = StringBuffer();
@@ -241,7 +243,10 @@ class RevisionsModule extends HubModule {
   Future<HubNotification?> autoPrepare({DateTime? now}) async {
     final n = now ?? DateTime.now();
     if (_preparing || store.getJson<bool>('autoPrep') == false) return null;
-    final next = tests.where((t) => t.due.difference(DateTime(n.year, n.month, n.day)).inDays <= 10).where((t) => needsPrep(t, n)).firstOrNull;
+    final next = tests
+        .where((t) => t.due.difference(DateTime(n.year, n.month, n.day)).inDays <= 10)
+        .where((t) => needsPrep(t, n))
+        .firstOrNull;
     if (next == null || !await AiText.available()) return null;
     _preparing = true;
     try {
@@ -249,7 +254,7 @@ class RevisionsModule extends HubModule {
       return HubNotification(
         id: 'prep-${testKey(next)}',
         title: '📝 Contrôle de ${next.subject} ${_inDays(next.due)}',
-        body: 'Clicky a préparé ta fiche, ${deck.cards.length} cartes et un quiz de ${deck.quiz.length} questions.',
+        body: 'Smily a préparé ta fiche, ${deck.cards.length} cartes et un quiz de ${deck.quiz.length} questions.',
         moduleId: id,
       );
     } catch (_) {
@@ -302,7 +307,8 @@ class RevisionsModule extends HubModule {
             title: 'Révision ${t.subject}',
             start: start,
             end: start.add(const Duration(minutes: 45)),
-            note: 'Contrôle le ${frDays[t.due.weekday - 1]} ${t.due.day} ${frMonths[t.due.month - 1]}'
+            note:
+                'Contrôle le ${frDays[t.due.weekday - 1]} ${t.due.day} ${frMonths[t.due.month - 1]}'
                 '${t.content.trim().isEmpty ? '' : ' : ${t.content.trim()}'}',
           ),
         );
@@ -359,8 +365,7 @@ class RevisionsModule extends HubModule {
     ),
     HubTool(
       name: 'revision_generer',
-      description:
-          'Clicky crée des cartes de révision à partir d\'un texte de cours ou d\'un Google Doc.',
+      description: 'Smily crée des cartes de révision à partir d\'un texte de cours ou d\'un Google Doc.',
       params: {
         'paquet': ('string', 'Nom du paquet'),
         'texte': ('string', 'Le cours (facultatif si document)'),
@@ -379,7 +384,12 @@ class RevisionsModule extends HubModule {
         final d = await revisions.createDeck('${a['paquet']}');
         final n = await revisions.addCards(d.id, cards);
         await refreshBadge();
-        return {'ok': true, 'ajoutees': n, 'paquet': d.name, 'exemples': [for (final c in cards.take(3)) '${c.$1} → ${c.$2}']};
+        return {
+          'ok': true,
+          'ajoutees': n,
+          'paquet': d.name,
+          'exemples': [for (final c in cards.take(3)) '${c.$1} → ${c.$2}'],
+        };
       },
     ),
     HubTool(
@@ -392,26 +402,39 @@ class RevisionsModule extends HubModule {
       run: (a) async {
         final q = '${a['matiere'] ?? ''}'.trim();
         await revisions.load();
-        final deck = revisions.decks
-                .where((d) => GradeMath.matchSubject(q, [d.name.replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ' ')]) != null)
+        final deck =
+            revisions.decks
+                .where(
+                  (d) =>
+                      GradeMath.matchSubject(q, [d.name.replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ' ')]) !=
+                      null,
+                )
                 .firstOrNull ??
             revisions.decks.where((d) => d.name.toLowerCase().contains(q.toLowerCase())).firstOrNull;
-        // Les comptes rendus des cours écoutés par Clicky dans cette matière.
+        // Les comptes rendus des cours écoutés par Smily dans cette matière.
         final notes = [
           for (final n in await CourseListener.instance.list())
             if (n.done && GradeMath.matchSubject(q, [n.subject]) != null) n.summary,
         ].take(3).join('\n\n');
-        final material = [if (deck != null) MockExam.material(deck), notes].where((m) => m.trim().isNotEmpty).join('\n\n');
+        final material = [
+          if (deck != null) MockExam.material(deck),
+          notes,
+        ].where((m) => m.trim().isNotEmpty).join('\n\n');
         await push(
           null,
-          () => MockExamPage(subject: deck?.name ?? q, material: material, color: deck == null ? color : Color(deck.color)),
+          () => MockExamPage(
+            subject: deck?.name ?? q,
+            material: material,
+            color: deck == null ? color : Color(deck.color),
+          ),
         );
         return {'ok': true, 'paquet': deck?.name, 'avec_comptes_rendus': notes.isNotEmpty};
       },
     ),
     HubTool(
       name: 'revision_lancer',
-      description: 'Ouvre une séance de révision dans Mon Hub (cartes à revoir, quiz, réponse écrite, association, minuteur).',
+      description:
+          'Ouvre une séance de révision dans Mon Hub (cartes à revoir, quiz, réponse écrite, association, minuteur).',
       params: {
         'mode': ('string', 'cartes (défaut), quiz, ecrire, associer ou minuteur'),
         'paquet': ('string', 'Nom ou id du paquet (facultatif pour « cartes »)'),
@@ -425,11 +448,14 @@ class RevisionsModule extends HubModule {
         } else if (mode == 'cartes' || d == null) {
           await push(null, () => ReviewPage(module: this, deckId: d?.id));
         } else {
-          await push(null, () => switch (mode) {
-            'quiz' => QuizPage(module: this, deck: d),
-            'ecrire' => WritePage(module: this, deck: d),
-            _ => MatchPage(module: this, deck: d),
-          });
+          await push(
+            null,
+            () => switch (mode) {
+              'quiz' => QuizPage(module: this, deck: d),
+              'ecrire' => WritePage(module: this, deck: d),
+              _ => MatchPage(module: this, deck: d),
+            },
+          );
         }
         return {'ok': true};
       },
@@ -438,7 +464,7 @@ class RevisionsModule extends HubModule {
       name: 'revision_preparer_controle',
       description:
           'Prépare un contrôle d\'École Directe : fiche de révision, cartes et quiz (le prochain, ou celui d\'une matière). '
-          'Clicky le fait aussi tout seul dès qu\'il voit un contrôle dans le cahier de texte.',
+          'Smily le fait aussi tout seul dès qu\'il voit un contrôle dans le cahier de texte.',
       params: {'matiere': ('string', 'Matière (facultatif : le prochain contrôle)')},
       run: (a) async {
         final m = '${a['matiere'] ?? ''}'.toLowerCase().trim();
@@ -614,22 +640,24 @@ class RevisionsHomePage extends StatelessWidget {
     if (context.mounted) await module.push(context, () => DeckPage(module: module, deckId: d.id));
   }
 
-  /// « Préparer maintenant » un contrôle (Clicky le fait aussi tout seul).
+  /// « Préparer maintenant » un contrôle (Smily le fait aussi tout seul).
   Future<void> _prepare(BuildContext context, EdHomework t) async {
     final nav = Navigator.of(context);
-    unawaited(showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        content: Row(
-          children: [
-            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
-            const SizedBox(width: 16),
-            Expanded(child: Text('Clicky prépare ta fiche, tes cartes et ton quiz de ${t.subject}…')),
-          ],
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          content: Row(
+            children: [
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+              const SizedBox(width: 16),
+              Expanded(child: Text('Smily prépare ta fiche, tes cartes et ton quiz de ${t.subject}…')),
+            ],
+          ),
         ),
       ),
-    ));
+    );
     try {
       final deck = await module.prepareTest(t);
       nav.pop();
@@ -644,9 +672,8 @@ class RevisionsHomePage extends StatelessWidget {
     final plan = await module.planFor(module.tests);
     if (!context.mounted) return;
     if (plan.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pas de créneau libre trouvé avant tes contrôles.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Pas de créneau libre trouvé avant tes contrôles.')));
       return;
     }
     final keep = {for (final e in plan) e.id};
@@ -686,7 +713,11 @@ class RevisionsHomePage extends StatelessWidget {
     }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${keep.length} séance${keep.length > 1 ? 's' : ''} ajoutée${keep.length > 1 ? 's' : ''} à l\'agenda')),
+        SnackBar(
+          content: Text(
+            '${keep.length} séance${keep.length > 1 ? 's' : ''} ajoutée${keep.length > 1 ? 's' : ''} à l\'agenda',
+          ),
+        ),
       );
     }
   }
@@ -717,12 +748,30 @@ class RevisionsHomePage extends StatelessWidget {
               _ => MindMapPage.open(),
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'copie', child: ListTile(leading: Icon(Icons.fact_check_rounded), title: Text('Corriger ma copie (photo)'))),
-              PopupMenuItem(value: 'oral', child: ListTile(leading: Icon(Icons.record_voice_over_rounded), title: Text('Coach d\'oral'))),
-              PopupMenuItem(value: 'video', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('Vidéo YouTube → fiche'))),
-              PopupMenuItem(value: 'carte', child: ListTile(leading: Icon(Icons.hub_rounded), title: Text('Carte mentale'))),
-              PopupMenuItem(value: 'interprete', child: ListTile(leading: Icon(Icons.translate_rounded), title: Text('Interprète en direct'))),
-              PopupMenuItem(value: 'soustitres', child: ListTile(leading: Icon(Icons.subtitles_rounded), title: Text('Sous-titres en direct'))),
+              PopupMenuItem(
+                value: 'copie',
+                child: ListTile(leading: Icon(Icons.fact_check_rounded), title: Text('Corriger ma copie (photo)')),
+              ),
+              PopupMenuItem(
+                value: 'oral',
+                child: ListTile(leading: Icon(Icons.record_voice_over_rounded), title: Text('Coach d\'oral')),
+              ),
+              PopupMenuItem(
+                value: 'video',
+                child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('Vidéo YouTube → fiche')),
+              ),
+              PopupMenuItem(
+                value: 'carte',
+                child: ListTile(leading: Icon(Icons.hub_rounded), title: Text('Carte mentale')),
+              ),
+              PopupMenuItem(
+                value: 'interprete',
+                child: ListTile(leading: Icon(Icons.translate_rounded), title: Text('Interprète en direct')),
+              ),
+              PopupMenuItem(
+                value: 'soustitres',
+                child: ListTile(leading: Icon(Icons.subtitles_rounded), title: Text('Sous-titres en direct')),
+              ),
             ],
           ),
           const SizedBox(width: 6),
@@ -751,7 +800,9 @@ class RevisionsHomePage extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    boxShadow: [BoxShadow(color: c.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 10))],
+                    boxShadow: [
+                      BoxShadow(color: c.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 10)),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -760,13 +811,18 @@ class RevisionsHomePage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              streak > 0 ? '🔥 $streak jour${streak > 1 ? 's' : ''} de suite' : '🔥 Commence ta série aujourd\'hui',
+                              streak > 0
+                                  ? '🔥 $streak jour${streak > 1 ? 's' : ''} de suite'
+                                  : '🔥 Commence ta série aujourd\'hui',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               due == 0 ? 'Tout est à jour 🎉' : '$due carte${due > 1 ? 's' : ''} t\'attendent',
-                              style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                             const SizedBox(height: 14),
                             Wrap(
@@ -805,7 +861,7 @@ class RevisionsHomePage extends StatelessWidget {
                       child: _ActionTile(
                         icon: Icons.auto_awesome_rounded,
                         color: const Color(0xFF7C5CFF),
-                        title: 'Créer avec Clicky',
+                        title: 'Créer avec Smily',
                         text: 'À partir d\'un cours, d\'une photo, d\'un PDF',
                         onTap: () => showGenerateSheet(context, module),
                       ),
@@ -826,7 +882,10 @@ class RevisionsHomePage extends StatelessWidget {
                   const SizedBox(height: 22),
                   Row(
                     children: [
-                      Text('Prochains contrôles', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'Prochains contrôles',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                      ),
                       const Spacer(),
                       TextButton.icon(
                         icon: const Icon(Icons.event_available_rounded),
@@ -851,39 +910,47 @@ class RevisionsHomePage extends StatelessWidget {
                               ? module.push(context, () => DeckPage(module: module, deckId: ready.id))
                               : _prepare(context, t),
                           child: Container(
-                          width: 220,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            color: const Color(0xFFE67E22).withValues(alpha: 0.10),
-                            border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_inDays(t.due).toUpperCase(),
+                            width: 220,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              color: const Color(0xFFE67E22).withValues(alpha: 0.10),
+                              border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _inDays(t.due).toUpperCase(),
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: const Color(0xFFE67E22),
                                     letterSpacing: 1,
-                                  )),
-                              const SizedBox(height: 4),
-                              Text(t.subject,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  t.subject,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-                              Text(t.content.trim().isEmpty ? dayLabel(t.due) : t.content.trim(),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
-                              const Spacer(),
-                              Text(
-                                ready != null ? '✓ Fiche, cartes et quiz prêts' : '✨ Préparer maintenant',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: ready != null ? const Color(0xFF23A55A) : const Color(0xFF7C5CFF),
+                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                                 ),
-                              ),
-                            ],
-                          ),
+                                Text(
+                                  t.content.trim().isEmpty ? dayLabel(t.due) : t.content.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                const Spacer(),
+                                Text(
+                                  ready != null ? '✓ Fiche, cartes et quiz prêts' : '✨ Préparer maintenant',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: ready != null ? const Color(0xFF23A55A) : const Color(0xFF7C5CFF),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -894,7 +961,9 @@ class RevisionsHomePage extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
                   title: const Text('Préparer mes contrôles automatiquement'),
-                  subtitle: const Text('Dès qu\'un contrôle apparaît dans le cahier de texte : fiche, cartes et quiz, tout seuls.'),
+                  subtitle: const Text(
+                    'Dès qu\'un contrôle apparaît dans le cahier de texte : fiche, cartes et quiz, tout seuls.',
+                  ),
                   value: module.store.getJson<bool>('autoPrep') != false,
                   onChanged: (v) async {
                     await module.store.setJson('autoPrep', v);
@@ -908,8 +977,8 @@ class RevisionsHomePage extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 30),
                     child: EmptyHint(
-                      'Pas encore de cartes. Crée-les avec Clicky à partir d\'un cours (photo, PDF, texte), '
-                      'ou dis : « Clicky, fais-moi des cartes sur la guerre froide ».',
+                      'Pas encore de cartes. Crée-les avec Smily à partir d\'un cours (photo, PDF, texte), '
+                      'ou dis : « Smily, fais-moi des cartes sur la guerre froide ».',
                       icon: Icons.style_outlined,
                     ),
                   )
@@ -985,7 +1054,13 @@ class _WeekBars extends StatelessWidget {
 }
 
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.color, required this.title, required this.text, required this.onTap});
+  const _ActionTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.text,
+    required this.onTap,
+  });
   final IconData icon;
   final Color color;
   final String title;
@@ -1078,8 +1153,10 @@ class _DeckTile extends StatelessWidget {
                           backgroundColor: Colors.white24,
                         ),
                       ),
-                      Text('${(deck.mastery * 100).round()}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                      Text(
+                        '${(deck.mastery * 100).round()}%',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
                     ],
                   ),
                 ),
@@ -1097,7 +1174,10 @@ class _DeckTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                    child: Text('$due à revoir', style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: Text(
+                      '$due à revoir',
+                      style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
                   ),
                 const Spacer(),
                 IconButton(
@@ -1135,7 +1215,12 @@ class DeckPage extends StatelessWidget {
     if (card == null) {
       await module.revisions.addCards(d.id, [(r[0], r[1])]);
     } else {
-      await module.revisions.updateCard(d.id, card.copy()..front = r[0].trim()..back = r[1].trim());
+      await module.revisions.updateCard(
+        d.id,
+        card.copy()
+          ..front = r[0].trim()
+          ..back = r[1].trim(),
+      );
     }
   }
 
@@ -1150,13 +1235,17 @@ class DeckPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Une carte par ligne : « question - réponse » (ou avec « : », « = », une tabulation). '
-                  'Tu peux coller un export de Quizlet.'),
+              const Text(
+                'Une carte par ligne : « question - réponse » (ou avec « : », « = », une tabulation). '
+                'Tu peux coller un export de Quizlet.',
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: ctrl,
                 maxLines: 12,
-                decoration: const InputDecoration(hintText: 'Capitale de l\'Italie - Rome\n1789 : Révolution française'),
+                decoration: const InputDecoration(
+                  hintText: 'Capitale de l\'Italie - Rome\n1789 : Révolution française',
+                ),
               ),
             ],
           ),
@@ -1170,7 +1259,8 @@ class DeckPage extends StatelessWidget {
     if (text == null) return;
     final n = await module.revisions.addCards(d.id, RevisionsStore.parseLines(text));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$n carte${n > 1 ? 's' : ''} ajoutée${n > 1 ? 's' : ''}')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$n carte${n > 1 ? 's' : ''} ajoutée${n > 1 ? 's' : ''}')));
     }
   }
 
@@ -1228,10 +1318,7 @@ class DeckPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
             children: [
-              if (d.sheet != null && d.sheet!.trim().isNotEmpty) ...[
-                _SheetCard(deck: d),
-                const SizedBox(height: 14),
-              ],
+              if (d.sheet != null && d.sheet!.trim().isNotEmpty) ...[_SheetCard(deck: d), const SizedBox(height: 14)],
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -1250,16 +1337,20 @@ class DeckPage extends StatelessWidget {
                     text: d.quiz.isNotEmpty
                         ? 'QCM préparé, ${d.quiz.length} questions'
                         : enough
-                            ? 'QCM, 10 questions'
-                            : '4 cartes minimum',
-                    onTap: enough || d.quiz.isNotEmpty ? () => module.push(context, () => QuizPage(module: module, deck: d)) : null,
+                        ? 'QCM, 10 questions'
+                        : '4 cartes minimum',
+                    onTap: enough || d.quiz.isNotEmpty
+                        ? () => module.push(context, () => QuizPage(module: module, deck: d))
+                        : null,
                   ),
                   _Mode(
                     icon: Icons.keyboard_rounded,
                     color: const Color(0xFF16A085),
                     title: 'Écrire',
                     text: 'Tape la réponse',
-                    onTap: d.cards.isEmpty ? null : () => module.push(context, () => WritePage(module: module, deck: d)),
+                    onTap: d.cards.isEmpty
+                        ? null
+                        : () => module.push(context, () => WritePage(module: module, deck: d)),
                   ),
                   _Mode(
                     icon: Icons.assignment_rounded,
@@ -1285,11 +1376,14 @@ class DeckPage extends StatelessWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Text('${d.cards.length} cartes', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    '${d.cards.length} cartes',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  ),
                   const Spacer(),
                   TextButton.icon(
                     icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('Clicky'),
+                    label: const Text('Smily'),
                     onPressed: () => showGenerateSheet(context, module, deck: d),
                   ),
                   TextButton.icon(
@@ -1308,8 +1402,8 @@ class DeckPage extends StatelessWidget {
                       c.mastered
                           ? Icons.verified_rounded
                           : c.isNew
-                              ? Icons.fiber_new_rounded
-                              : Icons.trending_up_rounded,
+                          ? Icons.fiber_new_rounded
+                          : Icons.trending_up_rounded,
                       color: c.mastered ? const Color(0xFF23A55A) : color,
                     ),
                     title: Text(c.front, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -1376,9 +1470,9 @@ class _Mode extends StatelessWidget {
   );
 }
 
-// ================================================================== Clicky
+// ================================================================== Smily
 
-/// « Créer avec Clicky » : un cours (texte, document, photos, PDF) devient
+/// « Créer avec Smily » : un cours (texte, document, photos, PDF) devient
 /// des cartes.
 Future<void> showGenerateSheet(BuildContext context, RevisionsModule module, {Deck? deck}) => showDialog<void>(
   context: context,
@@ -1469,9 +1563,12 @@ class _GenerateDialogState extends State<_GenerateDialog> {
   }
 
   Future<void> _add() async {
-    final name = deckName.text.trim().isEmpty ? 'Cartes de Clicky' : deckName.text.trim();
+    final name = deckName.text.trim().isEmpty ? 'Cartes de Smily' : deckName.text.trim();
     final d = widget.deck ?? await widget.module.revisions.createDeck(name);
-    final list = [for (var i = 0; i < cards!.length; i++) if (keep.contains(i)) cards![i]];
+    final list = [
+      for (var i = 0; i < cards!.length; i++)
+        if (keep.contains(i)) cards![i],
+    ];
     final n = await widget.module.revisions.addCards(d.id, list);
     await widget.module.refreshBadge();
     if (!mounted) return;
@@ -1494,7 +1591,7 @@ class _GenerateDialogState extends State<_GenerateDialog> {
         children: [
           Icon(Icons.auto_awesome_rounded, color: Color(0xFF7C5CFF)),
           SizedBox(width: 10),
-          Text('Créer des cartes avec Clicky'),
+          Text('Créer des cartes avec Smily'),
         ],
       ),
       content: SizedBox(
@@ -1531,13 +1628,19 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                     if (widget.deck == null)
                       TextField(
                         controller: deckName,
-                        decoration: const InputDecoration(labelText: 'Nom du paquet (ex. « Histoire — Guerre froide »)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Nom du paquet (ex. « Histoire — Guerre froide »)',
+                        ),
                       ),
                     const SizedBox(height: 12),
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(value: 'texte', icon: Icon(Icons.notes_rounded), label: Text('Texte')),
-                        ButtonSegment(value: 'document', icon: Icon(Icons.description_rounded), label: Text('Google Doc')),
+                        ButtonSegment(
+                          value: 'document',
+                          icon: Icon(Icons.description_rounded),
+                          label: Text('Google Doc'),
+                        ),
                         ButtonSegment(value: 'photo', icon: Icon(Icons.photo_camera_rounded), label: Text('Photos')),
                         ButtonSegment(value: 'pdf', icon: Icon(Icons.picture_as_pdf_rounded), label: Text('PDF')),
                       ],
@@ -1552,29 +1655,34 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                         onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(hintText: 'Colle ton cours ici…'),
                       ),
-                      'document' => !GoogleDocs.connected
-                          ? const Text('Connecte ton compte Google (Réglages → Connexion Google) pour choisir un Google Doc.')
-                          : FutureBuilder(
-                              future: GoogleDocs.list(size: 30),
-                              builder: (context, snap) => snap.hasError
-                                  ? Text('${snap.error}')
-                                  : DropdownButtonFormField<String>(
-                                      initialValue: docId,
-                                      isExpanded: true,
-                                      decoration: const InputDecoration(labelText: 'Un de tes Google Docs'),
-                                      items: [
-                                        for (final d in snap.data ?? const <Map<String, dynamic>>[])
-                                          DropdownMenuItem(
-                                            value: '${d['id']}',
-                                            child: Text('${d['name']}', overflow: TextOverflow.ellipsis),
-                                          ),
-                                      ],
-                                      onChanged: (v) => setState(() => docId = v),
-                                    ),
-                            ),
+                      'document' =>
+                        !GoogleDocs.connected
+                            ? const Text(
+                                'Connecte ton compte Google (Réglages → Connexion Google) pour choisir un Google Doc.',
+                              )
+                            : FutureBuilder(
+                                future: GoogleDocs.list(size: 30),
+                                builder: (context, snap) => snap.hasError
+                                    ? Text('${snap.error}')
+                                    : DropdownButtonFormField<String>(
+                                        initialValue: docId,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(labelText: 'Un de tes Google Docs'),
+                                        items: [
+                                          for (final d in snap.data ?? const <Map<String, dynamic>>[])
+                                            DropdownMenuItem(
+                                              value: '${d['id']}',
+                                              child: Text('${d['name']}', overflow: TextOverflow.ellipsis),
+                                            ),
+                                        ],
+                                        onChanged: (v) => setState(() => docId = v),
+                                      ),
+                              ),
                       'photo' => OutlinedButton.icon(
                         icon: const Icon(Icons.add_photo_alternate_rounded),
-                        label: Text(images.isEmpty ? 'Choisir les photos du cours' : '${images.length} photo(s) choisie(s)'),
+                        label: Text(
+                          images.isEmpty ? 'Choisir les photos du cours' : '${images.length} photo(s) choisie(s)',
+                        ),
                         onPressed: _pickImages,
                       ),
                       _ => OutlinedButton.icon(
@@ -1588,7 +1696,13 @@ class _GenerateDialogState extends State<_GenerateDialog> {
                       children: [
                         Text('${count.round()} cartes'),
                         Expanded(
-                          child: Slider(value: count, min: 5, max: 40, divisions: 7, onChanged: (v) => setState(() => count = v)),
+                          child: Slider(
+                            value: count,
+                            min: 5,
+                            max: 40,
+                            divisions: 7,
+                            onChanged: (v) => setState(() => count = v),
+                          ),
                         ),
                       ],
                     ),
@@ -1602,9 +1716,13 @@ class _GenerateDialogState extends State<_GenerateDialog> {
         if (list == null)
           FilledButton.icon(
             icon: busy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
                 : const Icon(Icons.auto_awesome_rounded),
-            label: Text(busy ? 'Clicky lit ton cours…' : 'Créer les cartes'),
+            label: Text(busy ? 'Smily lit ton cours…' : 'Créer les cartes'),
             onPressed: busy || !ready ? null : _go,
           )
         else
@@ -1704,7 +1822,11 @@ class _ReviewPageState extends State<ReviewPage> {
       onKeyEvent: _key,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.deckId == null ? 'Révision du jour' : widget.module.revisions.deck(widget.deckId!)?.name ?? 'Révision'),
+          title: Text(
+            widget.deckId == null
+                ? 'Révision du jour'
+                : widget.module.revisions.deck(widget.deckId!)?.name ?? 'Révision',
+          ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(6),
             child: LinearProgressIndicator(
@@ -1730,8 +1852,10 @@ class _ReviewPageState extends State<ReviewPage> {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        Text('${queue.length} carte${queue.length > 1 ? 's' : ''} restante${queue.length > 1 ? 's' : ''}',
-                            style: theme.textTheme.labelLarge),
+                        Text(
+                          '${queue.length} carte${queue.length > 1 ? 's' : ''} restante${queue.length > 1 ? 's' : ''}',
+                          style: theme.textTheme.labelLarge,
+                        ),
                         const SizedBox(height: 16),
                         Expanded(
                           child: GestureDetector(
@@ -1860,7 +1984,10 @@ class FlipCard extends StatelessWidget {
               ),
               const Spacer(),
               if (isNew && !backSide)
-                const Text('✨ Nouvelle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                const Text(
+                  '✨ Nouvelle',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
             ],
           ),
           Expanded(
@@ -1870,7 +1997,11 @@ class FlipCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (backSide) ...[
-                      Text(front, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      Text(
+                        front,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
                       const SizedBox(height: 14),
                       Container(width: 40, height: 3, color: color.withValues(alpha: 0.5)),
                       const SizedBox(height: 14),
@@ -1988,7 +2119,10 @@ class QuizPage extends StatefulWidget {
 
   /// Les 4 réponses d'une question (la bonne + 3 autres, mélangées).
   static List<String> options(StudyCard card, List<StudyCard> all, math.Random r) {
-    final others = {for (final c in all) if (c.id != card.id && c.back != card.back) c.back}.toList()..shuffle(r);
+    final others = {
+      for (final c in all)
+        if (c.id != card.id && c.back != card.back) c.back,
+    }.toList()..shuffle(r);
     return ([card.back, ...others.take(3)])..shuffle(r);
   }
 
@@ -1999,7 +2133,7 @@ class QuizPage extends StatefulWidget {
 class _QuizPageState extends State<QuizPage> {
   late final r = widget.random ?? math.Random();
 
-  /// Le quiz préparé par Clicky (avec de vrais pièges), sinon des questions
+  /// Le quiz préparé par Smily (avec de vrais pièges), sinon des questions
   /// tirées des cartes.
   late final List<StudyCard> questions = widget.deck.quiz.isNotEmpty
       ? [
@@ -2020,6 +2154,7 @@ class _QuizPageState extends State<QuizPage> {
     }
     return all..shuffle(r);
   }
+
   int i = 0;
   int score = 0;
   String? picked;
@@ -2065,8 +2200,10 @@ class _QuizPageState extends State<QuizPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(score * 2 >= questions.length ? '🏆' : '💪', style: const TextStyle(fontSize: 72)),
-                  Text('$score / ${questions.length}',
-                      style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color)),
+                  Text(
+                    '$score / ${questions.length}',
+                    style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color),
+                  ),
                   const SizedBox(height: 8),
                   Text(score == questions.length ? 'Parfait !' : 'Refais-le pour viser le sans-faute.'),
                   const SizedBox(height: 20),
@@ -2091,7 +2228,10 @@ class _QuizPageState extends State<QuizPage> {
                       child: Text(
                         questions[i].front,
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -2105,16 +2245,16 @@ class _QuizPageState extends State<QuizPage> {
                             color: picked == null
                                 ? theme.cardTheme.color
                                 : o == questions[i].back
-                                    ? const Color(0xFF23A55A).withValues(alpha: 0.2)
-                                    : o == picked
-                                        ? const Color(0xFFE5484D).withValues(alpha: 0.2)
-                                        : theme.cardTheme.color,
+                                ? const Color(0xFF23A55A).withValues(alpha: 0.2)
+                                : o == picked
+                                ? const Color(0xFFE5484D).withValues(alpha: 0.2)
+                                : theme.cardTheme.color,
                             border: Border.all(
                               color: picked != null && o == questions[i].back
                                   ? const Color(0xFF23A55A)
                                   : picked == o
-                                      ? const Color(0xFFE5484D)
-                                      : theme.colorScheme.outlineVariant,
+                                  ? const Color(0xFFE5484D)
+                                  : theme.colorScheme.outlineVariant,
                               width: 2,
                             ),
                           ),
@@ -2200,8 +2340,10 @@ class _WritePageState extends State<WritePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('✍️', style: TextStyle(fontSize: 72)),
-              Text('$score / ${cards.length}',
-                  style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color)),
+              Text(
+                '$score / ${cards.length}',
+                style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color),
+              ),
               const SizedBox(height: 20),
               FilledButton(onPressed: () => Navigator.maybePop(context), child: const Text('Terminer')),
             ],
@@ -2226,9 +2368,11 @@ class _WritePageState extends State<WritePage> {
                   borderRadius: BorderRadius.circular(28),
                   gradient: LinearGradient(colors: [color, Color.lerp(color, Colors.black, 0.3)!]),
                 ),
-                child: Text(c.front,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                child: Text(
+                  c.front,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                ),
               ),
               const SizedBox(height: 20),
               TextField(
@@ -2252,7 +2396,10 @@ class _WritePageState extends State<WritePage> {
                       Text(ok! ? '✅' : '❌', style: const TextStyle(fontSize: 26)),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(ok! ? 'Juste ! ${c.back}' : 'La réponse : ${c.back}', style: theme.textTheme.titleMedium),
+                        child: Text(
+                          ok! ? 'Juste ! ${c.back}' : 'La réponse : ${c.back}',
+                          style: theme.textTheme.titleMedium,
+                        ),
                       ),
                       if (ok == false)
                         TextButton(
@@ -2362,7 +2509,9 @@ class _MatchPageState extends State<MatchPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: Text('⏱️ $secs s', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+            child: Center(
+              child: Text('⏱️ $secs s', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            ),
           ),
         ],
       ),
@@ -2372,7 +2521,10 @@ class _MatchPageState extends State<MatchPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('⚡', style: TextStyle(fontSize: 72)),
-                  Text('$secs s', style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color)),
+                  Text(
+                    '$secs s',
+                    style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color),
+                  ),
                   if (best != null) Text('Record : ${(best / 1000).toStringAsFixed(1)} s'),
                   const SizedBox(height: 20),
                   FilledButton(onPressed: () => Navigator.maybePop(context), child: const Text('Terminer')),
@@ -2401,8 +2553,8 @@ class _MatchPageState extends State<MatchPage> {
                               color: wrong == i
                                   ? const Color(0xFFE5484D).withValues(alpha: 0.25)
                                   : first == i
-                                      ? color.withValues(alpha: 0.25)
-                                      : theme.cardTheme.color,
+                                  ? color.withValues(alpha: 0.25)
+                                  : theme.cardTheme.color,
                               border: Border.all(
                                 color: first == i ? color : theme.colorScheme.outlineVariant,
                                 width: 2,
@@ -2554,12 +2706,21 @@ class _FocusPageState extends State<FocusPage> {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(working ? 'CONCENTRATION' : 'PAUSE',
-                          style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 2, color: color, fontWeight: FontWeight.w800)),
-                      Text('$m:$s',
-                          style: theme.textTheme.displayLarge?.copyWith(fontWeight: FontWeight.w900, fontFeatures: const [
-                            FontFeature.tabularFigures(),
-                          ])),
+                      Text(
+                        working ? 'CONCENTRATION' : 'PAUSE',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          letterSpacing: 2,
+                          color: color,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        '$m:$s',
+                        style: theme.textTheme.displayLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                       Text('🍅' * rounds.clamp(0, 8), style: const TextStyle(fontSize: 18)),
                     ],
                   ),

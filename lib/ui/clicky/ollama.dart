@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/claude_api.dart';
 
-/// Cerveau local et gratuit pour Clicky : Ollama (ollama.com), qui fait
+/// Cerveau local et gratuit pour Smily : Ollama (ollama.com), qui fait
 /// tourner un modèle d'IA directement sur le PC. Aucune clé, aucun compte,
 /// rien n'est envoyé sur internet. Il faut un modèle qui comprend les images
 /// (« qwen2.5vl », « gemma3 », « llama3.2-vision »…).
@@ -12,10 +12,7 @@ class Ollama {
   Ollama._();
 
   static String get url =>
-      (ClaudeApi.store.getJson<String>('ollama.url') ?? 'http://127.0.0.1:11434').replaceAll(
-        RegExp(r'/+$'),
-        '',
-      );
+      (ClaudeApi.store.getJson<String>('ollama.url') ?? 'http://127.0.0.1:11434').replaceAll(RegExp(r'/+$'), '');
   static String get model => ClaudeApi.store.getJson<String>('ollama.model') ?? 'qwen2.5vl';
 
   static const suggested = ['qwen2.5vl', 'gemma3', 'llama3.2-vision', 'minicpm-v'];
@@ -64,10 +61,7 @@ class Ollama {
       }
       final out = StringBuffer();
       await for (final line
-          in res.stream
-              .transform(utf8.decoder)
-              .transform(const LineSplitter())
-              .timeout(const Duration(minutes: 4))) {
+          in res.stream.transform(utf8.decoder).transform(const LineSplitter()).timeout(const Duration(minutes: 4))) {
         if (line.trim().isEmpty) continue;
         final Map j;
         try {

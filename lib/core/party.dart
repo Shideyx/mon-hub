@@ -10,7 +10,14 @@ import 'phone_link.dart';
 
 /// Un son de la soirée.
 class PartySong {
-  PartySong({required this.id, required this.title, this.channel = '', this.length = '', this.by = '', this.guest = ''});
+  PartySong({
+    required this.id,
+    required this.title,
+    this.channel = '',
+    this.length = '',
+    this.by = '',
+    this.guest = '',
+  });
   final String id;
   final String guest;
   final String title;
@@ -63,11 +70,11 @@ class Party extends ChangeNotifier {
   }
 
   /// Les sons à venir : les plus votés d'abord, puis par ordre d'arrivée.
-  List<PartySong> get upcoming =>
-      [...queue]..sort((a, b) {
-        final v = b.votes.length.compareTo(a.votes.length);
-        return v != 0 ? v : a.added.compareTo(b.added);
-      });
+  List<PartySong> get upcoming => [...queue]
+    ..sort((a, b) {
+      final v = b.votes.length.compareTo(a.votes.length);
+      return v != 0 ? v : a.added.compareTo(b.added);
+    });
 
   Future<void> start() async {
     if (_code != null) return;
@@ -116,7 +123,9 @@ class Party extends ChangeNotifier {
     }
     if (queue.length >= maxQueue) return 'La file est pleine.';
     final mine = queue.where((q) => q.guest == guest).length;
-    if (guest.isNotEmpty && mine >= maxPerGuest) return 'Tu as déjà $maxPerGuest sons en attente : vote pour les autres !';
+    if (guest.isNotEmpty && mine >= maxPerGuest) {
+      return 'Tu as déjà $maxPerGuest sons en attente : vote pour les autres !';
+    }
     s.votes.add(guest);
     queue.add(s);
     notifyListeners();

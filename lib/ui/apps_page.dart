@@ -32,7 +32,8 @@ class _AppsPageState extends State<AppsPage> {
   Future<void> _launch(PcApp a) async {
     final ok = await PcApps.instance.launch(a);
     if (!ok && mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('Windows n\'a pas pu ouvrir « ${a.name} ».')));
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text('Windows n\'a pas pu ouvrir « ${a.name} ».')));
     }
   }
 
@@ -64,7 +65,10 @@ class _AppsPageState extends State<AppsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                       child: Row(
                         children: [
-                          Text('>_', style: hudMono(context, color: c.accentText, weight: FontWeight.w700)),
+                          Text(
+                            '>_',
+                            style: hudMono(context, color: c.accentText, weight: FontWeight.w700),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: TextField(
@@ -84,13 +88,21 @@ class _AppsPageState extends State<AppsPage> {
                               ),
                             ),
                           ),
-                          if (p.loading) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                          IconButton(tooltip: 'Relire la liste', icon: Icon(Icons.refresh_rounded, color: c.muted), onPressed: () => p.load(force: true)),
+                          if (p.loading)
+                            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          IconButton(
+                            tooltip: 'Relire la liste',
+                            icon: Icon(Icons.refresh_rounded, color: c.muted),
+                            onPressed: () => p.load(force: true),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text('Partout sur le PC : Ctrl + Alt + Espace, puis le nom de l\'appli.', style: hudLabel(context, size: 10, color: c.dim)),
+                    Text(
+                      'Partout sur le PC : Ctrl + Alt + Espace, puis le nom de l\'appli.',
+                      style: hudLabel(context, size: 10, color: c.dim),
+                    ),
                   ],
                 ),
               ),
@@ -159,7 +171,11 @@ class AppTile extends StatelessWidget {
                   children: [
                     HexAvatar(app.initials, size: small ? 40 : 50, color: HexAvatar.colorFor(app.name)),
                     if (pinned)
-                      Positioned(right: -4, top: -4, child: Icon(Icons.push_pin_rounded, size: 14, color: c.accentText)),
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Icon(Icons.push_pin_rounded, size: 14, color: c.accentText),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),

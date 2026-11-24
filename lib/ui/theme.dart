@@ -10,11 +10,7 @@ const _seed = Color(0xFF7C5CFF);
 ThemeData buildTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final h = dark ? HudColors.dark : HudColors.light;
-  final scheme = ColorScheme.fromSeed(
-    seedColor: _seed,
-    brightness: brightness,
-    surface: h.bg,
-  ).copyWith(
+  final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness, surface: h.bg).copyWith(
     primary: h.accent,
     secondary: h.pink,
     surfaceContainerLowest: h.panelLow,
@@ -69,20 +65,33 @@ ThemeData buildTheme(Brightness brightness) {
       border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
-    dialogTheme: DialogThemeData(backgroundColor: h.panel, shape: hudCut(18, side: BorderSide(color: h.hotLine))),
+    dialogTheme: DialogThemeData(
+      backgroundColor: h.panel,
+      shape: hudCut(18, side: BorderSide(color: h.hotLine)),
+    ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: h.panel,
       shape: const BeveledRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(18))),
     ),
-    popupMenuTheme: PopupMenuThemeData(color: h.panel, shape: hudCut(10, side: BorderSide(color: h.line))),
-    listTileTheme: const ListTileThemeData(shape: BeveledRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(8)))),
-    chipTheme: base.chipTheme.copyWith(shape: const SlantBorder(slant: 7), side: BorderSide(color: h.line)),
+    popupMenuTheme: PopupMenuThemeData(
+      color: h.panel,
+      shape: hudCut(10, side: BorderSide(color: h.line)),
+    ),
+    listTileTheme: const ListTileThemeData(
+      shape: BeveledRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(8))),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      shape: const SlantBorder(slant: 7),
+      side: BorderSide(color: h.line),
+    ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating, shape: slant),
     filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(shape: slant)),
     elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(shape: slant)),
     outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(shape: slant)),
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(shape: slant)),
-    segmentedButtonTheme: SegmentedButtonThemeData(style: SegmentedButton.styleFrom(shape: const BeveledRectangleBorder())),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(shape: const BeveledRectangleBorder()),
+    ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: h.side,
       indicatorColor: h.selected,
@@ -94,12 +103,14 @@ ThemeData buildTheme(Brightness brightness) {
     ),
     dividerTheme: DividerThemeData(color: h.line, space: 1),
     // Pages qui glissent en douceur, façon Spotify.
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: SpotifyPageTransitionsBuilder(),
-      TargetPlatform.windows: SpotifyPageTransitionsBuilder(),
-      TargetPlatform.linux: SpotifyPageTransitionsBuilder(),
-      TargetPlatform.macOS: SpotifyPageTransitionsBuilder(),
-      TargetPlatform.iOS: SpotifyPageTransitionsBuilder(),
-    }),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: SpotifyPageTransitionsBuilder(),
+        TargetPlatform.windows: SpotifyPageTransitionsBuilder(),
+        TargetPlatform.linux: SpotifyPageTransitionsBuilder(),
+        TargetPlatform.macOS: SpotifyPageTransitionsBuilder(),
+        TargetPlatform.iOS: SpotifyPageTransitionsBuilder(),
+      },
+    ),
   );
 }

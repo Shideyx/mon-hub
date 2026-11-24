@@ -29,29 +29,82 @@ const knownServices = [
   KnownService('Spotify', ['spotify.com'], price: 11.12, cancel: 'https://www.spotify.com/fr/account/subscription/'),
   KnownService('Deezer', ['deezer.com'], price: 11.99, cancel: 'https://www.deezer.com/account/subscription'),
   KnownService('Netflix', ['netflix.com'], price: 7.99, cancel: 'https://www.netflix.com/cancelplan'),
-  KnownService('Disney+', ['disneyplus.com', 'disney.com'], words: ['disney+'], price: 6.99,
-      cancel: 'https://www.disneyplus.com/account'),
-  KnownService('Prime Video', ['primevideo.com'], words: ['prime video'], price: 6.99,
-      cancel: 'https://www.amazon.fr/mc'),
-  KnownService('Amazon Prime', ['amazon.fr', 'amazon.com'], words: ['amazon prime', 'abonnement prime'], price: 6.99,
-      cancel: 'https://www.amazon.fr/mc'),
-  KnownService('YouTube Premium', ['youtube.com'], words: ['youtube premium', 'youtube music premium'], price: 12.99,
-      cancel: 'https://www.youtube.com/paid_memberships'),
+  KnownService(
+    'Disney+',
+    ['disneyplus.com', 'disney.com'],
+    words: ['disney+'],
+    price: 6.99,
+    cancel: 'https://www.disneyplus.com/account',
+  ),
+  KnownService(
+    'Prime Video',
+    ['primevideo.com'],
+    words: ['prime video'],
+    price: 6.99,
+    cancel: 'https://www.amazon.fr/mc',
+  ),
+  KnownService(
+    'Amazon Prime',
+    ['amazon.fr', 'amazon.com'],
+    words: ['amazon prime', 'abonnement prime'],
+    price: 6.99,
+    cancel: 'https://www.amazon.fr/mc',
+  ),
+  KnownService(
+    'YouTube Premium',
+    ['youtube.com'],
+    words: ['youtube premium', 'youtube music premium'],
+    price: 12.99,
+    cancel: 'https://www.youtube.com/paid_memberships',
+  ),
   KnownService('Apple', ['apple.com', 'itunes.com'], words: ['icloud+', 'apple music', 'apple tv+', 'apple one']),
   KnownService('Google Play', ['google.com', 'googleplay.com'], words: ['google play', 'google one']),
-  KnownService('Xbox Game Pass', ['xbox.com', 'microsoft.com'], words: ['game pass', 'xbox'], price: 11.99,
-      cancel: 'https://account.microsoft.com/services'),
-  KnownService('PlayStation Plus', ['playstation.com', 'sony.com'], words: ['playstation plus', 'ps plus'],
-      cancel: 'https://www.playstation.com/fr-fr/support/subscriptions/'),
-  KnownService('Nintendo Switch Online', ['nintendo.com', 'nintendo.net', 'nintendo.fr'],
-      words: ['nintendo switch online'], cancel: 'https://accounts.nintendo.com/'),
-  KnownService('Discord Nitro', ['discord.com', 'discordapp.com'], words: ['nitro'], price: 9.99,
-      cancel: 'https://discord.com/settings/subscriptions'),
-  KnownService('Roblox Premium', ['roblox.com'], words: ['roblox premium'], price: 5.49,
-      cancel: 'https://www.roblox.com/my/account#!/billing'),
-  KnownService('Crunchyroll', ['crunchyroll.com'], price: 6.99, cancel: 'https://www.crunchyroll.com/account/membership'),
+  KnownService(
+    'Xbox Game Pass',
+    ['xbox.com', 'microsoft.com'],
+    words: ['game pass', 'xbox'],
+    price: 11.99,
+    cancel: 'https://account.microsoft.com/services',
+  ),
+  KnownService(
+    'PlayStation Plus',
+    ['playstation.com', 'sony.com'],
+    words: ['playstation plus', 'ps plus'],
+    cancel: 'https://www.playstation.com/fr-fr/support/subscriptions/',
+  ),
+  KnownService(
+    'Nintendo Switch Online',
+    ['nintendo.com', 'nintendo.net', 'nintendo.fr'],
+    words: ['nintendo switch online'],
+    cancel: 'https://accounts.nintendo.com/',
+  ),
+  KnownService(
+    'Discord Nitro',
+    ['discord.com', 'discordapp.com'],
+    words: ['nitro'],
+    price: 9.99,
+    cancel: 'https://discord.com/settings/subscriptions',
+  ),
+  KnownService(
+    'Roblox Premium',
+    ['roblox.com'],
+    words: ['roblox premium'],
+    price: 5.49,
+    cancel: 'https://www.roblox.com/my/account#!/billing',
+  ),
+  KnownService(
+    'Crunchyroll',
+    ['crunchyroll.com'],
+    price: 6.99,
+    cancel: 'https://www.crunchyroll.com/account/membership',
+  ),
   KnownService('ADN', ['animationdigitalnetwork.fr', 'animationdigitalnetwork.com'], price: 6.99),
-  KnownService('Canal+', ['canalplus.com', 'canal-plus.com'], words: ['canal+'], cancel: 'https://client.canalplus.com/'),
+  KnownService(
+    'Canal+',
+    ['canalplus.com', 'canal-plus.com'],
+    words: ['canal+'],
+    cancel: 'https://client.canalplus.com/',
+  ),
   KnownService('Twitch', ['twitch.tv'], words: ['twitch turbo', 'abonnement twitch']),
   KnownService('Snapchat+', ['snapchat.com'], words: ['snapchat+'], price: 4.49),
   KnownService('ChatGPT', ['openai.com'], words: ['chatgpt plus'], price: 23),
@@ -62,7 +115,14 @@ const knownServices = [
 
 /// Ce qu'un mail dit d'un abonnement.
 class SubFinding {
-  const SubFinding({required this.service, this.price, this.yearly = false, this.date, this.kind = 'paiement', this.cancel = ''});
+  const SubFinding({
+    required this.service,
+    this.price,
+    this.yearly = false,
+    this.date,
+    this.kind = 'paiement',
+    this.cancel = '',
+  });
   final String service;
   final double? price;
   final bool yearly;
@@ -77,7 +137,13 @@ class SubFinding {
 
 /// Ce qu'un mail dit d'un colis.
 class ParcelFinding {
-  const ParcelFinding({required this.carrier, required this.number, required this.status, this.link = '', this.shop = ''});
+  const ParcelFinding({
+    required this.carrier,
+    required this.number,
+    required this.status,
+    this.link = '',
+    this.shop = '',
+  });
   final String carrier;
   final String number;
 
@@ -91,18 +157,47 @@ class MoneyRules {
   MoneyRules._();
 
   static const _months = {
-    'janvier': 1, 'janv': 1, 'january': 1, 'jan': 1,
-    'fevrier': 2, 'fevr': 2, 'fev': 2, 'february': 2, 'feb': 2,
-    'mars': 3, 'march': 3, 'mar': 3,
-    'avril': 4, 'avr': 4, 'april': 4, 'apr': 4,
-    'mai': 5, 'may': 5,
-    'juin': 6, 'june': 6, 'jun': 6,
-    'juillet': 7, 'juil': 7, 'july': 7, 'jul': 7,
-    'aout': 8, 'august': 8, 'aug': 8,
-    'septembre': 9, 'sept': 9, 'sep': 9, 'september': 9,
-    'octobre': 10, 'oct': 10, 'october': 10,
-    'novembre': 11, 'nov': 11, 'november': 11,
-    'decembre': 12, 'dec': 12, 'december': 12,
+    'janvier': 1,
+    'janv': 1,
+    'january': 1,
+    'jan': 1,
+    'fevrier': 2,
+    'fevr': 2,
+    'fev': 2,
+    'february': 2,
+    'feb': 2,
+    'mars': 3,
+    'march': 3,
+    'mar': 3,
+    'avril': 4,
+    'avr': 4,
+    'april': 4,
+    'apr': 4,
+    'mai': 5,
+    'may': 5,
+    'juin': 6,
+    'june': 6,
+    'jun': 6,
+    'juillet': 7,
+    'juil': 7,
+    'july': 7,
+    'jul': 7,
+    'aout': 8,
+    'august': 8,
+    'aug': 8,
+    'septembre': 9,
+    'sept': 9,
+    'sep': 9,
+    'september': 9,
+    'octobre': 10,
+    'oct': 10,
+    'october': 10,
+    'novembre': 11,
+    'nov': 11,
+    'november': 11,
+    'decembre': 12,
+    'dec': 12,
+    'december': 12,
   };
 
   /// Le service d'un mail (d'après l'expéditeur, puis les mots du sujet).
@@ -122,8 +217,10 @@ class MoneyRules {
 
   /// Un montant en euros (« 11,12 € », « €9.99 », « 9.99 EUR »).
   static double? amount(String text) {
-    final m = RegExp(r'(\d{1,4}(?:[.,]\d{2}))\s?(?:€|eur\b|euros?)|€\s?(\d{1,4}(?:[.,]\d{2}))', caseSensitive: false)
-        .firstMatch(text);
+    final m = RegExp(
+      r'(\d{1,4}(?:[.,]\d{2}))\s?(?:€|eur\b|euros?)|€\s?(\d{1,4}(?:[.,]\d{2}))',
+      caseSensitive: false,
+    ).firstMatch(text);
     final v = m == null ? null : (m[1] ?? m[2])!.replaceAll(',', '.');
     final d = v == null ? null : double.tryParse(v);
     return d == null || d <= 0 || d > 500 ? null : d;
@@ -189,10 +286,28 @@ class MoneyRules {
   static const _trial = ['essai gratuit', 'periode d essai', 'free trial', 'trial', 'offert pendant', 'mois offert'];
   static const _end = ['se termine', 'prend fin', 'expire', 'ends', 'will end', 'fin de votre', 'jusqu au', 'until'];
   static const _renew = [
-    'renouvel', 'prochain paiement', 'prochain prelevement', 'prochaine facturation', 'next billing', 'next payment',
-    'renews', 'will renew', 'sera preleve', 'sera facture', 'will be charged',
+    'renouvel',
+    'prochain paiement',
+    'prochain prelevement',
+    'prochaine facturation',
+    'next billing',
+    'next payment',
+    'renews',
+    'will renew',
+    'sera preleve',
+    'sera facture',
+    'will be charged',
   ];
-  static const _paid = ['recu', 'receipt', 'facture', 'invoice', 'paiement', 'payment', 'confirmation de commande', 'merci pour votre achat'];
+  static const _paid = [
+    'recu',
+    'receipt',
+    'facture',
+    'invoice',
+    'paiement',
+    'payment',
+    'confirmation de commande',
+    'merci pour votre achat',
+  ];
   static const _cancelled = ['resili', 'annul', 'cancel', 'ne sera pas renouvele', 'ended your', 'a pris fin'];
 
   /// Lit un mail d'un service payant.
@@ -259,25 +374,69 @@ class MoneyRules {
   static final _amazon = RegExp(r'\b(TBA\d{9,12})\b');
 
   static const _parcelWords = [
-    'colis', 'livraison', 'expedi', 'expedie', 'suivi', 'tracking', 'shipped', 'delivery', 'delivered', 'commande',
-    'point relais', 'retrait', 'parcel', 'package',
+    'colis',
+    'livraison',
+    'expedi',
+    'expedie',
+    'suivi',
+    'tracking',
+    'shipped',
+    'delivery',
+    'delivered',
+    'commande',
+    'point relais',
+    'retrait',
+    'parcel',
+    'package',
   ];
 
   /// L'état d'un colis d'après les mots du mail (le plus avancé gagne).
   static String? status(String text) {
     final t = foldText(text).replaceAll('\'', ' ').replaceAll('’', ' ');
     bool any(List<String> w) => w.any(t.contains);
-    if (any(['a ete livre', 'avez ete livre', 'colis livre', 'a bien ete livre', 'delivered', 'livraison effectuee', 'remis'])) {
+    if (any([
+      'a ete livre',
+      'avez ete livre',
+      'colis livre',
+      'a bien ete livre',
+      'delivered',
+      'livraison effectuee',
+      'remis',
+    ])) {
       return 'livre';
     }
-    if (any(['point relais', 'disponible en', 'a retirer', 'pret a etre retire', 'en attente de retrait', 'locker', 'consigne',
-        'ready for pickup', 'bureau de poste'])) {
+    if (any([
+      'point relais',
+      'disponible en',
+      'a retirer',
+      'pret a etre retire',
+      'en attente de retrait',
+      'locker',
+      'consigne',
+      'ready for pickup',
+      'bureau de poste',
+    ])) {
       return 'a_retirer';
     }
-    if (any(['en cours de livraison', 'livre aujourd hui', 'arrive aujourd hui', 'out for delivery', 'livraison prevue aujourd'])) {
+    if (any([
+      'en cours de livraison',
+      'livre aujourd hui',
+      'arrive aujourd hui',
+      'out for delivery',
+      'livraison prevue aujourd',
+    ])) {
       return 'en_livraison';
     }
-    if (any(['expedie', 'expediee', 'shipped', 'pris en charge', 'en route', 'en cours d acheminement', 'on its way', 'a ete envoye'])) {
+    if (any([
+      'expedie',
+      'expediee',
+      'shipped',
+      'pris en charge',
+      'en route',
+      'en cours d acheminement',
+      'on its way',
+      'a ete envoye',
+    ])) {
       return 'expedie';
     }
     if (any(['commande confirmee', 'confirmation de commande', 'order confirmed', 'merci pour votre commande'])) {
@@ -287,7 +446,12 @@ class MoneyRules {
   }
 
   /// Lit un mail de commande ou de livraison.
-  static ParcelFinding? parcel({required String fromEmail, required String fromName, required String subject, required String text}) {
+  static ParcelFinding? parcel({
+    required String fromEmail,
+    required String fromName,
+    required String subject,
+    required String text,
+  }) {
     final all = '$subject\n$text';
     final low = foldText('$fromEmail $fromName $all');
     if (!_parcelWords.any(low.contains)) return null;
@@ -301,19 +465,40 @@ class MoneyRules {
       if (!fromCarrier && !(generic && e.value.$1.any(low.contains))) continue;
       final m = e.value.$2.firstMatch(all);
       if (m != null) {
-        return ParcelFinding(carrier: e.key, number: m[1]!, status: st, link: trackingUrl(e.key, m[1]!), shop: shopOf(fromName, fromEmail));
+        return ParcelFinding(
+          carrier: e.key,
+          number: m[1]!,
+          status: st,
+          link: trackingUrl(e.key, m[1]!),
+          shop: shopOf(fromName, fromEmail),
+        );
       }
     }
     // Numéro au format La Poste / international, quel que soit l'expéditeur.
     final m = _colissimo.firstMatch(all) ?? _upu.firstMatch(all) ?? _ups.firstMatch(all);
     if (m != null) {
       final carrier = m[1]!.startsWith('1Z') ? 'UPS' : 'Colissimo';
-      return ParcelFinding(carrier: carrier, number: m[1]!, status: st, link: trackingUrl(carrier, m[1]!), shop: shopOf(fromName, fromEmail));
+      return ParcelFinding(
+        carrier: carrier,
+        number: m[1]!,
+        status: st,
+        link: trackingUrl(carrier, m[1]!),
+        shop: shopOf(fromName, fromEmail),
+      );
     }
     // Lien de suivi sans numéro lisible.
-    final link = RegExp(r'https?://[^\s"<>]*(?:suivi|tracking|track|tracker)[^\s"<>]*', caseSensitive: false).firstMatch(text);
+    final link = RegExp(
+      r'https?://[^\s"<>]*(?:suivi|tracking|track|tracker)[^\s"<>]*',
+      caseSensitive: false,
+    ).firstMatch(text);
     if (link != null) {
-      return ParcelFinding(carrier: shopOf(fromName, fromEmail), number: '', status: st, link: link[0]!, shop: shopOf(fromName, fromEmail));
+      return ParcelFinding(
+        carrier: shopOf(fromName, fromEmail),
+        number: '',
+        status: st,
+        link: link[0]!,
+        shop: shopOf(fromName, fromEmail),
+      );
     }
     return null;
   }

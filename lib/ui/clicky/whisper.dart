@@ -37,10 +37,7 @@ class Whisper {
   ];
 
   /// Modèles : « rapide » (base, 142 Mo) ou « précis » (small, 466 Mo).
-  static const models = {
-    'base': ('Rapide', 142),
-    'small': ('Précis', 466),
-  };
+  static const models = {'base': ('Rapide', 142), 'small': ('Précis', 466)};
 
   static String modelUrl(String m) =>
       'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$m.bin?download=true';
@@ -89,10 +86,7 @@ class Whisper {
   /// intégré échoue (antivirus, proxy…), `curl.exe` et `tar.exe` de
   /// Windows prennent le relais. Chaque erreur est notée dans
   /// whisper\installation.log.
-  static Future<void> install({
-    String model = 'base',
-    void Function(String step, double progress)? onProgress,
-  }) async {
+  static Future<void> install({String model = 'base', void Function(String step, double progress)? onProgress}) async {
     final f = folder;
     if (f == null) throw 'Dossier de Mon Hub introuvable';
     final sep = Platform.pathSeparator;
@@ -144,10 +138,8 @@ class Whisper {
     } finally {
       client.close();
       try {
-        await File('$f${sep}installation.log').writeAsString(
-          '${DateTime.now()}\n${log.join('\n')}\n\n',
-          mode: FileMode.append,
-        );
+        await File('$f${sep}installation.log')
+            .writeAsString('${DateTime.now()}\n${log.join('\n')}\n\n', mode: FileMode.append);
       } catch (_) {}
     }
   }
@@ -191,7 +183,16 @@ class Whisper {
       progress(0);
       final part = '$path.part';
       final r = await Process.run('curl.exe', [
-        '-L', '--fail', '--retry', '3', '--connect-timeout', '20', '-s', '-o', part, url,
+        '-L',
+        '--fail',
+        '--retry',
+        '3',
+        '--connect-timeout',
+        '20',
+        '-s',
+        '-o',
+        part,
+        url,
       ], runInShell: true);
       final f = File(part);
       if (r.exitCode != 0 || !await f.exists() || await f.length() < minBytes) {
@@ -205,12 +206,7 @@ class Whisper {
     }
   }
 
-  static Future<File> _downloadDart(
-    http.Client client,
-    String url,
-    String path,
-    void Function(double) progress,
-  ) async {
+  static Future<File> _downloadDart(http.Client client, String url, String path, void Function(double) progress) async {
     final req = http.Request('GET', Uri.parse(url))
       ..followRedirects = true
       ..maxRedirects = 10
@@ -252,7 +248,11 @@ class Whisper {
   }
 
   /// Transcrit un fichier WAV (16 kHz mono) en texte.
-  static Future<String> transcribe(String wav, {String lang = 'fr', Duration timeout = const Duration(seconds: 90)}) async {
+  static Future<String> transcribe(
+    String wav, {
+    String lang = 'fr',
+    Duration timeout = const Duration(seconds: 90),
+  }) async {
     final exe = await cli();
     final model = await installedModel();
     if (exe == null || model == null) throw 'Whisper n\'est pas installé';
@@ -261,31 +261,30 @@ class Whisper {
     // détaché n'a pas de code de sortie, on ne le lit donc pas).
     final p = await Process.start(
       exe,
-      [
-        '-m', modelPath(model)!,
-        '-f', wav,
-        '-l', lang,
-        '-t', '$threads',
-        '-nt',
-        '-np',
-      ],
+      ['-m', modelPath(model)!, '-f', wav, '-l', lang, '-t', '$threads', '-nt', '-np'],
       workingDirectory: File(exe).parent.path,
       mode: ProcessStartMode.detachedWithStdio,
     );
     unawaited(p.stdin.close().then((_) {}, onError: (_) {}));
     final err = StringBuffer();
     unawaited(
-      p.stderr.transform(const Utf8Decoder(allowMalformed: true)).forEach((s) {
-        if (err.length < 4000) err.write(s);
-      }).then((_) {}, onError: (_) {}),
+      p.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .forEach((s) {
+            if (err.length < 4000) err.write(s);
+          })
+          .then((_) {}, onError: (_) {}),
     );
     final out = await p.stdout
         .transform(const Utf8Decoder(allowMalformed: true))
         .join()
-        .timeout(timeout, onTimeout: () {
-          p.kill();
-          throw 'Whisper met trop de temps (essaie le modèle « Rapide »)';
-        });
+        .timeout(
+          timeout,
+          onTimeout: () {
+            p.kill();
+            throw 'Whisper met trop de temps (essaie le modèle « Rapide »)';
+          },
+        );
     final text = clean(out);
     if (text.isEmpty && err.toString().toLowerCase().contains('error')) {
       throw 'Whisper : ${err.toString().trim().split('\n').last}';
@@ -304,7 +303,7 @@ class Whisper {
       .trim();
 }
 
-/// Les « oreilles » de Clicky avec Whisper : enregistre, puis transcrit
+/// Les « oreilles » de Smily avec Whisper : enregistre, puis transcrit
 /// sur le PC.
 class WhisperEars extends RecordingEars {
   @override
@@ -331,7 +330,7 @@ class WhisperEars extends RecordingEars {
 class GeminiEars extends RecordingEars {
   GeminiEars(this.key);
 
-  /// Clé Gemini (celle de la voix de Clicky).
+  /// Clé Gemini (celle de la voix de Smily).
   final String Function() key;
 
   @override
@@ -345,7 +344,7 @@ class GeminiEars extends RecordingEars {
 
   @override
   EarsProblem get missing => const EarsProblem(
-    'Pas de clé Gemini : ajoute ta clé gratuite (aistudio.google.com) dans Réglages Clicky → Voix.',
+    'Pas de clé Gemini : ajoute ta clé gratuite (aistudio.google.com) dans Réglages Smily → Voix.',
     code: 'gemini-missing',
   );
 }
@@ -378,7 +377,8 @@ class GeminiTranscriber {
                     {
                       'parts': [
                         {
-                          'text': 'Transcris exactement ce qui est dit dans cet enregistrement (en français, '
+                          'text':
+                              'Transcris exactement ce qui est dit dans cet enregistrement (en français, '
                               'ou dans la langue parlée). Réponds uniquement avec le texte transcrit, sans '
                               'guillemets ni commentaire. S\'il n\'y a pas de parole, réponds par une chaîne vide.',
                         },
@@ -402,8 +402,12 @@ class GeminiTranscriber {
             final err = e is Map ? e['message'] : null;
             throw 'Gemini (code ${r.statusCode}) : ${err ?? ''}';
           }
-          final parts = ((((j as Map)['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
-          return [for (final p in parts ?? const []) if (p is Map && p['text'] != null) '${p['text']}'].join(' ').trim();
+          final parts =
+              ((((j as Map)['candidates'] as List?)?.firstOrNull as Map?)?['content'] as Map?)?['parts'] as List?;
+          return [
+            for (final p in parts ?? const [])
+              if (p is Map && p['text'] != null) '${p['text']}',
+          ].join(' ').trim();
         } on TimeoutException {
           last = 'Gemini met trop de temps';
         }
@@ -462,10 +466,7 @@ abstract class RecordingEars extends ClickyEars {
       }
       final dir = await Directory.systemTemp.createTemp('clicky-voix');
       _wav = '${dir.path}${Platform.pathSeparator}voix.wav';
-      await _rec.start(
-        const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
-        path: _wav!,
-      );
+      await _rec.start(const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1), path: _wav!);
     } catch (e) {
       return EarsProblem(
         'Je n\'arrive pas à ouvrir le micro ($e). Vérifie qu\'il est branché et choisi par défaut.',
@@ -542,10 +543,7 @@ abstract class RecordingEars extends ClickyEars {
   Future<EarsRepair> repair() async {
     await cancel();
     final ok = await isReady;
-    return EarsRepair(
-      problem: ok ? null : missing,
-      steps: [ok ? '$name est prêt.' : missing.message],
-    );
+    return EarsRepair(problem: ok ? null : missing, steps: [ok ? '$name est prêt.' : missing.message]);
   }
 }
 
@@ -636,10 +634,7 @@ class SmartEars extends ClickyEars {
     final relay = await _relay();
     if (relay != null) {
       _windowsFailed = true;
-      return EarsRepair(
-        problem: null,
-        steps: [...r.steps, 'Windows ne marche pas : je passe sur ${relay.name}.'],
-      );
+      return EarsRepair(problem: null, steps: [...r.steps, 'Windows ne marche pas : je passe sur ${relay.name}.']);
     }
     return EarsRepair(
       problem: EarsProblem(

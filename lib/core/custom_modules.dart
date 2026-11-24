@@ -103,29 +103,111 @@ class CustomModules {
 
   /// Couleurs au choix.
   static const colors = <int>[
-    0xFF7C5CFF, 0xFFE0457B, 0xFF2E7DFF, 0xFF00A86B, 0xFFFF8A00, 0xFFE53935,
-    0xFF00ACC1, 0xFF8E24AA, 0xFF5D4037, 0xFF455A64, 0xFF1DB954, 0xFFFFC107,
+    0xFF7C5CFF,
+    0xFFE0457B,
+    0xFF2E7DFF,
+    0xFF00A86B,
+    0xFFFF8A00,
+    0xFFE53935,
+    0xFF00ACC1,
+    0xFF8E24AA,
+    0xFF5D4037,
+    0xFF455A64,
+    0xFF1DB954,
+    0xFFFFC107,
   ];
 
   /// Prêts à l'emploi : un clic et c'est ajouté.
   static const catalog = <({String name, String url, String icon, int color, String description})>[
-    (name: 'WhatsApp', url: 'https://web.whatsapp.com/', icon: 'chat', color: 0xFF25D366, description: 'Tes discussions WhatsApp'),
-    (name: 'Messenger', url: 'https://www.messenger.com/', icon: 'chat', color: 0xFF0084FF, description: 'Messages Facebook'),
-    (name: 'Snapchat', url: 'https://web.snapchat.com/', icon: 'photo', color: 0xFFFFC107, description: 'Snapchat sur le PC'),
+    (
+      name: 'WhatsApp',
+      url: 'https://web.whatsapp.com/',
+      icon: 'chat',
+      color: 0xFF25D366,
+      description: 'Tes discussions WhatsApp',
+    ),
+    (
+      name: 'Messenger',
+      url: 'https://www.messenger.com/',
+      icon: 'chat',
+      color: 0xFF0084FF,
+      description: 'Messages Facebook',
+    ),
+    (
+      name: 'Snapchat',
+      url: 'https://web.snapchat.com/',
+      icon: 'photo',
+      color: 0xFFFFC107,
+      description: 'Snapchat sur le PC',
+    ),
     (name: 'TikTok', url: 'https://www.tiktok.com/', icon: 'video', color: 0xFF111111, description: 'Vidéos TikTok'),
     (name: 'Twitch', url: 'https://www.twitch.tv/', icon: 'game', color: 0xFF9146FF, description: 'Lives Twitch'),
-    (name: 'Netflix', url: 'https://www.netflix.com/', icon: 'video', color: 0xFFE50914, description: 'Films et séries'),
+    (
+      name: 'Netflix',
+      url: 'https://www.netflix.com/',
+      icon: 'video',
+      color: 0xFFE50914,
+      description: 'Films et séries',
+    ),
     (name: 'Deezer', url: 'https://www.deezer.com/', icon: 'music', color: 0xFFA238FF, description: 'Musique Deezer'),
-    (name: 'Pronote', url: 'https://www.index-education.com/fr/pronote-info191-demo.php', icon: 'school', color: 0xFF2E7DFF, description: 'Remplace l\'adresse par celle de ton lycée'),
-    (name: 'Google Classroom', url: 'https://classroom.google.com/', icon: 'school', color: 0xFF0F9D58, description: 'Tes cours en ligne'),
-    (name: 'Google Agenda', url: 'https://calendar.google.com/', icon: 'calendar', color: 0xFF4285F4, description: 'Ton agenda Google'),
+    (
+      name: 'Pronote',
+      url: 'https://www.index-education.com/fr/pronote-info191-demo.php',
+      icon: 'school',
+      color: 0xFF2E7DFF,
+      description: 'Remplace l\'adresse par celle de ton lycée',
+    ),
+    (
+      name: 'Google Classroom',
+      url: 'https://classroom.google.com/',
+      icon: 'school',
+      color: 0xFF0F9D58,
+      description: 'Tes cours en ligne',
+    ),
+    (
+      name: 'Google Agenda',
+      url: 'https://calendar.google.com/',
+      icon: 'calendar',
+      color: 0xFF4285F4,
+      description: 'Ton agenda Google',
+    ),
     (name: 'Gmail', url: 'https://mail.google.com/', icon: 'mail', color: 0xFFEA4335, description: 'Tes mails Google'),
     (name: 'Notion', url: 'https://www.notion.so/', icon: 'idea', color: 0xFF111111, description: 'Notes et projets'),
-    (name: 'Canva', url: 'https://www.canva.com/', icon: 'photo', color: 0xFF00C4CC, description: 'Affiches, exposés, montages'),
-    (name: 'Duolingo', url: 'https://www.duolingo.com/', icon: 'translate', color: 0xFF58CC02, description: 'Apprendre une langue'),
-    (name: 'Khan Academy', url: 'https://fr.khanacademy.org/', icon: 'school', color: 0xFF14BF96, description: 'Cours et exercices gratuits'),
-    (name: 'Wikipédia', url: 'https://fr.wikipedia.org/', icon: 'book', color: 0xFF455A64, description: 'L\'encyclopédie libre'),
-    (name: 'Pinterest', url: 'https://fr.pinterest.com/', icon: 'idea', color: 0xFFE60023, description: 'Idées et inspirations'),
+    (
+      name: 'Canva',
+      url: 'https://www.canva.com/',
+      icon: 'photo',
+      color: 0xFF00C4CC,
+      description: 'Affiches, exposés, montages',
+    ),
+    (
+      name: 'Duolingo',
+      url: 'https://www.duolingo.com/',
+      icon: 'translate',
+      color: 0xFF58CC02,
+      description: 'Apprendre une langue',
+    ),
+    (
+      name: 'Khan Academy',
+      url: 'https://fr.khanacademy.org/',
+      icon: 'school',
+      color: 0xFF14BF96,
+      description: 'Cours et exercices gratuits',
+    ),
+    (
+      name: 'Wikipédia',
+      url: 'https://fr.wikipedia.org/',
+      icon: 'book',
+      color: 0xFF455A64,
+      description: 'L\'encyclopédie libre',
+    ),
+    (
+      name: 'Pinterest',
+      url: 'https://fr.pinterest.com/',
+      icon: 'idea',
+      color: 0xFFE60023,
+      description: 'Idées et inspirations',
+    ),
     (name: 'Reddit', url: 'https://www.reddit.com/', icon: 'news', color: 0xFFFF4500, description: 'Communautés'),
   ];
 
@@ -146,9 +228,7 @@ class CustomModules {
     try {
       final raw = ModuleStore.prefs.getString(_key);
       if (raw == null) return const [];
-      return [
-        for (final j in jsonDecode(raw) as List) ?CustomModuleSpec.fromJson(j),
-      ];
+      return [for (final j in jsonDecode(raw) as List) ?CustomModuleSpec.fromJson(j)];
     } catch (_) {
       return const [];
     }

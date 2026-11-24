@@ -46,21 +46,33 @@ void main() {
     });
 
     test('messages : arnaques classiques, et messages normaux', () {
-      expect(ScamShield.checkMessage('Yo regarde, Nitro gratuit pendant 3 mois : discord-gifts.com/claim').danger, isTrue);
-      expect(ScamShield.checkMessage('Hey sorry I accidentally reported your account, contact support here').suspect, isTrue);
+      expect(
+        ScamShield.checkMessage('Yo regarde, Nitro gratuit pendant 3 mois : discord-gifts.com/claim').danger,
+        isTrue,
+      );
+      expect(
+        ScamShield.checkMessage('Hey sorry I accidentally reported your account, contact support here').suspect,
+        isTrue,
+      );
       expect(ScamShield.checkMessage('salut, tu peux tester mon jeu ?', files: ['MonJeu.exe']).danger, isTrue);
       expect(ScamShield.checkMessage('envoie moi le code que tu as reçu par sms stp').danger, isTrue);
       expect(ScamShield.checkMessage('scanne ce QR code pour avoir le badge').danger, isTrue);
-      final ok = ScamShield.checkMessage('On se retrouve à 14h au parc ? Regarde la vidéo https://www.youtube.com/watch?v=abc');
+      final ok = ScamShield.checkMessage(
+        'On se retrouve à 14h au parc ? Regarde la vidéo https://www.youtube.com/watch?v=abc',
+      );
       expect(ok.level, ScamLevel.ok, reason: '${ok.reasons}');
-      expect(ScamShield.checkMessage('t\'as fait le devoir de maths ? c\'est sur ecoledirecte.com').level, ScamLevel.ok);
+      expect(
+        ScamShield.checkMessage('t\'as fait le devoir de maths ? c\'est sur ecoledirecte.com').level,
+        ScamLevel.ok,
+      );
       expect(ScamShield.checkMessage('voilà mes photos', files: ['vacances.zip']).level, ScamLevel.ok);
       expect(ScamShield.checkMessage('Nitro gratuit ici discord-nitro.gift').say(), startsWith('Attention'));
     });
   });
 
   test('mails : faux expéditeur Discord repéré', () {
-    MailSummary m(String from, String subject) => MailSummary('moi@x.fr', 1, 'Discord', from, subject, DateTime(2026), false, MimeMessage());
+    MailSummary m(String from, String subject) =>
+        MailSummary('moi@x.fr', 1, 'Discord', from, subject, DateTime(2026), false, MimeMessage());
     expect(MailModule.scamOf(m('support@dlscord.com', 'Ton compte va être supprimé')).danger, isTrue);
     expect(MailModule.scamOf(m('noreply@discord.com', 'Nouvelle connexion')).level, ScamLevel.ok);
     expect(MailModule.scamOf(m('prof@lycee-hugo.fr', 'Devoir pour lundi')).level, ScamLevel.ok);
@@ -68,7 +80,7 @@ void main() {
 
   test('« ce lien est sûr ? » (le lien copié)', () async {
     final r = await QuickAnswers.answer(
-      'Clicky, est-ce que ce lien est sûr ?',
+      'Smily, est-ce que ce lien est sûr ?',
       call: (n, a) async => n == 'securite_lien' ? {'resume': 'Attention, arnaque.'} : null,
       tools: const {'securite_lien'},
     );
@@ -77,14 +89,24 @@ void main() {
 
   group('bilan de sécurité', () {
     test('tout va bien', () {
-      final items = SecurityCheck.build({
-        'av': [{'nom': 'Microsoft Defender Antivirus', 'etat': 397568}],
-        'defender': {'actif': true, 'tempsReel': true, 'signaturesJours': 0},
-        'parefeu': [{'nom': 'Domain', 'actif': true}, {'nom': 'Private', 'actif': true}, {'nom': 'Public', 'actif': true}],
-        'majJours': 12,
-        'redemarrage': false,
-        'uac': 1,
-      }, discord2fa: true, done: {'google'});
+      final items = SecurityCheck.build(
+        {
+          'av': [
+            {'nom': 'Microsoft Defender Antivirus', 'etat': 397568},
+          ],
+          'defender': {'actif': true, 'tempsReel': true, 'signaturesJours': 0},
+          'parefeu': [
+            {'nom': 'Domain', 'actif': true},
+            {'nom': 'Private', 'actif': true},
+            {'nom': 'Public', 'actif': true},
+          ],
+          'majJours': 12,
+          'redemarrage': false,
+          'uac': 1,
+        },
+        discord2fa: true,
+        done: {'google'},
+      );
       expect(items.where((i) => i.ok == false), isEmpty);
       expect(items.firstWhere((i) => i.id == 'antivirus').detail, contains('Microsoft Defender Antivirus'));
       expect(items.firstWhere((i) => i.id == 'google').ok, isTrue);
@@ -93,15 +115,26 @@ void main() {
     });
 
     test('les soucis sont repérés', () {
-      final items = SecurityCheck.build({
-        'av': [{'nom': 'Microsoft Defender Antivirus', 'etat': 393472}], // éteint
-        'defender': {'actif': false, 'tempsReel': false, 'signaturesJours': 20},
-        'parefeu': [{'nom': 'Public', 'actif': false}],
-        'majJours': 90,
-        'redemarrage': true,
-        'uac': 0,
-      }, discord2fa: false, pcControl: 'auto');
-      final bad = {for (final i in items) if (i.ok == false) i.id};
+      final items = SecurityCheck.build(
+        {
+          'av': [
+            {'nom': 'Microsoft Defender Antivirus', 'etat': 393472},
+          ], // éteint
+          'defender': {'actif': false, 'tempsReel': false, 'signaturesJours': 20},
+          'parefeu': [
+            {'nom': 'Public', 'actif': false},
+          ],
+          'majJours': 90,
+          'redemarrage': true,
+          'uac': 0,
+        },
+        discord2fa: false,
+        pcControl: 'auto',
+      );
+      final bad = {
+        for (final i in items)
+          if (i.ok == false) i.id,
+      };
       expect(bad, containsAll(['antivirus', 'signatures', 'parefeu', 'maj', 'uac', 'discord', 'clicky']));
       expect(items.firstWhere((i) => i.id == 'maj').detail, contains('redémarrage'));
       expect(SecurityCheck.say(items), startsWith('À régler'));

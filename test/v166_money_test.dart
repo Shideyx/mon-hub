@@ -64,7 +64,12 @@ void main() {
       expect(f.date, DateTime(2026, 11, 30));
       // Apple / Google envoient de tout : il faut le nom d'un abonnement.
       expect(
-        MoneyRules.subscription(fromEmail: 'news@apple.com', subject: 'Découvrez le nouvel iPhone', text: 'Paiement en 3 fois', mailDate: mailDate),
+        MoneyRules.subscription(
+          fromEmail: 'news@apple.com',
+          subject: 'Découvrez le nouvel iPhone',
+          text: 'Paiement en 3 fois',
+          mailDate: mailDate,
+        ),
         isNull,
       );
       expect(
@@ -116,7 +121,12 @@ void main() {
 
     test('un numéro court seulement si le mail vient du transporteur', () {
       expect(
-        MoneyRules.parcel(fromEmail: 'ami@gmail.com', fromName: 'Tom', subject: 'livraison de pizza', text: 'code 12345678'),
+        MoneyRules.parcel(
+          fromEmail: 'ami@gmail.com',
+          fromName: 'Tom',
+          subject: 'livraison de pizza',
+          text: 'code 12345678',
+        ),
         isNull,
       );
       final m = MoneyRules.parcel(
@@ -141,7 +151,10 @@ void main() {
     test('abonnements : total et prochain prélèvement', () {
       final s = MoneyStore();
       s.applySub(const SubFinding(service: 'Spotify', price: 11.12, kind: 'paiement'), mailDate);
-      s.applySub(SubFinding(service: 'Nitro', price: 99.99, yearly: true, kind: 'renouvellement', date: DateTime(2027, 1, 15)), mailDate);
+      s.applySub(
+        SubFinding(service: 'Nitro', price: 99.99, yearly: true, kind: 'renouvellement', date: DateTime(2027, 1, 15)),
+        mailDate,
+      );
       expect(s.monthly, closeTo(11.12 + 8.33, 0.01));
       s.applySub(const SubFinding(service: 'Spotify', kind: 'resiliation'), mailDate);
       expect(s.monthly, closeTo(8.33, 0.01));
@@ -161,12 +174,18 @@ void main() {
                   'title': 'Jeu Gratuit',
                   'id': 'a1',
                   'productSlug': 'jeu-gratuit/home',
-                  'keyImages': [{'type': 'OfferImageWide', 'url': 'https://img/a.jpg'}],
+                  'keyImages': [
+                    {'type': 'OfferImageWide', 'url': 'https://img/a.jpg'},
+                  ],
                   'promotions': {
                     'promotionalOffers': [
                       {
                         'promotionalOffers': [
-                          {'startDate': '2026-11-19T16:00:00.000Z', 'endDate': '2026-11-26T16:00:00.000Z', 'discountSetting': {'discountPercentage': 0}},
+                          {
+                            'startDate': '2026-11-19T16:00:00.000Z',
+                            'endDate': '2026-11-26T16:00:00.000Z',
+                            'discountSetting': {'discountPercentage': 0},
+                          },
                         ],
                       },
                     ],
@@ -176,15 +195,40 @@ void main() {
                 {
                   'title': 'Bientôt',
                   'id': 'b2',
-                  'catalogNs': {'mappings': [{'pageSlug': 'bientot'}]},
+                  'catalogNs': {
+                    'mappings': [
+                      {'pageSlug': 'bientot'},
+                    ],
+                  },
                   'promotions': {
                     'promotionalOffers': [],
                     'upcomingPromotionalOffers': [
-                      {'promotionalOffers': [{'startDate': '2026-11-26T16:00:00.000Z', 'discountSetting': {'discountPercentage': 0}}]},
+                      {
+                        'promotionalOffers': [
+                          {
+                            'startDate': '2026-11-26T16:00:00.000Z',
+                            'discountSetting': {'discountPercentage': 0},
+                          },
+                        ],
+                      },
                     ],
                   },
                 },
-                {'title': 'Simple promo', 'id': 'c3', 'promotions': {'promotionalOffers': [{'promotionalOffers': [{'discountSetting': {'discountPercentage': 50}}]}]}},
+                {
+                  'title': 'Simple promo',
+                  'id': 'c3',
+                  'promotions': {
+                    'promotionalOffers': [
+                      {
+                        'promotionalOffers': [
+                          {
+                            'discountSetting': {'discountPercentage': 50},
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
                 {'title': 'Sans promo', 'id': 'd4', 'promotions': null},
               ],
             },
@@ -201,10 +245,31 @@ void main() {
     });
 
     test('Steam : liste et promos', () {
-      expect(GameDeals.parseWishlist({'response': {'items': [{'appid': 10}, {'appid': 20}, {'x': 1}]}}), [10, 20]);
+      expect(
+        GameDeals.parseWishlist({
+          'response': {
+            'items': [
+              {'appid': 10},
+              {'appid': 20},
+              {'x': 1},
+            ],
+          },
+        }),
+        [10, 20],
+      );
       final deals = GameDeals.parsePrices({
-        '10': {'success': true, 'data': {'price_overview': {'discount_percent': 75, 'final_formatted': '4,99€', 'initial_formatted': '19,99€'}}},
-        '20': {'success': true, 'data': {'price_overview': {'discount_percent': 10}}},
+        '10': {
+          'success': true,
+          'data': {
+            'price_overview': {'discount_percent': 75, 'final_formatted': '4,99€', 'initial_formatted': '19,99€'},
+          },
+        },
+        '20': {
+          'success': true,
+          'data': {
+            'price_overview': {'discount_percent': 10},
+          },
+        },
         '30': {'success': true, 'data': []},
       }, 20);
       expect(deals, [(10, 75, '4,99€', '19,99€')]);
@@ -212,7 +277,9 @@ void main() {
 
     test('Steam : numéro de profil', () async {
       expect(await GameDeals.steamId('https://steamcommunity.com/profiles/76561198000000000/'), '76561198000000000');
-      final c = MockClient((r) async => http.Response('<profile><steamID64>76561198012345678</steamID64></profile>', 200));
+      final c = MockClient(
+        (r) async => http.Response('<profile><steamID64>76561198012345678</steamID64></profile>', 200),
+      );
       expect(await GameDeals.steamId('https://steamcommunity.com/id/monpseudo', client: c), '76561198012345678');
     });
   });
@@ -225,7 +292,10 @@ void main() {
       final c = MockClient((r) async {
         asked = r.url;
         expect(r.headers['Add-Padding'], 'true');
-        return http.Response('0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n1E4C9B93F3F0682250B6CF8331B7EE68FD8:9659365\r\nAAAA:0', 200);
+        return http.Response(
+          '0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n1E4C9B93F3F0682250B6CF8331B7EE68FD8:9659365\r\nAAAA:0',
+          200,
+        );
       });
       expect(await PwnedPasswords.count('password', client: c), 9659365);
       expect(asked.toString(), 'https://api.pwnedpasswords.com/range/5BAA6');
@@ -237,7 +307,7 @@ void main() {
     });
   });
 
-  group('Clicky sans IA', () {
+  group('Smily sans IA', () {
     final calls = <String>[];
     Future<Object?> fake(String name, Map<String, dynamic> a) async {
       calls.add(name);
@@ -261,8 +331,12 @@ void main() {
       };
     }
 
-    Future<String?> ask(String q) async =>
-        (await QuickAnswers.answer(q, call: fake, tools: const {'argent_abonnements', 'argent_colis', 'argent_jeux'}, now: mailDate))?.text;
+    Future<String?> ask(String q) async => (await QuickAnswers.answer(
+      q,
+      call: fake,
+      tools: const {'argent_abonnements', 'argent_colis', 'argent_jeux'},
+      now: mailDate,
+    ))?.text;
 
     test('phrases', () async {
       expect(await ask('mes abonnements'), contains('2 abonnements : Spotify (11,12 € par mois), Netflix'));

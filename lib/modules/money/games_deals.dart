@@ -4,7 +4,15 @@ import 'package:http/http.dart' as http;
 
 /// Un jeu gratuit (Epic Games Store).
 class FreeGame {
-  const FreeGame({required this.id, required this.title, required this.url, this.image = '', this.from, this.to, this.now = true});
+  const FreeGame({
+    required this.id,
+    required this.title,
+    required this.url,
+    this.image = '',
+    this.from,
+    this.to,
+    this.now = true,
+  });
   final String id;
   final String title;
   final String url;
@@ -38,7 +46,13 @@ class FreeGame {
 
 /// Un jeu de la liste de souhaits Steam en promo.
 class SteamDeal {
-  const SteamDeal({required this.appId, required this.name, required this.discount, required this.price, required this.before});
+  const SteamDeal({
+    required this.appId,
+    required this.name,
+    required this.discount,
+    required this.price,
+    required this.before,
+  });
   final int appId;
   final String name;
   final int discount;
@@ -131,7 +145,9 @@ class GameDeals {
         FreeGame(
           id: '${e['id'] ?? e['title']}',
           title: '${e['title'] ?? 'Jeu'}',
-          url: slug.isEmpty || slug == 'null' ? 'https://store.epicgames.com/fr/free-games' : 'https://store.epicgames.com/fr/p/$slug',
+          url: slug.isEmpty || slug == 'null'
+              ? 'https://store.epicgames.com/fr/free-games'
+              : 'https://store.epicgames.com/fr/p/$slug',
           image: image,
           from: when.$1,
           to: when.$2,
@@ -147,7 +163,8 @@ class GameDeals {
     final t = input.trim();
     final direct = RegExp(r'(7656119\d{10})').firstMatch(t);
     if (direct != null) return direct[1];
-    final vanity = RegExp(r'steamcommunity\.com/id/([A-Za-z0-9_-]{2,32})').firstMatch(t)?[1] ??
+    final vanity =
+        RegExp(r'steamcommunity\.com/id/([A-Za-z0-9_-]{2,32})').firstMatch(t)?[1] ??
         (RegExp(r'^[A-Za-z0-9_-]{2,32}$').hasMatch(t) ? t : null);
     if (vanity == null) return null;
     final c = client ?? http.Client();
@@ -166,7 +183,10 @@ class GameDeals {
     final c = client ?? http.Client();
     try {
       final w = await c
-          .get(Uri.parse('https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=$steamId'), headers: _ua)
+          .get(
+            Uri.parse('https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=$steamId'),
+            headers: _ua,
+          )
           .timeout(const Duration(seconds: 20));
       if (w.statusCode != 200) throw 'Steam : liste de souhaits introuvable (est-elle publique ?)';
       final ids = parseWishlist(jsonDecode(w.body));
@@ -176,7 +196,9 @@ class GameDeals {
         final chunk = ids.sublist(i, (i + 50).clamp(0, ids.length));
         final p = await c
             .get(
-              Uri.parse('https://store.steampowered.com/api/appdetails?appids=${chunk.join(',')}&cc=fr&filters=price_overview'),
+              Uri.parse(
+                'https://store.steampowered.com/api/appdetails?appids=${chunk.join(',')}&cc=fr&filters=price_overview',
+              ),
               headers: _ua,
             )
             .timeout(const Duration(seconds: 20));
@@ -187,7 +209,10 @@ class GameDeals {
         var name = 'Jeu ${d.$1}';
         try {
           final n = await c
-              .get(Uri.parse('https://store.steampowered.com/api/appdetails?appids=${d.$1}&cc=fr&l=french&filters=basic'), headers: _ua)
+              .get(
+                Uri.parse('https://store.steampowered.com/api/appdetails?appids=${d.$1}&cc=fr&l=french&filters=basic'),
+                headers: _ua,
+              )
               .timeout(const Duration(seconds: 15));
           name = '${((jsonDecode(n.body) as Map)['${d.$1}'] as Map?)?['data']?['name'] ?? name}';
         } catch (_) {}

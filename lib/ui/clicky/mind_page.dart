@@ -7,7 +7,7 @@ import 'clicky.dart';
 import 'life_view.dart' show emojiFonts;
 import 'mind.dart';
 
-/// Réglages → Conscience de Clicky : son humeur, ses souvenirs, sa présence.
+/// Réglages → Conscience de Smily : son humeur, ses souvenirs, sa présence.
 class MindPage extends StatefulWidget {
   const MindPage({super.key});
 
@@ -27,9 +27,11 @@ class _MindPageState extends State<MindPage> {
   void initState() {
     super.initState();
     unawaited(m.load());
-    unawaited(Carnet.instance.load().then((_) {
-      if (mounted) setState(() => city.text = Carnet.instance.setting<String>('city', ''));
-    }));
+    unawaited(
+      Carnet.instance.load().then((_) {
+        if (mounted) setState(() => city.text = Carnet.instance.setting<String>('city', ''));
+      }),
+    );
   }
 
   @override
@@ -59,7 +61,7 @@ class _MindPageState extends State<MindPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Conscience de Clicky')),
+      appBar: AppBar(title: const Text('Conscience de Smily')),
       body: ListenableBuilder(
         listenable: m,
         builder: (context, _) {
@@ -83,8 +85,11 @@ class _MindPageState extends State<MindPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Clicky est ${m.moodLabel(now)}',
-                            style: theme.textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                            'Smily est ${m.moodLabel(now)}',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -226,7 +231,7 @@ class _MindPageState extends State<MindPage> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 secondary: const Icon(Icons.bolt_rounded, color: Color(0xFFFFA000)),
-                title: const Text('Clicky décide tout seul', style: TextStyle(fontWeight: FontWeight.w800)),
+                title: const Text('Smily décide tout seul', style: TextStyle(fontWeight: FontWeight.w800)),
                 subtitle: const Text(
                   'Il regarde ta journée, décide d\'une chose utile à faire (préparer un contrôle, organiser ta soirée, '
                   'lancer des révisions, chercher pour toi…) et te la propose. Il ne fait rien sans ton « oui », et ne '
@@ -247,14 +252,11 @@ class _MindPageState extends State<MindPage> {
                   onSelectionChanged: (v) => m.setPace(v.first),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  switch (m.pace) {
-                    'souvent' => 'Jusqu\'à 8 idées par jour, au moins 25 minutes entre deux.',
-                    'rarement' => 'Jusqu\'à 3 idées par jour, au moins 1 h 30 entre deux.',
-                    _ => 'Jusqu\'à 5 idées par jour, au moins 45 minutes entre deux.',
-                  },
-                  style: theme.textTheme.bodySmall,
-                ),
+                Text(switch (m.pace) {
+                  'souvent' => 'Jusqu\'à 8 idées par jour, au moins 25 minutes entre deux.',
+                  'rarement' => 'Jusqu\'à 3 idées par jour, au moins 1 h 30 entre deux.',
+                  _ => 'Jusqu\'à 5 idées par jour, au moins 45 minutes entre deux.',
+                }, style: theme.textTheme.bodySmall),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -268,7 +270,7 @@ class _MindPageState extends State<MindPage> {
                         await c.proposeIdea(i);
                       } else if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Rien d\'utile à proposer pour l\'instant, d\'après Clicky.')),
+                          const SnackBar(content: Text('Rien d\'utile à proposer pour l\'instant, d\'après Smily.')),
                         );
                       }
                     },
@@ -319,7 +321,9 @@ class _MindPageState extends State<MindPage> {
                         context: context,
                         builder: (c) => AlertDialog(
                           title: const Text('Effacer sa mémoire ?'),
-                          content: const Text('Clicky oubliera vos conversations, son humeur et ce dont il voulait prendre des nouvelles.'),
+                          content: const Text(
+                            'Smily oubliera vos conversations, son humeur et ce dont il voulait prendre des nouvelles.',
+                          ),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
                             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Effacer')),

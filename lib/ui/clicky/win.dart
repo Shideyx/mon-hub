@@ -6,8 +6,8 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:win32/win32.dart';
 
-/// Petits appels Windows pour « Clicky partout » : clavier et souris de tout
-/// le système, écrans, capture, et placement de la fenêtre de Clicky.
+/// Petits appels Windows pour « Smily partout » : clavier et souris de tout
+/// le système, écrans, capture, et placement de la fenêtre de Smily.
 class Win {
   Win._();
 
@@ -68,8 +68,7 @@ class Win {
     }
     // L'écran principal contient le point (0, 0).
     out.sort((a, b) {
-      bool primary((int, int, int, int) m) =>
-          m.$1 <= 0 && m.$2 <= 0 && m.$1 + m.$3 > 0 && m.$2 + m.$4 > 0;
+      bool primary((int, int, int, int) m) => m.$1 <= 0 && m.$2 <= 0 && m.$1 + m.$3 > 0 && m.$2 + m.$4 > 0;
       return (primary(b) ? 1 : 0) - (primary(a) ? 1 : 0);
     });
     if (out.isEmpty) {
@@ -114,13 +113,10 @@ class Win {
     }
   }
 
-  /// La fenêtre de Clicky (créée par le lanceur avec le titre « Clicky »),
+  /// La fenêtre de Smily (créée par le lanceur avec le titre « Smily »),
   /// en vérifiant qu'elle appartient bien à ce programme.
   static HWND? findClicky(int myPid) => using((a) {
-    final r = FindWindow(
-      'FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a),
-      'Clicky'.toPcwstr(allocator: a),
-    );
+    final r = FindWindow('FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a), 'Smily'.toPcwstr(allocator: a));
     final h = r.value;
     if (h.address == 0) return null;
     final owner = a<Uint32>();
@@ -131,10 +127,7 @@ class Win {
   /// Ramène la fenêtre principale de Mon Hub au premier plan (de ce
   /// programme : [myPid]).
   static bool raiseMain(int myPid) => using((a) {
-    final h = FindWindow(
-      'FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a),
-      'Mon Hub'.toPcwstr(allocator: a),
-    ).value;
+    final h = FindWindow('FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a), 'Mon Hub'.toPcwstr(allocator: a)).value;
     if (h.address == 0) return false;
     final owner = a<Uint32>();
     GetWindowThreadProcessId(h, owner);
@@ -146,15 +139,7 @@ class Win {
 
   /// Place la fenêtre (pixels physiques), au premier plan, sans voler le focus.
   static void place(HWND hwnd, int x, int y, int w, int h) {
-    SetWindowPos(
-      hwnd,
-      HWND_TOPMOST,
-      x,
-      y,
-      w,
-      h,
-      SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE | SWP_SHOWWINDOW),
-    );
+    SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE | SWP_SHOWWINDOW));
   }
 
   static void hide(HWND hwnd) => ShowWindow(hwnd, SW_HIDE);
@@ -176,7 +161,7 @@ class Win {
   /// Message compris par le lanceur (windows/runner/clicky_follow.h).
   static const _followMessage = WM_APP + 0x51;
 
-  /// **Clicky colle à la souris** : Windows déplace lui-même la fenêtre à
+  /// **Smily colle à la souris** : Windows déplace lui-même la fenêtre à
   /// chaque mouvement de la souris (jusqu'à 1000 fois par seconde), sans
   /// attendre le code Dart — c'est ce qui le rend fluide. [dx]/[dy] : où se
   /// tient la fenêtre par rapport au curseur (pixels physiques).
@@ -205,7 +190,7 @@ class Win {
   static bool _affinityLooked = false;
 
   /// Retire (ou remet) une fenêtre des captures d'écran (Windows 10 2004 et
-  /// plus) : Clicky reste visible pour toi pendant que la photo de l'écran
+  /// plus) : Smily reste visible pour toi pendant que la photo de l'écran
   /// se fait sans lui. Renvoie false si Windows ne sait pas faire.
   static bool excludeFromCapture(HWND hwnd, bool exclude) {
     if (!_affinityLooked) {
@@ -248,7 +233,8 @@ class Win {
       bi.ref.bmiHeader
         ..biSize = sizeOf<BITMAPINFOHEADER>()
         ..biWidth = tw
-        ..biHeight = -th // de haut en bas
+        ..biHeight =
+            -th // de haut en bas
         ..biPlanes = 1
         ..biBitCount = 32
         ..biCompression = BI_RGB;
@@ -285,14 +271,9 @@ class Win {
 
   /// Ouvre la dictée de Windows (Win + H) : elle écrit ce que tu dis dans la
   /// zone de texte qui a le focus. Solution de secours si le micro de
-  /// Clicky ne marche pas.
+  /// Smily ne marche pas.
   static void voiceTyping() => using((a) {
-    const keys = [
-      (VK_LWIN, false),
-      (VIRTUAL_KEY(0x48), false),
-      (VIRTUAL_KEY(0x48), true),
-      (VK_LWIN, true),
-    ];
+    const keys = [(VK_LWIN, false), (VIRTUAL_KEY(0x48), false), (VIRTUAL_KEY(0x48), true), (VK_LWIN, true)];
     final inputs = a<INPUT>(keys.length);
     for (var i = 0; i < keys.length; i++) {
       final (vk, up) = keys[i];
@@ -346,7 +327,7 @@ class Win {
   }
 
   /// La fenêtre au premier plan couvre tout un écran (jeu, vidéo en grand) :
-  /// Clicky se fait discret.
+  /// Smily se fait discret.
   static bool foregroundFullscreen() {
     final f = foregroundRect();
     if (f == null) return false;
@@ -399,7 +380,7 @@ class Win {
     return out;
   }
 
-  // ---------- Clavier et souris (Clicky pilote, dictée) ----------
+  // ---------- Clavier et souris (Smily pilote, dictée) ----------
 
   static void _keys(List<(int vk, bool up)> keys) => using((a) {
     final inputs = a<INPUT>(keys.length);
@@ -414,8 +395,10 @@ class Win {
   });
 
   /// Relâche Ctrl, Alt, Maj et Windows (pour taper sans raccourci parasite).
-  static void releaseModifiers() =>
-      _keys([for (final vk in const [0x10, 0x11, 0x12, 0x5B, 0x5C]) if (down(vk)) (vk, true)]);
+  static void releaseModifiers() => _keys([
+    for (final vk in const [0x10, 0x11, 0x12, 0x5B, 0x5C])
+      if (down(vk)) (vk, true),
+  ]);
 
   /// Tape un texte (caractères Unicode, sans dépendre du clavier).
   static void typeText(String text) => using((a) {
@@ -435,9 +418,7 @@ class Win {
           ki
             ..wVk = const VIRTUAL_KEY(0)
             ..wScan = units[i]
-            ..dwFlags = j == 1
-                ? KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)
-                : KEYEVENTF_UNICODE;
+            ..dwFlags = j == 1 ? KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP) : KEYEVENTF_UNICODE;
         }
       }
     }
@@ -445,13 +426,40 @@ class Win {
   });
 
   static const _named = {
-    'ctrl': 0x11, 'control': 0x11, 'alt': 0x12, 'shift': 0x10, 'maj': 0x10,
-    'win': 0x5B, 'windows': 0x5B, 'enter': 0x0D, 'entree': 0x0D, 'entrée': 0x0D,
-    'tab': 0x09, 'esc': 0x1B, 'echap': 0x1B, 'échap': 0x1B, 'escape': 0x1B,
-    'space': 0x20, 'espace': 0x20, 'backspace': 0x08, 'retour': 0x08,
-    'delete': 0x2E, 'suppr': 0x2E, 'del': 0x2E, 'home': 0x24, 'end': 0x23,
-    'fin': 0x23, 'pageup': 0x21, 'pagedown': 0x22, 'up': 0x26, 'haut': 0x26,
-    'down': 0x28, 'bas': 0x28, 'left': 0x25, 'gauche': 0x25, 'right': 0x27,
+    'ctrl': 0x11,
+    'control': 0x11,
+    'alt': 0x12,
+    'shift': 0x10,
+    'maj': 0x10,
+    'win': 0x5B,
+    'windows': 0x5B,
+    'enter': 0x0D,
+    'entree': 0x0D,
+    'entrée': 0x0D,
+    'tab': 0x09,
+    'esc': 0x1B,
+    'echap': 0x1B,
+    'échap': 0x1B,
+    'escape': 0x1B,
+    'space': 0x20,
+    'espace': 0x20,
+    'backspace': 0x08,
+    'retour': 0x08,
+    'delete': 0x2E,
+    'suppr': 0x2E,
+    'del': 0x2E,
+    'home': 0x24,
+    'end': 0x23,
+    'fin': 0x23,
+    'pageup': 0x21,
+    'pagedown': 0x22,
+    'up': 0x26,
+    'haut': 0x26,
+    'down': 0x28,
+    'bas': 0x28,
+    'left': 0x25,
+    'gauche': 0x25,
+    'right': 0x27,
     'droite': 0x27,
   };
 
@@ -503,7 +511,7 @@ class Win {
     SendInput(1, input, sizeOf<INPUT>());
   });
 
-  // ---------- Clicky agit : souris visible, glisser, fenêtres ----------
+  // ---------- Smily agit : souris visible, glisser, fenêtres ----------
 
   /// Déplace la souris en douceur jusqu'au point (on la voit bouger).
   static Future<void> glide(int x, int y, {Duration duration = const Duration(milliseconds: 380)}) async {
@@ -585,7 +593,7 @@ class Win {
       final hwnd = HWND(h);
       if (IsWindowVisible(hwnd)) {
         final t = _title(hwnd);
-        if (t.trim().isNotEmpty && t != 'Clicky' && t != 'Program Manager') {
+        if (t.trim().isNotEmpty && t != 'Smily' && t != 'Program Manager') {
           var exe = '';
           try {
             exe = _exeOf(hwnd);

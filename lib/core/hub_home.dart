@@ -100,7 +100,9 @@ class _HubHomeLayerState extends State<HubHomeLayer> {
     final search = HubHome.instance.onSearchText;
     // Ctrl + Espace ou Ctrl + K : la recherche (applis du PC comprises).
     final ctrlK = e.logicalKey == LogicalKeyboardKey.keyK && HardwareKeyboard.instance.isControlPressed;
-    if (search != null && (ctrlK || e.logicalKey == LogicalKeyboardKey.space) && HardwareKeyboard.instance.isControlPressed &&
+    if (search != null &&
+        (ctrlK || e.logicalKey == LogicalKeyboardKey.space) &&
+        HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isAltPressed) {
       search('');
       return true;
@@ -195,7 +197,10 @@ class _HomeTab extends StatelessWidget {
             ),
             borderRadius: const BorderRadius.horizontal(right: Radius.circular(22)),
             boxShadow: [
-              BoxShadow(color: scheme.primary.withValues(alpha: expanded ? 0.45 : 0.25), blurRadius: expanded ? 18 : 8),
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: expanded ? 0.45 : 0.25),
+                blurRadius: expanded ? 18 : 8,
+              ),
             ],
           ),
           child: Row(
@@ -219,7 +224,10 @@ class _HomeTab extends StatelessWidget {
                 child: expanded
                     ? const Padding(
                         padding: EdgeInsets.only(left: 6),
-                        child: Text('Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        child: Text(
+                          'Menu',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                        ),
                       )
                     : const SizedBox.shrink(),
               ),

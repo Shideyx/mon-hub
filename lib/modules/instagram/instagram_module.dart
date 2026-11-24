@@ -78,8 +78,12 @@ class InstagramModule extends HubModule {
     } catch (_) {}
   }
 
-  void open(BuildContext context, String url) =>
-      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => InstagramPage(module: this, url: url)));
+  void open(BuildContext context, String url) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => InstagramPage(module: this, url: url),
+    ),
+  );
 
   @override
   List<HubTool> get tools => [
@@ -87,7 +91,7 @@ class InstagramModule extends HubModule {
       name: 'instagram_ouvrir',
       description:
           'Ouvre le vrai Instagram dans Mon Hub : page = fil, reels, messages ou explorer, ou le profil de quelqu\'un '
-          '(nom). Clicky ne lit et n\'envoie jamais de messages Instagram lui-même (Instagram l\'interdit) : la '
+          '(nom). Smily ne lit et n\'envoie jamais de messages Instagram lui-même (Instagram l\'interdit) : la '
           'personne le fait dans la page.',
       params: {
         'page': ('string', 'fil, reels, messages ou explorer'),

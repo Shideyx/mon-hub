@@ -132,7 +132,7 @@ class YouTubeSearch {
 
 /// YouTube : **tout le vrai YouTube** dans Mon Hub (ton compte, tes
 /// abonnements, tes playlists…), une recherche rapide et « Reprendre » sur
-/// l'accueil, et Clicky qui peut chercher et lancer une vidéo. L'historique
+/// l'accueil, et Smily qui peut chercher et lancer une vidéo. L'historique
 /// reste sur l'appareil.
 class YouTubeModule extends HubModule {
   @override
@@ -863,7 +863,7 @@ class YouTubeMiniPlayer extends ChangeNotifier {
 
   void _attach(InAppWebViewController c) {
     _c = c;
-    // Clicky peut mettre en pause, passer… la vidéo du petit écran.
+    // Smily peut mettre en pause, passer… la vidéo du petit écran.
     final m = _module;
     if (m != null && m._page == null) m._page = c;
   }

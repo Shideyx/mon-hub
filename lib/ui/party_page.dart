@@ -255,13 +255,19 @@ class _PartyPageState extends State<PartyPage> {
           children: [
             Expanded(
               child: Text(
-                playing == null ? 'Rien en cours : ajoute un son 🎶' : '🎶 ${playing.title}${playing.by.isEmpty ? '' : ' — par ${playing.by}'}',
+                playing == null
+                    ? 'Rien en cours : ajoute un son 🎶'
+                    : '🎶 ${playing.title}${playing.by.isEmpty ? '' : ' — par ${playing.by}'}',
                 style: theme.textTheme.titleMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            IconButton.filledTonal(tooltip: 'Pause / lecture', onPressed: _togglePause, icon: const Icon(Icons.pause_rounded)),
+            IconButton.filledTonal(
+              tooltip: 'Pause / lecture',
+              onPressed: _togglePause,
+              icon: const Icon(Icons.pause_rounded),
+            ),
             const SizedBox(width: 6),
             IconButton.filled(tooltip: 'Son suivant', onPressed: _skip, icon: const Icon(Icons.skip_next_rounded)),
           ],
@@ -289,7 +295,10 @@ class _PartyPageState extends State<PartyPage> {
                 )
               : Column(
                   children: [
-                    SizedBox(height: 320, child: Padding(padding: const EdgeInsets.all(12), child: player)),
+                    SizedBox(
+                      height: 320,
+                      child: Padding(padding: const EdgeInsets.all(12), child: player),
+                    ),
                     Expanded(child: panel),
                   ],
                 ),

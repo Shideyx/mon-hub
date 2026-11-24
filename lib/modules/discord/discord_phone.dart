@@ -30,7 +30,7 @@ class DiscordPhone extends ChangeNotifier {
   static bool get supported => !kIsWeb && Platform.isWindows;
 
   /// Seule la fenêtre principale de Mon Hub garde Discord ouvert (pas
-  /// Clicky partout, ni les widgets du bureau).
+  /// Smily partout, ni les widgets du bureau).
   static bool allowed = false;
 
   /// Le Discord caché existe (il tourne en fond).
@@ -64,6 +64,7 @@ class DiscordPhone extends ChangeNotifier {
     this.state = state;
     notifyListeners();
   }
+
   bool _checking = false;
 
   void _set(PhoneState s, {String? who}) {
@@ -272,7 +273,8 @@ class DiscordPhone extends ChangeNotifier {
   static const _joinVoice = r'(rejoindre le (salon )?vocal|join voice)';
   static const _callWords = r'(appel|call|sonne|ring)';
 
-  static const _helpers = '''
+  static const _helpers =
+      '''
   function vis(e) { var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
   function lab(e) { return ((e.getAttribute && e.getAttribute('aria-label')) || e.textContent || '').trim(); }
   function buttons(root) {
@@ -421,7 +423,12 @@ class DiscordPhoneLayer extends StatelessWidget {
                 child: _CallBar(phone: phone),
               ),
             if (!shown && phone.state == PhoneState.ringing)
-              Positioned(key: const ValueKey('phone-ring'), top: 16, right: 16, child: _RingCard(phone: phone)),
+              Positioned(
+                key: const ValueKey('phone-ring'),
+                top: 16,
+                right: 16,
+                child: _RingCard(phone: phone),
+              ),
             if (!shown && (phone.state == PhoneState.inCall || phone.state == PhoneState.calling))
               Positioned(
                 key: const ValueKey('phone-pill'),
@@ -473,11 +480,7 @@ class _CallBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
-            IconButton(
-              color: Colors.white,
-              icon: const Icon(Icons.arrow_back_rounded),
-              onPressed: phone.hide,
-            ),
+            IconButton(color: Colors.white, icon: const Icon(Icons.arrow_back_rounded), onPressed: phone.hide),
             const SizedBox(width: 4),
             const Icon(Icons.forum_rounded, color: Colors.white, size: 20),
             const SizedBox(width: 10),
@@ -596,8 +599,7 @@ class _Pulse extends StatefulWidget {
 }
 
 class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
-  late final _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
-    ..repeat(reverse: true);
+  late final _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..repeat(reverse: true);
 
   @override
   void dispose() {

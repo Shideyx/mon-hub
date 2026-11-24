@@ -31,8 +31,7 @@ class RobloxAccount {
   int presence;
   String location;
 
-  String get presenceLabel =>
-      const ['Hors ligne', 'En ligne', 'En jeu', 'Dans Studio'][presence.clamp(0, 3)];
+  String get presenceLabel => const ['Hors ligne', 'En ligne', 'En jeu', 'Dans Studio'][presence.clamp(0, 3)];
 }
 
 /// API publiques Roblox (users / thumbnails / friends / presence).
@@ -46,15 +45,15 @@ class RobloxApi {
     final res = await _http.post(
       Uri.parse('https://users.roblox.com/v1/usernames/users'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'usernames': [username], 'excludeBannedUsers': false}),
+      body: jsonEncode({
+        'usernames': [username],
+        'excludeBannedUsers': false,
+      }),
     );
     final data = jsonDecode(res.body)['data'] as List? ?? [];
     if (data.isEmpty) return null;
     final u = data.first as Map<String, dynamic>;
-    return RobloxAccount(
-        id: u['id'] as int,
-        name: u['name'] as String,
-        displayName: u['displayName'] as String);
+    return RobloxAccount(id: u['id'] as int, name: u['name'] as String, displayName: u['displayName'] as String);
   }
 
   Future<void> refresh(List<RobloxAccount> accounts) async {
@@ -62,9 +61,12 @@ class RobloxApi {
     final ids = accounts.map((a) => a.id).toList();
     final byId = {for (final a in accounts) a.id: a};
 
-    final thumbs = await _http.get(Uri.parse(
+    final thumbs = await _http.get(
+      Uri.parse(
         'https://thumbnails.roblox.com/v1/users/avatar-headshot'
-        '?userIds=${ids.join(',')}&size=150x150&format=Png&isCircular=true'));
+        '?userIds=${ids.join(',')}&size=150x150&format=Png&isCircular=true',
+      ),
+    );
     for (final t in (jsonDecode(thumbs.body)['data'] as List? ?? [])) {
       byId[t['targetId']]?.avatarUrl = t['imageUrl'] as String?;
     }
@@ -81,11 +83,12 @@ class RobloxApi {
       a.location = p['lastLocation'] as String? ?? '';
     }
 
-    await Future.wait(accounts.map((a) async {
-      final r = await _http.get(
-          Uri.parse('https://friends.roblox.com/v1/users/${a.id}/friends/count'));
-      a.friends = jsonDecode(r.body)['count'] as int?;
-    }));
+    await Future.wait(
+      accounts.map((a) async {
+        final r = await _http.get(Uri.parse('https://friends.roblox.com/v1/users/${a.id}/friends/count'));
+        a.friends = jsonDecode(r.body)['count'] as int?;
+      }),
+    );
   }
 }
 
@@ -110,10 +113,9 @@ class RobloxModule extends HubModule {
   List<RobloxAccount> _saved() {
     final raw = store.getJson<List<dynamic>>('accounts') ?? const [];
     return raw
-        .map((e) => RobloxAccount(
-            id: e['id'] as int,
-            name: e['name'] as String,
-            displayName: e['displayName'] as String))
+        .map(
+          (e) => RobloxAccount(id: e['id'] as int, name: e['name'] as String, displayName: e['displayName'] as String),
+        )
         .toList();
   }
 
@@ -135,8 +137,7 @@ class RobloxModule extends HubModule {
   final gamesApi = RobloxGamesApi();
   final _games = <int, RobloxGame>{};
 
-  List<int> get gameIds =>
-      [for (final e in store.getJson<List<dynamic>>('games') ?? const []) (e as num).toInt()];
+  List<int> get gameIds => [for (final e in store.getJson<List<dynamic>>('games') ?? const []) (e as num).toInt()];
 
   int? get selectedGame {
     final s = store.getJson<int>('game');
@@ -170,9 +171,7 @@ class RobloxModule extends HubModule {
   /// toutes les 60 s sauf [force].
   Future<RobloxGame> loadGame(int id, {bool force = false}) {
     final g = game(id);
-    final fresh = g.fetchedAt != null &&
-        DateTime.now().difference(g.fetchedAt!).inSeconds < 60 &&
-        g.name.isNotEmpty;
+    final fresh = g.fetchedAt != null && DateTime.now().difference(g.fetchedAt!).inSeconds < 60 && g.name.isNotEmpty;
     if (!force && fresh && _full[id] != null) return _full[id]!;
     return _full[id] = () async {
       try {
@@ -188,8 +187,7 @@ class RobloxModule extends HubModule {
 
   /// Relevés enregistrés sur l'appareil (pour les courbes).
   List<GameSnapshot> history(int id) => [
-    for (final e in store.getJson<List<dynamic>>('hist.$id') ?? const [])
-      ?GameSnapshot.fromJson(e),
+    for (final e in store.getJson<List<dynamic>>('hist.$id') ?? const []) ?GameSnapshot.fromJson(e),
   ];
 
   /// Ajoute un relevé (au plus un toutes les 5 minutes).
@@ -240,11 +238,13 @@ class RobloxModule extends HubModule {
       ]) {
         final m = milestone(value);
         if (m > 0) {
-          out.add(HubNotification(
-            id: 'rbx:$id:$what:$m',
-            title: '$emoji ${g.name} : ${fmtInt(m)} $what !',
-            body: 'Ton jeu vient de passer ${fmtInt(m)} $what.',
-          ));
+          out.add(
+            HubNotification(
+              id: 'rbx:$id:$what:$m',
+              title: '$emoji ${g.name} : ${fmtInt(m)} $what !',
+              body: 'Ton jeu vient de passer ${fmtInt(m)} $what.',
+            ),
+          );
         }
       }
     }
@@ -268,37 +268,38 @@ class RobloxModule extends HubModule {
 
   @override
   List<HubTool> get tools => [
-        HubTool(
-          name: 'roblox_jeu_stats',
-          description: 'Statistiques du jeu Roblox suivi : joueurs en ligne, visites, '
-              'favoris, j\'aime, serveurs, badges.',
-          run: (_) async => [
-            for (final id in gameIds)
-              await loadGame(id).then((g) => {
-                    'jeu': g.name,
-                    'joueurs_en_ligne': g.playing,
-                    'visites': g.visits,
-                    'favoris': g.favorites,
-                    'jaime': g.upVotes,
-                    'jaime_pas': g.downVotes,
-                    'serveurs': g.servers.length,
-                    'mis_a_jour': g.updated,
-                    'badges': [
-                      for (final b in g.badges.take(20))
-                        {'nom': b.name, 'obtenu': b.awarded, 'taux': b.winRate},
-                    ],
-                  }),
-          ],
-        ),
-        HubTool(
-          name: 'roblox_statut',
-          description: 'Statut des comptes Roblox suivis (en ligne, en jeu…).',
-          run: (_) async => [
-            for (final a in await load(force: true))
-              {'pseudo': a.name, 'nom': a.displayName, 'statut': a.presenceLabel},
-          ],
-        ),
-      ];
+    HubTool(
+      name: 'roblox_jeu_stats',
+      description:
+          'Statistiques du jeu Roblox suivi : joueurs en ligne, visites, '
+          'favoris, j\'aime, serveurs, badges.',
+      run: (_) async => [
+        for (final id in gameIds)
+          await loadGame(id).then(
+            (g) => {
+              'jeu': g.name,
+              'joueurs_en_ligne': g.playing,
+              'visites': g.visits,
+              'favoris': g.favorites,
+              'jaime': g.upVotes,
+              'jaime_pas': g.downVotes,
+              'serveurs': g.servers.length,
+              'mis_a_jour': g.updated,
+              'badges': [
+                for (final b in g.badges.take(20)) {'nom': b.name, 'obtenu': b.awarded, 'taux': b.winRate},
+              ],
+            },
+          ),
+      ],
+    ),
+    HubTool(
+      name: 'roblox_statut',
+      description: 'Statut des comptes Roblox suivis (en ligne, en jeu…).',
+      run: (_) async => [
+        for (final a in await load(force: true)) {'pseudo': a.name, 'nom': a.displayName, 'statut': a.presenceLabel},
+      ],
+    ),
+  ];
 
   Future<void> addAccount(String username) async {
     final acc = await api.lookup(username);
@@ -308,141 +309,140 @@ class RobloxModule extends HubModule {
     await _persist(list);
   }
 
-  Future<void> removeAccount(RobloxAccount a) =>
-      _persist(_saved()..removeWhere((x) => x.id == a.id));
+  Future<void> removeAccount(RobloxAccount a) => _persist(_saved()..removeWhere((x) => x.id == a.id));
 
   Future<void> _persist(List<RobloxAccount> list) async {
     await store.setJson('accounts', [
-      for (final a in list)
-        {'id': a.id, 'name': a.name, 'displayName': a.displayName}
+      for (final a in list) {'id': a.id, 'name': a.name, 'displayName': a.displayName},
     ]);
     await load(force: true);
   }
 
   Widget _avatar(RobloxAccount a, double r) => CircleAvatar(
-        radius: r,
-        backgroundImage: a.avatarUrl == null ? null : NetworkImage(a.avatarUrl!),
-        child: a.avatarUrl == null ? Text(a.name[0].toUpperCase()) : null,
-      );
+    radius: r,
+    backgroundImage: a.avatarUrl == null ? null : NetworkImage(a.avatarUrl!),
+    child: a.avatarUrl == null ? Text(a.name[0].toUpperCase()) : null,
+  );
 
-  Color _presenceColor(int p) =>
-      const [Colors.grey, Colors.blue, Colors.green, Colors.orange][p.clamp(0, 3)];
+  Color _presenceColor(int p) => const [Colors.grey, Colors.blue, Colors.green, Colors.orange][p.clamp(0, 3)];
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) => selectedGame != null
-            ? GameSummary(module: this, id: selectedGame!)
-            : FutureBuilder(
-          future: load(),
-          initialData: _cache,
-          builder: (context, snap) {
-            final list = snap.data ?? [];
-            if (list.isEmpty) {
-              return const EmptyHint('Ajoute ton jeu ou tes comptes Roblox', icon: Icons.add);
-            }
-            // Les comptes en visages : l'anneau dit s'ils jouent.
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
-              child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: [
-                    for (final a in list)
-                      SummaryFace(
-                        name: a.displayName,
-                        url: a.avatarUrl,
-                        color: color,
-                        ring: a.presence == 0 ? null : _presenceColor(a.presence),
-                        sub: a.presenceLabel,
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      );
-
-  @override
-  Widget buildPage(BuildContext context) => DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(name),
-            bottom: const TabBar(tabs: [Tab(text: 'Mon jeu'), Tab(text: 'Comptes')]),
-          ),
-          body: TabBarView(
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              GameDashboard(module: this),
-              _accountsPage(context),
-            ],
-          ),
-        ),
-      );
-
-  Widget _accountsPage(BuildContext context) => Scaffold(
-        floatingActionButton: Builder(
-          builder: (context) => FloatingActionButton.extended(
-            icon: const Icon(Icons.person_add_alt),
-            label: const Text('Ajouter un compte'),
-            onPressed: () async {
-              final r = await askFields(context,
-                  title: 'Compte Roblox', labels: ['Nom d\'utilisateur']);
-              if (r == null || r[0].isEmpty) return;
-              try {
-                await addAccount(r[0]);
-              } catch (e) {
-                if (context.mounted) showError(context, e);
-              }
-            },
-          ),
-        ),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) => FutureBuilder(
+    listenable: store,
+    builder: (context, _) => selectedGame != null
+        ? GameSummary(module: this, id: selectedGame!)
+        : FutureBuilder(
             future: load(),
             initialData: _cache,
             builder: (context, snap) {
               final list = snap.data ?? [];
-              if (list.isEmpty) return const EmptyHint('Aucun compte');
-              return ListView(
-                padding: const EdgeInsets.only(bottom: 80),
-                children: [
-                  for (final a in list)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        leading: _avatar(a, 24),
-                        title: Text('${a.displayName}  (@${a.name})'),
-                        subtitle: Text([
-                          a.presenceLabel,
-                          if (a.location.isNotEmpty) a.location,
-                          if (a.friends != null) '${a.friends} amis',
-                        ].join(' · ')),
-                        onTap: () => openLink(
-                            context, 'https://www.roblox.com/users/${a.id}/profile'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => removeAccount(a),
+              if (list.isEmpty) {
+                return const EmptyHint('Ajoute ton jeu ou tes comptes Roblox', icon: Icons.add);
+              }
+              // Les comptes en visages : l'anneau dit s'ils jouent.
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      for (final a in list)
+                        SummaryFace(
+                          name: a.displayName,
+                          url: a.avatarUrl,
+                          color: color,
+                          ring: a.presence == 0 ? null : _presenceColor(a.presence),
+                          sub: a.presenceLabel,
                         ),
-                      ),
-                    ),
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Le statut « en jeu » n\'apparaît que si le compte autorise '
-                      'tout le monde à voir où il joue (paramètres de '
-                      'confidentialité Roblox).',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               );
             },
           ),
+  );
+
+  @override
+  Widget buildPage(BuildContext context) => DefaultTabController(
+    length: 2,
+    child: Scaffold(
+      appBar: AppBar(
+        title: Text(name),
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Mon jeu'),
+            Tab(text: 'Comptes'),
+          ],
         ),
-      );
+      ),
+      body: TabBarView(
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          GameDashboard(module: this),
+          _accountsPage(context),
+        ],
+      ),
+    ),
+  );
+
+  Widget _accountsPage(BuildContext context) => Scaffold(
+    floatingActionButton: Builder(
+      builder: (context) => FloatingActionButton.extended(
+        icon: const Icon(Icons.person_add_alt),
+        label: const Text('Ajouter un compte'),
+        onPressed: () async {
+          final r = await askFields(context, title: 'Compte Roblox', labels: ['Nom d\'utilisateur']);
+          if (r == null || r[0].isEmpty) return;
+          try {
+            await addAccount(r[0]);
+          } catch (e) {
+            if (context.mounted) showError(context, e);
+          }
+        },
+      ),
+    ),
+    body: ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => FutureBuilder(
+        future: load(),
+        initialData: _cache,
+        builder: (context, snap) {
+          final list = snap.data ?? [];
+          if (list.isEmpty) return const EmptyHint('Aucun compte');
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 80),
+            children: [
+              for (final a in list)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: ListTile(
+                    leading: _avatar(a, 24),
+                    title: Text('${a.displayName}  (@${a.name})'),
+                    subtitle: Text(
+                      [
+                        a.presenceLabel,
+                        if (a.location.isNotEmpty) a.location,
+                        if (a.friends != null) '${a.friends} amis',
+                      ].join(' · '),
+                    ),
+                    onTap: () => openLink(context, 'https://www.roblox.com/users/${a.id}/profile'),
+                    trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => removeAccount(a)),
+                  ),
+                ),
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Le statut « en jeu » n\'apparaît que si le compte autorise '
+                  'tout le monde à voir où il joue (paramètres de '
+                  'confidentialité Roblox).',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
 }

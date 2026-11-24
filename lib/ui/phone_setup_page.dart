@@ -28,9 +28,11 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
 
   Future<void> _mail(String code) async {
     final to = GoogleAuth.driveAccount ?? '';
-    final body = 'Sur ton iPhone : ouvre Mon Hub → « Retrouver mon compte d\'un autre appareil » → copie tout ce '
+    final body =
+        'Sur ton iPhone : ouvre Mon Hub → « Retrouver mon compte d\'un autre appareil » → copie tout ce '
         'message et appuie sur « Coller le code de mon PC ».\n\n$code\n';
-    final uri = 'mailto:$to?subject=${Uri.encodeComponent('Mon Hub : code pour mon iPhone')}&body=${Uri.encodeComponent(body)}';
+    final uri =
+        'mailto:$to?subject=${Uri.encodeComponent('Mon Hub : code pour mon iPhone')}&body=${Uri.encodeComponent(body)}';
     if (!await Browser.open(uri)) _snack('Pas d\'appli de mail sur ce PC : copie le code à la place.');
   }
 
@@ -166,7 +168,7 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
               Text(
-                'Mon Hub sur ton iPhone, avec le même compte que ce PC : tes modules, Clicky, tes réglages, tes '
+                'Mon Hub sur ton iPhone, avec le même compte que ce PC : tes modules, Smily, tes réglages, tes '
                 'révisions, tes anniversaires… Ce que tu changes d\'un côté arrive de l\'autre. Rien ne passe par un '
                 'serveur à nous : la copie chiffrée est dans ton propre Google Drive.',
                 style: theme.textTheme.bodyMedium,
@@ -182,12 +184,18 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(radius: 16, child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                            CircleAvatar(
+                              radius: 16,
+                              child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                            ),
                             const SizedBox(width: 10),
                             Icon(icon, color: theme.colorScheme.primary),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                              child: Text(
+                                title,
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                              ),
                             ),
                           ],
                         ),
@@ -200,10 +208,7 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
               if (!Platform.isWindows)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    'Cette page se suit depuis le PC (Windows).',
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  child: Text('Cette page se suit depuis le PC (Windows).', style: theme.textTheme.bodySmall),
                 ),
             ],
           ),
@@ -232,8 +237,11 @@ class _PasteGoogleCodeState extends State<PasteGoogleCode> {
         widget.onDone();
         return;
       }
-      setState(() => _error = 'Je ne trouve pas le code dans ce que tu as copié. Sur le PC : Réglages → Mes appareils → '
-          'Ajouter mon iPhone → « M\'envoyer le code par mail », puis copie tout le mail.');
+      setState(
+        () => _error =
+            'Je ne trouve pas le code dans ce que tu as copié. Sur le PC : Réglages → Mes appareils → '
+            'Ajouter mon iPhone → « M\'envoyer le code par mail », puis copie tout le mail.',
+      );
     } catch (e) {
       setState(() => _error = '$e');
     }
@@ -249,7 +257,10 @@ class _PasteGoogleCodeState extends State<PasteGoogleCode> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Mon Hub est déjà sur ton PC ?', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              'Mon Hub est déjà sur ton PC ?',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 6),
             const Text(
               'Sur le PC : Réglages → Mes appareils → « Ajouter mon iPhone » → « M\'envoyer le code par mail ». '

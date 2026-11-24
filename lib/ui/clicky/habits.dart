@@ -1,4 +1,4 @@
-// **Clicky te connaît** (v1.58) : il apprend tes habitudes avec le temps
+// **Smily te connaît** (v1.58) : il apprend tes habitudes avec le temps
 // d'écran par heure (sur ce PC seulement, jamais envoyé) — « le mercredi
 // vers 14 h, c'est Roblox (4 semaines sur 4) », ton heure la plus active,
 // l'heure où tu quittes le PC le soir, ton appli n° 1 — et s'en sert pour
@@ -26,7 +26,13 @@ class Habit {
 
   String get say => 'le ${days[weekday - 1]} vers $hour h : $app ($weeks semaines sur 4)';
 
-  Map<String, dynamic> toJson() => {'jour': days[weekday - 1], 'heure': hour, 'appli': app, 'semaines': weeks, 'minutes': minutes};
+  Map<String, dynamic> toJson() => {
+    'jour': days[weekday - 1],
+    'heure': hour,
+    'appli': app,
+    'semaines': weeks,
+    'minutes': minutes,
+  };
 }
 
 class Habits {
@@ -81,7 +87,7 @@ class Habits {
     return null;
   }
 
-  /// Ce que Clicky a remarqué (des phrases), sur les 4 dernières semaines.
+  /// Ce que Smily a remarqué (des phrases), sur les 4 dernières semaines.
   static List<String> insights(Map raw, Map<String, int> week, DateTime now) {
     final out = <String>[];
     final habits = find(raw, now);
@@ -120,7 +126,9 @@ class Habits {
     if (nights.length >= 5) {
       final avg = nights.reduce((a, b) => a + b) / nights.length;
       final h = avg.floor() % 24, m = ((avg - avg.floor()) * 60).round();
-      out.add('Le soir, tu quittes le PC vers ${h == 0 ? 'minuit' : '$h h'}${m >= 15 ? ' ${(m ~/ 15 * 15).toString().padLeft(2, '0')}' : ''} en moyenne.');
+      out.add(
+        'Le soir, tu quittes le PC vers ${h == 0 ? 'minuit' : '$h h'}${m >= 15 ? ' ${(m ~/ 15 * 15).toString().padLeft(2, '0')}' : ''} en moyenne.',
+      );
     }
     final top = ScreenTime.sorted(week).where((e) => e.key != 'Mon Hub').firstOrNull;
     if (top != null && top.value >= 3600) {
@@ -136,7 +144,13 @@ class Habits {
     Map? due;
     for (final x in homework) {
       final d = x['pour_le'] is DateTime ? x['pour_le'] as DateTime : DateTime.tryParse('${x['pour_le']}');
-      if (x['fait'] == true || d == null || d.year != tomorrow.year || d.month != tomorrow.month || d.day != tomorrow.day) continue;
+      if (x['fait'] == true ||
+          d == null ||
+          d.year != tomorrow.year ||
+          d.month != tomorrow.month ||
+          d.day != tomorrow.day) {
+        continue;
+      }
       if (due == null || x['controle'] == true) due = x;
     }
     if (due == null) return null;

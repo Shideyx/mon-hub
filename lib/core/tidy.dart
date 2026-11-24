@@ -51,7 +51,29 @@ class PcTidy {
     'Présentations': ['ppt', 'pptx', 'odp', 'key'],
     'Archives': ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'],
     'Programmes': ['exe', 'msi', 'msix', 'msixbundle', 'appx', 'dmg', 'pkg', 'apk', 'iso'],
-    'Code': ['py', 'js', 'ts', 'dart', 'java', 'c', 'cpp', 'h', 'cs', 'html', 'css', 'json', 'xml', 'yml', 'yaml', 'sql', 'sh', 'ps1', 'bat', 'ipynb', 'lua'],
+    'Code': [
+      'py',
+      'js',
+      'ts',
+      'dart',
+      'java',
+      'c',
+      'cpp',
+      'h',
+      'cs',
+      'html',
+      'css',
+      'json',
+      'xml',
+      'yml',
+      'yaml',
+      'sql',
+      'sh',
+      'ps1',
+      'bat',
+      'ipynb',
+      'lua',
+    ],
     'Polices': ['ttf', 'otf', 'woff', 'woff2'],
     '3D': ['stl', 'obj', 'fbx', 'blend', '3mf', 'rbxl', 'rbxm', 'glb', 'gltf'],
   };
@@ -141,7 +163,10 @@ class PcTidy {
       return d.existsSync() ? d : null;
     }
     // OneDrive d'abord pour le Bureau et les Documents (souvent déplacés).
-    for (final n in names.reversed.where((n) => n.contains('OneDrive')).followedBy(names.where((n) => !n.contains('OneDrive')))) {
+    for (final n
+        in names.reversed
+            .where((n) => n.contains('OneDrive'))
+            .followedBy(names.where((n) => !n.contains('OneDrive')))) {
       final d = Directory('$home$sep$n');
       if (d.existsSync()) return d;
     }
@@ -194,9 +219,8 @@ class PcTidy {
           } catch (_) {}
         }
         for (final group in byHash.values.where((l) => l.length > 1)) {
-          final dated = [
-            for (final f in group) (f, (await f.stat()).modified),
-          ]..sort((a, b) => originalFirst(a.$1.uri.pathSegments.last, a.$2, b.$1.uri.pathSegments.last, b.$2));
+          final dated = [for (final f in group) (f, (await f.stat()).modified)]
+            ..sort((a, b) => originalFirst(a.$1.uri.pathSegments.last, a.$2, b.$1.uri.pathSegments.last, b.$2));
           for (final (f, _) in dated.skip(1)) {
             dup.add(f.path);
             moves.add(TidyMove(f.path, 'Doublons', 'Copie de ${dated.first.$1.uri.pathSegments.last}'));

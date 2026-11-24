@@ -112,10 +112,8 @@ class Fsrs {
               (g == 2 ? w[15] : 1) *
               (g == 4 ? w[16] : 1));
 
-  static double stabilityAfterForget(double d, double s, double r) => math.min(
-    w[11] * math.pow(d, -w[12]) * (math.pow(s + 1, w[13]) - 1) * math.exp(w[14] * (1 - r)),
-    s,
-  );
+  static double stabilityAfterForget(double d, double s, double r) =>
+      math.min(w[11] * math.pow(d, -w[12]) * (math.pow(s + 1, w[13]) - 1) * math.exp(w[14] * (1 - r)), s);
 
   /// Révision le jour même (apprentissage).
   static double shortTerm(double s, int g) => s * math.exp(w[17] * (g - 3 + w[18]));

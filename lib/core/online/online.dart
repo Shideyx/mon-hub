@@ -367,11 +367,7 @@ class Online extends ChangeNotifier {
     final h = cleanHandle(handle);
     if (h == null) throw 'Pseudo : 3 à 30 lettres, chiffres, point, tiret ou _.';
     try {
-      profile = await db
-          .from('profiles')
-          .upsert({'id': id, 'name': name.trim(), 'handle': h})
-          .select()
-          .single();
+      profile = await db.from('profiles').upsert({'id': id, 'name': name.trim(), 'handle': h}).select().single();
     } catch (e) {
       throw explain(e);
     }

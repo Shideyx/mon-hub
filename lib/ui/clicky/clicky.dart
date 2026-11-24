@@ -64,7 +64,10 @@ import 'marks.dart';
 import 'neural_voice.dart';
 import 'ocr.dart';
 import 'pc.dart';
+import 'homework_auto.dart';
+import 'patience.dart';
 import 'quick.dart';
+import 'smily.dart';
 import 'ollama.dart';
 import 'pointer.dart';
 import 'routines.dart';
@@ -98,12 +101,12 @@ import '../../core/everywhere_search.dart';
 import '../../core/hub_home.dart';
 import '../../core/phone_link.dart';
 
-/// « Clicky » : un petit compagnon IA qui vit à côté de ton curseur.
+/// « Smily » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
 /// * Maintiens **Ctrl + Alt** et parle, relâche pour envoyer (appui court =
 ///   écrire). Sur téléphone : la bulle bleue.
 /// * Il voit ton écran (capture envoyée avec ta question ; sur Windows, avec
-///   « Clicky partout », tous tes écrans et toutes tes applis).
+///   « Smily partout », tous tes écrans et toutes tes applis).
 /// * Il répond à voix haute, le texte s'écrit à côté du curseur, et son
 ///   curseur bleu **vole jusqu'au bouton** dont il parle.
 /// * « Agent, … » : il lance une tâche de fond avec tes modules (agenda,
@@ -128,10 +131,10 @@ class ClickyShot {
   final int width;
   final int height;
 
-  /// Coin haut-gauche de la capture, en coordonnées de la couche Clicky.
+  /// Coin haut-gauche de la capture, en coordonnées de la couche Smily.
   final Offset origin;
 
-  /// Taille d'un pixel de la capture, en coordonnées de la couche Clicky.
+  /// Taille d'un pixel de la capture, en coordonnées de la couche Smily.
   final double logicalPerPx;
 
   Offset toLayer(Offset px) => origin + px * logicalPerPx;
@@ -147,7 +150,7 @@ class ClickyController extends ChangeNotifier {
   /// Modules de Mon Hub (dans l'appli).
   HubController? hub;
 
-  /// « Clicky partout » (Windows) : actions lues via le pont local, capture
+  /// « Smily partout » (Windows) : actions lues via le pont local, capture
   /// de tous les écrans, et bascule clics traversants / cliquable.
   List<HubTool> Function()? toolsOverride;
   Future<List<ClickyShot>> Function()? captureOverride;
@@ -167,14 +170,14 @@ class ClickyController extends ChangeNotifier {
   /// Niveaux sonores récents (0..1) pour l'onde pendant l'écoute.
   final levels = List<double>.filled(7, 0);
 
-  /// Position du curseur (coordonnées de la couche Clicky).
+  /// Position du curseur (coordonnées de la couche Smily).
   Offset? cursor;
 
   /// Cible montrée par l'IA (coordonnées de la couche) et son libellé.
   Offset? target;
   String targetLabel = '';
 
-  /// Là où Clicky regarde de lui-même (il y vole sans « pointer »), et ce
+  /// Là où Smily regarde de lui-même (il y vole sans « pointer »), et ce
   /// qu'il en pense (petite bulle). Sa « présence ».
   Offset? gaze;
   String gazeNote = '';
@@ -251,7 +254,7 @@ class ClickyController extends ChangeNotifier {
 
   bool get hasHistory => _memory().isNotEmpty;
 
-  /// Mode discret : Clicky n'apparaît que pendant un échange.
+  /// Mode discret : Smily n'apparaît que pendant un échange.
   bool _recent = false;
   Timer? _fade;
 
@@ -270,7 +273,7 @@ class ClickyController extends ChangeNotifier {
     return d;
   }
 
-  // Réglages partagés avec « Clicky partout » (Windows). Les deux programmes
+  // Réglages partagés avec « Smily partout » (Windows). Les deux programmes
   // gardent leurs préférences en mémoire sans relire le disque : on passe
   // donc par un petit fichier commun, relu toutes les 2 secondes.
   static const _sharedKeys = [
@@ -322,7 +325,7 @@ class ClickyController extends ChangeNotifier {
     return d == null ? null : File('$d${Platform.pathSeparator}clicky.json');
   }
 
-  /// Ce que Clicky sait de toi (Carnet → Mémoire).
+  /// Ce que Smily sait de toi (Carnet → Mémoire).
   List<String> get _facts => Carnet.instance.facts.take(60).toList();
 
   /// Recharge l'historique et le journal (démarrage, compte changé).
@@ -334,7 +337,7 @@ class ClickyController extends ChangeNotifier {
   }
 
   /// Mon Hub (Windows) : publie les réglages du compte ouvert et suit ceux
-  /// que « Clicky partout » modifie.
+  /// que « Smily partout » modifie.
   Future<void> shareOptions() async {
     if (!everywhereSupported) return;
     _shared = null;
@@ -344,7 +347,7 @@ class ClickyController extends ChangeNotifier {
     _watchShared();
   }
 
-  /// « Clicky partout » : lit les réglages publiés par Mon Hub.
+  /// « Smily partout » : lit les réglages publiés par Mon Hub.
   Future<void> followSharedOptions() async {
     await _readShared();
     _watchShared();
@@ -376,7 +379,7 @@ class ClickyController extends ChangeNotifier {
       if (m is! Map) return;
       final next = m.cast<String, dynamic>();
       if (!desktopMode) {
-        // Changé depuis « Clicky partout » : on le garde pour ce compte.
+        // Changé depuis « Smily partout » : on le garde pour ce compte.
         for (final e in next.entries) {
           if (_shared?[e.key] != e.value) await ClaudeApi.store.setJson('clicky.${e.key}', e.value);
         }
@@ -390,13 +393,13 @@ class ClickyController extends ChangeNotifier {
 
   bool get enabled => _opt('enabled', true);
 
-  /// Clicky lit ses réponses à voix haute (sinon : texte seulement).
+  /// Smily lit ses réponses à voix haute (sinon : texte seulement).
   bool get voice => _opt('voice', true);
 
-  /// On peut parler à Clicky au micro (sinon : Ctrl + Alt ouvre la saisie).
+  /// On peut parler à Smily au micro (sinon : Ctrl + Alt ouvre la saisie).
   bool get mic => _opt('mic', true);
 
-  /// Coupe / remet la voix de Clicky (et se tait tout de suite).
+  /// Coupe / remet la voix de Smily (et se tait tout de suite).
   Future<void> toggleVoice() async {
     if (voice) await stopSpeaking();
     await setOption('voice', !voice);
@@ -411,7 +414,7 @@ class ClickyController extends ChangeNotifier {
   /// (clé API) ou 'ollama' (local, gratuit).
   String get provider => _opt('provider', ClaudeCode.supported ? 'claudecode' : 'claude');
 
-  /// Windows : Clicky au-dessus de tout l'écran et de toutes les applis.
+  /// Windows : Smily au-dessus de tout l'écran et de toutes les applis.
   bool get everywhere => _opt('everywhere', true);
 
   /// Apparence : 'hud' (réacteur animé, fenêtres tête haute) ou 'classic'
@@ -419,7 +422,7 @@ class ClickyController extends ChangeNotifier {
   String get look => _opt('look', 'hud');
   bool get hud => look != 'classic';
 
-  /// Comment Clicky t'appelle (vide : ton prénom de compte Mon Hub).
+  /// Comment Smily t'appelle (vide : ton prénom de compte Mon Hub).
   String get callName {
     final n = _opt('callName', '').trim();
     if (n.isNotEmpty) return n;
@@ -456,7 +459,7 @@ class ClickyController extends ChangeNotifier {
   /// Ctrl + Alt + Maj : dictée dans n'importe quelle appli.
   bool get dictation => _opt('dictation', true);
 
-  /// Clicky peut proposer de cliquer / taper à ta place (après relecture).
+  /// Smily peut proposer de cliquer / taper à ta place (après relecture).
   bool get driveOn => _opt('drive', true);
 
   /// Contrôle du PC : 'ask' (permission à chaque commande), 'auto' (sans
@@ -470,10 +473,10 @@ class ClickyController extends ChangeNotifier {
   /// Journal des connaissances.
   bool get journalOn => _opt('journal', true);
 
-  /// Une mémoire séparée par appli (Clicky partout).
+  /// Une mémoire séparée par appli (Smily partout).
   bool get perApp => _opt('perApp', true);
 
-  /// Clicky bouge tout seul autour du curseur (vivant).
+  /// Smily bouge tout seul autour du curseur (vivant).
   bool get alive => _opt('alive', true);
 
   /// Conversation continue : après avoir répondu à voix haute, il réécoute
@@ -482,7 +485,7 @@ class ClickyController extends ChangeNotifier {
 
   static bool get everywhereSupported => !kIsWeb && Platform.isWindows;
 
-  /// Clicky de l'appli désactivé car « Clicky partout » s'en charge.
+  /// Smily de l'appli désactivé car « Smily partout » s'en charge.
   bool get handledElsewhere => !desktopMode && everywhereSupported && everywhere;
 
   Future<void> setOption(String k, Object v) async {
@@ -492,7 +495,7 @@ class ClickyController extends ChangeNotifier {
       _live = null;
       _liveDownUntil = null;
     }
-    // « Clicky partout » n'écrit jamais dans les préférences (ça écraserait
+    // « Smily partout » n'écrit jamais dans les préférences (ça écraserait
     // celles de Mon Hub) : seulement dans le fichier partagé.
     if (!desktopMode) await ClaudeApi.store.setJson('clicky.$k', v);
     if (_shared != null || desktopMode) {
@@ -504,7 +507,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clicky a un cerveau (clé Claude, ou Ollama choisi). Tant que ce n'est
+  /// Smily a un cerveau (clé Claude, ou Ollama choisi). Tant que ce n'est
   /// pas le cas, il reste complètement invisible et ne fait rien : le reste
   /// de Mon Hub marche exactement pareil sans lui.
   bool ready = false;
@@ -530,7 +533,7 @@ class ClickyController extends ChangeNotifier {
       ears.warmUp();
       warmUpLive();
     }
-    // Mot d'activation (« Clicky »).
+    // Mot d'activation (« Smily »).
     if (r && enabled && mic && here && wakeOn && WakeWord.supported) {
       unawaited(_wake.start());
     } else if (_wake.running) {
@@ -557,7 +560,7 @@ class ClickyController extends ChangeNotifier {
     return r;
   }
 
-  /// Clicky te salue au premier démarrage de la journée.
+  /// Smily te salue au premier démarrage de la journée.
   Future<void> _greetOnce() async {
     if (!greet || !voice || !_voicePlatform) return;
     try {
@@ -592,7 +595,7 @@ class ClickyController extends ChangeNotifier {
     encode: (v) => v,
   );
 
-  /// Clicky doit s'afficher et écouter le clavier.
+  /// Smily doit s'afficher et écouter le clavier.
   bool get active => enabled && ready;
 
   bool get buddyVisible =>
@@ -619,7 +622,7 @@ class ClickyController extends ChangeNotifier {
       // Revenu après une longue absence : nouvelle séance.
       if (now.difference(_lastMove).inMinutes >= 15) _sessionStart = now;
       _lastMove = now;
-      // On bouge la souris : Clicky revient tout de suite à côté (sauf s'il
+      // On bouge la souris : Smily revient tout de suite à côté (sauf s'il
       // dort dans son coin ou s'il est assis sur ta fenêtre).
       if (gaze != null && !_gazeHold && !_lifeHold) {
         gaze = null;
@@ -627,8 +630,8 @@ class ClickyController extends ChangeNotifier {
         notifyListeners();
       }
     }
-    // Clicky partout : c'est Windows qui déplace sa fenêtre avec la souris,
-    // rien à redessiner (avant : tout Clicky était redessiné 60 fois par
+    // Smily partout : c'est Windows qui déplace sa fenêtre avec la souris,
+    // rien à redessiner (avant : tout Smily était redessiné 60 fois par
     // seconde dès que la souris bougeait).
     if (!desktopMode && follow && active && state != ClickyState.pointing && buddyVisible) notifyListeners();
   }
@@ -645,6 +648,7 @@ class ClickyController extends ChangeNotifier {
     final v = _opt('micEngine', 'auto');
     return const ['auto', 'windows', 'whisper', 'gemini'].contains(v) ? v : 'auto';
   }
+
   final voiceOut = ClickyVoice();
   late final WakeWord _wake = WakeWord(_onWake);
 
@@ -656,10 +660,7 @@ class ClickyController extends ChangeNotifier {
 
   /// Clé Gemini (gratuite), gardée chiffrée.
   Future<void> setGeminiKey(String? key) async {
-    await ClaudeApi.store.writeSecret(
-      'gemini.key',
-      key == null || key.trim().isEmpty ? null : key.trim(),
-    );
+    await ClaudeApi.store.writeSecret('gemini.key', key == null || key.trim().isEmpty ? null : key.trim());
     voiceOut.geminiKey = key?.trim() ?? '';
   }
 
@@ -677,7 +678,7 @@ class ClickyController extends ChangeNotifier {
 
   Timer? _autoSend;
 
-  /// « Clicky ! » entendu : il écoute ta question.
+  /// « Smily ! » entendu : il écoute ta question.
   void _onWake() {
     if (!active || state != ClickyState.idle) {
       _wake.resume();
@@ -770,7 +771,7 @@ class ClickyController extends ChangeNotifier {
     final problem = await starting;
     _micStarting = null;
     if (problem == null) return;
-    // Panne de lancement (PowerShell bloqué, planté…) : Clicky se répare
+    // Panne de lancement (PowerShell bloqué, planté…) : Smily se répare
     // tout seul une fois, au lieu de juste afficher l'erreur.
     if (isLaunchProblem(problem) && !_autoRepaired) {
       _autoRepaired = true;
@@ -822,13 +823,13 @@ class ClickyController extends ChangeNotifier {
     await startListening(followUp: true);
   }
 
-  /// Clicky a déjà tenté de se réparer tout seul depuis le démarrage.
+  /// Smily a déjà tenté de se réparer tout seul depuis le démarrage.
   bool _autoRepaired = false;
 
   /// Une réparation est en cours.
   bool repairing = false;
 
-  /// « Clicky répare » : remet le micro à zéro, essaie toutes les façons de
+  /// « Smily répare » : remet le micro à zéro, essaie toutes les façons de
   /// le lancer et vérifie qu'il s'ouvre. S'il reste bloqué, l'IA explique
   /// quoi faire en sachant ce qui a déjà été essayé.
   Future<void> repairMic({bool auto = false}) async {
@@ -837,11 +838,7 @@ class ClickyController extends ChangeNotifier {
     final before = micProblem;
     micProblem = null;
     openPanel();
-    _set(
-      ClickyState.thinking,
-      status: auto ? 'Le micro a calé, je le répare…' : 'Je répare le micro…',
-      reply: '',
-    );
+    _set(ClickyState.thinking, status: auto ? 'Le micro a calé, je le répare…' : 'Je répare le micro…', reply: '');
     EarsRepair r;
     try {
       r = await ears.repair();
@@ -862,7 +859,7 @@ class ClickyController extends ChangeNotifier {
     micProblem = r.problem;
     _set(ClickyState.idle, status: '', reply: '');
     // Réparation manuelle : l'IA explique la panne. Automatique : on
-    // affiche le souci (bouton « Clicky répare » pour aller plus loin).
+    // affiche le souci (bouton « Smily répare » pour aller plus loin).
     if (!auto) {
       await _askAi(
         micRepairPrompt(before ?? r.problem!, r, system: kIsWeb ? '' : Platform.operatingSystem),
@@ -961,7 +958,7 @@ class ClickyController extends ChangeNotifier {
         ClickyState.idle,
         status:
             'Je n\'ai rien entendu. Parle un peu plus fort, ou teste ton micro '
-            'dans Réglages → Clicky.',
+            'dans Réglages → Smily.',
       );
       _fadeSoon();
       _wake.resume();
@@ -975,7 +972,7 @@ class ClickyController extends ChangeNotifier {
   bool _spokenAsk = false;
 
   /// Secours Windows : la dictée de Windows (Win + H) écrit dans la zone
-  /// de texte de Clicky.
+  /// de texte de Smily.
   final inputFocus = FocusNode();
   Future<void> windowsDictation() async {
     micProblem = null;
@@ -990,7 +987,7 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Lit un texte à voix haute. [force] : même si la voix de Clicky est
+  /// Lit un texte à voix haute. [force] : même si la voix de Smily est
   /// coupée (les briefings sont toujours lus).
   Future<void> speak(String text, {bool force = false}) async {
     if ((!voice && !force) || !_voicePlatform || text.isEmpty) return;
@@ -1040,7 +1037,7 @@ class ClickyController extends ChangeNotifier {
   void hotkey({required bool down, bool other = false, bool dictate = false}) {
     if (!active) return;
     if (_holding && other) {
-      // Ctrl + Alt + une touche = un raccourci clavier, pas Clicky.
+      // Ctrl + Alt + une touche = un raccourci clavier, pas Smily.
       _cancelled = true;
       _holdTimer?.cancel();
       if (state == ClickyState.listening) unawaited(stopListening(send: false));
@@ -1061,9 +1058,7 @@ class ClickyController extends ChangeNotifier {
       _holding = false;
       _holdTimer?.cancel();
       if (_cancelled) return;
-      final short =
-          DateTime.now().difference(_holdStart ?? DateTime.now()) <
-          const Duration(milliseconds: 350);
+      final short = DateTime.now().difference(_holdStart ?? DateTime.now()) < const Duration(milliseconds: 350);
       if (short) {
         panelOpen ? closePanel() : openPanel();
       } else {
@@ -1095,12 +1090,12 @@ class ClickyController extends ChangeNotifier {
     LogicalKeyboardKey.shiftRight,
   };
 
-  /// Clavier de l'appli (quand Clicky vit dans la fenêtre de Mon Hub).
+  /// Clavier de l'appli (quand Smily vit dans la fenêtre de Mon Hub).
   bool onKey(KeyEvent e) {
     try {
       return _onKey(e);
     } catch (_) {
-      return false; // Clicky ne doit jamais gêner le clavier de l'appli
+      return false; // Smily ne doit jamais gêner le clavier de l'appli
     }
   }
 
@@ -1112,7 +1107,7 @@ class ClickyController extends ChangeNotifier {
       return false;
     }
     // AltGr (claviers français : @, €, #…) envoie aussi Ctrl + Alt : on
-    // l'ignore pour ne pas ouvrir Clicky en tapant une adresse mail.
+    // l'ignore pour ne pas ouvrir Smily en tapant une adresse mail.
     final altGr =
         k.physicalKeysPressed.contains(PhysicalKeyboardKey.altRight) ||
         k.logicalKeysPressed.contains(LogicalKeyboardKey.altGraph);
@@ -1174,7 +1169,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mode discret : Clicky disparaît 1 s après la fin de l'échange.
+  /// Mode discret : Smily disparaît 1 s après la fin de l'échange.
   void _fadeSoon() {
     _fade?.cancel();
     _fade = Timer(const Duration(seconds: 1), () {
@@ -1235,7 +1230,7 @@ class ClickyController extends ChangeNotifier {
   bool _noticing = false;
 
   /// Pour les regards autour (mode « partout ») : là où il peut aller voir.
-  /// Donné par Clicky partout (coordonnées de l'écran).
+  /// Donné par Smily partout (coordonnées de l'écran).
   List<Offset> Function()? lookSpots;
 
   /// L'appli au premier plan est en plein écran (jeu, vidéo) : il se fait
@@ -1317,7 +1312,11 @@ class ClickyController extends ChangeNotifier {
         await _refreshCtx(now);
         note = mind.thought(_ctx, now: now) ?? '';
       }
-      glance(at, note: note, hold: Duration(milliseconds: 2600 + r.nextInt(2400)));
+      glance(
+        at,
+        note: note,
+        hold: Duration(milliseconds: 2600 + r.nextInt(2400)),
+      );
       if (note.isNotEmpty && voice && await mind.spendVoice()) unawaited(speak(note));
     }
   }
@@ -1367,7 +1366,7 @@ class ClickyController extends ChangeNotifier {
     _ctx = ctx;
   }
 
-  /// Clicky va regarder quelque part tout seul (puis revient).
+  /// Smily va regarder quelque part tout seul (puis revient).
   void glance(Offset at, {String note = '', Duration hold = const Duration(seconds: 3)}) {
     // Il dormait ou était assis sur ta fenêtre : il se lève d'abord.
     if (_lifeHold) _endRest(quiet: true);
@@ -1410,7 +1409,9 @@ class ClickyController extends ChangeNotifier {
         : 'Batterie à $pct %, pense à brancher le chargeur.';
     notify?.call('Batterie faible', text);
     final at = cursor;
-    if (at != null && state == ClickyState.idle) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 6));
+    if (at != null && state == ClickyState.idle) {
+      glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 6));
+    }
     if (voice && state == ClickyState.idle) unawaited(speak(text));
   }
 
@@ -1420,7 +1421,7 @@ class ClickyController extends ChangeNotifier {
     try {
       title = Win.foregroundTitle();
     } catch (_) {}
-    if (title.trim().isEmpty || title == 'Clicky') return;
+    if (title.trim().isEmpty || title == 'Smily') return;
     // Seulement quand l'appli **arrive** au premier plan (pas si elle y était
     // déjà quand on a demandé le rappel).
     final changed = title != _lastFront;
@@ -1429,7 +1430,7 @@ class ClickyController extends ChangeNotifier {
     final r = await AppReminders.instance.due(title);
     if (r == null) return;
     final text = 'Rappel : ${r.text}';
-    notify?.call('Rappel de Clicky', r.text);
+    notify?.call('Rappel de Smily', r.text);
     final at = cursor;
     if (at != null) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 8));
     if (voice) unawaited(speak(withoutEmoji(text)));
@@ -1460,7 +1461,7 @@ class ClickyController extends ChangeNotifier {
   /// (Gemini seulement, jamais Claude ; 8 fois par jour au plus).
   Future<void> noticeSomething({bool force = false}) async {
     final mind = ClickyMind.instance;
-    // C'est Clicky partout (sur tout l'écran) qui regarde.
+    // C'est Smily partout (sur tout l'écran) qui regarde.
     if (handledElsewhere) {
       await ClickyDesktop.send('notice');
       return;
@@ -1481,12 +1482,14 @@ class ClickyController extends ChangeNotifier {
       // L'écran où est la souris.
       final cur = cursor;
       final shot = shots.firstWhere(
-        (s) => cur == null || Rect.fromLTWH(s.origin.dx, s.origin.dy, s.width * s.logicalPerPx, s.height * s.logicalPerPx).contains(cur),
+        (s) =>
+            cur == null ||
+            Rect.fromLTWH(s.origin.dx, s.origin.dy, s.width * s.logicalPerPx, s.height * s.logicalPerPx).contains(cur),
         orElse: () => shots.first,
       );
       final r = await AiText.ask(
         ClickyMind.noticePrompt(name: callName, mood: mind.moodLabel(DateTime.now())),
-        system: 'Tu es Clicky, un compagnon curieux et sympa. Tu réponds en français, très court.',
+        system: 'Tu es Smily, un compagnon curieux et sympa. Tu réponds en français, très court.',
         images: [shot.png64],
         geminiOnly: true,
       );
@@ -1529,12 +1532,12 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Pose une question à Clicky depuis une page de Mon Hub (« Essayer » du
-  /// catalogue, de la visite guidée) : c'est Clicky partout qui répond s'il
+  /// Pose une question à Smily depuis une page de Mon Hub (« Essayer » du
+  /// catalogue, de la visite guidée) : c'est Smily partout qui répond s'il
   /// est là.
   void askAnywhere(String question) => _explainScreen(question);
 
-  /// Il ouvre sa boîte et répond à une question sur l'écran (Clicky partout
+  /// Il ouvre sa boîte et répond à une question sur l'écran (Smily partout
   /// s'il est là).
   void _explainScreen(String question) {
     if (handledElsewhere) {
@@ -1547,7 +1550,7 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Sa vie à lui (v1.57) : il dort, rêve, danse, réagit ----------
 
-  /// Clicky partout : son coin pour dormir (en bas de l'écran où est la
+  /// Smily partout : son coin pour dormir (en bas de l'écran où est la
   /// souris), et où s'asseoir sur la fenêtre au premier plan (avec le
   /// rectangle de la fenêtre : il tombe si elle bouge ou se ferme).
   Offset? Function()? restSpot;
@@ -1682,13 +1685,14 @@ class ClickyController extends ChangeNotifier {
     life.show('😵‍💫', seconds: 3);
     if (life.mayEmoji('tournis-texte', now, const Duration(minutes: 20))) {
       _lifeSay(
-        const ['Ouh là… la tête qui tourne !', 'Doucement, j\'ai le mal de mer !', 'Waouh, on est où là ?'][now.second % 3],
+        const ['Ouh là… la tête qui tourne !', 'Doucement, j\'ai le mal de mer !', 'Waouh, on est où là ?'][now.second %
+            3],
         seconds: 3,
       );
     }
   }
 
-  /// Un clic (Clicky partout) : il se réveille, ou s'inquiète si tu
+  /// Un clic (Smily partout) : il se réveille, ou s'inquiète si tu
   /// cliques comme un fou (sauf dans un jeu).
   void userClicked() {
     final life = ClickyLife.instance;
@@ -1871,7 +1875,7 @@ class ClickyController extends ChangeNotifier {
       try {
         final r = await AiText.ask(
           ClickyLife.dreamPrompt(name: callName, app: app, artist: artist, memory: memory),
-          system: 'Tu es Clicky, un petit curseur vivant, drôle et tendre. Français, très court.',
+          system: 'Tu es Smily, un petit curseur vivant, drôle et tendre. Français, très court.',
           geminiOnly: true,
         ).timeout(const Duration(seconds: 12));
         dream = ClickyLife.cleanDream(r) ?? dream;
@@ -1953,7 +1957,7 @@ class ClickyController extends ChangeNotifier {
     }
   }
 
-  /// Ta musique joue (Clicky partout) : il écoute le son du PC et danse en
+  /// Ta musique joue (Smily partout) : il écoute le son du PC et danse en
   /// rythme (seulement sur une vraie musique, au rythme régulier).
   Future<void> _checkDance(bool quietMode) async {
     final life = ClickyLife.instance;
@@ -1965,14 +1969,11 @@ class ClickyController extends ChangeNotifier {
     if (want && _beatSub == null) {
       _beatDetector.reset();
       life.setDancing(true);
-      _beatSub = LoopbackCapture.start().listen(
-        (pcm) {
-          if (_beatDetector.push(pcm) > 0 && state == ClickyState.idle && !life.asleep) {
-            life.onBeat(steady: _beatDetector.steady);
-          }
-        },
-        onError: (Object _) => unawaited(_stopDance()),
-      );
+      _beatSub = LoopbackCapture.start().listen((pcm) {
+        if (_beatDetector.push(pcm) > 0 && state == ClickyState.idle && !life.asleep) {
+          life.onBeat(steady: _beatDetector.steady);
+        }
+      }, onError: (Object _) => unawaited(_stopDance()));
     } else if (!want && _beatSub != null) {
       await _stopDance();
     }
@@ -1995,7 +1996,7 @@ class ClickyController extends ChangeNotifier {
     unawaited(feel(f.$1, text: f.$2));
   }
 
-  /// Ce qu'il ressent, à côté de lui (envoyé à Clicky partout s'il est là).
+  /// Ce qu'il ressent, à côté de lui (envoyé à Smily partout s'il est là).
   Future<void> feel(String emoji, {String? text}) async {
     if (handledElsewhere) {
       await ClickyDesktop.send('feel64 ${base64Encode(utf8.encode(jsonEncode({'e': emoji, 't': text})))}');
@@ -2019,6 +2020,10 @@ class ClickyController extends ChangeNotifier {
 
   /// L'idée en attente de ta réponse.
   ClickyIdea? idea;
+
+  /// Le dernier sujet dont il a parlé de lui-même (pour « arrête de me le
+  /// répéter », même quand la boîte est déjà refermée).
+  String? _lastSubject;
   Timer? _ideaTimeout;
   Timer? _autonomy;
   bool _deciding = false;
@@ -2032,6 +2037,9 @@ class ClickyController extends ChangeNotifier {
       return;
     }
     if (!active || !_calm) return;
+    // Sujet déjà refusé (« j'ai pas envie », « arrête ») : il se taît.
+    if (!Patience.instance.mayTalk(i.tool)) return;
+    _lastSubject = i.tool;
     idea = i;
     _keepReply = true;
     onInteractive?.call(true);
@@ -2056,8 +2064,12 @@ class ClickyController extends ChangeNotifier {
     if (!panelOpen && board == null) onInteractive?.call(false);
     final mind = ClickyMind.instance;
     if (yes != null) unawaited(mind.recordDecision(i.tool, yes));
+    // Un seul endroit retient tes refus : plus il refuse un sujet, plus
+    // Smily se taît longtemps dessus (et au 3ᵉ refus, il laisse tomber).
+    final patience = Patience.instance;
+    unawaited(patience.answered(i.tool, yes == true ? Answer.yes : (yes == false ? Answer.no : Answer.later)));
     if (yes != true) {
-      final r = yes == false ? 'D\'accord, je laisse tomber.' : '';
+      final r = yes == false ? PatienceRules.ack(Answer.no) : '';
       _set(ClickyState.idle, status: '', reply: r);
       if (r.isNotEmpty) unawaited(speak(r));
       _fadeSoon();
@@ -2067,6 +2079,22 @@ class ClickyController extends ChangeNotifier {
   }
 
   Future<void> _runIdea(ClickyIdea i) async {
+    // « Oui » à la question des devoirs : l'autorisation est donnée, et il
+    // s'y met dès que tu t'éloignes.
+    if (i.tool == 'devoirs_auto') {
+      await HomeworkAuto.instance.setAllowed(true);
+      final id = '${i.args['id'] ?? ''}', subject = '${i.args['matiere'] ?? 'ce devoir'}';
+      _set(
+        ClickyState.idle,
+        status: '',
+        reply:
+            'C\'est noté : je m\'occupe de tes devoirs dès que tu t\'éloignes, et je te montre le travail au retour. '
+            'Tu peux couper ça dans mes réglages.',
+      );
+      unawaited(speak(reply));
+      await _startHomework(id, subject);
+      return;
+    }
     if (i.tool == 'agent') {
       unawaited(_runAgent('${i.args['tache'] ?? ''}'.trim()));
       return;
@@ -2091,7 +2119,7 @@ class ClickyController extends ChangeNotifier {
           say = (await AiText.ask(
             'Tu viens de faire ceci pour la personne : ${i.say}\nRésultat (données) : ${jsonEncode(ClaudeBridge.plain(r))}\n'
             'Dis-lui le résultat en une ou deux phrases courtes, à l\'oral, sans liste.',
-            system: 'Tu es Clicky, un assistant chaleureux. Français, très court.',
+            system: 'Tu es Smily, un assistant chaleureux. Français, très court.',
             geminiOnly: true,
           )).trim();
         } catch (_) {}
@@ -2131,7 +2159,10 @@ class ClickyController extends ChangeNotifier {
   void _refreshFeed() {
     final h = hub;
     if (h == null) return;
-    final tools = {for (final m in h.enabled) for (final t in m.tools) t.name: t};
+    final tools = {
+      for (final m in h.enabled)
+        for (final t in m.tools) t.name: t,
+    };
     unawaited(
       HubFeed.instance
           .refresh(
@@ -2208,7 +2239,11 @@ class ClickyController extends ChangeNotifier {
           missed = CatchUp.short(await _catchUp(Duration(seconds: away + 120)).timeout(const Duration(seconds: 10)));
         } catch (_) {}
       }
-      if (propose) unawaited(think([hello, missed, ?extra].where((t) => t.isNotEmpty).join(' ')));
+      // Les devoirs faits pendant ton absence (et ceux qu'il a ratés).
+      final homework = HomeworkAuto.instance.takeWelcome();
+      if (propose) {
+        unawaited(think([hello, homework, missed, ?extra].where((t) => t.isNotEmpty).join(' ')));
+      }
       return null;
     }
     // Quelque chose d'important arrive (cours dans 30 min, contrôle demain) :
@@ -2241,26 +2276,28 @@ class ClickyController extends ChangeNotifier {
     final names = {for (final t in tools) t.name};
     final skip = mind.skipTools(n);
     if (await AiText.hasGemini()) {
-      final a = Assistant.instance..useTools(
-        call: (name, args) async => tools.where((t) => t.name == name).firstOrNull?.run(args),
-        tools: () => names,
-      );
+      final a = Assistant.instance
+        ..useTools(
+          call: (name, args) async => tools.where((t) => t.name == name).firstOrNull?.run(args),
+          tools: () => names,
+        );
       final situation = Assistant.briefingText(await a.collect(n), name: callName);
       final fg = DriveRunner.supported ? Win.foregroundTitle() : '';
       final r = await AiText.ask(
         Autonomy.prompt(
           situation: situation,
-          tools: [for (final t in tools) if (!skip.contains(t.name)) t],
+          tools: [
+            for (final t in tools)
+              if (!skip.contains(t.name)) t,
+          ],
           name: callName,
           window: ClickyController.privateApp.hasMatch(fg.toLowerCase()) ? '' : fg,
-          memory: [
-            for (final e in mind.episodes.take(4)) '- souvenir : ${e.text}',
-          ].join('\n'),
+          memory: [for (final e in mind.episodes.take(4)) '- souvenir : ${e.text}'].join('\n'),
           likes: mind.likes,
           dislikes: mind.dislikes,
           now: n,
         ),
-        system: 'Tu es Clicky, un assistant personnel autonome, prudent et utile. Tu réponds seulement en JSON.',
+        system: 'Tu es Smily, un assistant personnel autonome, prudent et utile. Tu réponds seulement en JSON.',
         geminiOnly: true,
       );
       final i = Autonomy.parse(AiText.json(r), names);
@@ -2280,7 +2317,10 @@ class ClickyController extends ChangeNotifier {
     final rev = await call('revision_paquets');
     if (rev is Map) {
       ctx['cartes'] = rev['a_revoir_aujourdhui'];
-      final decks = [for (final d in (rev['paquets'] as List?) ?? const []) if (d is Map) '${d['nom']}'];
+      final decks = [
+        for (final d in (rev['paquets'] as List?) ?? const [])
+          if (d is Map) '${d['nom']}',
+      ];
       for (final t in (rev['controles'] as List?) ?? const []) {
         if (t is! Map) continue;
         final d = t['date'] is DateTime ? t['date'] as DateTime : DateTime.tryParse('${t['date']}');
@@ -2308,7 +2348,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Garde-fou : Clicky resté coincé sur « j'écoute » ou « je réfléchis »
+  /// Garde-fou : Smily resté coincé sur « j'écoute » ou « je réfléchis »
   /// (réseau qui ne répond plus, micro bloqué…) n'acceptait plus rien. Sans
   /// nouvelle pendant trop longtemps, il se débloque tout seul.
   Timer? _stuck;
@@ -2323,7 +2363,7 @@ class ClickyController extends ChangeNotifier {
     if (limit == null) return;
     _stuck = Timer(limit, () {
       if (state != s) return;
-      ErrorLog.record('Clicky est resté bloqué sur « ${s.name} » ($status)', StackTrace.current, where: 'Clicky');
+      ErrorLog.record('Smily est resté bloqué sur « ${s.name} » ($status)', StackTrace.current, where: 'Smily');
       unawaited(
         cancel().then((_) => _set(ClickyState.idle, status: 'Je m\'étais coincé : c\'est reparti, redemande-moi.')),
       );
@@ -2347,7 +2387,7 @@ class ClickyController extends ChangeNotifier {
     state = s;
     // On l'appelle pendant qu'il dort ou qu'il est assis : il revient.
     if (s != ClickyState.idle && _lifeHold) _endRest(quiet: true);
-    FreezeWatch.note('Clicky : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
+    FreezeWatch.note('Smily : ${s.name}${status == null || status.isEmpty ? '' : ' ($status)'}');
     if (status != null) this.status = status;
     if (reply != null) this.reply = reply;
     if (s != ClickyState.idle) {
@@ -2385,8 +2425,7 @@ class ClickyController extends ChangeNotifier {
     if (DriveRunner.supported)
       HubTool(
         name: 'clicky_corriger_selection',
-        description:
-            'Corrige (ou reformule, ou traduit) le texte surligné dans l\'appli ouverte et le remplace, comme Ctrl + Alt + C.',
+        description: 'Corrige (ou reformule, ou traduit) le texte surligné dans l\'appli ouverte et le remplace, comme Ctrl + Alt + C.',
         params: {'mode': ('string', 'corriger (défaut), reformuler, ou traduire:anglais (ou une autre langue)')},
         run: (a) async => fixSelection(mode: '${a['mode'] ?? 'corriger'}'),
       ),
@@ -2436,12 +2475,9 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_concentration',
       description:
-          'Mode concentration : pendant la séance, Clicky ne dérange plus (pas d\'idées ni de remarques), les '
+          'Mode concentration : pendant la séance, Smily ne dérange plus (pas d\'idées ni de remarques), les '
           'notifications de Mon Hub attendent la fin, et il annonce la fin avec le bilan.',
-      params: {
-        'minutes': ('integer', 'Durée (défaut 45)'),
-        'arreter': ('boolean', 'Arrêter la séance en cours'),
-      },
+      params: {'minutes': ('integer', 'Durée (défaut 45)'), 'arreter': ('boolean', 'Arrêter la séance en cours')},
       run: (a) async {
         final f = FocusMode.instance;
         if (a['arreter'] == true) {
@@ -2456,7 +2492,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'clicky_rappel_appli',
       description:
-          'Rappel lié à une appli : Clicky le dit la prochaine fois que l\'appli est ouverte (« rappelle-moi de '
+          'Rappel lié à une appli : Smily le dit la prochaine fois que l\'appli est ouverte (« rappelle-moi de '
           'répondre à Léo quand j\'ouvre Discord »). Sans texte : liste les rappels ; supprimer=true : les retire.',
       params: {
         'appli': ('string', 'L\'appli ou le site (Discord, Chrome, YouTube, Word…)'),
@@ -2469,7 +2505,9 @@ class ClickyController extends ChangeNotifier {
         final text = '${a['texte'] ?? ''}'.trim();
         if (a['supprimer'] == true) return {'ok': await r.remove(app)};
         if (app.isEmpty || text.isEmpty) {
-          return [for (final x in await r.list()) {'appli': x.app, 'rappel': x.text}];
+          return [
+            for (final x in await r.list()) {'appli': x.app, 'rappel': x.text},
+          ];
         }
         await r.add(app, text);
         return {'ok': true, 'appli': app};
@@ -2485,10 +2523,16 @@ class ClickyController extends ChangeNotifier {
   /// Une correction de texte est en cours.
   bool _fixing = false;
 
-  /// Une petite bulle à côté de Clicky (sans bouger la boîte).
+  /// Une petite bulle à côté de Smily (sans bouger la boîte).
   void _bubble(String text, {int seconds = 5}) {
     final at = cursor;
-    if (at != null) glance(at + const Offset(40, -30), note: text, hold: Duration(seconds: seconds));
+    if (at != null) {
+      glance(
+        at + const Offset(40, -30),
+        note: text,
+        hold: Duration(seconds: seconds),
+      );
+    }
   }
 
   /// **Ctrl + Alt + C** : corrige le texte surligné dans l'appli ouverte
@@ -2548,7 +2592,9 @@ class ClickyController extends ChangeNotifier {
       Win.pressCombo('ctrl+v');
       // Le temps que l'appli colle, puis on remet ton presse-papier.
       await Future<void>.delayed(const Duration(milliseconds: 450));
-      return done(mode == 'corriger' ? 'Corrigé ✓ ($n mot${n > 1 ? 's' : ''} changé${n > 1 ? 's' : ''})' : 'C\'est fait ✓');
+      return done(
+        mode == 'corriger' ? 'Corrigé ✓ ($n mot${n > 1 ? 's' : ''} changé${n > 1 ? 's' : ''})' : 'C\'est fait ✓',
+      );
     } catch (e) {
       ErrorLog.record(e, null, where: 'Correction du texte surligné');
       return done('Je n\'ai pas pu corriger ce texte ($e).');
@@ -2598,7 +2644,9 @@ class ClickyController extends ChangeNotifier {
       run: (a) async {
         final st = ScreenTime.instance;
         await st.load();
-        if (!st.on) return {'resume': 'Le temps d\'écran n\'est pas suivi (Réglages → Temps d\'écran pour l\'activer).'};
+        if (!st.on) {
+          return {'resume': 'Le temps d\'écran n\'est pas suivi (Réglages → Temps d\'écran pour l\'activer).'};
+        }
         final now = DateTime.now();
         final p = ToolRouter.normalize('${a['periode'] ?? 'jour'}');
         final (m, label) = p.startsWith('sem')
@@ -2612,13 +2660,16 @@ class ClickyController extends ChangeNotifier {
           final secs = key == null ? 0 : m[key]!;
           final limit = key == null ? null : st.limits[key];
           return {
-            'resume': '$label : ${ScreenTime.say(secs)} sur ${key ?? app}'
+            'resume':
+                '$label : ${ScreenTime.say(secs)} sur ${key ?? app}'
                 '${limit == null ? '' : ' (limite : ${ScreenTime.say(limit * 60)} par jour)'}.',
           };
         }
         return {
           'resume': ScreenTime.summary(m, when: label),
-          'applis': [for (final e in ScreenTime.sorted(m).take(10)) {'appli': e.key, 'temps': ScreenTime.say(e.value)}],
+          'applis': [
+            for (final e in ScreenTime.sorted(m).take(10)) {'appli': e.key, 'temps': ScreenTime.say(e.value)},
+          ],
           'limites': {for (final e in st.limits.entries) e.key: ScreenTime.say(e.value * 60)},
         };
       },
@@ -2674,7 +2725,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'copie_corriger',
       description:
-          'Ouvre la correction de copie : la personne prend sa copie (rédaction, exercice) en photo et Clicky entoure '
+          'Ouvre la correction de copie : la personne prend sa copie (rédaction, exercice) en photo et Smily entoure '
           'chaque faute à sa place sur la feuille, avec la correction et la règle, et une note estimée.',
       params: {'chemin': ('string', 'Chemin d\'une photo déjà sur le PC (facultatif)')},
       run: (a) async {
@@ -2705,12 +2756,15 @@ class ClickyController extends ChangeNotifier {
         if (Win.supportedHere) Win.raiseMain(pid);
         final l = '${a['lien'] ?? ''}'.trim();
         unawaited(VideoNotesPage.open(url: l.isEmpty ? null : l));
-        return l.isEmpty ? 'Colle le lien de la vidéo dans la page qui s\'ouvre.' : 'Je regarde la vidéo et je fais la fiche…';
+        return l.isEmpty
+            ? 'Colle le lien de la vidéo dans la page qui s\'ouvre.'
+            : 'Je regarde la vidéo et je fais la fiche…';
       },
     ),
     HubTool(
       name: 'carte_mentale',
-      description: 'Fait une carte mentale animée (branches qui se déplient) sur un sujet ou à partir du texte d\'un cours.',
+      description:
+          'Fait une carte mentale animée (branches qui se déplient) sur un sujet ou à partir du texte d\'un cours.',
       params: {'sujet': ('string', 'Le sujet, ou le texte du cours')},
       run: (a) async {
         if (Win.supportedHere) Win.raiseMain(pid);
@@ -2722,7 +2776,7 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'interprete_ouvrir',
       description:
-          'Ouvre l\'interprète en direct : la personne parle avec quelqu\'un dans une autre langue, Clicky traduit à voix '
+          'Ouvre l\'interprète en direct : la personne parle avec quelqu\'un dans une autre langue, Smily traduit à voix '
           'haute dans les deux sens (français ⇄ la langue choisie).',
       params: {'langue': ('string', 'Anglais, Espagnol, Allemand, Italien, Portugais, Arabe, Chinois, Japonais…')},
       run: (a) async {
@@ -2782,7 +2836,7 @@ class ClickyController extends ChangeNotifier {
     return EverywhereSearch.run(query, (n, a) async => byName[n]?.run(a), byName.keys.toSet(), onPart: onPart);
   }
 
-  /// Ctrl + Alt + Espace (Clicky partout) ou Ctrl + Espace (Mon Hub).
+  /// Ctrl + Alt + Espace (Smily partout) ou Ctrl + Espace (Mon Hub).
   Future<void> openSearch([String text = '']) async {
     if (hub != null && !desktopMode) {
       HubHome.instance.onSearchText?.call(text);
@@ -2857,11 +2911,14 @@ class ClickyController extends ChangeNotifier {
     HubTool(
       name: 'cours_ecouter',
       description:
-          'Clicky écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
+          'Smily écoute le cours en entier au micro (transcription au fur et à mesure), pour en faire un compte '
           'rendu à la fin. Matière et heure de fin trouvées dans l\'emploi du temps si possible.',
       params: {
         'matiere': ('string', 'Matière ou thème (facultatif)'),
-        'google_doc': ('boolean', 'Écrire les notes en direct dans un Google Doc (oui par défaut si Google est connecté)'),
+        'google_doc': (
+          'boolean',
+          'Écrire les notes en direct dans un Google Doc (oui par défaut si Google est connecté)',
+        ),
       },
       run: (a) async {
         final l = CourseListener.instance;
@@ -2884,18 +2941,20 @@ class ClickyController extends ChangeNotifier {
       run: (_) async {
         final l = CourseListener.instance;
         if (!l.recording) return {'ok': false, 'message': 'Je n\'écoutais pas de cours.'};
-        unawaited(l.stop().then((n) {
-          if (n != null && n.done) {
-            notify?.call('Compte rendu prêt', n.title);
-            unawaited(CoursePage.show());
-          }
-        }));
+        unawaited(
+          l.stop().then((n) {
+            if (n != null && n.done) {
+              notify?.call('Compte rendu prêt', n.title);
+              unawaited(CoursePage.show());
+            }
+          }),
+        );
         return {'ok': true};
       },
     ),
     HubTool(
       name: 'cours_comptes_rendus',
-      description: 'Les comptes rendus des cours écoutés par Clicky (les plus récents d\'abord).',
+      description: 'Les comptes rendus des cours écoutés par Smily (les plus récents d\'abord).',
       params: {'recherche': ('string', 'Matière ou mot (facultatif)')},
       run: (a) async {
         final q = '${a['recherche'] ?? ''}'.toLowerCase().trim();
@@ -2930,7 +2989,7 @@ class ClickyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Appli au premier plan (Clicky partout) : chaque appli a sa mémoire.
+  /// Appli au premier plan (Smily partout) : chaque appli a sa mémoire.
   String currentApp = '';
   final _threadFor = <String, String>{};
 
@@ -3036,7 +3095,7 @@ class ClickyController extends ChangeNotifier {
 
   // ---------- Question → IA ----------
 
-  /// Capture de la fenêtre de Mon Hub (Clicky dans l'appli).
+  /// Capture de la fenêtre de Mon Hub (Smily dans l'appli).
   Future<List<ClickyShot>> _captureApp() async {
     try {
       final b = shotKey.currentContext?.findRenderObject();
@@ -3074,15 +3133,14 @@ class ClickyController extends ChangeNotifier {
     final names = {for (final t in local) t.name};
     return [
       ...[
-        ...toolsOverride?.call() ??
-            [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
+        ...toolsOverride?.call() ?? [for (final m in hub?.enabled ?? const <HubModule>[]) ...m.tools],
         if (toolsOverride == null) ...McpTools.cached,
       ].where((t) => !names.contains(t.name)),
       ...local,
     ];
   }
 
-  /// Outils de Clicky lui-même (exécutés dans ce programme) : dépannage et
+  /// Outils de Smily lui-même (exécutés dans ce programme) : dépannage et
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
     if (_voicePlatform) ...repairTools,
@@ -3108,36 +3166,38 @@ class ClickyController extends ChangeNotifier {
     if (hub != null && toolsOverride == null) ...Assistant.instance.tools,
   ];
 
-  /// Les outils de dépannage de Clicky : l'IA peut voir ce qui ne va pas
+  /// Les outils de dépannage de Smily : l'IA peut voir ce qui ne va pas
   /// et réparer le micro elle-même (« mon micro ne marche pas »).
   List<HubTool> get repairTools => [
     HubTool(
       name: 'clicky_reparer',
       description:
-          'Répare Clicky tout seul : relit le journal des erreurs du PC et corrige ce qui est '
-          'réparable (micro bloqué, certificats cassés, appli qui fige, Clicky partout qui n\'arrive '
+          'Répare Smily tout seul : relit le journal des erreurs du PC et corrige ce qui est '
+          'réparable (micro bloqué, certificats cassés, appli qui fige, Smily partout qui n\'arrive '
           'pas à tenir, disque presque plein). À utiliser quand la personne dit « répare-toi », '
           '« tu bugues », « ça ne marche plus ».',
       run: (_) async {
         final done = await SelfRepair.instance.run(manual: true, diskFreeGb: SelfRepair.diskFreeGb());
         return {
           'resume': RepairRules.say(done),
-          'reparations': [for (final r in done) {'quoi': r.title, 'fait': r.fixed}],
+          'reparations': [
+            for (final r in done) {'quoi': r.title, 'fait': r.fixed},
+          ],
         };
       },
     ),
     HubTool(
       name: 'clicky_diagnostic',
       description:
-          'Diagnostic de Clicky : état du micro (dernière panne, façon de lancer la reconnaissance '
+          'Diagnostic de Smily : état du micro (dernière panne, façon de lancer la reconnaissance '
           'vocale), du mot d\'activation, de la voix et du cerveau (Claude). À utiliser quand la '
-          'personne dit que Clicky, le micro ou la voix ne marche pas.',
+          'personne dit que Smily, le micro ou la voix ne marche pas.',
       run: (_) async => diagnostic(),
     ),
     HubTool(
       name: 'clicky_reparer_micro',
       description:
-          'Répare le micro de Clicky : arrête l\'écoute bloquée, relance la reconnaissance vocale en '
+          'Répare le micro de Smily : arrête l\'écoute bloquée, relance la reconnaissance vocale en '
           'essayant toutes les façons de la démarrer, et vérifie que le micro s\'ouvre. Renvoie ce '
           'qui a été fait et le souci qui reste (avec le réglage à ouvrir).',
       run: (_) async {
@@ -3159,7 +3219,7 @@ class ClickyController extends ChangeNotifier {
   /// Dernière réparation du micro (pour le diagnostic).
   EarsRepair? lastRepair;
 
-  /// État de Clicky, lisible par l'IA (outil clicky_diagnostic).
+  /// État de Smily, lisible par l'IA (outil clicky_diagnostic).
   Map<String, Object?> diagnostic() {
     final e = ears;
     return {
@@ -3174,9 +3234,7 @@ class ClickyController extends ChangeNotifier {
       if (e is SmartEars && e.windows is WindowsEars) 'micro_lancement': (e.windows as WindowsEars).launch.label,
       'micro_reglage': micEngine,
       'micro_langue': e.language,
-      'derniere_reparation': lastRepair == null
-          ? null
-          : {'reussie': lastRepair!.ok, 'etapes': lastRepair!.steps},
+      'derniere_reparation': lastRepair == null ? null : {'reussie': lastRepair!.ok, 'etapes': lastRepair!.steps},
       'mot_activation': _wake.running,
       'voix': voice,
       'cerveau': provider,
@@ -3212,7 +3270,7 @@ class ClickyController extends ChangeNotifier {
     ].join(' ; ');
     final base =
         '''
-Tu es Clicky, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
+Tu es Smily, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
@@ -3223,7 +3281,7 @@ ${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoi
 ${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
 $_sensesBlock
 $thinkingRules
-${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Clicky ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
+${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Smily ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
 Les révisions (outils revision_…) : « fais-moi des cartes sur… », « transforme mon cours en fiches » → revision_generer ou revision_ajouter_cartes ; « interroge-moi », « quiz », « minuteur » → revision_lancer ; « organise mes révisions avant le contrôle » → revision_planifier (montre d'abord le plan) ; revision_paquets pour la série et ce qu'il reste à revoir.
 ${homeworkRules(helpOnly)}
@@ -3247,7 +3305,7 @@ ${_tools.isEmpty ? '' : 'Tu peux utiliser les actions de Mon Hub pour lire les v
 ${webSearch && provider != 'ollama' ? 'Tu peux chercher sur internet quand la question porte sur l\'actualité ou des faits récents ; cite brièvement la source à l\'oral (« d\'après … »).' : ''}
 ${quizMode ? 'MODE QUIZ : au lieu de donner la réponse, pose une question à la personne pour la faire réfléchir (une seule à la fois), puis évalue sa réponse en une phrase quand elle répond.' : ''}
 ${code ? 'MODE CODE : un éditeur de code est ouvert. Tu peux mettre de courts extraits de code dans le tableau (bloc "exemple"), donner le langage, expliquer l\'algorithme pas à pas, et pointer la ligne concernée.' : ''}
-${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Clicky montre une étape à la fois.' : ''}
+${stepsMode ? 'Leçon en plusieurs étapes : si la personne demande comment faire quelque chose qui prend plusieurs manipulations, découpe ta réponse en étapes séparées par [ETAPE] (au plus 8). Chaque étape est une ou deux phrases avec, si utile, sa propre balise [POINT…] ; la première étape commence tout de suite, et la dernière phrase de la première étape dit « dis suivant quand c\'est fait ». Smily montre une étape à la fois.' : ''}
 
 $_boardGuide
 
@@ -3304,15 +3362,66 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         '(ni dans le cahier de texte ni dans un fichier), dis-le au lieu d\'inventer.';
   }
 
+  /// **Un nouveau devoir arrive** : s'il en a l'autorisation et que tu n'es
+  /// pas là, il le fait en arrière-plan et te montre le travail au retour.
+  /// Sinon il demande (une fois : [Patience] retient un refus).
+  Future<void> onNewHomework(String id, String title) async {
+    if (hub == null || toolsOverride != null || helpOnly) return;
+    final auto = HomeworkAuto.instance;
+    if (id.isEmpty || auto.already(id)) return;
+    final subject = HomeworkRules.subjectOf(title);
+    if (!auto.allowed) {
+      await proposeIdea(
+        ClickyIdea(
+          tool: 'devoirs_auto',
+          args: {'id': id, 'matiere': subject},
+          say:
+              'Tu as un nouveau devoir de $subject. Tu veux que je m\'en occupe pendant que tu n\'es pas là, '
+              'et que je te montre le travail à ton retour ?',
+          why: 'nouveau devoir',
+        ),
+      );
+      return;
+    }
+    await _startHomework(id, subject);
+  }
+
+  /// Il se met au travail (si c'est le bon moment).
+  Future<void> _startHomework(String id, String subject) async {
+    final auto = HomeworkAuto.instance;
+    final windows = Win.supportedHere;
+    final away = windows ? Duration(seconds: Win.idleSeconds()) : HomeworkRules.awayAfter;
+    if (!HomeworkRules.shouldStart(
+      allowed: auto.allowed,
+      awayFor: away,
+      doneToday: auto.doneToday(),
+      busy: BackgroundTasks.instance.current != null,
+    )) {
+      return;
+    }
+    final note = AutoHomework(id: id, subject: subject, at: DateTime.now());
+    await auto.record(note);
+    BackgroundTasks.instance.start(
+      homeworkTask(subject, null),
+      whenDone: (t) {
+        // Il ne dit jamais qu'il a fini si ça a raté.
+        final ok =
+            t.status == 'fini' &&
+            !RegExp(r"introuvable|je n'ai pas (?:pu|réussi)", caseSensitive: false).hasMatch(t.result);
+        auto.willTell(AutoHomework(id: id, subject: subject, at: DateTime.now(), failed: !ok));
+      },
+    );
+  }
+
   /// « Fais-le à ma place », « fais ça pour moi », « en arrière-plan ».
   static final forMeRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?(?:fais|fait)(?:[\s-]+(?:le|la|les|ça|ca|tout))?\s+(?:(?:à|a)\s+ma\s+place|pour\s+moi)\b[\s,:]*'
-    r'|^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?en\s+arri[eè]re[\s-]plan\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?(?:fais|fait)(?:[\s-]+(?:le|la|les|ça|ca|tout))?\s+(?:(?:à|a)\s+ma\s+place|pour\s+moi)\b[\s,:]*'
+    r'|^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?en\s+arri[eè]re[\s-]plan\b[\s,:]*',
     caseSensitive: false,
   );
 
   static final _agentRe = RegExp(
-    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:clicky[\s,]+)?agent\b[\s,:]*',
+    r'^\s*(?:(?:hey|ok|dis|eh)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?agent\b[\s,:]*',
     caseSensitive: false,
   );
 
@@ -3336,9 +3445,9 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     target = null;
     showHistory = false;
     clearMarks();
-    // « Prends la main et … » : Clicky agit tout de suite.
+    // « Prends la main et … » : Smily agit tout de suite.
     final take = RegExp(
-      r'^\s*(?:(?:hey|ok|dis)\s+)?(?:clicky[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
+      r'^\s*(?:(?:hey|ok|dis)\s+)?(?:(?:clicky|smily|smiley)[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
       caseSensitive: false,
     ).firstMatch(q);
     if (take != null && DriveRunner.supported) {
@@ -3362,19 +3471,48 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     // « Oui », « vas-y », « non merci » : c'est la réponse à son idée.
     final pending = idea;
     if (pending != null) {
+      // « Arrête », « lâche-moi », « ne me le redis plus » : il laisse
+      // tomber ce sujet pour de bon (et il le dit simplement).
+      if (PatienceRules.read(q) == Answer.never) {
+        final subject = pending.tool;
+        idea = null;
+        _ideaTimeout?.cancel();
+        _keepReply = false;
+        await Patience.instance.answered(subject, Answer.never);
+        final r = PatienceRules.ack(Answer.never);
+        _set(ClickyState.idle, status: '', reply: r);
+        unawaited(speak(r));
+        _fadeSoon();
+        return;
+      }
       final yes = Autonomy.answer(q);
       if (yes != null) {
         await answerIdea(yes);
         return;
       }
     }
+    // Rien en attente, mais « arrête de me le répéter » : c'est le dernier
+    // sujet dont il a parlé de lui-même.
+    if (pending == null && PatienceRules.read(q) == Answer.never && _lastSubject != null) {
+      final subject = _lastSubject!;
+      _lastSubject = null;
+      await Patience.instance.answered(subject, Answer.never);
+      final r = PatienceRules.ack(Answer.never);
+      _set(ClickyState.idle, status: '', reply: r);
+      unawaited(speak(r));
+      _fadeSoon();
+      return;
+    }
     // Sa « conscience » : humeur, souvenirs, choses dont prendre des nouvelles.
     unawaited(ClickyMind.instance.onUserMessage(q).catchError((Object _) {}));
     // Mémoire de l'assistant : un projet, une décision, un objectif.
     unawaited(
-      Assistant.instance.remember(q).then((m) {
-        if (m != null) notify?.call('Clicky s\'en souviendra', m);
-      }).catchError((Object _) {}),
+      Assistant.instance
+          .remember(q)
+          .then((m) {
+            if (m != null) notify?.call('Smily s\'en souviendra', m);
+          })
+          .catchError((Object _) {}),
     );
     try {
       if (await _handleCommand(q)) return;
@@ -3404,7 +3542,8 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     if (!quick) return false;
     final mind = ClickyMind.instance;
     await mind.load();
-    var r = mind.selfAnswer(q, now: DateTime.now(), name: callName) ??
+    var r =
+        mind.selfAnswer(q, now: DateTime.now(), name: callName) ??
         (mind.on && mind.life
             ? ClickyLife.instance.answer(
                 q,
@@ -3526,7 +3665,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           _set(
             ClickyState.idle,
             reply: WorkflowCapture.supported
-                ? 'Je n\'ai rien enregistré. Lance « Capturer mes gestes » dans la boîte de Clicky, fais ta manip, puis redemande-moi.'
+                ? 'Je n\'ai rien enregistré. Lance « Capturer mes gestes » dans la boîte de Smily, fais ta manip, puis redemande-moi.'
                 : 'La capture des gestes ne marche que sur Windows.',
           );
           await speak(reply);
@@ -3588,16 +3727,20 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final d = r.timer;
     if (d != null) {
       final label = r.timerLabel;
-      _quickTimers.add(Timer(d, () {
-        unawaited(ClickyChime.play());
-        final say = label.isEmpty ? 'C\'est l\'heure ! Ton minuteur est terminé.' : 'C\'est l\'heure : $label.';
-        notify?.call('Clicky : minuteur', say);
-        _set(ClickyState.speaking, status: '', reply: say);
-        unawaited(speak(say).then((_) {
-          if (state == ClickyState.speaking) _set(ClickyState.idle);
-          _fadeSoon();
-        }));
-      }));
+      _quickTimers.add(
+        Timer(d, () {
+          unawaited(ClickyChime.play());
+          final say = label.isEmpty ? 'C\'est l\'heure ! Ton minuteur est terminé.' : 'C\'est l\'heure : $label.';
+          notify?.call('Smily : minuteur', say);
+          _set(ClickyState.speaking, status: '', reply: say);
+          unawaited(
+            speak(say).then((_) {
+              if (state == ClickyState.speaking) _set(ClickyState.idle);
+              _fadeSoon();
+            }),
+          );
+        }),
+      );
     }
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
     unawaited(history.add(threadId, ChatMsg(mine: false, text: r.text), app: _appKey));
@@ -3701,7 +3844,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     if (id != _askId) return;
     final memory = _memory();
-    // Clicky économe : seulement les actions utiles à cette question (les
+    // Smily économe : seulement les actions utiles à cette question (les
     // autres restent accessibles par mon_hub_outils), et un effort adapté.
     final groups = thrift ? ToolRouter.groupsOrDefault(q) : null;
     final allTools = _tools;
@@ -3728,9 +3871,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           drawing = d;
           _set(
             state,
-            status: d
-                ? (HoloScene.writing(t) ? 'Je projette l\'hologramme…' : 'Je dessine au tableau…')
-                : '',
+            status: d ? (HoloScene.writing(t) ? 'Je projette l\'hologramme…' : 'Je dessine au tableau…') : '',
             reply: clean,
           );
         }
@@ -3743,9 +3884,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           system: system,
           question: _withMemory(question, memory),
           imagesB64: [for (final s in shots) s.png64],
-          imageLabels: [
-            for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}) :',
-          ],
+          imageLabels: [for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}) :'],
           extraBlocks: docBlocks,
           web: webSearch,
           groups: groups,
@@ -3828,22 +3967,12 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       );
       if (journalOn) {
         unawaited(
-          Journal.instance.add(
-            question: _lastQuestion,
-            answer: clean,
-            board: newBoard?.title,
-            app: currentApp,
-          ),
+          Journal.instance.add(question: _lastQuestion, answer: clean, board: newBoard?.title, app: currentApp),
         );
       }
       if (LessonRecorder.instance.on) {
         unawaited(
-          LessonRecorder.instance.add(
-            _lastQuestion,
-            clean,
-            png64: shots.firstOrNull?.png64,
-            board: newBoard?.summary,
-          ),
+          LessonRecorder.instance.add(_lastQuestion, clean, png64: shots.firstOrNull?.png64, board: newBoard?.summary),
         );
       }
       steps = parts.length > 1 ? parts : const [];
@@ -3870,12 +3999,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   static String _plain(String part) => stripClickyTags(ClickyMark.extract(parsePoint(part).$1).$1);
 
   /// Montre une réponse (ou une étape) : texte, pointage, dessins, voix.
-  Future<void> _present(
-    String part,
-    List<ClickyShot> shots, {
-    bool step = false,
-    bool liveSpoken = false,
-  }) async {
+  Future<void> _present(String part, List<ClickyShot> shots, {bool step = false, bool liveSpoken = false}) async {
     final id = _askId;
     final (noPoint, point, label, screen) = parsePoint(part);
     final (text0, rawMarks) = ClickyMark.extract(noPoint);
@@ -3923,7 +4047,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       _fadeSoon();
     }
     if (state == ClickyState.pointing) {
-      // On laisse la flèche le temps de voir, puis Clicky revient.
+      // On laisse la flèche le temps de voir, puis Smily revient.
       Timer(Duration(seconds: slow ? 7 : 4), () {
         if (state == ClickyState.pointing && id == _askId) {
           target = null;
@@ -3941,8 +4065,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       final zone = PrecisePointer.zone(p, shot.width, shot.height);
       final img = await PrecisePointer.gridImage(shot.png64, zone);
       if (img == null) return null;
-      const sys =
-          'Tu aides à viser précisément un élément sur une capture d\'écran. Réponds uniquement par une case.';
+      const sys = 'Tu aides à viser précisément un élément sur une capture d\'écran. Réponds uniquement par une case.';
       final String a;
       if (provider == 'claudecode') {
         a = await ClaudeCode.ask(
@@ -3981,7 +4104,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
   }
 
-  /// « Clicky pilote » : relecture du plan, puis clics / frappe.
+  /// « Smily pilote » : relecture du plan, puis clics / frappe.
   Future<void> _drive(DrivePlan plan, List<ClickyShot> shots) async {
     if (!desktopMode || !DriveRunner.supported || shots.isEmpty) return;
     onInteractive?.call(true);
@@ -3992,7 +4115,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       _fadeSoon();
       return;
     }
-    // La fenêtre de Clicky ne doit pas recevoir les clics.
+    // La fenêtre de Smily ne doit pas recevoir les clics.
     closePanel();
     final r = await DriveRunner.run(
       plan,
@@ -4013,7 +4136,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Réponses instantanées sans l'IA (heure, calculs, devoirs, musique…).
   bool get quick => _opt('quick', true);
 
-  /// Clicky économe : Claude seulement pour les demandes lourdes (les
+  /// Smily économe : Claude seulement pour les demandes lourdes (les
   /// questions simples de culture générale vont à Gemini, gratuit).
   bool get thrift => _opt('thrift', true);
 
@@ -4091,7 +4214,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     return '''
 ${clickyPersona(callName, helpOnly: helpOnly)}
 ${ClickyMind.instance.promptBlock(name: callName)}
-${_lifeBlock()}Tu es Clicky, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
+${_lifeBlock()}Tu es Smily, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
@@ -4103,7 +4226,7 @@ $_sensesBlock
 $thinkingRules''';
   }
 
-  /// Ce que Clicky fait quand on lui demande ses devoirs.
+  /// Ce que Smily fait quand on lui demande ses devoirs.
   static String homeworkRules(bool helpOnly) => helpOnly
       ? 'Devoirs : la personne a choisi « Aider sans faire à ma place » dans tes réglages : explique la méthode, donne '
             'des pistes et corrige ce qu\'elle propose, mais ne donne pas la réponse complète.'
@@ -4113,7 +4236,7 @@ $thinkingRules''';
 - Après chaque exercice, une ou deux phrases « Comment j'ai fait » pour qu'elle puisse comprendre et refaire seule au contrôle.
 - Où écrire : un travail long (rédaction, plusieurs exercices, exposé) va dans un Google Doc (doc_creer, titre « Matière — devoir pour le … ») ; un exercice court va dans le tableau (bloc « etapes » ou « exemple »). Si la personne écrit dans un document ouvert, tu peux aussi le compléter (doc_ecrire).''';
 
-  /// Comment Clicky réfléchit (comme un vrai assistant personnel).
+  /// Comment Smily réfléchit (comme un vrai assistant personnel).
   static const thinkingRules = '''Ta façon de penser :
 - Comprends le vrai besoin derrière la question et réponds à celui-là ; si c'est ambigu, prends l'interprétation la plus probable d'après la situation et la mémoire, et ne pose une question que si c'est vraiment indispensable.
 - Pour un calcul, un raisonnement ou un problème en plusieurs étapes : réfléchis étape par étape en silence, vérifie le résultat, puis donne la réponse claire.
@@ -4135,7 +4258,7 @@ $thinkingRules''';
     },
     {
       'name': 'agir_sur_ordinateur',
-      'description': 'Clicky prend la souris et le clavier pour faire une tâche à l\'écran (ouvrir un site et y chercher, cliquer, faire défiler, écrire dans une appli…).',
+      'description': 'Smily prend la souris et le clavier pour faire une tâche à l\'écran (ouvrir un site et y chercher, cliquer, faire défiler, écrire dans une appli…).',
       'parameters': {
         'type': 'OBJECT',
         'properties': {
@@ -4146,7 +4269,8 @@ $thinkingRules''';
     },
     {
       'name': 'expliquer_au_tableau',
-      'description': 'Explication détaillée avec tableau visuel, schéma, hologramme 3D ou en montrant où cliquer à l\'écran.',
+      'description':
+          'Explication détaillée avec tableau visuel, schéma, hologramme 3D ou en montrant où cliquer à l\'écran.',
       'parameters': {
         'type': 'OBJECT',
         'properties': {
@@ -4169,47 +4293,51 @@ $thinkingRules''';
       await current.close();
     }
     late final GeminiLive l;
-    l = GeminiLive(
-      key: voiceOut.geminiKey,
-      system: _liveSystem(),
-      voice: voiceOut.geminiVoice,
-      tools: [for (final t in _tools) if (!t.name.startsWith('mcp_')) t],
-      extraDeclarations: _liveExtras,
-    )
-      ..onAudio = _liveAudio
-      ..onOutputText = (t) {
-        if (_liveIgnore) return;
-        _liveOut = '$_liveOut$t';
-        reply = _liveOut.trim();
-        notifyListeners();
-      }
-      ..onInputText = (t) {
-        _liveIn = '$_liveIn$t';
-        transcript = _liveIn.trim();
-        notifyListeners();
-      }
-      ..onInterrupted = _livePlayer.stop
-      ..onTurnComplete = () {
-        unawaited(_liveDone());
-      }
-      ..onToolCall = _liveTool
-      ..onToolStatus = (name) {
-        if (!_liveIgnore) _set(ClickyState.thinking, status: 'J\'utilise ${name.replaceAll('_', ' ')}…');
-      }
-      ..onClosed = (why) {
-        if (identical(_live, l)) _live = null;
-        // Quota atteint au milieu d'une question : Claude et la voix
-        // Microsoft répondent à la place, sans rien perdre.
-        if (isQuotaError(why)) {
-          _liveFailed(why);
-          if (_liveTurn && !_liveIgnore) {
-            _liveTurn = false;
-            _liveWatch?.cancel();
-            final q = _liveIn.trim();
-            if (q.isNotEmpty) unawaited(_askAi(q));
+    l =
+        GeminiLive(
+            key: voiceOut.geminiKey,
+            system: _liveSystem(),
+            voice: voiceOut.geminiVoice,
+            tools: [
+              for (final t in _tools)
+                if (!t.name.startsWith('mcp_')) t,
+            ],
+            extraDeclarations: _liveExtras,
+          )
+          ..onAudio = _liveAudio
+          ..onOutputText = (t) {
+            if (_liveIgnore) return;
+            _liveOut = '$_liveOut$t';
+            reply = _liveOut.trim();
+            notifyListeners();
           }
-        }
-      };
+          ..onInputText = (t) {
+            _liveIn = '$_liveIn$t';
+            transcript = _liveIn.trim();
+            notifyListeners();
+          }
+          ..onInterrupted = _livePlayer.stop
+          ..onTurnComplete = () {
+            unawaited(_liveDone());
+          }
+          ..onToolCall = _liveTool
+          ..onToolStatus = (name) {
+            if (!_liveIgnore) _set(ClickyState.thinking, status: 'J\'utilise ${name.replaceAll('_', ' ')}…');
+          }
+          ..onClosed = (why) {
+            if (identical(_live, l)) _live = null;
+            // Quota atteint au milieu d'une question : Claude et la voix
+            // Microsoft répondent à la place, sans rien perdre.
+            if (isQuotaError(why)) {
+              _liveFailed(why);
+              if (_liveTurn && !_liveIgnore) {
+                _liveTurn = false;
+                _liveWatch?.cancel();
+                final q = _liveIn.trim();
+                if (q.isNotEmpty) unawaited(_askAi(q));
+              }
+            }
+          };
     _live = l;
     await l.connect();
     liveError = null;
@@ -4447,12 +4575,12 @@ $thinkingRules''';
         final goal = '${args['but'] ?? ''}'.trim();
         if (goal.isEmpty) return 'Quel est le but ?';
         // Juste après avoir lu un message d'un inconnu : on vérifie que
-        // c'est bien la personne qui veut que Clicky prenne la souris.
+        // c'est bien la personne qui veut que Smily prenne la souris.
         if (PromptShield.tainted &&
             !await _confirmOpen(
               goal,
-              title: 'Clicky veut prendre la souris',
-              note: 'Clicky va cliquer et écrire à ta place pour ce but :',
+              title: 'Smily veut prendre la souris',
+              note: 'Smily va cliquer et écrire à ta place pour ce but :',
             )) {
           return 'La personne a refusé.';
         }
@@ -4467,7 +4595,7 @@ $thinkingRules''';
           }
           await _askAi(question);
         }());
-        return 'Clicky prépare l\'explication au tableau : dis juste « je te montre ».';
+        return 'Smily prépare l\'explication au tableau : dis juste « je te montre ».';
     }
     final tool = _tools.where((t) => t.name == name).firstOrNull;
     if (tool == null) return 'Action inconnue : $name';
@@ -4481,9 +4609,9 @@ $thinkingRules''';
     return PromptShield.wrap(name, plain is String ? plain : jsonEncode(plain));
   }
 
-  // ---------- Clicky agit : il prend la souris et le clavier ----------
+  // ---------- Smily agit : il prend la souris et le clavier ----------
 
-  /// Une tâche « Clicky agit » est en cours.
+  /// Une tâche « Smily agit » est en cours.
   bool acting = false;
 
   /// Journal de la tâche en cours (montré dans la boîte).
@@ -4499,13 +4627,16 @@ $thinkingRules''';
     return (raw.replaceAll(_actRe, '').trim(), goal.isEmpty ? null : goal);
   }
 
-  /// Comment l'IA déclenche « Clicky agit ».
+  /// Comment l'IA déclenche « Smily agit ».
   static const actGuide = '''
 Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l'écran à sa place (ouvrir un site et y chercher quelque chose, cliquer, remplir, faire défiler, ranger des fenêtres, regarder une vidéo, écrire un message dans une appli…), dis en une phrase ce que tu vas faire, puis ajoute à la fin [AGIR]le but précis, avec tous les détails utiles[/AGIR]. Tu prendras alors la souris et le clavier toi-même, étape par étape, en regardant l'écran. Pour une simple commande système (son, fichiers, logiciels), préfère les outils pc_.''';
 
   /// Une question rapide à l'IA (sans outils), avec les captures.
   Future<String> _askRaw(String system, String prompt, List<ClickyShot> shots) async {
-    final labels = [for (var i = 0; i < shots.length; i++) 'Écran ${i + 1} (${shots[i].label}, ${shots[i].width} × ${shots[i].height} px) :'];
+    final labels = [
+      for (var i = 0; i < shots.length; i++)
+        'Écran ${i + 1} (${shots[i].label}, ${shots[i].width} × ${shots[i].height} px) :',
+    ];
     switch (provider) {
       case 'claudecode':
         return ClaudeCode.ask(
@@ -4544,18 +4675,18 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     }
   }
 
-  /// Clicky prend la main pour atteindre [goal] : il regarde l'écran, fait
+  /// Smily prend la main pour atteindre [goal] : il regarde l'écran, fait
   /// une action (en volant jusqu'à l'endroit), regarde de nouveau…
   /// Échap ou bouger la souris l'arrête.
   Future<void> act(String goal) async {
     if (!DriveRunner.supported || goal.trim().isEmpty) return;
     if (!desktopMode) {
-      // Dans la fenêtre Mon Hub : c'est Clicky partout qui agit (il voit
+      // Dans la fenêtre Mon Hub : c'est Smily partout qui agit (il voit
       // tout l'écran et passe au-dessus des fenêtres).
       await ClickyDesktop.launch();
       final sent = await ClickyDesktop.send('act64 ${base64Encode(utf8.encode(goal))}');
       if (!sent) {
-        _set(ClickyState.idle, reply: 'Pour que je prenne la souris, active « Clicky partout » dans mes réglages.');
+        _set(ClickyState.idle, reply: 'Pour que je prenne la souris, active « Smily partout » dans mes réglages.');
       }
       return;
     }
@@ -4596,7 +4727,9 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
           break;
         }
         final now = Win.cursor();
-        if (expected != null && now != null && ((now.$1 - expected.$1).abs() > 12 || (now.$2 - expected.$2).abs() > 12)) {
+        if (expected != null &&
+            now != null &&
+            ((now.$1 - expected.$1).abs() > 12 || (now.$2 - expected.$2).abs() > 12)) {
           result = 'Tu as bougé la souris : je te rends la main.';
           break;
         }
@@ -4610,7 +4743,10 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
           result = 'Je ne vois pas l\'écran.';
           break;
         }
-        final windows = Win.windowList().take(25).map((w) => '- id ${w.$1} : ${w.$2}${w.$3.isEmpty ? '' : ' (${w.$3})'}').join('\n');
+        final windows = Win.windowList()
+            .take(25)
+            .map((w) => '- id ${w.$1} : ${w.$2}${w.$3.isEmpty ? '' : ' (${w.$3})'}')
+            .join('\n');
         final prompt = [
           'But : $goal',
           'Fenêtre au premier plan : « ${Win.foregroundTitle()} ».',
@@ -4658,14 +4794,14 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       target = null;
     }
     actLog = List.of(log);
-    notify?.call('Clicky a agi', '$goal\n$result');
+    notify?.call('Smily a agi', '$goal\n$result');
     _set(ClickyState.speaking, status: '', reply: result);
     await speak(result);
     if (state == ClickyState.speaking) _set(ClickyState.idle);
     _fadeSoon();
   }
 
-  /// Fait une action : Clicky vole jusqu'au point, la vraie souris suit.
+  /// Fait une action : Smily vole jusqu'au point, la vraie souris suit.
   Future<String> _doStep(ActStep s, List<ClickyShot> shots) async {
     Future<(int, int)?> flyTo((Offset, int)? pt, String label) async {
       if (pt == null || shots.isEmpty) return null;
@@ -4738,7 +4874,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       context: ctx,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.mouse_rounded),
-        title: const Text('Clicky prend la main'),
+        title: const Text('Smily prend la main'),
         content: SizedBox(
           width: 440,
           child: Column(
@@ -4792,8 +4928,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
 
   /// Une tâche faite par l'agent (mode « Agent, … » et routines). Renvoie le
   /// compte rendu.
-  Future<String> runTask(String task) async =>
-      _plain(ClickyBoard.strip(DrivePlan.extract(await runTaskRaw(task)).$1));
+  Future<String> runTask(String task) async => _plain(ClickyBoard.strip(DrivePlan.extract(await runTaskRaw(task)).$1));
 
   /// Un compagnon travaille : compté dans « agents au travail ».
   Future<String> runBuddyTask(String task) async {
@@ -4810,18 +4945,11 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   /// Le travail d'un agent, texte brut (avec les outils de Mon Hub).
   Future<String> runTaskRaw(String task) async {
     final usePro = provider == 'claudecode';
-    if (usePro
-        ? await ClaudeCode.find() == null
-        : (provider != 'claude' || !await ClaudeApi.hasKey())) {
+    if (usePro ? await ClaudeCode.find() == null : (provider != 'claude' || !await ClaudeApi.hasKey())) {
       throw 'Le mode agent a besoin de Claude (ton abonnement Claude Pro ou une clé API).';
     }
     final r = usePro
-        ? await ClaudeCode.ask(
-            system: _system(const [], agent: true),
-            question: task,
-            effort: 'high',
-            web: webSearch,
-          )
+        ? await ClaudeCode.ask(system: _system(const [], agent: true), question: task, effort: 'high', web: webSearch)
         : await ClaudeApi.chat(
             system: _system(const [], agent: true),
             history: [
@@ -4836,19 +4964,20 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   }
 
   /// **Fais-le à ma place** : la tâche part en arrière-plan dans Mon Hub
-  /// (qui a les modules et l'extension du navigateur) ; Clicky reste
+  /// (qui a les modules et l'extension du navigateur) ; Smily reste
   /// disponible.
   Future<void> doForMe(String task) async {
     // « Fais-le à ma place » tout court : ce dont on vient de parler.
     if (task.trim().isEmpty && _lastQuestion.trim().isNotEmpty) {
-      task = 'Ce que la personne vient de demander : « $_lastQuestion »'
+      task =
+          'Ce que la personne vient de demander : « $_lastQuestion »'
           '${reply.trim().isEmpty ? '' : ' (ta dernière réponse : « ${reply.length > 600 ? reply.substring(0, 600) : reply} »)'}';
     }
     String say;
     if (hub != null && toolsOverride == null) {
       say = BackgroundTasks.instance.start(task);
     } else {
-      // Clicky partout : c'est Mon Hub qui fait le travail.
+      // Smily partout : c'est Mon Hub qui fait le travail.
       final t = _tools.where((t) => t.name == 'clicky_a_ma_place').firstOrNull;
       if (t == null) return _runAgent(task);
       try {
@@ -4887,7 +5016,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
 
   /// Une action dans le navigateur qui envoie, publie, paie ou supprime.
   Future<bool> confirmBrowser(String what) async {
-    notify?.call('Clicky attend ton accord', 'Il veut $what dans ton navigateur.');
+    notify?.call('Smily attend ton accord', 'Il veut $what dans ton navigateur.');
     onInteractive?.call(true);
     try {
       final ctx = await hubDialogContext(timeout: const Duration(seconds: 5));
@@ -4896,7 +5025,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.public_rounded, color: Colors.orange),
-          title: const Text('Clicky veut agir dans ton navigateur'),
+          title: const Text('Smily veut agir dans ton navigateur'),
           content: Text(
             'Il veut $what.\n\nAutorise seulement si c\'est bien ce que tu lui as demandé'
             '${PromptShield.tainted ? ' (il vient de lire une page écrite par quelqu\'un d\'autre : méfie-toi des pièges)' : ''}.',
@@ -4913,7 +5042,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     }
   }
 
-  /// Tâche de fond : Clicky reste disponible pendant que l'agent travaille.
+  /// Tâche de fond : Smily reste disponible pendant que l'agent travaille.
   Future<void> _runAgent(String task) async {
     if (task.isEmpty) {
       _set(
@@ -4934,7 +5063,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
       _set(state, reply: 'Agent : $text');
       unawaited(history.add(threadId, ChatMsg(mine: true, text: 'Agent, $task'), app: _appKey));
       unawaited(history.add(threadId, ChatMsg(mine: false, text: text), app: _appKey));
-      notify?.call('Clicky : tâche terminée', text);
+      notify?.call('Smily : tâche terminée', text);
       if (state == ClickyState.idle) await speak('Ton agent a fini. $text');
     } catch (e) {
       agentsRunning--;
@@ -4971,7 +5100,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
         context: ctx,
         builder: (c) => AlertDialog(
           icon: const Icon(Icons.auto_awesome_rounded),
-          title: const Text('Clicky veut agir'),
+          title: const Text('Smily veut agir'),
           content: SingleChildScrollView(
             child: Text(
               '${tool.description}\n\n'
@@ -4994,8 +5123,9 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
   /// (« .exe », script, raccourci, partage réseau…).
   Future<bool> _confirmOpen(
     String target, {
-    String title = 'Clicky veut ouvrir un programme',
-    String note = 'Ouvrir ceci peut lancer un programme ou un script. Autorise seulement si c\'est bien ce que '
+    String title = 'Smily veut ouvrir un programme',
+    String note =
+        'Ouvrir ceci peut lancer un programme ou un script. Autorise seulement si c\'est bien ce que '
         'tu as demandé.',
   }) async {
     if (pcControl == 'off') return false;
@@ -5019,7 +5149,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
-                      'Clicky vient de lire des messages ou une page écrits par quelqu\'un d\'autre : '
+                      'Smily vient de lire des messages ou une page écrits par quelqu\'un d\'autre : '
                       'méfie-toi, c\'est peut-être un piège.',
                       style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
                     ),
@@ -5064,9 +5194,9 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
           title: Text(
             command
                 ? (args['admin'] == true
-                      ? 'Clicky veut lancer une commande (administrateur)'
-                      : 'Clicky veut lancer une commande')
-                : (args['ajouter'] == true ? 'Clicky veut compléter un fichier' : 'Clicky veut écrire un fichier'),
+                      ? 'Smily veut lancer une commande (administrateur)'
+                      : 'Smily veut lancer une commande')
+                : (args['ajouter'] == true ? 'Smily veut compléter un fichier' : 'Smily veut écrire un fichier'),
           ),
           content: SizedBox(
             width: 520,
@@ -5080,7 +5210,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
                     const Padding(
                       padding: EdgeInsets.only(bottom: 8),
                       child: Text(
-                        'Clicky vient de lire des messages ou une page écrits par quelqu\'un d\'autre. '
+                        'Smily vient de lire des messages ou une page écrits par quelqu\'un d\'autre. '
                         'Si ce n\'est pas toi qui as demandé cette action, refuse : c\'est peut-être un piège.',
                         style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w600),
                       ),
@@ -5131,8 +5261,7 @@ Agir sur l'ordinateur : quand la personne te demande de FAIRE quelque chose à l
     final text = raw.replaceAll(_tagRe, '').trim();
     if (m == null) return (text, null, '', 1);
     final inner = m.group(1)!.trim();
-    final c = RegExp(r'^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*(?::\s*(.*))?$')
-        .firstMatch(inner);
+    final c = RegExp(r'^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*(?::\s*(.*))?$').firstMatch(inner);
     if (c == null) return (text, null, '', 1);
     var label = (c.group(3) ?? '').trim();
     var screen = 1;
@@ -5167,7 +5296,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
     ClaudeApi.store.addListener(_settingsChanged);
     _settingsChanged();
     // Compagnons : ils travaillent avec les actions de Mon Hub (directement,
-    // ou par le pont local pour Clicky partout).
+    // ou par le pont local pour Smily partout).
     Buddies.instance
       ..runner = c.runBuddyTask
       ..onDone = (title, body) {
@@ -5180,7 +5309,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
       Assistant.instance
         ..notify = ((title, body) {
           c.notify?.call(title, body);
-          // Clicky le dit lui-même, à côté de la souris (il est « présent »).
+          // Smily le dit lui-même, à côté de la souris (il est « présent »).
           unawaited(c.think(title));
         })
         ..present = ((title, text) => c.presentTopo(title, text))
@@ -5188,7 +5317,7 @@ class _ClickyLayerState extends State<ClickyLayer> {
           call: (name, args) async => c.hubTools.where((t) => t.name == name).firstOrNull?.run(args),
           tools: () => {for (final t in c.hubTools) t.name},
         );
-      // Clicky autonome : il réfléchit et propose (rien sans ton accord).
+      // Smily autonome : il réfléchit et propose (rien sans ton accord).
       c.startAutonomy();
       // « Fais-le à ma place » : les tâches de fond, et le navigateur.
       BackgroundTasks.instance
@@ -5202,14 +5331,14 @@ class _ClickyLayerState extends State<ClickyLayer> {
       Browser.confirmScam = c.confirmScamLink;
       final r = Routines.instance
         // Le briefing du matin est préparé par Mon Hub (sans Claude) ; les
-        // autres routines par le cerveau de Clicky.
+        // autres routines par le cerveau de Smily.
         ..runner = ((task) => task == Routine.topoMorningPrompt && Assistant.instance.briefingOn
             ? Assistant.instance.morningBriefing(name: c.callName)
             : c.runTask(task))
         ..onDone = (routine, run) async {
           c.notify?.call(routine.name, run.text);
           if (routine.isTopo && run.ok) {
-            // Le topo s'affiche en grand chez Clicky (partout ou dans l'appli),
+            // Le topo s'affiche en grand chez Smily (partout ou dans l'appli),
             // et part sur le téléphone si ntfy est configuré.
             final topic = Carnet.instance.setting<String>('ntfy', '');
             if (topic.isNotEmpty) {
@@ -5285,9 +5414,8 @@ class _ClickyLayerState extends State<ClickyLayer> {
             Positioned.fill(
               child: ListenableBuilder(
                 listenable: Listenable.merge([c, ClaudeApi.store]),
-                // Sans cerveau configuré (ou désactivé) : aucun Clicky.
-                builder: (context, _) =>
-                    c.active && !c.handledElsewhere ? ClickyBuddy(c: c) : const SizedBox.shrink(),
+                // Sans cerveau configuré (ou désactivé) : aucun Smily.
+                builder: (context, _) => c.active && !c.handledElsewhere ? ClickyBuddy(c: c) : const SizedBox.shrink(),
               ),
             ),
         ],
@@ -5352,7 +5480,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
 
     return Stack(
       children: [
-        // Les dessins de Clicky (flèches, cercles…), sur toute la fenêtre.
+        // Les dessins de Smily (flèches, cercles…), sur toute la fenêtre.
         if (c.marks.isNotEmpty)
           Positioned.fill(
             child: ClickyMarksView(
@@ -5363,7 +5491,7 @@ class _ClickyBuddyState extends State<ClickyBuddy> {
               onDone: c.clearMarks,
             ),
           ),
-        // Le petit curseur bleu de Clicky (suit la souris, vole vers la cible).
+        // Le petit curseur bleu de Smily (suit la souris, vole vers la cible).
         AnimatedOpacity(
           opacity: c.buddyVisible ? 1 : 0,
           duration: const Duration(milliseconds: 250),
@@ -5439,10 +5567,8 @@ class _PointerWithLabel extends StatelessWidget {
   final ClickyController c;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder(
-    valueListenable: c.flightPose,
-    builder: (context, _, _) => _build(context),
-  );
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder(valueListenable: c.flightPose, builder: (context, _, _) => _build(context));
 
   Widget _build(BuildContext context) {
     final label = c.state == ClickyState.pointing && c.targetLabel.isNotEmpty
@@ -5450,63 +5576,63 @@ class _PointerWithLabel extends StatelessWidget {
         : (c.gaze != null && c.gazeNote.isNotEmpty ? c.gazeNote : c.lifeNote);
     final flying = c.flightScale != 1 || c.flightAngle != 0;
     return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      ClickyAlive(
-        moving: c.alive && c.state != ClickyState.pointing && !flying,
-        bootAt: c.bootAt,
-        base: c.state == ClickyState.pointing || !c.alive ? Offset.zero : const Offset(8, 6),
-        // En vol : la pointe suit le sens du vol et il grossit un peu.
-        child: Transform.rotate(
-          angle: c.flightAngle,
-          alignment: Alignment.topLeft,
-          child: Transform.scale(
-            scale: c.flightScale,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClickyAlive(
+          moving: c.alive && c.state != ClickyState.pointing && !flying,
+          bootAt: c.bootAt,
+          base: c.state == ClickyState.pointing || !c.alive ? Offset.zero : const Offset(8, 6),
+          // En vol : la pointe suit le sens du vol et il grossit un peu.
+          child: Transform.rotate(
+            angle: c.flightAngle,
             alignment: Alignment.topLeft,
-            // Sa vie à lui : émoji de ce qu'il ressent, accessoire, danse.
-            child: ClickyLifeBody(hud: c.hud, child: _Pointer(c: c)),
-          ),
-        ),
-      ),
-      if (label.isNotEmpty && !flying)
-        TweenAnimationBuilder<double>(
-          key: ValueKey(label),
-          tween: Tween(begin: 0.5, end: 1),
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.elasticOut,
-          builder: (context, s, child) => Transform.scale(scale: s, alignment: Alignment.centerLeft, child: child),
-          child: Container(
-          constraints: const BoxConstraints(maxWidth: 240),
-          margin: EdgeInsets.only(left: 4, top: c.hud ? 22 : 14),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: c.hud ? hudGlass : clickyBlue,
-            borderRadius: BorderRadius.circular(c.hud ? 4 : 12),
-            border: c.hud ? Border.all(color: hudCyan) : null,
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 8,
-                color: c.hud ? hudCyan.withValues(alpha: 0.4) : const Color(0x33000000),
+            child: Transform.scale(
+              scale: c.flightScale,
+              alignment: Alignment.topLeft,
+              // Sa vie à lui : émoji de ce qu'il ressent, accessoire, danse.
+              child: ClickyLifeBody(
+                hud: c.hud,
+                child: _Pointer(c: c),
               ),
-            ],
-          ),
-          child: TypedText(
-            c.hud ? label.toUpperCase() : label,
-            key: ValueKey('typed-$label'),
-            style: TextStyle(
-              color: c.hud ? hudCyan : Colors.white,
-              fontWeight: FontWeight.w600,
-              letterSpacing: c.hud ? 1.2 : null,
             ),
           ),
         ),
-        ),
-    ],
-  );
+        if (label.isNotEmpty && !flying)
+          TweenAnimationBuilder<double>(
+            key: ValueKey(label),
+            tween: Tween(begin: 0.5, end: 1),
+            duration: const Duration(milliseconds: 380),
+            curve: Curves.elasticOut,
+            builder: (context, s, child) => Transform.scale(scale: s, alignment: Alignment.centerLeft, child: child),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 240),
+              margin: EdgeInsets.only(left: 4, top: c.hud ? 22 : 14),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: c.hud ? hudGlass : clickyBlue,
+                borderRadius: BorderRadius.circular(c.hud ? 4 : 12),
+                border: c.hud ? Border.all(color: hudCyan) : null,
+                boxShadow: [
+                  BoxShadow(blurRadius: 8, color: c.hud ? hudCyan.withValues(alpha: 0.4) : const Color(0x33000000)),
+                ],
+              ),
+              child: TypedText(
+                c.hud ? label.toUpperCase() : label,
+                key: ValueKey('typed-$label'),
+                style: TextStyle(
+                  color: c.hud ? hudCyan : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: c.hud ? 1.2 : null,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
-/// Oui / Non / Plus tard, sous une idée de Clicky.
+/// Oui / Non / Plus tard, sous une idée de Smily.
 class _IdeaButtons extends StatelessWidget {
   const _IdeaButtons({required this.c, required this.accent});
   final ClickyController c;
@@ -5557,12 +5683,7 @@ class _IdeaButtons extends StatelessWidget {
 /// Ouverture / fermeture animée : la boîte grandit depuis le curseur en
 /// rebondissant légèrement, et se replie en s'effaçant.
 class ClickyPopIn extends StatelessWidget {
-  const ClickyPopIn({
-    super.key,
-    required this.open,
-    required this.child,
-    this.alignment = Alignment.topLeft,
-  });
+  const ClickyPopIn({super.key, required this.open, required this.child, this.alignment = Alignment.topLeft});
 
   final bool open;
   final Widget child;
@@ -5572,21 +5693,17 @@ class ClickyPopIn extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedSwitcher(
     duration: const Duration(milliseconds: 260),
     reverseDuration: const Duration(milliseconds: 170),
-    layoutBuilder: (current, previous) =>
-        Stack(alignment: alignment, children: [...previous, ?current]),
+    layoutBuilder: (current, previous) => Stack(alignment: alignment, children: [...previous, ?current]),
     // Le rebond (qui dépasse 1) ne s'applique qu'à la taille, jamais au
     // fondu : l'animation reste entre 0 et 1.
     transitionBuilder: (child, anim) => FadeTransition(
       opacity: CurvedAnimation(parent: anim, curve: const Interval(0, 0.6)),
       child: ScaleTransition(
         alignment: alignment,
-        scale: Tween(begin: 0.55, end: 1.0).animate(
-          CurvedAnimation(
-            parent: anim,
-            curve: Curves.easeOutBack,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        ),
+        scale: Tween(
+          begin: 0.55,
+          end: 1.0,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic)),
         child: child,
       ),
     ),
@@ -5596,7 +5713,7 @@ class ClickyPopIn extends StatelessWidget {
   );
 }
 
-/// Contenu de la petite fenêtre de « Clicky partout » : la fenêtre elle-même
+/// Contenu de la petite fenêtre de « Smily partout » : la fenêtre elle-même
 /// suit la souris, le bout du curseur bleu est dans son coin haut-gauche, et
 /// la boîte de texte s'ouvre juste à côté.
 class ClickyFollower extends StatelessWidget {
@@ -5742,8 +5859,7 @@ class _FlightState extends State<_Flight> with SingleTickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      Positioned(left: _pos.dx - 2, top: _pos.dy - 2, child: widget.child);
+  Widget build(BuildContext context) => Positioned(left: _pos.dx - 2, top: _pos.dy - 2, child: widget.child);
 }
 
 /// Un texte qui s'écrit lettre par lettre (30 à 60 ms), comme s'il parlait.
@@ -5791,84 +5907,32 @@ class _Pointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (c.hud) {
-      final mode = switch (c.state) {
-        ClickyState.listening => HudMode.listening,
-        ClickyState.thinking => HudMode.thinking,
-        ClickyState.speaking => HudMode.speaking,
-        ClickyState.pointing => HudMode.pointing,
-        _ => HudMode.idle,
-      };
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Le bout du réacteur reste au même endroit que la pointe du curseur.
-          Transform.translate(
-            offset: Offset(
-              mode == HudMode.pointing ? -27 : -4,
-              mode == HudMode.pointing ? -27 : -4,
-            ),
-            child: HudReactor(mode: mode, levels: c.levels, size: 34),
-          ),
-          if (c.agentsRunning > 0)
-            Positioned(
-              left: 24,
-              top: 22,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(color: hudAmber, borderRadius: BorderRadius.circular(8)),
-                child: Text(
-                  '${c.agentsRunning}',
-                  style: const TextStyle(color: Colors.black, fontSize: 10),
-                ),
-              ),
-            ),
-        ],
-      );
-    }
-    final mood = switch (c.state) {
+    // Smily est un smiley : il change d'expression selon ce qu'il fait
+    // (plus de curseur en flèche, qui était aussi le plus lourd à dessiner).
+    final doing = switch (c.state) {
       ClickyState.listening => AliveMood.listening,
       ClickyState.thinking => AliveMood.thinking,
       ClickyState.speaking => AliveMood.speaking,
       ClickyState.pointing => AliveMood.pointing,
       _ => AliveMood.idle,
     };
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 26,
-          height: 26,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Rebond, halo quand il réfléchit, saut de joie quand il répond.
-              ClickyBounce(
-                mood: mood,
-                color: clickyBlue,
-                child: CustomPaint(size: const Size(22, 22), painter: _TrianglePainter()),
-              ),
-              if (c.agentsRunning > 0)
-                Positioned(
-                  right: -4,
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${c.agentsRunning}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+    final life = ClickyLife.instance;
+    final mood = SmilyRules.moodFor(
+      doing: doing,
+      asleep: life.asleep,
+      quiet: FocusMode.instance.active,
+      agents: c.agentsRunning,
+      feeling: life.emoji,
+    );
+    return SizedBox(
+      width: c.hud ? 36 : 28,
+      height: c.hud ? 36 : 28,
+      child: ClickyBounce(
+        mood: doing,
+        color: clickyBlue,
+        size: c.hud ? 34 : 26,
+        child: SmilyFace(mood: mood, size: c.hud ? 30 : 24, agents: c.agentsRunning),
+      ),
     );
   }
 }
@@ -5894,40 +5958,12 @@ class _Wave extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               width: 3,
               height: 4.0 + 14 * l,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2)),
             ),
         ],
       ),
     );
   }
-}
-
-class _TrianglePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size s) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(s.width, s.height * 0.42)
-      ..lineTo(s.width * 0.45, s.height * 0.55)
-      ..lineTo(s.width * 0.32, s.height)
-      ..close();
-    canvas.drawShadow(path, Colors.black, 3, false);
-    canvas.drawPath(path, Paint()..color = clickyBlue);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..strokeJoin = StrokeJoin.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Fab extends StatelessWidget {
@@ -5938,7 +5974,7 @@ class _Fab extends StatelessWidget {
   Widget build(BuildContext context) {
     final listening = c.state == ClickyState.listening;
     return Tooltip(
-      message: 'Clicky (maintiens Ctrl + Alt pour parler)',
+      message: 'Smily (maintiens Ctrl + Alt pour parler)',
       child: GestureDetector(
         onLongPressStart: (_) => c.startListening(),
         onLongPressEnd: (_) => c.stopListening(),
@@ -5974,7 +6010,7 @@ class _Fab extends StatelessWidget {
   }
 }
 
-/// La petite boîte de texte de Clicky, ouverte là où est la souris : ce que
+/// La petite boîte de texte de Smily, ouverte là où est la souris : ce que
 /// tu dis s'y écrit pendant que tu parles, puis la réponse s'y écrit à son
 /// tour. On peut aussi y taper sa question, joindre un document, revoir
 /// l'historique, passer à l'étape suivante d'une leçon.
@@ -6003,7 +6039,7 @@ class ClickyBox extends StatelessWidget {
     final listening = c.state == ClickyState.listening;
     final busy = c.state == ClickyState.thinking;
     final problem = c.micProblem;
-    final name = hud ? 'CLICKY' : 'Clicky';
+    final name = hud ? 'CLICKY' : 'Smily';
     final title = switch (c.state) {
       _ when problem != null => 'Souci de micro',
       _ when c.showHistory => 'Historique',
@@ -6061,11 +6097,7 @@ class ClickyBox extends StatelessWidget {
                   if (LessonRecorder.instance.on)
                     const Tooltip(
                       message: 'Leçon en cours d\'enregistrement',
-                      child: Icon(
-                        Icons.fiber_manual_record_rounded,
-                        color: Colors.redAccent,
-                        size: 14,
-                      ),
+                      child: Icon(Icons.fiber_manual_record_rounded, color: Colors.redAccent, size: 14),
                     ),
                   if (WorkflowCapture.instance.on)
                     const Tooltip(
@@ -6090,10 +6122,7 @@ class ClickyBox extends StatelessWidget {
                   IconButton(
                     tooltip: c.voice ? 'Couper la voix' : 'Remettre la voix',
                     visualDensity: VisualDensity.compact,
-                    icon: Icon(
-                      c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      size: 18,
-                    ),
+                    icon: Icon(c.voice ? Icons.volume_up_rounded : Icons.volume_off_rounded, size: 18),
                     onPressed: c.toggleVoice,
                   ),
                   IconButton(
@@ -6127,9 +6156,7 @@ class ClickyBox extends StatelessWidget {
                       alignment: Alignment.topLeft,
                       child: Text(
                         c.transcript.isEmpty ? 'Parle, j\'écris…' : c.transcript,
-                        style: text.titleMedium?.copyWith(
-                          color: c.transcript.isEmpty ? scheme.onSurfaceVariant : null,
-                        ),
+                        style: text.titleMedium?.copyWith(color: c.transcript.isEmpty ? scheme.onSurfaceVariant : null),
                       ),
                     ),
                   ] else if (c.transcript.isNotEmpty && c.state != ClickyState.idle)
@@ -6137,10 +6164,7 @@ class ClickyBox extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         '« ${c.transcript} »',
-                        style: text.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
-                        ),
+                        style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic),
                       ),
                     ),
                   if (problem != null) _MicHelp(c: c, problem: problem),
@@ -6158,20 +6182,14 @@ class ClickyBox extends StatelessWidget {
                   if (!listening && c.status.isNotEmpty && !c.drawing)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(
-                        c.status,
-                        style: text.bodySmall?.copyWith(color: hud ? hudCyan : null),
-                      ),
+                      child: Text(c.status, style: text.bodySmall?.copyWith(color: hud ? hudCyan : null)),
                     ),
                   // La réponse, écrite au fur et à mesure.
                   if (!listening && c.reply.isNotEmpty)
                     AnimatedSize(
                       duration: const Duration(milliseconds: 120),
                       alignment: Alignment.topLeft,
-                      child: SelectableText(
-                        c.reply,
-                        style: text.bodyMedium?.copyWith(height: 1.35),
-                      ),
+                      child: SelectableText(c.reply, style: text.bodyMedium?.copyWith(height: 1.35)),
                     ),
                   // Son idée : il attend ton accord (ou dis « oui » / « non »).
                   if (c.idea != null) _IdeaButtons(c: c, accent: accent),
@@ -6198,10 +6216,7 @@ class ClickyBox extends StatelessWidget {
                   ),
                 const SizedBox(width: 8),
                 FilledButton.tonalIcon(
-                  icon: Icon(
-                    c.hasNextStep ? Icons.skip_next_rounded : Icons.check_rounded,
-                    size: 18,
-                  ),
+                  icon: Icon(c.hasNextStep ? Icons.skip_next_rounded : Icons.check_rounded, size: 18),
                   label: Text(c.hasNextStep ? 'Suivant' : 'Terminé'),
                   onPressed: busy ? null : c.nextStep,
                 ),
@@ -6218,10 +6233,7 @@ class ClickyBox extends StatelessWidget {
               children: [
                 for (final d in c.docs)
                   InputChip(
-                    avatar: Icon(
-                      d.image64 != null ? Icons.image_rounded : Icons.description_rounded,
-                      size: 16,
-                    ),
+                    avatar: Icon(d.image64 != null ? Icons.image_rounded : Icons.description_rounded, size: 16),
                     label: Text(d.name, overflow: TextOverflow.ellipsis),
                     visualDensity: VisualDensity.compact,
                     onDeleted: () => c.removeDoc(d),
@@ -6310,9 +6322,7 @@ class ClickyBox extends StatelessWidget {
                     tooltip: listening ? 'J\'ai fini' : 'Parler',
                     icon: Icon(listening ? Icons.stop_rounded : Icons.mic_rounded),
                     color: listening ? Colors.redAccent : null,
-                    onPressed: busy
-                        ? null
-                        : () => listening ? c.stopListening() : c.startListening(),
+                    onPressed: busy ? null : () => listening ? c.stopListening() : c.startListening(),
                   ),
                 IconButton(
                   tooltip: 'Envoyer',
@@ -6431,31 +6441,19 @@ class _ToolsMenu extends StatelessWidget {
       itemBuilder: (_) => [
         const PopupMenuItem(
           value: 'buddies',
-          child: ListTile(
-            leading: Icon(Icons.cloud_rounded),
-            title: Text('Mes compagnons'),
-          ),
+          child: ListTile(leading: Icon(Icons.cloud_rounded), title: Text('Mes compagnons')),
         ),
         const PopupMenuItem(
           value: 'new',
-          child: ListTile(
-            leading: Icon(Icons.add_comment_rounded),
-            title: Text('Nouvelle conversation'),
-          ),
+          child: ListTile(leading: Icon(Icons.add_comment_rounded), title: Text('Nouvelle conversation')),
         ),
         const PopupMenuItem(
           value: 'doc',
-          child: ListTile(
-            leading: Icon(Icons.attach_file_rounded),
-            title: Text('Joindre un document'),
-          ),
+          child: ListTile(leading: Icon(Icons.attach_file_rounded), title: Text('Joindre un document')),
         ),
         const PopupMenuItem(
           value: 'review',
-          child: ListTile(
-            leading: Icon(Icons.psychology_rounded),
-            title: Text('Réviser (journal)'),
-          ),
+          child: ListTile(leading: Icon(Icons.psychology_rounded), title: Text('Réviser (journal)')),
         ),
         CheckedPopupMenuItem(value: 'quiz', checked: c.quizMode, child: const Text('Mode quiz')),
         CheckedPopupMenuItem(value: 'slow', checked: c.slow, child: const Text('Mode lent')),
@@ -6552,12 +6550,7 @@ class _HudWave extends StatelessWidget {
 }
 
 class _QuickChip extends StatelessWidget {
-  const _QuickChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color = clickyBlue,
-  });
+  const _QuickChip({required this.icon, required this.label, required this.onTap, this.color = clickyBlue});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -6602,13 +6595,9 @@ class _MicHelp extends StatelessWidget {
           children: [
             FilledButton.icon(
               icon: c.repairing
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.auto_fix_high_rounded, size: 16),
-              label: const Text('Clicky répare'),
+              label: const Text('Smily répare'),
               onPressed: c.repairing ? null : c.repairMic,
             ),
             if (problem.fixUri != null)
@@ -6648,12 +6637,7 @@ class _HudStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final city = Carnet.instance.setting<String>('city', '');
     final now = DateTime.now();
-    const style = TextStyle(
-      color: hudCyan,
-      fontSize: 10.5,
-      letterSpacing: 1.4,
-      fontWeight: FontWeight.w600,
-    );
+    const style = TextStyle(color: hudCyan, fontSize: 10.5, letterSpacing: 1.4, fontWeight: FontWeight.w600);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
       decoration: BoxDecoration(
@@ -6667,25 +6651,17 @@ class _HudStrip extends StatelessWidget {
             FutureBuilder(
               future: Weather.forCity(city),
               builder: (context, snap) => snap.hasData
-                  ? Text(
-                      '${snap.data!['icone']} ${snap.data!['temperature']?.round()} °C',
-                      style: style,
-                    )
+                  ? Text('${snap.data!['icone']} ${snap.data!['temperature']?.round()} °C', style: style)
                   : const SizedBox.shrink(),
             ),
           if (c.agentsRunning > 0) ...[
             const SizedBox(width: 10),
-            Text(
-              '${c.agentsRunning} AGENT${c.agentsRunning > 1 ? 'S' : ''}',
-              style: style.copyWith(color: hudAmber),
-            ),
+            Text('${c.agentsRunning} AGENT${c.agentsRunning > 1 ? 'S' : ''}', style: style.copyWith(color: hudAmber)),
           ],
-          if (c.docs.isNotEmpty) ...[
-            const SizedBox(width: 10),
-            Text('${c.docs.length} DOC', style: style),
-          ],
+          if (c.docs.isNotEmpty) ...[const SizedBox(width: 10), Text('${c.docs.length} DOC', style: style)],
         ],
       ),
     );
   }
+
 }
