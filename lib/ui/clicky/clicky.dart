@@ -70,6 +70,7 @@ import 'patience.dart';
 import 'quick.dart';
 import 'smily.dart';
 import 'announce.dart';
+import 'game_coach.dart';
 import 'identity.dart';
 import 'ollama.dart';
 import 'pointer.dart';
@@ -82,6 +83,7 @@ import 'whisper.dart';
 import 'mic_test.dart' show openMicFix;
 import 'win.dart';
 import '../../core/freeze_watch.dart';
+import '../../core/gemini_agent.dart';
 import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
@@ -323,6 +325,7 @@ class ClickyController extends ChangeNotifier {
     'instant',
     'quick',
     'thrift',
+    'economie',
   ];
   Map<String, dynamic>? _shared;
   DateTime? _sharedStamp;
@@ -724,6 +727,15 @@ class ClickyController extends ChangeNotifier {
   Future<void> startListening({bool dictate = false, bool followUp = false}) async {
     await stopSpeaking();
     if (state == ClickyState.thinking || state == ClickyState.listening) return;
+    // Coach de jeu lancé : ta voix part directement au coach, qui voit ta
+    // partie (Ctrl + Alt, comme d'habitude).
+    final coach = GameCoach.instance;
+    if (coach.active && !dictate && mic) {
+      if (await coach.talkStart()) {
+        _set(ClickyState.listening, status: 'Le coach t\'écoute…');
+        return;
+      }
+    }
     if (!followUp) _followChain = 0;
     if (!mic) {
       // Micro désactivé : on écrit à la place.
@@ -903,6 +915,12 @@ class ClickyController extends ChangeNotifier {
   Future<void> stopListening({bool send = true}) async {
     if (state != ClickyState.listening) return;
     _autoSend?.cancel();
+    final coach = GameCoach.instance;
+    if (coach.talking) {
+      await coach.talkEnd(send: send);
+      _set(ClickyState.idle, status: '');
+      return;
+    }
     if (_liveMic != null) return _liveStop(send: send);
     if (!send) {
       await ears.cancel();
@@ -2111,6 +2129,16 @@ class ClickyController extends ChangeNotifier {
     unawaited(feel(f.$1, text: f.$2));
   }
 
+  /// Ctrl + Alt + M : coupe ou rallume le micro (dans toutes les applis).
+  Future<void> toggleMute() async {
+    final m = await CallShield.instance.mute('toggle');
+    if (m == null) return;
+    final text = m ? '🔇 Micro coupé. Ctrl + Alt + M pour le rallumer.' : '🎙️ Micro rallumé.';
+    final at = cursor;
+    // Une petite bulle, même en jeu (là où Nexo se tait d'habitude).
+    if (at != null) glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 3));
+  }
+
   /// « Il m'annonce mes messages » (oui par défaut) : une bulle à côté de la
   /// souris dès qu'un message arrive (Discord, Instagram, mails, École
   /// Directe, espaces).
@@ -3312,6 +3340,8 @@ class ClickyController extends ChangeNotifier {
     ...SelfKnowledge.tools(() => _tools),
     ...TokenBudget.instance.tools(),
     if (_voicePlatform) ...repairTools,
+    // Le coach de jeu en direct (il vit là où Nexo t'écoute).
+    if (GameCoach.supported) ...GameCoach.instance.tools(),
     // Le navigateur (extension) et les tâches de fond vivent dans Mon Hub.
     if (hub != null && toolsOverride == null && !desktopMode) ...[
       ...BrowserLink.instance.tools,
@@ -3768,6 +3798,14 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       }
       if (liveReady && !needsClassic(q) && await _liveAsk(q)) {
         unawaited(ClaudeUsage.saved());
+        return;
+      }
+      // Pendant une partie coachée : la question part au coach, qui voit
+      // le jeu (Gemini Live, gratuit).
+      final coach = GameCoach.instance;
+      if (coach.active) {
+        _set(ClickyState.idle, status: '');
+        await coach.ask(q);
         return;
       }
       // Question simple : Gemini (gratuit) avant Claude.
@@ -4395,7 +4433,16 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// questions simples de culture générale vont à Gemini, gratuit).
   bool get thrift => _opt('thrift', true);
 
-  /// Une question simple sans Claude : Gemini répond (gratuit).
+  /// Qui répond : « econome » (défaut : Gemini avec les outils de Mon Hub,
+  /// Claude pour les gros travaux), « equilibre » (l'ancien réglage), ou
+  /// « claude » (toujours Claude).
+  String get brainMode {
+    final m = _opt('economie', 'econome');
+    return BrainRules.modes.contains(m) ? m : 'econome';
+  }
+
+  /// Une question sans Claude : Gemini répond (gratuit), avec les outils de
+  /// Mon Hub si besoin.
   Future<bool> _thriftAnswer(String q) async {
     if (docs.isNotEmpty) return false;
     // Nexo se règle tout seul : plus le budget de jetons du jour se
@@ -4403,16 +4450,20 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     final level = TokenBudget.instance.level;
     if (!thrift && level == TokenLevel.normal) return false;
     final screen = needsScreen(q);
-    if (!TokenRules.geminiFirst(
+    final light = ClaudeThrift.light(q, screen: screen);
+    final heavy = ClaudeThrift.heavy(q), deep = ClaudeThrift.deep(q);
+    final byMode =
+        thrift &&
+        BrainRules.geminiFirst(brainMode, light: light, heavy: heavy, deep: deep, screen: screen, docs: false);
+    final byBudget = TokenRules.geminiFirst(
       level,
-      light: thrift && ClaudeThrift.light(q, screen: screen),
-      heavy: ClaudeThrift.heavy(q),
-      deep: ClaudeThrift.deep(q),
+      light: thrift && light,
+      heavy: heavy,
+      deep: deep,
       screen: screen,
       docs: false,
-    )) {
-      return false;
-    }
+    );
+    if (!byMode && !byBudget) return false;
     if (!await AiText.hasGemini()) return false;
     final id = ++_askId;
     _lastQuestion = q;
@@ -4423,20 +4474,47 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       final context = [
         for (final (u, a) in memory.length > 3 ? memory.sublist(memory.length - 3) : memory) 'Personne : $u\nToi : $a',
       ].join('\n');
-      r = (await AiText.ask(
-        '${context.isEmpty ? '' : 'Début de la conversation :\n$context\n\n'}Question : $q',
-        system:
-            '${clickyPersona(callName, helpOnly: helpOnly)}\n${PromptShield.rule}\nRéponds en français, à l\'oral : 1 à 4 phrases courtes, '
-            'sans markdown ni liste. Si la question demande des données de Mon Hub (agenda, notes, messages) ou d\'agir, '
-            'réponds seulement : CLAUDE',
-        geminiOnly: true,
-      )).trim();
+      final tools = light ? const <HubTool>[] : ToolRouter.pick(q, _tools);
+      if (tools.isEmpty) {
+        r = (await AiText.ask(
+          '${context.isEmpty ? '' : 'Début de la conversation :\n$context\n\n'}Question : $q',
+          system:
+              '${clickyPersona(callName, helpOnly: helpOnly)}\n${PromptShield.rule}\nRéponds en français, à l\'oral : 1 à 4 phrases courtes, '
+              'sans markdown ni liste. Si la question demande des données de Mon Hub (agenda, notes, messages) ou d\'agir, '
+              'réponds seulement : CLAUDE',
+          geminiOnly: true,
+        )).trim();
+      } else {
+        // Le cerveau économe : Gemini lit et agit dans Mon Hub lui-même.
+        final now = DateTime.now();
+        r = (await GeminiAgent.ask(
+              question: q,
+              context: context.isEmpty ? '' : 'Début de la conversation :\n$context',
+              tools: tools,
+              run: (t, a) async {
+                if (ClaudeBridge.isWriteAction(t) && !await confirmAction(t, a)) {
+                  throw 'La personne a refusé cette action.';
+                }
+                return t.run(a);
+              },
+              system:
+                  '${clickyPersona(callName, helpOnly: helpOnly)}\n${PromptShield.rule}\n'
+                  'Nous sommes le ${frDays[now.weekday - 1]} ${now.day}/${now.month}/${now.year}, il est '
+                  '${now.hour} h ${now.minute.toString().padLeft(2, '0')}.\n'
+                  'Utilise les fonctions pour lire ou agir dans Mon Hub (ne les invente jamais). Réponds en français, à '
+                  'l\'oral : 1 à 4 phrases courtes, sans markdown ni liste. Si la demande exige de voir l\'écran, '
+                  'd\'agir sur le PC, de rédiger un long texte, de faire un devoir complet ou une tâche en plusieurs '
+                  'étapes, réponds seulement : ${GeminiAgent.handOff}',
+            ) ??
+            '')
+            .trim();
+      }
     } catch (_) {
       if (id == _askId) _set(ClickyState.thinking, status: '');
       return false;
     }
     if (id != _askId) return true;
-    if (r.isEmpty || r.toUpperCase().startsWith('CLAUDE')) return false;
+    if (GeminiAgent.handsOff(r)) return false;
     unawaited(ClaudeUsage.saved());
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
     unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));

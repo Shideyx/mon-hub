@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'camera_guard.dart';
+import 'game_pal.dart' show GameRules;
 import 'hub_module.dart';
 import 'module_store.dart';
 import 'powershell.dart';
@@ -16,8 +17,9 @@ class CallRules {
   static const callApps = {'Discord', 'Teams', 'Zoom', 'Skype', 'WhatsApp', 'Chrome', 'Edge', 'Firefox', 'Snapchat'};
 
   /// Celles qui ont toujours le droit (Mon Hub lui-même : Nexo écoute ta
-  /// question ; le magnétophone de Windows quand c'est toi qui le lances).
-  static const alwaysOk = {'Mon Hub', 'OBS', 'Appareil photo'};
+  /// question, le Discord intégré ; le magnétophone de Windows quand c'est
+  /// toi qui le lances).
+  static const alwaysOk = {'Mon Hub', 'Nexo (PowerShell)', 'OBS', 'Appareil photo', 'Steam', 'Roblox'};
 
   /// L'appli de l'appel en cours : une appli d'appel qui a le micro ouvert.
   /// (Chrome / Edge / Firefox : Meet, Discord web…)
@@ -28,13 +30,29 @@ class CallRules {
     return null;
   }
 
-  /// Pendant un appel : les **autres** applis qui filment ou écoutent.
-  static List<(SensorUse, bool)> intruders(SensorState cam, SensorState mic, String call) => [
-    for (final u in cam.active)
-      if (u.app != call && !alwaysOk.contains(u.app)) (u, false),
-    for (final u in mic.active)
-      if (u.app != call && !alwaysOk.contains(u.app)) (u, true),
-  ];
+  /// Un jeu (son chat vocal a le droit d'utiliser le micro). La clé du
+  /// registre est le chemin du programme, avec « # » à la place de « \ ».
+  static bool isGame(String key) {
+    final path = key.replaceAll('#', r'\');
+    final exe = path.split(RegExp(r'[\\/]')).last;
+    return GameRules.gameOf(exe: exe, path: path) != null;
+  }
+
+  /// Pendant un appel : les **autres** applis qui filment ou écoutent — sauf
+  /// celles qui ont toutes les raisons de le faire. Avant, une autre appli
+  /// d'appel (Discord pendant un Meet), ton **jeu** (son chat vocal), le
+  /// Discord intégré ou Nexo qui écoute passaient pour des espions, et
+  /// couper leur accès te coupait le micro pour de bon.
+  static List<(SensorUse, bool)> intruders(SensorState cam, SensorState mic, String call) {
+    bool fine(SensorUse u) =>
+        u.app == call || alwaysOk.contains(u.app) || callApps.contains(u.app) || isGame(u.key);
+    return [
+      for (final u in cam.active)
+        if (!fine(u)) (u, false),
+      for (final u in mic.active)
+        if (!fine(u)) (u, true),
+    ];
+  }
 
   /// Ce qu'il dit quand une appli espionne pendant l'appel.
   static String alert(String app, String call, {required bool mic}) =>
@@ -145,10 +163,103 @@ Set-ItemProperty -Path $p -Name Value -Value $etat
         'cle': key,
         'etat': off ? 'Deny' : 'Allow',
       }, const Duration(seconds: 20));
-      return '${r.stdout}'.contains('Ok');
+      final ok = '${r.stdout}'.contains('Ok');
+      // On retient à qui Nexo a coupé l'accès, pour pouvoir le lui rendre.
+      if (ok) await _remember('${mic ? 'micro' : 'camera'}|$key', blocked: off);
+      return ok;
     } catch (_) {
       return false;
     }
+  }
+
+  // ------------------------------------------------- Rendre le micro
+
+  static const _kBlocked = 'app.micro.bloques';
+  static const _kMuted = 'app.micro.sourdine.nexo';
+  static const _kRepaired = 'app.micro.repare.v1';
+
+  List<String> get _blocked {
+    try {
+      return ModuleStore.global.getStringList(_kBlocked) ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _remember(String entry, {required bool blocked}) async {
+    try {
+      final l = {..._blocked};
+      blocked ? l.add(entry) : l.remove(entry);
+      await ModuleStore.global.setStringList(_kBlocked, l.toList());
+    } catch (_) {}
+  }
+
+  /// Nexo a mis le micro en sourdine (et ne l'a pas rallumé).
+  bool get mutedByNexo {
+    try {
+      return ModuleStore.global.getBool(_kMuted) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Une appli qui ne devrait jamais être privée de micro par Nexo : ton
+  /// appli d'appel, un jeu, Mon Hub, Nexo. Sans Windows : testable.
+  static bool shouldHaveMic(SensorUse u) =>
+      u.denied && (CallRules.callApps.contains(u.app) || CallRules.alwaysOk.contains(u.app) || CallRules.isGame(u.key));
+
+  /// **Rend le micro** : enlève la sourdine, et rend l'accès aux applis
+  /// d'appel, aux jeux, à Mon Hub et à celles que Nexo avait bloquées. [all] :
+  /// aussi le grand interrupteur du micro de Windows. Renvoie ce qui a été
+  /// réparé (vide : rien à réparer).
+  Future<List<String>> giveMicBack({bool unmute = true, bool all = true}) async {
+    if (!CameraGuard.supported) return const [];
+    final done = <String>[];
+    if (unmute && await mute('etat') == true) {
+      if (await mute('off') == false) done.add('la sourdine');
+    }
+    final g = CameraGuard.instance;
+    await g.read(force: true);
+    if (all && g.micro.blocked && await g.setBlocked(false, mic: true)) done.add('le micro de Windows');
+    final mine = _blocked;
+    for (final u in g.micro.uses) {
+      if (!u.denied) continue;
+      if (!shouldHaveMic(u) && !mine.contains('micro|${u.key}')) continue;
+      if (await blockApp(u.key, mic: true, off: false)) done.add(u.app);
+    }
+    return done;
+  }
+
+  /// Ce qu'il dit après avoir rendu le micro.
+  static String sayGiven(List<String> done) => done.isEmpty
+      ? '🎙️ Ton micro n\'est bloqué nulle part : il est ouvert. Si personne ne t\'entend, regarde le bouton micro de ton appli d\'appel.'
+      : '🎙️ C\'est réparé : j\'ai rendu le micro à ${done.join(', ')}.';
+
+  /// Une fois, après la mise à jour : répare le micro coupé par erreur par
+  /// l'ancien bouclier (ton jeu, Discord, Mon Hub). null : rien à dire.
+  Future<String?> repairOnce() async {
+    if (!CameraGuard.supported) return null;
+    try {
+      if (ModuleStore.global.getBool(_kRepaired) == true) return null;
+      await ModuleStore.global.setBool(_kRepaired, true);
+    } catch (_) {
+      return null;
+    }
+    final done = await giveMicBack(unmute: mutedByNexo, all: false);
+    return done.isEmpty ? null : sayGiven(done);
+  }
+
+  /// Rappel : le micro est toujours en sourdine (mise par Nexo).
+  Future<String?> muteReminder() async {
+    if (!mutedByNexo) return null;
+    final m = await mute('etat');
+    if (m != true) {
+      try {
+        await ModuleStore.global.setBool(_kMuted, false);
+      } catch (_) {}
+      return null;
+    }
+    return '🔇 Ton micro est toujours en sourdine (tu me l\'avais demandé). Dis « remets mon micro » ou fais Ctrl + Alt + M.';
   }
 
   // ----------------------------------------------------- Micro en sourdine
@@ -208,13 +319,31 @@ public static class MonHubMic {
     try {
       final r = await PowerShell.run(muteScript, {'mode': mode}, const Duration(seconds: 20));
       final out = '${r.stdout}'.trim();
-      if (out.endsWith('muet')) return true;
-      if (out.endsWith('ouvert')) return false;
+      final muted = out.endsWith('muet') ? true : (out.endsWith('ouvert') ? false : null);
+      // On retient que c'est Nexo qui a coupé (rappel, réparation).
+      if (muted != null && mode != 'etat') {
+        try {
+          await ModuleStore.global.setBool(_kMuted, muted);
+        } catch (_) {}
+      }
+      return muted;
     } catch (_) {}
     return null;
   }
 
   List<HubTool> tools() => [
+    HubTool(
+      name: 'micro_rendre',
+      description:
+          'Rend le micro quand personne n\'entend la personne : enlève la sourdine, rallume le micro de Windows et '
+          'rend l\'accès au micro aux applis d\'appel (Discord…), aux jeux et à Mon Hub s\'il leur avait été coupé. '
+          'À utiliser pour « on ne m\'entend plus », « rends-moi mon micro », « débloque mon micro ».',
+      run: (_) async {
+        if (!CameraGuard.supported) return {'resume': 'Ça n\'existe que sur le PC.'};
+        final done = await giveMicBack();
+        return {'resume': sayGiven(done), 'repare': done};
+      },
+    ),
     HubTool(
       name: 'micro_sourdine',
       description:

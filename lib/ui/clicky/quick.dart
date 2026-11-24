@@ -6,6 +6,7 @@ import '../widgets.dart';
 import 'tutor.dart' show normalize;
 import 'patience.dart';
 import 'watchers.dart' show WatchParse;
+import 'game_coach.dart' show CoachRules;
 import '../../core/cam_blur.dart';
 import '../../core/birthdays.dart';
 
@@ -314,6 +315,15 @@ class QuickAnswers {
       if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
     }
 
+    // ---- Le coach de jeu en direct (« coach-moi », « arrête le coach ») ----
+    if (has('jeu_coach')) {
+      final action = CoachRules.command(n);
+      if (action != null) {
+        final r = await call('jeu_coach', {'action': action});
+        if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+      }
+    }
+
     // ---- Les appels Discord à la voix (« décroche », « raccroche ») ----
     if (has('discord_appel')) {
       final action = QuickAnswers.callAction(n);
@@ -335,6 +345,15 @@ class QuickAnswers {
 
     // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----
 
+    // Personne ne t'entend : il rend le micro partout où il était coupé.
+    if (has('micro_rendre') &&
+        RegExp(
+          r'^(?:rends|rend|redonne)(?: moi)? (?:mon|le) micro$|^(?:debloque|repare) (?:moi )?(?:mon|le) micro$|'
+          r'^(?:on|personne) ne m entend (?:plus|pas)$|^on m entend plus$|^mon micro (?:est bloque|est coupe|ne marche plus)$',
+        ).hasMatch(n)) {
+      final r = await call('micro_rendre', {});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
     // La sourdine (instantanée, dans toutes les applis, l'appel continue).
     if (has('micro_sourdine')) {
       final mute = RegExp(

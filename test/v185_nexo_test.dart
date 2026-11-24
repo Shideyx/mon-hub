@@ -2,8 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hub/core/call_shield.dart';
+import 'package:hub/core/cam_blur.dart';
+import 'package:hub/core/camera_guard.dart';
+import 'package:hub/core/gemini_agent.dart';
 import 'package:hub/core/hub_controller.dart';
 import 'package:hub/core/hub_files.dart';
+import 'package:hub/ui/clicky/game_coach.dart';
 import 'package:hub/core/hub_module.dart';
 import 'package:hub/core/install.dart';
 import 'package:hub/core/module_store.dart';
@@ -197,6 +202,144 @@ void main() {
       await first;
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(a.calls, 2);
+    });
+  });
+
+  group('Le coach de jeu, le cerveau économe, le micro', () {
+    test('« coach-moi » et « arrête le coach »', () {
+      expect(CoachRules.command('coach moi'), 'lancer');
+      expect(CoachRules.command('mode coach'), 'lancer');
+      expect(CoachRules.command('aide moi dans ce jeu'), 'lancer');
+      expect(CoachRules.command('arrete le coach'), 'arreter');
+      expect(CoachRules.command('c est quoi un coach'), isNull);
+    });
+
+    test('quand il n\'a rien à dire, on n\'entend rien', () {
+      expect(CoachRules.silent('RIEN'), isTrue);
+      expect(CoachRules.silent(' Rien.'), isTrue);
+      expect(CoachRules.silent('Attention, un ennemi à gauche !'), isFalse);
+      expect(CoachRules.silent('Rien de grave, mais recharge ton arme.'), isTrue,
+          reason: 'commence par « rien » : on préfère se taire');
+    });
+
+    test('les images envoyées sont petites (flux léger, pas des captures en grand)', () {
+      expect(CoachRules.frameSize(2560, 1440, 768), (768, 432));
+      expect(CoachRules.frameSize(640, 480, 768), (640, 480));
+      expect(CoachRules.system('Fortnite', ''), contains('Fortnite'));
+      expect(CoachRules.system('', ''), contains('RIEN'));
+    });
+
+    test('économe : Gemini répond à presque tout, Claude pour les gros travaux', () {
+      bool first(String mode, {bool heavy = false, bool screen = false, bool deep = false, bool light = false}) =>
+          BrainRules.geminiFirst(mode, light: light, heavy: heavy, deep: deep, screen: screen, docs: false);
+      expect(first('econome'), isTrue, reason: 'mes devoirs de demain, mon agenda… : Gemini avec les outils');
+      expect(first('econome', heavy: true), isFalse, reason: 'rédiger, analyser, coder : Claude');
+      expect(first('econome', screen: true), isFalse, reason: 'voir ou agir sur l\'écran : Claude');
+      expect(first('econome', deep: true), isFalse);
+      expect(first('equilibre'), isFalse);
+      expect(first('equilibre', light: true), isTrue);
+      expect(first('claude', light: true), isFalse);
+    });
+
+    test('Gemini utilise les outils de Mon Hub, puis répond', () async {
+      final calls = <String>[];
+      var step = 0;
+      GeminiAgent.postOverride = (body) async {
+        step++;
+        if (step == 1) {
+          expect((body['tools'] as List).isNotEmpty, isTrue);
+          return {
+            'candidates': [
+              {
+                'content': {
+                  'parts': [
+                    {
+                      'functionCall': {
+                        'name': 'agenda_lire',
+                        'args': {'jour': 'demain'},
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': 'Demain tu as maths à 9 h.'},
+                ],
+              },
+            },
+          ],
+        };
+      };
+      final tool = HubTool(
+        name: 'agenda_lire',
+        description: 'Lit l\'agenda',
+        params: {'jour': ('string', 'le jour')},
+        run: (a) async => {'cours': 'Maths 9 h'},
+      );
+      final r = await GeminiAgent.ask(
+        question: 'J\'ai quoi demain ?',
+        system: 'Tu es Nexo.',
+        tools: [tool],
+        run: (t, a) async {
+          calls.add(t.name);
+          return t.run(a);
+        },
+      );
+      GeminiAgent.postOverride = null;
+      expect(calls, ['agenda_lire']);
+      expect(r, 'Demain tu as maths à 9 h.');
+      expect(GeminiAgent.handsOff(r), isFalse);
+      expect(GeminiAgent.handsOff('CLAUDE'), isTrue);
+    });
+
+    test('le bouclier ne prend plus ton jeu, ton appli d\'appel ou Nexo pour des espions', () {
+      SensorUse use(String key) => SensorUse(key: key, app: CameraRules.appName(key), active: true);
+      final mic = SensorState(
+        uses: [
+          use(r'C:#Users#Erik#AppData#Local#Discord#app-1.0#Discord.exe'),
+          use(r'C:#Program Files#Epic Games#Fortnite#FortniteGame#Binaries#Win64#FortniteClient-Win64-Shipping.exe'),
+          use(r'C:#Windows#System32#WindowsPowerShell#v1.0#powershell.exe'),
+          use(r'C:#Program Files (x86)#Microsoft#EdgeWebView#Application#msedgewebview2.exe'),
+          use(r'C:#Users#Erik#Downloads#truc_louche.exe'),
+        ],
+      );
+      final call = CallRules.callApp(mic);
+      expect(call, 'Discord');
+      final bad = CallRules.intruders(const SensorState(), mic, call!);
+      expect([for (final (u, _) in bad) u.app], ['Truc_louche']);
+    });
+
+    test('rendre le micro : seulement aux applis qui doivent l\'avoir', () {
+      expect(
+        CallShield.shouldHaveMic(
+          SensorUse(key: r'C:#Users#Erik#Discord.exe', app: 'Discord', active: false, denied: true),
+        ),
+        isTrue,
+      );
+      expect(
+        CallShield.shouldHaveMic(SensorUse(key: 'x#truc.exe', app: 'Truc', active: false, denied: true)),
+        isFalse,
+      );
+      expect(
+        CallShield.shouldHaveMic(SensorUse(key: r'C:#Users#Erik#Discord.exe', app: 'Discord', active: false)),
+        isFalse,
+        reason: 'pas bloqué : rien à rendre',
+      );
+      expect(CallShield.sayGiven(const ['Discord']), contains('Discord'));
+    });
+
+    test('« floute mon arrière-plan » : le fond flou, le visage net', () {
+      expect(CamBlur.modeFrom('floute mon arrière-plan'), 'fond');
+      expect(CamBlur.modes, contains('fond'));
+      expect(CamBlur.script('fond'), contains("mode === 'fond'"));
+      expect(CamBlur.label('fond'), 'Arrière-plan flou');
     });
   });
 

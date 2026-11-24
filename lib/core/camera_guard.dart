@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:win32/win32.dart';
 
+import 'call_shield.dart';
 import 'cam_blur.dart';
 import 'hub_module.dart';
 import 'module_store.dart';
@@ -16,7 +17,10 @@ import 'powershell.dart';
 /// Une appli qui a utilisé (ou utilise) la caméra ou le micro.
 @immutable
 class SensorUse {
-  const SensorUse({required this.key, required this.app, required this.active, this.at});
+  const SensorUse({required this.key, required this.app, required this.active, this.at, this.denied = false});
+
+  /// Windows lui refuse l'accès (réglage « Refuser » pour cette appli).
+  final bool denied;
 
   /// La clé du registre (chemin du programme, ou nom du paquet Windows).
   final String key;
@@ -77,6 +81,10 @@ class CameraRules {
     'windowscamera': 'Appareil photo',
     'microsoft.windowscamera': 'Appareil photo',
     'hub': 'Mon Hub',
+    // Le navigateur intégré de Mon Hub (le Discord caché, les appels).
+    'msedgewebview2': 'Mon Hub',
+    // Le mot « Nexo » est guetté par la reconnaissance vocale de Windows.
+    'powershell': 'Nexo (PowerShell)',
     'roblox': 'Roblox',
     'robloxplayerbeta': 'Roblox',
     'steam': 'Steam',
@@ -144,7 +152,15 @@ class CameraRules {
       final stop = (a['fin'] as num?) ?? 0;
       // Windows met la fin à 0 pendant que l'appli s'en sert.
       final active = start > 0 && stop == 0;
-      out.add(SensorUse(key: key, app: appName(key), active: active, at: fromFileTime(active ? start : stop)));
+      out.add(
+        SensorUse(
+          key: key,
+          app: appName(key),
+          active: active,
+          at: fromFileTime(active ? start : stop),
+          denied: a['refuse'] == true,
+        ),
+      );
     }
     return SensorState(blocked: blocked, uses: out);
   }
@@ -384,7 +400,8 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
     } catch (_) {}
   }
 
-  static String _sig(SensorState s) => '${s.blocked}:${[for (final u in s.recent) '${u.key}${u.active}'].join(',')}';
+  static String _sig(SensorState s) =>
+      '${s.blocked}:${[for (final u in s.recent) '${u.key}${u.active}${u.denied}'].join(',')}';
 
   static const _consent = r'SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore';
 
@@ -434,13 +451,35 @@ foreach (\$r in @(\$root, "\$root\\NonPackaged")) {
                 return ok == ERROR_SUCCESS ? q.value : null;
               }
 
+              final vbuf = a<Uint16>(64);
+              final vsize = a<Uint32>();
+              bool deny(Pointer<Utf16> child) {
+                vsize.value = 128;
+                final ok = RegGetValue(
+                  key,
+                  PCWSTR(child),
+                  'Value'.toPcwstr(allocator: a),
+                  RRF_RT_REG_SZ,
+                  null,
+                  vbuf,
+                  vsize,
+                );
+                return ok == ERROR_SUCCESS && PCWSTR(vbuf.cast<Utf16>()).toDartString() == 'Deny';
+              }
+
               for (var i = 0; i < 4000; i++) {
                 len.value = 520;
                 if (RegEnumKeyEx(key, i, PWSTR(name.cast<Utf16>()), len, null, null, null) != ERROR_SUCCESS) break;
                 final child = PCWSTR(name.cast<Utf16>()).toDartString(length: len.value);
                 final start = qword(name.cast<Utf16>(), 'LastUsedTimeStart');
-                if (start == null) continue;
-                apps.add({'cle': child, 'debut': start, 'fin': qword(name.cast<Utf16>(), 'LastUsedTimeStop') ?? 0});
+                final refused = deny(name.cast<Utf16>());
+                if (start == null && !refused) continue;
+                apps.add({
+                  'cle': child,
+                  'debut': start ?? 0,
+                  'fin': qword(name.cast<Utf16>(), 'LastUsedTimeStop') ?? 0,
+                  'refuse': refused,
+                });
               }
             } finally {
               RegCloseKey(key);
@@ -556,18 +595,23 @@ extension CameraTools on CameraGuard {
     HubTool(
       name: 'camera_flou',
       description:
-          'Floute la caméra dans les appels Discord passés par Mon Hub (le Discord intégré) : visage = seulement '
-          'le visage (toute l\'image si le visage n\'est pas trouvé), tout = toute l\'image, non = enlever le flou. '
-          'Marche aussi en plein appel. À utiliser pour « floute mon visage », « enlève le flou ».',
-      params: {'mode': ('string', 'visage, tout ou non')},
+          'Floute la caméra dans les appels Discord passés par Mon Hub (le Discord intégré) : fond = l\'arrière-plan '
+          'flou et le visage net, visage = cacher le visage (toute l\'image si le visage n\'est pas trouvé), tout = '
+          'toute l\'image, non = enlever le flou. Marche aussi en plein appel. À utiliser pour « floute mon '
+          'arrière-plan », « floute mon visage », « enlève le flou ».',
+      params: {'mode': ('string', 'fond, visage, tout ou non')},
       run: (a) async {
-        final m = '${a['mode'] ?? 'visage'}'.toLowerCase();
-        final mode = CamBlur.modes.contains(m) ? m : 'visage';
+        final m = '${a['mode'] ?? 'fond'}'.toLowerCase();
+        final mode = CamBlur.modes.contains(m) ? m : 'fond';
         await CamBlur.instance.setMode(mode);
+        // Un appel dans une autre appli (Discord normal, Meet…) : son propre
+        // flou, on explique où il est.
+        final outside = CallShield.instance.call;
         return {
           'resume':
               '${CamBlur.say(mode, faces: CamBlur.instance.faceDetection)}'
-              '${mode == 'non' ? '' : ' (dans les appels Discord passés par Mon Hub ; pour le Discord normal, c\'est son propre flou d\'arrière-plan)'}',
+              '${mode == 'non' ? '' : ' (dans les appels Discord passés par Mon Hub.'
+                        '${outside == null ? ' Pour le Discord normal, c\'est son propre flou d\'arrière-plan.)' : ' Ton appel $outside a son propre flou : ${CallRules.blurHow(outside)})'}'}',
           'mode': mode,
           'fait': true,
         };

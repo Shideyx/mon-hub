@@ -7,9 +7,11 @@ import 'module_store.dart';
 /// visage (ou toute l'image) est flouté. Les autres voient le flou, jamais
 /// l'image nette.
 ///
-/// Trois façons :
-/// * `visage` : seulement ton visage (Windows le repère) ; si ton visage
-///   n'est pas trouvé, **toute** l'image est floue (jamais de raté net) ;
+/// Quatre façons :
+/// * `fond` : l'arrière-plan flou, ton visage (et tes épaules) restent nets ;
+///   visage pas trouvé : tout flou ;
+/// * `visage` : seulement ton visage caché (Windows le repère) ; si ton
+///   visage n'est pas trouvé, **toute** l'image est floue (jamais de raté net) ;
 /// * `tout` : toute l'image floue (on devine une personne, rien de plus) ;
 /// * `non` : l'image normale.
 ///
@@ -19,7 +21,7 @@ class CamBlur extends ChangeNotifier {
   CamBlur._();
   static final instance = CamBlur._();
 
-  static const modes = ['non', 'visage', 'tout'];
+  static const modes = ['non', 'fond', 'visage', 'tout'];
   static const _kMode = 'app.cam.flou';
 
   /// L'argument du navigateur intégré (WebView2) qui allume la détection des
@@ -61,12 +63,17 @@ class CamBlur extends ChangeNotifier {
   bool? faceDetection;
 
   static String label(String m) => switch (m) {
+    'fond' => 'Arrière-plan flou',
     'visage' => 'Visage flouté',
     'tout' => 'Tout flou',
     _ => 'Sans flou',
   };
 
   static String say(String m, {bool? faces}) => switch (m) {
+    'fond' =>
+      faces == false
+          ? 'Flou activé. Ce PC ne sait pas repérer les visages, alors toute l\'image est floue.'
+          : 'Ton arrière-plan est flou, ton visage reste net. Si je ne te trouve pas, toute l\'image devient floue.',
     'visage' =>
       faces == false
           ? 'Flou activé. Ce PC ne sait pas repérer les visages, alors toute l\'image est floue.'
@@ -96,6 +103,12 @@ class CamBlur extends ChangeNotifier {
     if (RegExp(r'^(?:floute|rends? flou) (?:tout|toute (?:ma |l )?image|toute la camera|ma camera en entier)$')
         .hasMatch(t)) {
       return 'tout';
+    }
+    if (RegExp(
+      r'^(?:floute|flouter|rends? flou|cache) (?:moi )?(?:mon |l |le |la )?(?:arriere(?: |-)?plan|fond|decor|chambre|piece|derriere moi)'
+      r'(?: (?:a|pendant) (?:la camera|l appel|mon appel|la webcam))?$',
+    ).hasMatch(t)) {
+      return 'fond';
     }
     return null;
   }
@@ -136,9 +149,10 @@ class CamBlur extends ChangeNotifier {
         sctx = small.getContext('2d');
       }
       ctx.drawImage(src, 0, 0, w, h);
-      if (mode !== 'visage' && mode !== 'tout') return canvas;
+      if (mode !== 'visage' && mode !== 'tout' && mode !== 'fond') return canvas;
       const now = performance.now();
-      if (mode === 'visage' && detector && !busy && now - lastDetect > 120) {
+      const findFaces = mode === 'visage' || mode === 'fond';
+      if (findFaces && detector && !busy && now - lastDetect > 120) {
         busy = true;
         lastDetect = now;
         createImageBitmap(canvas)
@@ -154,10 +168,28 @@ class CamBlur extends ChangeNotifier {
       sctx.imageSmoothingEnabled = true;
       sctx.drawImage(canvas, 0, 0, small.width, small.height);
       ctx.imageSmoothingEnabled = true;
-      const fresh = mode === 'visage' && detector && faces.length > 0 && now - facesAt < 700;
+      // Arrière-plan : on garde le dernier visage un peu plus longtemps (pas de
+      // clignotement quand tu bouges la tête).
+      const keep = mode === 'fond' ? 1500 : 700;
+      const fresh = findFaces && detector && faces.length > 0 && now - facesAt < keep;
       if (!fresh) {
         // « tout », ou visage pas trouvé : TOUTE l'image floue (jamais net par erreur).
         ctx.drawImage(small, 0, 0, w, h);
+        return canvas;
+      }
+      if (mode === 'fond') {
+        // Tout flou, puis ta tête et tes épaules redessinées nettes.
+        ctx.drawImage(small, 0, 0, w, h);
+        for (const b of faces) {
+          const cx = b.x + b.width / 2, cy = b.y + b.height * 0.95;
+          const rx = b.width * 1.45, ry = b.height * 1.9;
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(src, 0, 0, w, h);
+          ctx.restore();
+        }
         return canvas;
       }
       for (const b of faces) {
@@ -235,7 +267,7 @@ class CamBlur extends ChangeNotifier {
     } catch (e) {
       state.erreur = String(e);
       // Flou demandé mais impossible : pas d'image plutôt qu'une image nette.
-      if (window.__monhubFlou === 'visage' || window.__monhubFlou === 'tout') {
+      if (window.__monhubFlou === 'visage' || window.__monhubFlou === 'tout' || window.__monhubFlou === 'fond') {
         s.getVideoTracks().forEach((t) => t.stop());
         throw new DOMException('Flou impossible', 'NotReadableError');
       }

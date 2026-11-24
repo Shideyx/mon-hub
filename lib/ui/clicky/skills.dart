@@ -45,6 +45,20 @@ class ClickySkills {
       Skill('Au démarrage, il te salue avec la chose importante du moment (un contrôle demain, un cours…).'),
       Skill('« Nexo, protocole travail » : il enchaîne tes actions préparées (Carnet → Protocoles).'),
       Skill(
+        '« Coach-moi » pendant une partie : il voit ton jeu en direct (flux léger vers Gemini, gratuit) et te guide à '
+        'voix haute ; Ctrl + Alt pour lui parler, « arrête le coach » pour finir.',
+        tryIt: 'Coach-moi',
+      ),
+      Skill('Ctrl + Alt + M : coupe ou rallume ton micro partout, même en jeu. « On ne m\'entend plus » : il le répare.'),
+      Skill(
+        '« Floute mon arrière-plan » : dans les appels de Mon Hub, ta pièce est floue et ton visage net (ou « floute '
+        'mon visage » pour le cacher).',
+      ),
+      Skill(
+        'Économe : Gemini (gratuit) répond à presque tout avec tes données ; Claude seulement pour les gros travaux '
+        '(Réglages de Nexo → L\'essentiel → Qui répond).',
+      ),
+      Skill(
         'Messages Discord et Instagram en direct : tu es prévenu dès qu\'on t\'écrit (Instagram : Réglages → '
         'Notifications → Messages Instagram en direct).',
       ),

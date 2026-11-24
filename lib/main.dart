@@ -616,6 +616,19 @@ class _HubAppState extends State<HubApp> {
             unawaited(ClickyController.instance.think(body, aloud: false));
           });
         Perf.later(7, () => SelfRepair.instance.run(diskFreeGb: SelfRepair.diskFreeGb()));
+        // Le micro coupé par erreur par l'ancien bouclier d'appel (ton jeu,
+        // Discord, Mon Hub) : rendu une fois, en le disant. Et le rappel si
+        // le micro est resté en sourdine.
+        if (Win.supportedHere) {
+          Perf.later(8, () async {
+            final fixed = await CallShield.instance.repairOnce();
+            if (fixed != null) {
+              await n.post(HubNotification(id: 'micro:repare', title: '🎙️ Micro réparé', body: fixed, moduleId: 'claude'));
+            }
+            final muted = await CallShield.instance.muteReminder();
+            if (muted != null) await ClickyController.instance.think(muted, aloud: false);
+          });
+        }
         // Alertes de Nexo (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(

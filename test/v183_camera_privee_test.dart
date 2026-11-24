@@ -58,7 +58,9 @@ void main() {
       expect(CamBlur.modeFrom('floute tout'), 'tout');
       expect(CamBlur.modeFrom('enlève le flou'), 'non');
       expect(CamBlur.modeFrom('Pourquoi mon visage est flou sur les photos ?'), isNull);
-      expect(CamBlur.modeFrom('floute mon arrière-plan'), isNull);
+      // v1.66 : l'arrière-plan flou existe dans les appels de Mon Hub.
+      expect(CamBlur.modeFrom('floute mon arrière-plan'), 'fond');
+      expect(CamBlur.modeFrom('floute le fond'), 'fond');
     });
 
     test('script : mode choisi, filtre branché, jamais d\'image nette si le flou rate', () {

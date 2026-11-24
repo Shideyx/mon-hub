@@ -24,7 +24,12 @@ class GeminiLive {
     this.extraDeclarations = const [],
     this.language = 'fr-FR',
     this.autoVad = false,
+    this.mediaResolution,
   });
+
+  /// Qualité des images envoyées en direct (coach de jeu) :
+  /// `MEDIA_RESOLUTION_LOW` = peu de jetons par image. null : par défaut.
+  final String? mediaResolution;
 
   /// Langue de la voix (null : Gemini choisit, ex. pour l'interprète).
   final String? language;
@@ -141,6 +146,7 @@ class GeminiLive {
           },
           'languageCode': ?language,
         },
+        'mediaResolution': ?mediaResolution,
       },
       'systemInstruction': {
         'parts': [
@@ -203,6 +209,14 @@ class GeminiLive {
   void sendAudio(Uint8List pcm) => _send({
     'realtimeInput': {
       'audio': {'data': base64Encode(pcm), 'mimeType': 'audio/pcm;rate=16000'},
+    },
+  });
+
+  /// Une image de l'écran, en direct (JPEG en base64) : Gemini « voit »
+  /// comme une vidéo, sans question à poser.
+  void sendVideo(String jpeg64) => _send({
+    'realtimeInput': {
+      'video': {'data': jpeg64, 'mimeType': 'image/jpeg'},
     },
   });
 

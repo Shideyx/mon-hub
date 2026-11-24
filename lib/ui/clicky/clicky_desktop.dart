@@ -407,7 +407,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   Timer? _tick, _slow;
   bool _wasBoth = false;
   bool _wasEsc = false;
-  bool _wasFix = false, _wasFind = false, _wasClick = false;
+  bool _wasFix = false, _wasFind = false, _wasClick = false, _wasMute = false;
   bool _fullscreen = false;
   int _n = 0;
   bool _interactive = false;
@@ -622,6 +622,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final fix = both && Win.down(0x43);
     if (fix && !_wasFix) unawaited(c.fixSelection());
     _wasFix = fix;
+    // Ctrl + Alt + M : coupe / rallume le micro, partout (même en jeu).
+    final muteKey = both && Win.down(0x4D);
+    if (muteKey && !_wasMute) unawaited(c.toggleMute());
+    _wasMute = muteKey;
     // Ctrl + Alt + Espace : la recherche partout (dans Mon Hub).
     final find = both && Win.down(0x20);
     if (find && !_wasFind) unawaited(c.openSearch());

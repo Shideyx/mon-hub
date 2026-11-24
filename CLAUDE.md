@@ -696,6 +696,29 @@
   déconnexion confirmée ; bouton « Supprimer » en rouge ; listes déroulantes qui ne plantent plus sur une valeur hors
   liste ; « Redémarrer Mon Hub maintenant » dans Vitesse (`AppInstall.restart`, `--relance`) ; l'import de
   configuration garde les nombres à virgule.
+- **Cerveau économe (v1.66)** (demande : « tout ne doit pas passer par Claude, trop de jetons ») :
+  `core/gemini_agent.dart` (`GeminiAgent.ask` = Gemini `generateContent` avec `functionDeclarations` des outils
+  `ToolRouter.pick`, boucle ≤ 5 tours, même permission que Claude (`isWriteAction` + `confirmAction`), résultats
+  `PromptShield.wrap` + `ToolRouter.cap`, « CLAUDE » = passer la main ; `BrainRules` : `econome` (défaut : Gemini sauf
+  gros travail `ClaudeThrift.heavy`, `deep`, écran, documents) / `equilibre` (l'ancien) / `claude`). Branché dans
+  `_thriftAnswer` (réglage partagé `economie`, choix dans L'essentiel).
+- **Coach de jeu en direct (v1.66)** : `ui/clicky/game_coach.dart` (`GameCoach` : Gemini Live avec **images en flux**
+  `GeminiLive.sendVideo` (JPEG 768 px qualité 60 toutes les 2 s, `mediaResolution: MEDIA_RESOLUTION_LOW`) — pas des
+  captures envoyées à Claude ; conseil de lui-même toutes les 25 s (`CoachRules.tipPrompt`, « RIEN » = son retenu puis
+  jeté : `_hold`) ; Ctrl + Alt = `talkStart/talkEnd` (branché au début de `startListening/stopListening`), questions
+  écrites → `ask` (dans `ClickyController.ask`, après les réponses sans IA) ; images seulement quand le jeu est au
+  premier plan, arrêt seul après 4 min sans jeu ; outil local `jeu_coach`, phrases `CoachRules.command`). Les jeux en
+  plein écran **exclusif** peuvent donner une image noire (capture GDI) : ceux en « plein écran fenêtré » marchent.
+- **Micro (v1.66)** : le bouclier d'appel prenait pour des espions une autre appli d'appel, les **jeux** (chat vocal),
+  le Discord intégré (`msedgewebview2` → « Mon Hub ») et Nexo qui guette son nom (`powershell` → « Nexo (PowerShell) »)
+  → « couper son accès » coupait le micro pour de bon. `CallRules.intruders` les exclut (`isGame` par le chemin de la
+  clé). `CallShield.giveMicBack` (sourdine levée, accès rendu aux applis d'appel / jeux / Mon Hub / celles que Nexo a
+  bloquées, retenues dans `app.micro.bloques`), `repairOnce` au démarrage (une fois, notification), `muteReminder`
+  (sourdine mise par Nexo `app.micro.sourdine.nexo`), outil `micro_rendre`, phrases « on ne m'entend plus », Ctrl + Alt
+  + M (`toggleMute`, Nexo partout). Le registre lit aussi `Value` par appli (`SensorUse.denied`).
+- **Flou (v1.66)** : mode `fond` dans `CamBlur` (arrière-plan flou, tête et épaules nettes ; pas de visage = tout
+  flou), « floute mon arrière-plan ». Toujours seulement les appels passés par Mon Hub (pas de caméra virtuelle sous
+  Windows 10).
 - Vérifier ici sous Windows : `dart analyze --fatal-infos` (pas `flutter analyze`, qui se perd dans le SDK quand il est
   dans un chemin long) ; 4 tests de l'accueil échouent **seulement sous Windows** (PowerShell de `PcApps.load` →
   minuteur en attente, texte « PC (Windows) ») : sous Linux (GitHub) ils passent.

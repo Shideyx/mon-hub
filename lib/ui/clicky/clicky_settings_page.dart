@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/gemini_agent.dart';
 import '../../modules/claude/claude_module.dart';
 import 'assistant_view.dart';
 import 'clicky.dart';
@@ -307,6 +308,33 @@ class _Essentials extends StatelessWidget {
                 value: c.wakeOn,
                 onChanged: (v) => c.setOption('wake', v),
               ),
+            // Qui répond : Gemini (gratuit) d'abord, Claude pour les gros
+            // travaux. Avant, tout ce qui touchait à tes données partait
+            // chez Claude (trop de jetons).
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.savings_rounded),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text('Qui répond', style: Theme.of(context).textTheme.titleSmall),
+                  ),
+                ],
+              ),
+            ),
+            SegmentedButton<String>(
+              segments: [
+                for (final m in BrainRules.modes)
+                  ButtonSegment(value: m, label: Text(BrainRules.label(m).replaceAll(' (conseillé)', ''))),
+              ],
+              selected: {c.brainMode},
+              onSelectionChanged: (v) => c.setOption('economie', v.first),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 6, 0, 8),
+              child: Text(BrainRules.explain(c.brainMode), style: Theme.of(context).textTheme.bodySmall),
+            ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.bolt_rounded),
