@@ -154,7 +154,7 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with: { persist-credentials: false }
@@ -164,10 +164,21 @@ jobs:
       - uses: actions/configure-pages@v5
         continue-on-error: true
         with: { enablement: true }
+      # Un nom par essai : relancer le job ne trouve pas deux fois le même site.
       - uses: actions/upload-pages-artifact@v3
-        with: { path: build/web }
+        with: { path: build/web, name: 'github-pages-${{ github.run_attempt }}' }
+      # GitHub refuse parfois la première mise en ligne (« try again later ») :
+      # un deuxième essai 30 s plus tard.
       - id: deploy
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+        with: { artifact_name: 'github-pages-${{ github.run_attempt }}' }
+      - if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+      - id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with: { artifact_name: 'github-pages-${{ github.run_attempt }}' }
 
   release:
     # Seul Windows est indispensable : Android est ajouté s'il est prêt,
