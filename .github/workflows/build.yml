@@ -47,7 +47,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter build windows --release ${{ env.GOOGLE_DEFINES }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MonHub-Windows
           path: build/windows/x64/runner/Release/
@@ -66,7 +66,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter build apk --release ${{ env.GOOGLE_DEFINES }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MonHub-Android
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -88,7 +88,7 @@ jobs:
       # version minimale des plugins dans macos/Podfile.
       - run: flutter config --no-enable-swift-package-manager
       - run: flutter build macos --release ${{ env.GOOGLE_DEFINES }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MonHub-macOS
           path: build/macos/Build/Products/Release/*.app
@@ -112,7 +112,7 @@ jobs:
           mkdir -p dist/Payload
           cp -R build/ios/iphoneos/Runner.app dist/Payload/
           cd dist && zip -qr MonHub-iOS.ipa Payload
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MonHub-iOS
           path: dist/MonHub-iOS.ipa
@@ -131,7 +131,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter build linux --release ${{ env.GOOGLE_DEFINES }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MonHub-Linux
           path: build/linux/x64/release/bundle/
