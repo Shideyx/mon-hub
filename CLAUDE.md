@@ -559,3 +559,31 @@
   (`ClickyIdea` outil `devoirs_auto`, passe par `Patience`) ou `_startHomework` → `BackgroundTasks.start(goal,
   whenDone:)` (le `whenDone` est appelé aussi quand ça rate) ; le retour est dit dans `welcomeBack` via
   `takeWelcome()`. Interrupteur dans `ui/clicky/settings.dart` (rubrique `teach`). Tests `test/v180_homework_test.dart`.
+- **Jeux (v1.62)** : `core/game_pal.dart`. `GameRules.gameOf(exe, path, title, engine)` = un jeu seulement avec un
+  **vrai signe** (dossier Steam/Epic/Riot/Xbox/Ubisoft/EA/GOG/Battle.net/Roblox, `knownExe`, `-Win64-Shipping`,
+  Unity/Unreal à côté du .exe `GamePal.engineNear`, site de jeux dans le navigateur ; `never` = applis jamais jeux,
+  dont Claude/ChatGPT/Notion) : avant, toute appli agrandie inconnue était un jeu (« tu joues à Claude »).
+  `GameMode.isGame/tick(path:, title:, engine:)` s'en sert (plein écran en plus). `Win.foregroundPath`. `GamePal` (tour
+  de 15 s de `main.dart`) : fiche Steam FR (`storesearch` + `appdetails`) sinon Wikipédia FR, `jeux-infos.json` 30 j,
+  `jeu-en-cours.json` (jamais synchronisé) → `GamePal.promptBlock` ajouté à `_sensesBlock` (aider vraiment, pas de
+  triche). Outil `jeu_en_cours` (groupe `jeu`).
+- **Bouclier d'appel (v1.62)** : `core/call_shield.dart` (`CallRules.callApp/intruders/alert/blurHow` ; `CallShield.tick`
+  après `CameraGuard.tick` : une autre appli filme/écoute pendant l'appel → notification `arnaque:appel:` + idée
+  `camera_bloquer_appli` (une seule appli : registre `ConsentStore\<cap>\NonPackaged\<clé>`, **action à autoriser**) ;
+  début d'appel avec caméra → bulle muette « comment flouter » ; `muteScript` = sourdine du micro par défaut
+  (IAudioEndpointVolume en C# via PowerShell, console + communications), outil `micro_sourdine` ; `appel_flou`).
+  Le vrai flou n'existe que dans l'appli d'appel (ou les effets de studio Windows) : on ne fait pas de faux flou.
+  Phrases sans IA : « coupe mon micro » = sourdine, « coupe ma caméra » = refus Windows, « floute mon arrière-plan ».
+  Réglage `app.appel.bouclier`.
+- **Mémoire à long terme + rêves (v1.62)** : `ui/clicky/long_memory.dart`. `Memory` (sujet `MemoryRules.topics`,
+  poids, `pinned`), `memoire.json` ; `MemoryRules.merge` (sans doublon `same`, la version récente gagne),
+  `prune` (oubli : détail vu 1 fois et pas revu 60 j), `relevant` + `promptBlock` (`_memoryBlock` du contrôleur, calculé
+  dans `ask`, dans `_system` et `_liveSystem`), `rememberRequest` (« retiens que… », géré dans `ask`), `dreamPrompt` /
+  `parseDream` (JSON souvenirs + capacites + reve, secrets filtrés) / `byRules` (sans IA), `dreamDue` (absent ≥ 20 min,
+  ≥ 3 messages neufs, 6 h d'écart), `morning`. `ClickyController._maybeDream` (dans `_lifeTick`, Mon Hub seulement) :
+  relit `clicky-history.json` + épisodes, IA **locale** = `Ollama.chat` si `Ollama.installed()` sinon règles ;
+  `_tellDream` raconte d'abord `takeUntold()`, puis `_offerDreamSkill` → idée `clicky_creer_capacite` (VoiceSkill
+  `ask`, **action à autoriser**). `Assistant.remember` écrit aussi dans cette mémoire. Outils `memoire_retenir`,
+  `memoire_souvenirs`, `memoire_effacer_souvenir`, `clicky_capacites_perso`. Page `ui/clicky/memory_page.dart`
+  (Réglages de Smily → Sa personnalité → Sa mémoire ; réglage `dreams`, bouclier d'appel). Tests
+  `test/v181_jeux_appels_memoire_test.dart`.

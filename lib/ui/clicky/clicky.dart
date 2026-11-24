@@ -100,6 +100,9 @@ import '../../core/screen_time.dart';
 import '../../core/everywhere_search.dart';
 import '../../core/hub_home.dart';
 import '../../core/phone_link.dart';
+import '../../core/game_pal.dart';
+import '../../core/call_shield.dart';
+import 'long_memory.dart';
 
 /// « Smily » : un petit compagnon IA qui vit à côté de ton curseur.
 ///
@@ -1524,9 +1527,12 @@ class ClickyController extends ChangeNotifier {
   /// (préparé en avance, toutes les 30 s).
   String _sensesBlock = '';
 
+  /// Les souvenirs utiles pour la question en cours (mémoire à long terme).
+  String _memoryBlock = '';
+
   Future<void> _refreshSenses() async {
     try {
-      _sensesBlock = await ClickySenses.promptBlock();
+      _sensesBlock = await ClickySenses.promptBlock() + await GamePal.promptBlock();
     } catch (_) {
       _sensesBlock = '';
     }
@@ -1723,6 +1729,15 @@ class ClickyController extends ChangeNotifier {
       } catch (_) {}
       life.restore(mind.lifeState);
     }
+    // Il rêve (range sa mémoire) quand tu n'es pas là : une fois par minute
+    // on regarde, dans Mon Hub seulement (pas deux fois avec Smily partout).
+    _dreamCheckN++;
+    if (!desktopMode && _dreamCheckN % 30 == 0 && !_dreaming) {
+      final away = DriveRunner.supported
+          ? Duration(seconds: Win.idleSeconds())
+          : now.difference(_lastMove);
+      unawaited(_maybeDream(away, now).catchError((Object _) {}));
+    }
     if (!_lifeOn) {
       if (_lifeHold) _endRest(quiet: true);
       life.refreshAccessory(now, off: true);
@@ -1847,11 +1862,92 @@ class ClickyController extends ChangeNotifier {
     Timer(const Duration(milliseconds: 1300), () {
       if (!life.asleep) life.show('🥱', seconds: 2.5);
     });
-    if (life.dreamDue(slept, now)) _dreamAt = now.add(const Duration(seconds: 8));
+    if (life.dreamDue(slept, now) || LongMemory.instance.untold.isNotEmpty) {
+      _dreamAt = now.add(const Duration(seconds: 8));
+    }
+  }
+
+  int _dreamCheckN = 0;
+  bool _dreaming = false;
+
+  /// Réglage : rêver pour ranger sa mémoire (oui par défaut).
+  bool get dreamsOn => _opt('dreams', true);
+
+  /// Il rêve : il relit ce qu'il a vécu depuis le dernier rêve et range ce
+  /// qu'il a appris dans sa mémoire à long terme — avec l'IA **locale**
+  /// (Ollama) si elle est là, sinon par des règles. Rien ne sort du PC.
+  Future<void> _maybeDream(Duration away, DateTime now) async {
+    if (!dreamsOn) return;
+    final mem = LongMemory.instance;
+    await mem.load();
+    final last = mem.lastDream;
+    final since = last ?? now.subtract(const Duration(days: 2));
+    final mine = <String>[], material = <String>[];
+    for (final t in await history.load()) {
+      for (final m in t.messages) {
+        if (!m.at.isAfter(since)) continue;
+        final text = m.text.trim();
+        if (text.isEmpty) continue;
+        if (m.mine) mine.add(text);
+        material.add('${m.mine ? 'Elle/il' : 'Smily'} : ${text.length > 200 ? '${text.substring(0, 200)}…' : text}');
+      }
+    }
+    for (final e in ClickyMind.instance.episodes) {
+      if (e.at.isAfter(since)) material.add('Souvenir : ${e.text}');
+    }
+    if (!MemoryRules.dreamDue(away: away, last: last, fresh: mine.length, now: now)) return;
+    _dreaming = true;
+    try {
+      final models = await Ollama.installed();
+      await mem.dream(
+        material: material,
+        mine: mine,
+        name: callName,
+        local: models.isEmpty
+            ? null
+            : (prompt) => Ollama.chat(
+                system: 'Tu ranges la mémoire d\'un assistant. Tu réponds seulement en JSON.',
+                memory: const [],
+                question: prompt,
+              ),
+        now: now,
+      );
+    } finally {
+      _dreaming = false;
+    }
+  }
+
+  /// Il propose une capacité qu'il a imaginée en rêvant (avec ton accord).
+  Future<void> _offerDreamSkill() async {
+    final ideas = LongMemory.instance.ideas;
+    if (ideas.isEmpty) return;
+    final (phrase, todo) = ideas.first;
+    await LongMemory.instance.dropIdea(phrase);
+    if (VoiceSkill.all.any((s) => normalize(s.phrase) == normalize(phrase))) return;
+    await proposeIdea(
+      ClickyIdea(
+        tool: 'clicky_creer_capacite',
+        args: {'phrase': phrase, 'consigne': todo},
+        say: 'J\'ai eu une idée en rêvant : quand tu me dis « $phrase », je pourrais directement $todo. Je me crée '
+            'cette capacité ?',
+        why: 'nouvelle capacité',
+      ),
+    );
   }
 
   /// Il raconte le rêve qu'il a fait (une fois par jour, en bulle muette).
   Future<void> _tellDream() async {
+    // Un vrai rêve (sa mémoire rangée pendant ton absence) passe d'abord.
+    final told = await LongMemory.instance.takeUntold();
+    if (told.isNotEmpty) {
+      final life = ClickyLife.instance;
+      life.dreamt(told, DateTime.now());
+      unawaited(ClickyMind.instance.saveLife(life.toJson()));
+      life.show('🌙', seconds: 4);
+      _lifeSay(told, seconds: 9, force: true);
+      Timer(const Duration(seconds: 12), () => unawaited(_offerDreamSkill()));
+      return;
+    }
     final life = ClickyLife.instance;
     final now = DateTime.now();
     if (!_lifeOn || !life.dreamDue(const Duration(hours: 1), now)) return;
@@ -1875,7 +1971,7 @@ class ClickyController extends ChangeNotifier {
       try {
         final r = await AiText.ask(
           ClickyLife.dreamPrompt(name: callName, app: app, artist: artist, memory: memory),
-          system: 'Tu es Smily, un petit curseur vivant, drôle et tendre. Français, très court.',
+          system: 'Tu es Smily, un petit smiley vivant, drôle et tendre. Français, très court.',
           geminiOnly: true,
         ).timeout(const Duration(seconds: 12));
         dream = ClickyLife.cleanDream(r) ?? dream;
@@ -2241,8 +2337,11 @@ class ClickyController extends ChangeNotifier {
       }
       // Les devoirs faits pendant ton absence (et ceux qu'il a ratés).
       final homework = HomeworkAuto.instance.takeWelcome();
+      // Sans sa petite vie à l'écran, son rêve (sa mémoire rangée) est dit ici.
+      final dream = _lifeOn ? '' : await LongMemory.instance.takeUntold();
       if (propose) {
-        unawaited(think([hello, homework, missed, ?extra].where((t) => t.isNotEmpty).join(' ')));
+        unawaited(think([hello, homework, dream, missed, ?extra].where((t) => t.isNotEmpty).join(' ')));
+        if (dream.isNotEmpty) Timer(const Duration(seconds: 20), () => unawaited(_offerDreamSkill()));
       }
       return null;
     }
@@ -2632,6 +2731,16 @@ class ClickyController extends ChangeNotifier {
     ...Replies.tools(),
     // La caméra et le micro : qui s'en sert, et les couper d'un mot.
     if (CameraGuard.supported) ...CameraGuard.instance.tools(),
+    // Pendant un appel : sourdine d'un mot, couper une appli qui espionne, flou.
+    if (CameraGuard.supported) ...CallShield.instance.tools(),
+    // Le jeu en cours : son nom et ce qu'on sait dessus (pour aider).
+    HubTool(
+      name: 'jeu_en_cours',
+      description:
+          'Le jeu vidéo auquel la personne joue en ce moment (reconnu sur le PC) et sa fiche (genre, résumé, lien). '
+          'À utiliser quand elle demande de l\'aide dans son jeu.',
+      run: (_) => GamePal.instance.describe(),
+    ),
     HubTool(
       name: 'temps_ecran',
       description:
@@ -3169,6 +3278,55 @@ class ClickyController extends ChangeNotifier {
   /// Les outils de dépannage de Smily : l'IA peut voir ce qui ne va pas
   /// et réparer le micro elle-même (« mon micro ne marche pas »).
   List<HubTool> get repairTools => [
+    // Sa mémoire à long terme (rangée par sujets, enrichie en rêvant).
+    ...LongMemory.instance.tools(),
+    // Les capacités qu'il se crée (toujours avec ton accord).
+    HubTool(
+      name: 'clicky_creer_capacite',
+      description:
+          'Smily se crée une nouvelle capacité : une phrase qui déclenche une consigne toute faite (ex. « mode '
+          'poème » → « aide-moi à écrire un poème : propose 3 thèmes, puis corrige les rimes »). Seulement quand la '
+          'personne a dit oui. La consigne passe par Smily normalement (les actions sensibles redemandent la permission).',
+      params: {
+        'phrase': ('string', 'Ce que la personne dira, en minuscules (« mode poème »)'),
+        'consigne': ('string', 'Ce que Smily doit faire quand elle le dit'),
+      },
+      required: const ['phrase', 'consigne'],
+      run: (a) async {
+        final phrase = '${a['phrase'] ?? ''}'.trim().toLowerCase();
+        final todo = '${a['consigne'] ?? ''}'.trim();
+        if (phrase.length < 3 || todo.length < 8) return {'resume': 'Il me faut une phrase et une consigne.'};
+        final list = VoiceSkill.all.where((s) => normalize(s.phrase) != normalize(phrase)).toList()
+          ..add(VoiceSkill(phrase, 'ask', todo));
+        await VoiceSkill.save(list);
+        return {
+          'resume': 'Nouvelle capacité : quand tu me dis « $phrase », je m\'en occupe. Tu peux la modifier ou '
+              'l\'effacer dans mes réglages (« Mes raccourcis »).',
+          'fait': true,
+        };
+      },
+    ),
+    HubTool(
+      name: 'clicky_capacites_perso',
+      description: 'Les capacités que Smily s\'est créées (ou que la personne a ajoutées) ; avec effacer=phrase, en enlève une.',
+      params: {'effacer': ('string', 'La phrase de la capacité à enlever (facultatif)')},
+      run: (a) async {
+        final del = normalize('${a['effacer'] ?? ''}');
+        var list = VoiceSkill.all;
+        if (del.isNotEmpty) {
+          list = [
+            for (final s in list)
+              if (normalize(s.phrase) != del) s,
+          ];
+          await VoiceSkill.save(list);
+        }
+        return {
+          'capacites': [
+            for (final s in list) {'phrase': s.phrase, 'type': VoiceSkill.kinds[s.kind] ?? s.kind, 'fait': s.value},
+          ],
+        };
+      },
+    ),
     HubTool(
       name: 'clicky_reparer',
       description:
@@ -3270,7 +3428,7 @@ class ClickyController extends ChangeNotifier {
     ].join(' ; ');
     final base =
         '''
-Tu es Smily, un compagnon IA qui vit à côté du curseur de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
+Tu es Smily, un petit smiley (un compagnon IA) qui vit dans un coin de l'écran de la personne, dans « Mon Hub », l'appli personnelle d'un·e élève (emploi du temps, École Directe, mails, Discord, Instagram, Roblox, livres, Google Drive…). $where
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => '${m.name} (${m.description})').join(' ; ')}.'}
 ${foreground.isEmpty ? '' : 'Fenêtre au premier plan : « $foreground ».'}
 Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
@@ -3279,7 +3437,7 @@ ${PromptShield.rule}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_lifeBlock()}${_facts.isEmpty ? '' : 'Ce que tu sais de la personne (sa mémoire, à utiliser naturellement) :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données à jour de Mon Hub : sers-t\'en directement, sans relancer d\'action pour les relire) :\n$_situation'}
-$_sensesBlock
+$_sensesBlock$_memoryBlock
 $thinkingRules
 ${groups == null ? '' : 'Tu as les actions utiles à cette question ; pour une autre action de Mon Hub, mon_hub_outils (liste un groupe) puis mon_hub_action.\n'}${_voicePlatform && has('clicky') ? 'Si la personne dit que tu ne l\'entends pas, que le micro ou Smily ne marche pas : lance clicky_diagnostic, puis clicky_reparer_micro, et dis-lui en une phrase ce qui a été réparé ou le réglage précis à ouvrir.\n' : ''}${pcControl != 'off' && has('pc') ? '${PcControl.guide}\n' : ''}Le Carnet (outils carnet_…) : « retiens que… » → carnet_memoire ; « note ça », une idée en passant → carnet_idees ; tâches et notes → carnet_taches_notes ; « j'ai dépensé… » → carnet_budget ; sport, jeux, poèmes, météo et tenue, bilan du soir, protocoles, presse-papier, notification sur le téléphone : outils carnet_ correspondants.
 Google Docs (outils doc_…, le vrai Google Docs de son Drive, ouvert dans Mon Hub) : « écris-moi un exposé / une lettre / une fiche sur… » → doc_creer (texte complet et bien structuré en Markdown, il s'ouvre à l'écran) ; « ouvre un document » → doc_nouveau ou doc_ouvrir ; relire ou compléter → doc_lire, doc_ecrire ; en Word ou PDF sur le PC → doc_exporter.
@@ -3514,7 +3672,21 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
           })
           .catchError((Object _) {}),
     );
+    // Sa mémoire à long terme : les souvenirs utiles pour cette question.
+    await LongMemory.instance.load();
+    _memoryBlock = LongMemory.instance.promptBlock(q);
     try {
+      // « Retiens que… » : gardé pour de bon, dans sa mémoire rangée.
+      final keep = MemoryRules.rememberRequest(q);
+      if (keep != null) {
+        await LongMemory.instance.remember(keep);
+        const r = 'C\'est retenu. Tu peux voir tout ce que je sais de toi dans mes réglages, « Sa mémoire ».';
+        _set(ClickyState.speaking, status: '', reply: r);
+        await speak(r);
+        if (state == ClickyState.speaking) _set(ClickyState.idle);
+        _fadeSoon();
+        return;
+      }
       if (await _handleCommand(q)) return;
       if (await _handleSelf(q)) return;
       if (await _handleSkill(q)) return;
@@ -4222,7 +4394,7 @@ ${PromptShield.rule}
 Ce qu'il y a à l'écran : regarder_ecran. Faire quelque chose à l'écran à sa place (ouvrir, cliquer, écrire dans une appli) : agir_sur_ordinateur. Une explication avec tableau, schéma ou hologramme, ou montrer où cliquer : expliquer_au_tableau (puis ne dis presque rien, le tableau arrive).
 ${_facts.isEmpty ? '' : 'Ce que tu sais de la personne :\n${_facts.map((f) => '- $f').join('\n')}'}
 ${_situation.isEmpty ? '' : 'En ce moment (données de Mon Hub) :\n$_situation'}
-$_sensesBlock
+$_sensesBlock$_memoryBlock
 $thinkingRules''';
   }
 

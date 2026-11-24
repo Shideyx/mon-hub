@@ -611,6 +611,8 @@ class AccountSync extends ChangeNotifier {
       // Les guetteurs tournent sur ce PC (sinon : deux alertes).
       name != 'guetteurs.json' &&
       name != 'veille.json' &&
+      // Le jeu en cours, c'est sur ce PC à cet instant.
+      name != 'jeu-en-cours.json' &&
       !name.startsWith('sync-');
 
   /// Fichiers déjà lus : (date de modification, contenu, empreinte). Un

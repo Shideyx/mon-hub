@@ -266,7 +266,62 @@ class QuickAnswers {
       if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
     }
 
+    // ---- Sa mémoire à long terme ----
+
+    if (has('memoire_souvenirs') &&
+        RegExp(
+          r'^(?:qu est ce que|que) tu sais (?:sur|de) moi\s?\??$|^tu sais quoi (?:sur|de) moi\s?\??$|'
+          r'^(?:de )?quoi tu te souviens (?:sur moi|de moi)\s?\??$|^(?:montre|dis) moi ta memoire$',
+        ).hasMatch(n)) {
+      final r = await call('memoire_souvenirs', {});
+      if (r is Map && r['souvenirs'] is List) {
+        final l = [
+          for (final m in r['souvenirs'] as List)
+            if (m is Map) '${m['texte']}',
+        ];
+        return QuickReply(
+          l.isEmpty
+              ? 'Je ne sais encore presque rien de toi. Dis-moi « retiens que… », ou parle-moi : je range ce que '
+                    'j\'apprends en rêvant.'
+              : 'Je me souviens que : ${l.take(6).join(' ; ')}${l.length > 6 ? '… et ${l.length - 6} autres choses' : ''}. '
+                    'Tout est dans mes réglages, « Sa mémoire ».',
+        );
+      }
+    }
+    final forgetThat = RegExp(r'^oublie (?:que |le fait que )(.{3,120})$').firstMatch(n);
+    if (forgetThat != null && has('memoire_effacer_souvenir')) {
+      var q = forgetThat.group(1)!.replaceFirst(RegExp(r'^(?:je|j) '), '');
+      if (q.split(' ').length > 3) q = q.split(' ').skip(1).take(3).join(' ');
+      final r = await call('memoire_effacer_souvenir', {'quoi': q});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
+
     // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----
+
+    // La sourdine (instantanée, dans toutes les applis, l'appel continue).
+    if (has('micro_sourdine')) {
+      final mute = RegExp(
+        r'^(?:coupe|ferme|eteins) (?:moi )?(?:mon|le) (?:micro|microphone)$|^mute(?: moi)?$|'
+        r'^(?:mets|met) (?:moi |mon micro )?en sourdine$|^sourdine$',
+      ).hasMatch(n);
+      final back = RegExp(
+        r'^(?:rallume|remets|rouvre|reactive) (?:moi )?(?:mon|le) (?:micro|microphone)$|^(?:unmute|demute)(?: moi)?$|'
+        r'^(?:enleve|retire) (?:la )?sourdine$',
+      ).hasMatch(n);
+      final ask = RegExp(r'^(?:je suis|suis je|est ce que je suis) (?:mute|muet|muette|en sourdine)\s?\??$').hasMatch(n);
+      if (mute || back || ask) {
+        final r = await call('micro_sourdine', {'mode': mute ? 'on' : (back ? 'off' : 'etat')});
+        if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+      }
+    }
+    if (has('appel_flou') &&
+        RegExp(
+          r'^(?:floute|flouter|rends? flou) (?:moi |ma |mon |la |le )?(?:camera|webcam|arriere plan|fond|image)(?: pendant (?:l|mon) appel)?$|'
+          r'^comment (?:je )?(?:floute|flouter) (?:ma|la|mon) (?:camera|webcam|arriere plan|fond)\s?\??$',
+        ).hasMatch(n)) {
+      final r = await call('appel_flou', {});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
 
     if (has('camera_couper')) {
       final off = RegExp(

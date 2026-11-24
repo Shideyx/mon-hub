@@ -1,3 +1,4 @@
+import 'memory_page.dart';
 import 'senses_page.dart';
 
 import 'dart:async';
@@ -139,6 +140,13 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
             Icons.pets_rounded,
             const Color(0xFF2B6CFF),
             (ctx) => MindPage.open(ctx),
+          ),
+          _Entry(
+            'Sa mémoire',
+            'Tout ce qu\'il sait de toi, rangé par sujets ; ses rêves (son IA locale range ce qu\'il a appris)',
+            Icons.psychology_rounded,
+            const Color(0xFF7C5CFF),
+            (ctx) => MemoryPage.open(ctx),
           ),
           page('look'),
         ],

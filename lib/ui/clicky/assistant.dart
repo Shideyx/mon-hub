@@ -1,3 +1,4 @@
+import 'long_memory.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -1461,6 +1462,10 @@ class Assistant extends ChangeNotifier {
     final found = detectMemory(said);
     if (found == null) return null;
     final (kind, text) = found;
+    // Une seule mémoire : c'est aussi rangé dans sa mémoire à long terme.
+    unawaited(
+      LongMemory.instance.remember(text, topic: kind == 'objectif' ? 'objectifs' : 'projets').catchError((Object _) => 0),
+    );
     final c = Carnet.instance;
     await c.load();
     if (kind == 'objectif') {
