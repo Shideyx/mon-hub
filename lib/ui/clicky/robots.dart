@@ -659,7 +659,8 @@ class Robots extends ChangeNotifier {
   bool _startedSent = false;
   String _suggestedDay = '';
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     try {
       await _file.load();
       final raw = _file.value['robots'];

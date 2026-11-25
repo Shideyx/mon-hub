@@ -51,6 +51,11 @@ class ClickySkills {
       ),
       Skill('Ctrl + Alt + M : coupe ou rallume ton micro partout, même en jeu. « On ne m\'entend plus » : il le répare.'),
       Skill(
+        'Ses robots, sans IA ni jetons : « crée un robot : quand j\'ouvre Discord, coupe mon micro », « tous les jours à '
+        '19 h, j\'ai quoi à faire pour demain ». Il en propose aussi lui-même (Réglages de Nexo → Ses robots).',
+        tryIt: 'Mes robots',
+      ),
+      Skill(
         '« Floute mon arrière-plan » : dans les appels de Mon Hub, ta pièce est floue et ton visage net (ou « floute '
         'mon visage » pour le cacher).',
       ),

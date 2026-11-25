@@ -2170,6 +2170,10 @@ class ClickyController extends ChangeNotifier {
     return GeminiAgent.handsOff(g) ? null : g;
   }
 
+  /// Qui a répondu la dernière fois : « sans IA », « Gemini » (gratuit) ou
+  /// « Claude » (montré dans la boîte : on sait ce que ça coûte).
+  String lastBrain = '';
+
   /// Ctrl + Alt + M : coupe ou rallume le micro (dans toutes les applis).
   Future<void> toggleMute() async {
     final m = await CallShield.instance.mute('toggle');
@@ -3739,6 +3743,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     _voiceTurn = _spokenAsk;
     _spokenAsk = false;
     if (q.isEmpty) return;
+    lastBrain = '';
     _lastAsk = DateTime.now();
     _keepReply = false;
     await stopSpeaking();
@@ -3836,6 +3841,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       if (await _handleSkill(q)) return;
       // Tout ce qu'un algorithme sait faire : réponse immédiate, sans l'IA.
       if (await _handleQuick(q)) {
+        lastBrain = 'sans IA';
         unawaited(ClaudeUsage.saved());
         return;
       }
@@ -4128,6 +4134,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     // Opus pour « réfléchis bien »).
     ClaudeApi.econome = brainMode == 'econome';
     ClaudeApi.deep = ClaudeThrift.deep(q);
+    lastBrain = 'Claude';
     final id = ++_askId;
     _lastQuestion = shown ?? q;
     steps = const [];
@@ -4562,6 +4569,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
     if (id != _askId) return true;
     if (GeminiAgent.handsOff(r)) return false;
+    lastBrain = 'Gemini';
     unawaited(ClaudeUsage.saved());
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
     unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));
@@ -6515,6 +6523,9 @@ class ClickyBox extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  // Qui a répondu : on voit tout de suite ce que ça a coûté.
+                  if (c.lastBrain.isNotEmpty && c.reply.isNotEmpty && !busy && !listening)
+                    Padding(padding: const EdgeInsets.only(right: 2), child: _BrainPill(brain: c.lastBrain)),
                   if (LessonRecorder.instance.on)
                     const Tooltip(
                       message: 'Leçon en cours d\'enregistrement',
@@ -6612,6 +6623,16 @@ class ClickyBox extends StatelessWidget {
                       alignment: Alignment.topLeft,
                       child: SelectableText(c.reply, style: text.bodyMedium?.copyWith(height: 1.35)),
                     ),
+                  if (!listening && !busy && c.reply.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        tooltip: 'Copier la réponse',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        onPressed: () => Clipboard.setData(ClipboardData(text: c.reply)),
+                      ),
+                    ),
                   // Son idée : il attend ton accord (ou dis « oui » / « non »).
                   if (c.idea != null) _IdeaButtons(c: c, accent: accent),
                 ],
@@ -6662,8 +6683,18 @@ class ClickyBox extends StatelessWidget {
               ],
             ),
           ),
-        // Raccourcis pour apprendre.
-        if ((c.panelOpen || c.reply.isNotEmpty) &&
+        // Boîte ouverte, rien encore demandé : les actions utiles en un clic,
+        // toutes sans IA (aucun jeton).
+        if (c.panelOpen &&
+            c.reply.isEmpty &&
+            c.state == ClickyState.idle &&
+            problem == null &&
+            c.steps.isEmpty &&
+            !c.showHistory &&
+            !compact)
+          _QuickActions(c: c, color: accent)
+        // Après une réponse : les raccourcis pour aller plus loin.
+        else if ((c.panelOpen || c.reply.isNotEmpty) &&
             c.state == ClickyState.idle &&
             problem == null &&
             c.steps.isEmpty &&
@@ -6732,7 +6763,7 @@ class ClickyBox extends StatelessWidget {
                     textInputAction: TextInputAction.send,
                     onSubmitted: c.ask,
                     decoration: InputDecoration(
-                      hintText: 'Demande-moi quelque chose…',
+                      hintText: 'Demande, ou « crée un robot : quand… »',
                       isDense: true,
                       border: const OutlineInputBorder(),
                     ),
@@ -6769,8 +6800,8 @@ class ClickyBox extends StatelessWidget {
     );
     final box = ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: compact ? 520 : 380,
-        maxHeight: c.showHistory ? 420 : (compact ? 220 : 400),
+        maxWidth: compact ? 520 : 420,
+        maxHeight: c.showHistory ? 460 : (compact ? 220 : 460),
       ),
       child: body,
     );
@@ -6965,6 +6996,78 @@ class _HudWave extends StatelessWidget {
               boxShadow: [BoxShadow(color: hudCyan.withValues(alpha: 0.6), blurRadius: 4)],
             ),
           ),
+      ],
+    ),
+  );
+}
+
+/// Qui a répondu : « sans IA » / « Gemini » (gratuits) ou « Claude ».
+class _BrainPill extends StatelessWidget {
+  const _BrainPill({required this.brain});
+  final String brain;
+
+  @override
+  Widget build(BuildContext context) {
+    final free = brain != 'Claude';
+    final color = free ? const Color(0xFF2FA36B) : const Color(0xFFD97757);
+    return Tooltip(
+      message: free ? 'Réponse gratuite : aucun jeton Claude utilisé' : 'Réponse de Claude (utilise tes jetons)',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(8)),
+        child: Text(
+          free ? '$brain · gratuit' : brain,
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+/// Les actions utiles en un clic quand on ouvre Nexo : toutes passent par
+/// les réponses sans IA (aucun jeton).
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({required this.c, required this.color});
+  final ClickyController c;
+  final Color color;
+
+  static const actions = <(IconData, String, String)>[
+    (Icons.radar_rounded, 'Fais le point', 'fais le point'),
+    (Icons.menu_book_rounded, 'Mes devoirs', 'j ai quoi a faire pour demain'),
+    (Icons.schedule_rounded, 'Prochain cours', 'c est quoi mon prochain cours'),
+    (Icons.history_toggle_off_rounded, 'Ce que j\'ai raté', 'qu est ce que j ai rate'),
+    (Icons.music_note_rounded, 'Musique', 'mets de la musique'),
+    (Icons.sports_esports_rounded, 'Coach de jeu', 'coach moi'),
+    (Icons.smart_toy_rounded, 'Mes robots', 'mes robots'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 4),
+          child: Text(
+            'En un clic, sans jetons',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, letterSpacing: 0.6),
+          ),
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final (icon, label, phrase) in actions)
+              _QuickChip(icon: icon, label: label, color: color, onTap: () => c.ask(phrase)),
+            _QuickChip(
+              icon: Icons.mic_off_rounded,
+              label: 'Micro',
+              color: color,
+              onTap: () => unawaited(c.toggleMute()),
+            ),
+          ],
+        ),
       ],
     ),
   );

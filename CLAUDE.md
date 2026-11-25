@@ -725,6 +725,26 @@
   Ctrl + Alt + M marche pour tous les appels. **Modèle Claude économe** : sans modèle choisi, `ClaudeApi.model` =
   Sonnet en mode `econome` (Opus seulement si `ClaudeApi.deep`, « réfléchis bien ») ; Claude Code : `--model sonnet`
   (réglé dans `_askAi`).
+- **Les robots de Nexo (v1.66)** (demande : « plein de petits robots que Nexo utilise et crée, proactif de dingue sans
+  jetons ») : `ui/clicky/robots.dart`. `Robot` (déclencheur `heure` / `appli` / `jeu` / `retour` / `message` / `note` /
+  `demarrage` / `usage` + actions `phrase:` (exécutée **sans IA** par `ClickyController.robotPhrase` = `QuickAnswers`,
+  sinon Gemini `GeminiAgent`, **jamais Claude** ; Nexo partout : `ClickyDesktop.ask`), `dire:`, `notifier:`,
+  `protocole:` ; `ask` = proposer d'abord, `perDay`). `RobotRules` sans IA : `parse` (« quand j'ouvre Discord, coupe
+  mon micro », « tous les jours à 19 h, … », « le samedi à 10 h 30, … », « toutes les 45 minutes, … »), `looksLikeRobot`,
+  `firesOnTick` (transitions : appli qui **arrive**, jeu qui **commence**, retour après absence ; heure dans les 3 min,
+  une fois), `firesOnNote`, `templates` (robots tout prêts ; `byDefault` allumés d'office : devoirs 19 h, programme de
+  demain 21 h, coach quand tu joues (demande), pause des yeux). `Robots` (`robots.json`, synchronisé) : `tick` (tour
+  de 15 s de `main.dart`), `onNotification` (`NotificationCenter.onAny`), `_maybeSuggest` (un modèle proposé par jour
+  via `proposeIdea` → outil `robot_installer`), outils `robot_creer/liste/supprimer/activer/installer/lancer` (dans
+  `lifeTools`), phrases sans IA dans `QuickAnswers` (création, « mes robots »). Page `ui/clicky/robots_page.dart`
+  (Réglages de Nexo → Ce qu'il fait pour toi → Ses robots). Tests `test/v186_robots_test.dart`.
+- **Boîte de Nexo plus pratique (v1.66)** : `_QuickActions` (boîte ouverte sans réponse : fais le point, devoirs,
+  prochain cours, ce que j'ai raté, musique, coach, robots, micro — tout sans IA), `_BrainPill` (qui a répondu :
+  `ClickyController.lastBrain` = sans IA / Gemini / Claude), bouton copier, boîte 420 × 460.
+- **Publier sans session** : si `gh` n'est pas connecté, `scratchpad/publish.ps1` (robot : code de connexion GitHub
+  renouvelé dans le presse-papier, push, PR + fusion par `gh api`, attente de la version, installation dans
+  `%LOCALAPPDATA%\Programs\Mon Hub` + recopie du profil WebView2) ; envoyer le code ailleurs (hébergeur, artefact)
+  est refusé par la sécurité de Claude Code.
 - Vérifier ici sous Windows : `dart analyze --fatal-infos` (pas `flutter analyze`, qui se perd dans le SDK quand il est
   dans un chemin long) ; 4 tests de l'accueil échouent **seulement sous Windows** (PowerShell de `PcApps.load` →
   minuteur en attente, texte « PC (Windows) ») : sous Linux (GitHub) ils passent.

@@ -17,6 +17,7 @@ import 'tutorial.dart';
 import 'mic_test.dart';
 import 'wake.dart';
 import 'mind_page.dart';
+import 'robots_page.dart';
 import 'settings.dart';
 
 /// **Tous les réglages de Nexo, au même endroit**, rangés par rubrique
@@ -101,6 +102,13 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
       (
         'Ce qu\'il fait pour toi',
         [
+          _Entry(
+            'Ses robots',
+            'Petites automatisations sans IA ni jetons : « quand j\'ouvre Discord, coupe mon micro », les devoirs à 19 h…',
+            Icons.smart_toy_rounded,
+            const Color(0xFFE0457B),
+            (ctx) => RobotsPage.open(ctx),
+          ),
           _Entry(
             'Nexo prend les devants',
             'Rappels de devoirs, plan de la journée, objectifs, idées (toujours avec ton accord)',
