@@ -29,6 +29,7 @@ import 'ui/clicky/watchers.dart';
 import 'ui/clicky/interests.dart';
 import 'ui/clicky/jarvis.dart' show FocusMode;
 import 'ui/phone_link_page.dart';
+import 'ui/clicky/piper_voice.dart';
 import 'ui/clicky/win.dart';
 import 'core/certificates.dart';
 import 'core/claude_bridge.dart';
@@ -347,6 +348,18 @@ class _HubAppState extends State<HubApp> {
           });
           // « Demande à Nexo » depuis le téléphone (texte ou dictée).
           PhoneLink.instance.ask = ClickyController.instance.askFromPhone;
+          // La voix du PC (Piper) s'installe toute seule, une fois, en fond :
+          // Nexo parle même quand Gemini est épuisé ou sans internet.
+          if (PiperVoice.supported) {
+            Perf.later(
+              9,
+              () => PiperVoice.autoInstall(
+                notify: (title, body) => unawaited(
+                  n.post(HubNotification(id: 'piper:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
+                ),
+              ),
+            );
+          }
           Perf.later(5, PhoneLink.instance.start);
         }
         // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier

@@ -12,6 +12,7 @@ import 'journal.dart';
 import 'pc.dart';
 import 'routines.dart';
 import 'neural_voice.dart';
+import 'piper_voice.dart';
 import 'tutorial.dart';
 import 'wake.dart';
 import 'win.dart';
@@ -254,6 +255,13 @@ class ClickyMoreSettings extends StatelessWidget {
           );
         }
         add('voice', 'voix gemini cle api gratuite ecouter la voix choisir', const _NeuralVoicePicker());
+        if (PiperVoice.supported) {
+          add(
+            'voice',
+            'voix du pc piper sans gemini hors ligne sans internet illimitee installer quota epuise',
+            const _PiperSettings(),
+          );
+        }
         if (Win.supportedHere) {
           sw(
             'voice',
@@ -861,7 +869,8 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
         testing = false;
         info = err == null
             ? null
-            : 'La voix Gemini ne répond pas ($err). Vérifie ta clé et ta connexion internet ; sinon Nexo répond par écrit.';
+            : 'La voix Gemini ne répond pas ($err). Vérifie ta clé et ta connexion internet ; sinon installe la voix '
+                  'du PC (plus bas) : elle prend le relais.';
       });
     }
   }
@@ -873,7 +882,8 @@ class _NeuralVoicePickerState extends State<_NeuralVoicePicker> {
       Text(
         'Une seule voix, naturelle : celle de Google Gemini, avec ta clé gratuite (aistudio.google.com → '
         'Get API key). Nexo lit ses réponses par gros morceaux ; si le quota gratuit du jour est épuisé, '
-        'Gemini Live prend le relais avec la même voix. Sans clé ni internet, Nexo répond par écrit.',
+        'Gemini Live prend le relais avec la même voix. Sans clé, quota épuisé ou sans internet : la voix du PC '
+        '(plus bas) parle à sa place.',
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 8),
@@ -1095,6 +1105,134 @@ class _MicEngineState extends State<_MicEngine> {
           ],
         );
       },
+    );
+  }
+}
+
+
+/// La voix du PC (Piper) : installer, choisir, écouter, et qui parle.
+class _PiperSettings extends StatefulWidget {
+  const _PiperSettings();
+
+  @override
+  State<_PiperSettings> createState() => _PiperSettingsState();
+}
+
+class _PiperSettingsState extends State<_PiperSettings> {
+  final c = ClickyController.instance;
+  String? step;
+  double progress = 0;
+  String? info;
+  bool testing = false;
+
+  Future<void> _install([String? voice]) async {
+    setState(() {
+      step = 'Préparation…';
+      info = null;
+    });
+    try {
+      await PiperVoice.install(
+        voice: voice,
+        onProgress: (s, p) {
+          if (mounted) {
+            setState(() {
+              step = s;
+              progress = p;
+            });
+          }
+        },
+      );
+      info = 'Ma voix du PC est prête : je parle même sans Gemini ni internet.';
+    } catch (e) {
+      info = 'Installation impossible : $e';
+    }
+    if (mounted) setState(() => step = null);
+  }
+
+  Future<void> _test() async {
+    setState(() => testing = true);
+    final was = c.voiceOut.engine;
+    c.voiceOut.engine = 'pc';
+    final err = await c.voiceOut.test('Bonjour ! C\'est Nexo, avec ma voix du PC : sans internet et sans limite.');
+    c.voiceOut.engine = was;
+    if (mounted) {
+      setState(() {
+        testing = false;
+        info = err;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final ready = PiperVoice.ready;
+    final v = PiperVoice.voiceOf(PiperVoice.chosen);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 12),
+        Text('Voix du PC (sans Gemini)', style: text.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          'Une voix qui tourne sur ton ordinateur (Piper, libre et gratuite) : sans internet, sans limite, toujours le '
+          'même son. Elle prend le relais tout seul quand Gemini est épuisé ; tu peux aussi la choisir tout le temps.',
+          style: text.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'auto', label: Text('Gemini, puis PC')),
+            ButtonSegment(value: 'pc', label: Text('Toujours le PC')),
+            ButtonSegment(value: 'gemini', label: Text('Gemini seul')),
+          ],
+          selected: {c.voiceEngine},
+          onSelectionChanged: (s) async {
+            await c.setOption('voiceEngine', s.first);
+            if (mounted) setState(() {});
+          },
+        ),
+        const SizedBox(height: 8),
+        if (step != null) ...[
+          Text(step!, style: text.bodySmall),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(value: progress > 0 && progress < 1 ? progress : null),
+        ] else if (!ready)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              icon: const Icon(Icons.download_rounded),
+              label: const Text('Installer la voix du PC (≈ 85 Mo, une fois)'),
+              onPressed: _install,
+            ),
+          )
+        else ...[
+          DropdownButtonFormField<String>(
+            initialValue: v.id,
+            decoration: const InputDecoration(labelText: 'Voix du PC', border: OutlineInputBorder()),
+            items: [
+              for (final x in PiperVoice.voices) DropdownMenuItem(value: x.id, child: Text('${x.name} — ${x.about}')),
+            ],
+            onChanged: (id) async {
+              if (id == null) return;
+              await PiperVoice.choose(id);
+              if (!PiperVoice.ready) await _install(id);
+              if (mounted) setState(() {});
+            },
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: testing
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.play_arrow_rounded),
+              label: const Text('Écouter la voix du PC'),
+              onPressed: testing ? null : _test,
+            ),
+          ),
+        ],
+        if (info != null) Text(info!, style: text.bodySmall?.copyWith(color: Colors.orange)),
+      ],
     );
   }
 }

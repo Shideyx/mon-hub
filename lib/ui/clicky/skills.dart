@@ -75,6 +75,11 @@ class ClickySkills {
       Skill('Dis « Nexo » (mot d\'activation, dans Réglages de Nexo → Écoute et micro) : mains libres.'),
       Skill('Après sa réponse, enchaîne directement : il t\'écoute encore quelques secondes.'),
       Skill(
+        '« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile',
+        tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?',
+      ),
+      Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
+      Skill(
         '« Nexo, on discute » : la conversation en direct façon JARVIS. Micro ouvert, il répond tout de suite, tu '
         'peux lui couper la parole ; gratuit (Gemini Live), aucun jeton Claude. « Merci Nexo, c\'est tout » pour finir.',
         tryIt: 'Mode conversation',
@@ -84,10 +89,10 @@ class ClickySkills {
         'le son ne hache plus (petit tampon anti-coupures).',
       ),
       Skill(
-        '« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile',
-        tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?',
+        'Il parle même sans Gemini : sa voix du PC (Piper, gratuite, sans internet, sans limite) s\'installe toute '
+        'seule et prend le relais quand le quota est épuisé. « On discute » marche aussi sans Gemini. Réglages de '
+        'Nexo → Voix : « Toujours le PC » pour garder la même voix tout le temps.',
       ),
-      Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
     ]),
     SkillGroup('🏫', 'Il sait quand tu as cours', Color(0xFFE5484D), isNew: true, [
       Skill(
