@@ -10,6 +10,7 @@ import 'game_coach.dart' show CoachRules;
 import 'robots.dart' show RobotRules;
 import '../../core/cam_blur.dart';
 import '../../core/birthdays.dart';
+import '../../core/school_calendar.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
 typedef QuickTool = Future<Object?> Function(String name, Map<String, dynamic> args);
@@ -113,6 +114,215 @@ class QuickAnswers {
   static String _short(String s, [int max = 90]) {
     final t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     return t.length > max ? '${t.substring(0, max)}…' : t;
+  }
+
+  static const _dayWords =
+      r'(?: (?:pour )?(?:demain|apres demain|aujourd hui|ce matin|cet apres midi|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche))?';
+
+  /// Les questions sur l'école, **sans IA**, avec l'action `agenda_ecole`
+  /// (École Directe + calendrier scolaire officiel) : « j'ai cours demain ? »,
+  /// « c'est quand les vacances ? », « c'est quand la rentrée ? », « je finis
+  /// à quelle heure ? », « j'ai un trou ? », « c'est férié demain ? »,
+  /// « je suis en zone B ».
+  static Future<QuickReply?> schoolAnswer(String n, DateTime t, QuickTool call, Set<String> tools) async {
+    Future<Map> school([DateTime? day]) async {
+      final r = await call('agenda_ecole', {
+        if (day != null) 'date': SchoolRules.ymd(day),
+      });
+      return r is Map ? r : const {};
+    }
+
+    final today = DateTime(t.year, t.month, t.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    String cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+    // La zone de vacances.
+    final zoneSet = RegExp(
+      r'^(?:je suis|j habite|on est|mon lycee est|mon college est) (?:en |dans la )?zone ([abc])$|'
+      r'^ma zone(?: de vacances)? (?:c est|est) (?:la )?(?:zone )?([abc])$|^(?:mets|regle|change) (?:ma )?zone (?:en |sur )?([abc])$',
+    ).firstMatch(n);
+    if (zoneSet != null && tools.contains('agenda_vacances')) {
+      final z = (zoneSet[1] ?? zoneSet[2] ?? zoneSet[3])!.toUpperCase();
+      final r = await call('agenda_vacances', {'zone': z});
+      final next = r is Map ? '${r['prochaines'] ?? ''}' : '';
+      return QuickReply('C\'est noté : zone $z pour tes vacances.${next.isEmpty ? '' : ' $next'}');
+    }
+    if (RegExp(
+          r'^(?:c est quoi |quelle est )?ma zone(?: de vacances| scolaire)?$|^(?:je suis|on est) (?:dans )?quelle zone$',
+        ).hasMatch(n) &&
+        tools.contains('agenda_vacances')) {
+      final r = await call('agenda_vacances', {});
+      if (r is! Map) return null;
+      return QuickReply(
+        r['conseil'] != null
+            ? '${r['conseil']}'
+            : 'Tu es en ${r['zone']} pour les vacances scolaires (dis « je suis en zone B » pour changer).',
+      );
+    }
+
+    // Les jours fériés (calculés, sans internet).
+    final ferie = RegExp(r'^(?:est ce que )?(.+?) c est ferie$|^c est ferie (.+)$').firstMatch(n);
+    if (ferie != null) {
+      final d = dayFrom(ferie[1] ?? ferie[2] ?? '', t);
+      if (d != null) {
+        final name = SchoolRules.publicHoliday(d);
+        return QuickReply(
+          name == null ? 'Non, ${_dayName(d, t)} n\'est pas férié.' : 'Oui, ${_dayName(d, t)} c\'est férié : $name.',
+        );
+      }
+    }
+    if (RegExp(r'^(?:c est quand |quel est |quand est )?le prochain (?:jour )?ferie$|^prochain (?:jour )?ferie$').hasMatch(n)) {
+      final (d, name) = SchoolRules.nextPublicHoliday(today.add(const Duration(days: 1)));
+      return QuickReply('Le prochain jour férié : $name, le ${SchoolRules.longDate(d)}.');
+    }
+
+    // Les vacances.
+    final holidays = RegExp(
+      r'^(?:c est quand|quand (?:est ce que )?(?:sont|commencent|c est|arrivent|tombent)|elles sont quand|'
+      r'dans combien de (?:jours|temps)(?: (?:sont|commencent|c est|arrivent))?|combien de jours (?:avant|jusqu aux?|il reste avant)|'
+      r'il reste combien de (?:jours|temps) avant)(?: les| mes)? (?:prochaines )?vacances(?: (?:de |d |du )?(noel|la toussaint|toussaint|fevrier|hiver|printemps|paques|ete))?$|'
+      r'^(?:les |mes )?(?:prochaines )?vacances(?: c est quand| commencent quand| sont quand)?$',
+    ).firstMatch(n);
+    if (holidays != null) {
+      final r = await school();
+      final want = holidays[1];
+      if (want != null && tools.contains('agenda_vacances')) {
+        final key = switch (want) {
+          'la toussaint' || 'toussaint' => 'toussaint',
+          'fevrier' || 'hiver' => 'hiver',
+          'paques' || 'printemps' => 'printemps',
+          'ete' => 'ete',
+          _ => 'noel',
+        };
+        final all = await call('agenda_vacances', {});
+        final list = all is Map ? _list(all['a_venir']) : const <Map>[];
+        final hit = list.where((b) => SchoolRules.norm('${b['nom']}').contains(key)).firstOrNull;
+        if (hit != null) {
+          final s0 = DateTime.tryParse('${hit['debut']}'), e0 = DateTime.tryParse('${hit['reprise']}');
+          if (s0 != null && e0 != null) {
+            final days = s0.difference(today).inDays;
+            final when = days <= 0 ? 'en ce moment' : (days == 1 ? 'demain' : 'dans $days jours');
+            return QuickReply(
+              '${cap('${hit['nom']}')} : du ${SchoolRules.longDate(s0)} au ${SchoolRules.longDate(e0.subtract(const Duration(days: 1)))}'
+              '${hit['reprise_approx'] == true ? '' : ', reprise le ${SchoolRules.longDate(e0)}'} ($when).',
+            );
+          }
+        }
+      }
+      final cur = r['vacances_en_cours'];
+      if (cur is Map) return QuickReply('Tu es en vacances ! ${r['resume'] ?? ''}');
+      final next = r['prochaines_vacances'];
+      if (next is Map) return QuickReply('${next['texte']}');
+      return const QuickReply('Je ne connais pas encore tes prochaines vacances : dis-moi ta zone (« je suis en zone B »).');
+    }
+    if (RegExp(r'^(?:est ce que )?(?:je suis|on est|c est|j suis) (?:en vacances|les vacances)$').hasMatch(n)) {
+      final r = await school();
+      if (r['vacances_en_cours'] is Map) return QuickReply('Oui ! ${r['resume'] ?? ''}');
+      final next = r['prochaines_vacances'];
+      return QuickReply('Pas encore. ${next is Map ? next['texte'] : ''}'.trim());
+    }
+
+    // La rentrée / la reprise des cours.
+    if (RegExp(
+      r'^(?:c est quand|quand est|quand c est|c est quel jour) (?:la rentree|la reprise|la reprise des cours)$|'
+      r'^(?:je reprends|on reprend|je retourne en cours|je reprends les cours|on reprend les cours|je retourne au lycee|je retourne au college)(?: quand)?$|'
+      r'^quand (?:est ce que )?(?:je reprends|on reprend|je retourne en cours|je reprends les cours|on reprend les cours)$|^(?:la )?rentree(?: c est quand)?$',
+    ).hasMatch(n)) {
+      final r = await school();
+      final next = r['prochain_jour_de_cours'];
+      if (next is! Map) return const QuickReply('Je ne vois pas quand tu reprends : ton emploi du temps n\'est pas encore lu.');
+      final back = '${next['texte']}';
+      if (r['vacances_en_cours'] is Map || (r['aujourdhui'] as Map?)?['cours'] == false) {
+        return QuickReply('Tu reprends les cours : ${back[0].toLowerCase()}${back.substring(1)}');
+      }
+      return QuickReply('Tu n\'es pas en vacances : prochain jour de cours, ${back[0].toLowerCase()}${back.substring(1)}');
+    }
+
+    // « J'ai cours (demain) ? »
+    final has = RegExp(
+      '^(?:est ce que )?(?:j ai|on a|il y a|y a) (?:cours|ecole|classe|cours au lycee|cours au college)$_dayWords\$|'
+      '^(?:est ce que )?(?:je vais|je dois aller) (?:en cours|a l ecole|au lycee|au college)$_dayWords\$',
+    ).hasMatch(n);
+    if (has) {
+      final day = dayFrom(n, t) ?? today;
+      final r = day == today || day == tomorrow ? await school() : await school(day);
+      final info = day == today ? r['aujourdhui'] : (day == tomorrow ? r['demain'] : r);
+      if (info is! Map) return null;
+      if (info['cours'] == true) {
+        final c = info['annules'] is List && (info['annules'] as List).isNotEmpty
+            ? ' (${(info['annules'] as List).length} annulé${(info['annules'] as List).length > 1 ? 's' : ''})'
+            : '';
+        if (day == today) return QuickReply('Oui. ${r['resume'] ?? ''}');
+        final list = [for (final x in (info['liste'] as List?) ?? const []) '$x'];
+        return QuickReply(
+          'Oui, ${_dayName(day, t)} : ${list.isEmpty ? 'de ${info['debut']} à ${info['fin']}' : '${list.take(9).join(', ')}. Tu finis à ${info['fin']}'}$c.'
+          '${info['commence_plus_tard'] == true ? ' Tu commences plus tard : premier cours annulé.' : ''}',
+        );
+      }
+      if (info['type'] == 'inconnu') {
+        return QuickReply(
+          day.weekday <= 5
+              ? 'Normalement oui (${_dayName(day, t)} est un jour de semaine), mais je n\'ai pas ton emploi du temps.'
+              : 'A priori non, c\'est le week-end.',
+        );
+      }
+      final why = day == today ? '${r['resume'] ?? ''}' : SchoolRules.sayDay(_dayOf(info, day), t);
+      return QuickReply('Non ! $why'.trim());
+    }
+
+    // Les heures : début, fin, trous, le cours en ce moment.
+    final end = RegExp(
+      '^(?:je finis|je termine|on finit|je sors|je fini|on termine) a quelle heure$_dayWords\$|'
+      '^a quelle heure (?:je finis|je termine|je sors|je fini|on finit|on termine)$_dayWords\$|^(?:je finis|je termine) quand$_dayWords\$',
+    ).hasMatch(n);
+    final start = RegExp(
+      '^(?:je commence|on commence|je rentre) a quelle heure$_dayWords\$|'
+      '^a quelle heure (?:je commence|j ai cours|on commence|je rentre)$_dayWords\$|^j ai cours a quelle heure$_dayWords\$',
+    ).hasMatch(n);
+    final gap = RegExp(
+      '^(?:est ce que )?j ai (?:un trou|des trous|une heure de libre|des heures de libre|une heure de perm|une perm)$_dayWords\$',
+    ).hasMatch(n);
+    if (end || start || gap) {
+      final day = dayFrom(n, t) ?? (start && t.hour >= 17 ? tomorrow : today);
+      final r = day == today || day == tomorrow ? await school() : await school(day);
+      final info = day == today ? r['aujourdhui'] : (day == tomorrow ? r['demain'] : r);
+      if (info is! Map) return null;
+      final word = _dayName(day, t);
+      if (info['cours'] != true) {
+        final why = day == today ? '${r['resume'] ?? ''}' : SchoolRules.sayDay(_dayOf(info, day), t);
+        return QuickReply(why.isEmpty ? 'Pas de cours $word.' : why);
+      }
+      if (gap) {
+        final trous = info['trous'];
+        if (trous is List && trous.isNotEmpty) {
+          return QuickReply('Oui, $word : ${trous.length == 1 ? 'une heure de libre' : '${trous.length} trous'} (${trous.join(', ')}).');
+        }
+        return QuickReply('Pas de trou $word (en dehors de la pause de midi).');
+      }
+      if (end) {
+        final early = info['finit_plus_tot'] == true ? ' (plus tôt que prévu : dernier cours annulé)' : '';
+        return QuickReply('${cap(word)}, tu finis à ${info['fin']}$early.');
+      }
+      final late = info['commence_plus_tard'] == true ? ' (plus tard que prévu : premier cours annulé)' : '';
+      final first = (info['liste'] as List?)?.firstOrNull;
+      return QuickReply(
+        '${cap(word)}, tu commences à ${info['debut']}$late${first == null ? '' : ' : ${'$first'.replaceFirst(RegExp(r'^\S+ h(?: \d+)? '), '')}'}.',
+      );
+    }
+    if (RegExp(
+      r'^(?:j ai quoi|c est quoi mon cours|quel cours j ai|j ai quel cours) (?:maintenant|en ce moment|la)$|'
+      r'^(?:je suis|suis je|est ce que je suis) (?:cense etre |censee etre )?en cours(?: la| maintenant| en ce moment)?$',
+    ).hasMatch(n)) {
+      final r = await school();
+      return QuickReply('${r['resume'] ?? 'Je ne sais pas.'}');
+    }
+    return null;
+  }
+
+  /// Une journée renvoyée par `agenda_ecole` (avec `date`) → assez pour la phrase.
+  static SchoolDay _dayOf(Map info, DateTime day) {
+    final kind = SchoolDayKind.values.where((k) => k.name == '${info['type']}').firstOrNull ?? SchoolDayKind.inconnu;
+    return SchoolDay(date: day, kind: kind, reason: '${info['raison'] ?? ''}');
   }
 
   static List<Map> _list(Object? v) => [
@@ -1142,6 +1352,12 @@ class QuickAnswers {
       }
     }
 
+    // L'école : ai-je cours ? vacances, rentrée, fériés, heure de fin…
+    if (has('agenda_ecole')) {
+      final r = await schoolAnswer(n, t, call, tools);
+      if (r != null) return r;
+    }
+
     // Emploi du temps.
     if (has('agenda_lire')) {
       final next = RegExp(r'^(?:c est quoi |quel est |j ai quoi comme )?(?:mon |le )?prochain cours$').hasMatch(n);
@@ -1156,11 +1372,29 @@ class QuickAnswers {
           for (final e in _list(
             await call('agenda_lire', {'debut': target.toIso8601String().substring(0, 10), 'jours': next ? 7 : 1}),
           ))
-            if (e['annule'] != true) e,
+            if (e['annule'] != true && e['vacances'] != true) e,
         ]..sort((a, b) => _date(a['debut'])!.compareTo(_date(b['debut'])!));
         if (next) {
-          final up = items.where((e) => _date(e['debut'])!.isAfter(t)).firstOrNull;
-          if (up == null) return const QuickReply('Je ne vois pas de cours à venir cette semaine.');
+          // Un vrai cours d'École Directe d'abord ; sans École Directe, le
+          // premier créneau de l'agenda (emploi du temps importé…).
+          final future = items.where((e) => _date(e['debut'])!.isAfter(t)).toList();
+          final up =
+              future.where(SchoolRules.isLesson).firstOrNull ??
+              (future.any(SchoolRules.isSchoolItem) ? null : future.firstOrNull);
+          if (up == null) {
+            // Vacances, week-end… : la reprise, d'après le calendrier scolaire.
+            if (has('agenda_ecole')) {
+              final r = await call('agenda_ecole', {});
+              final back = r is Map ? r['prochain_jour_de_cours'] : null;
+              if (back is Map) {
+                final txt = '${back['texte']}';
+                return QuickReply(
+                  'Pas de cours d\'ici là. Ton prochain cours : ${txt[0].toLowerCase()}${txt.substring(1)}',
+                );
+              }
+            }
+            return const QuickReply('Je ne vois pas de cours à venir cette semaine.');
+          }
           final d = _date(up['debut'])!;
           final lieu = '${up['lieu'] ?? ''}'.trim();
           return QuickReply(
@@ -1172,7 +1406,15 @@ class QuickAnswers {
             : RegExp(r'\bmatin\b').hasMatch(n)
             ? items.where((e) => _date(e['debut'])!.hour < 12).toList()
             : items;
-        if (cancelled.isEmpty) return QuickReply('Rien de prévu ${_dayName(target, t)} 😎');
+        if (cancelled.isEmpty) {
+          if (has('agenda_ecole')) {
+            final r = await call('agenda_ecole', {'date': SchoolRules.ymd(target)});
+            if (r is Map && '${r['resume'] ?? ''}'.isNotEmpty && r['type'] != 'inconnu') {
+              return QuickReply('${r['resume']}');
+            }
+          }
+          return QuickReply('Rien de prévu ${_dayName(target, t)} 😎');
+        }
         final parts = [for (final e in cancelled.take(9)) '${_hour(_date(e['debut'])!)} ${e['titre']}'];
         final end = _date(cancelled.last['fin']);
         return QuickReply(

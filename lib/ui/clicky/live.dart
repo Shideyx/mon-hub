@@ -25,7 +25,19 @@ class GeminiLive {
     this.language = 'fr-FR',
     this.autoVad = false,
     this.mediaResolution,
+    this.temperature,
   });
+
+  /// Plus bas = une voix et un ton plus réguliers (lecture : 0,3).
+  final double? temperature;
+
+  /// La façon de parler de Nexo, **la même dans toutes ses connexions**
+  /// (conversation, lecture, conversation continue) : sa voix ne change plus
+  /// d'une réponse à l'autre.
+  static const voiceStyle =
+      'Ta voix : toujours la même, du début à la fin et d\'une réponse à l\'autre — calme, posée, assurée, un '
+      'peu grave, débit régulier et plutôt rapide, accent français de France neutre. Ne change jamais de ton, de '
+      'rythme, d\'accent ni de langue ; pas de chuchotement, pas de cri, pas d\'imitation, pas d\'effets.';
 
   /// Qualité des images envoyées en direct (coach de jeu) :
   /// `MEDIA_RESOLUTION_LOW` = peu de jetons par image. null : par défaut.
@@ -81,6 +93,10 @@ class GeminiLive {
   Future<Object?> Function(String name, Map<String, dynamic> args)? onToolCall;
   void Function(String status)? onToolStatus;
   void Function(Object error)? onClosed;
+
+  /// Le serveur va couper (au bout de quelques minutes) : la conversation
+  /// peut se rouvrir là où elle en était.
+  void Function()? onGoAway;
 
   bool get connected => _ws != null && (_ready?.isCompleted ?? false);
 
@@ -147,6 +163,7 @@ class GeminiLive {
           'languageCode': ?language,
         },
         'mediaResolution': ?mediaResolution,
+        'temperature': ?temperature,
       },
       'systemInstruction': {
         'parts': [
@@ -302,6 +319,7 @@ class GeminiLive {
       // Le serveur va couper : la prochaine question rouvrira la connexion
       // (en reprenant la conversation).
       unawaited(close());
+      onGoAway?.call();
     }
   }
 

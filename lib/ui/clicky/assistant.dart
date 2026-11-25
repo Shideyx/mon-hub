@@ -15,6 +15,7 @@ import 'initiatives.dart';
 import 'quick.dart' show QuickTool;
 import 'tutor.dart' show normalize;
 import 'school_bag.dart';
+import '../../core/school_calendar.dart';
 import '../../core/screen_time.dart';
 import '../../core/birthdays.dart';
 
@@ -378,7 +379,7 @@ class Assistant extends ChangeNotifier {
   static DateTime? firstLesson(List<Map> events, DateTime day) {
     final starts = [
       for (final e in events)
-        if (e['annule'] != true && '${e['source'] ?? ''}'.toLowerCase().contains('cole'))
+        if (SchoolRules.isLesson(e))
           if (_date(e['debut']) case final d? when d.year == day.year && d.month == day.month && d.day == day.day) d,
     ]..sort();
     return starts.firstOrNull;
@@ -492,7 +493,10 @@ class Assistant extends ChangeNotifier {
     final text = await bagFor(day, events: events, homework: hw, word: 'demain');
     await mark(key, n);
     if (text == null) return;
-    notify?.call('🎒 Prépare ton sac', text);
+    // La veille de la reprise après des vacances : il le dit.
+    final school = await _get('agenda_ecole');
+    final back = school is Map && school['reprise_demain'] == true;
+    notify?.call(back ? '🎒 Demain, c\'est la reprise !' : '🎒 Prépare ton sac', text);
   }
 
   // Anticipation ------------------------------------------------------------
@@ -1492,6 +1496,8 @@ class Assistant extends ChangeNotifier {
     final day = today.toIso8601String().substring(0, 10);
     final events = _list(await _get('agenda_lire', {'debut': day, 'jours': 2}));
     final hw = _list(await _get('ecole_devoirs'));
+    // Le point « école » (vacances, week-end, férié, cours annulés…).
+    final school = await _get('agenda_ecole');
     final c = Carnet.instance;
     await c.load();
     final todos = c.list('todos');
@@ -1518,9 +1524,10 @@ class Assistant extends ChangeNotifier {
     return {
       'date': n,
       'meteo': weather,
+      if (school is Map) 'ecole': school,
       'cours': [
         for (final e in events)
-          if (isToday(e) && '${e['source']}'.contains('cole')) e,
+          if (isToday(e) && SchoolRules.isSchoolItem(e) && !SchoolRules.isBreakItem(e)) e,
       ],
       'rdv': [
         for (final e in events)
@@ -1607,6 +1614,14 @@ class Assistant extends ChangeNotifier {
     return out.take(4).toList();
   }
 
+  static String _schoolEmoji(Map school) => switch ('${(school['aujourdhui'] as Map?)?['type'] ?? ''}') {
+    'vacances' => '🏖️',
+    'weekend' => '😎',
+    'ferie' => '🎌',
+    'annule' => '🎉',
+    _ => '📚',
+  };
+
   /// Le briefing en texte (sans IA).
   static String briefingText(Map<String, Object?> d, {String name = ''}) {
     final now = d['date'] as DateTime;
@@ -1622,9 +1637,12 @@ class Assistant extends ChangeNotifier {
       );
     }
     final lessons = (d['cours'] as List).cast<Map>();
+    final school = d['ecole'] is Map ? d['ecole'] as Map : const {};
     b.writeln();
     if (lessons.isEmpty) {
-      b.writeln('📚 Pas de cours aujourd\'hui.');
+      // Pourquoi pas de cours (vacances, week-end, férié…) et quand ça reprend.
+      final why = '${school['resume'] ?? ''}'.trim();
+      b.writeln(why.isEmpty ? '📚 Pas de cours aujourd\'hui.' : '${_schoolEmoji(school)} $why');
     } else {
       final cancelled = [
         for (final l in lessons)
@@ -1640,6 +1658,14 @@ class Assistant extends ChangeNotifier {
       );
       for (final c in cancelled) {
         b.writeln('🎉 Annulé : ${c['titre']} à ${_hour(_date(c['debut'])!)}.');
+      }
+    }
+    // Les prochaines vacances, quand elles approchent (≤ 10 jours).
+    final next = school['prochaines_vacances'];
+    if (next is Map && school['vacances_en_cours'] == null) {
+      final start = DateTime.tryParse('${next['debut'] ?? ''}');
+      if (start != null && start.difference(DateTime(now.year, now.month, now.day)).inDays <= 10) {
+        b.writeln('🏖️ ${next['texte']}');
       }
     }
     final hw = (d['devoirs'] as List).cast<Map>();

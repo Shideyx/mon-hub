@@ -23,6 +23,7 @@ import 'video_notes.dart';
 import '../../core/ai_text.dart';
 import '../../core/camera_guard.dart';
 import '../../core/self_repair.dart';
+import '../../core/school_calendar.dart';
 import '../../core/claude_api.dart';
 import '../../core/perf.dart';
 import '../../modules/carnet/carnet_module.dart';
@@ -88,6 +89,7 @@ import '../../core/gemini_agent.dart';
 import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
+import 'jarvis_talk.dart';
 import 'life.dart';
 import 'senses.dart';
 import 'pc_watch.dart';
@@ -289,6 +291,8 @@ class ClickyController extends ChangeNotifier {
   // donc par un petit fichier commun, relu toutes les 2 secondes.
   static const _sharedKeys = [
     'helpOnly',
+    'quietInClass',
+    'voiceSteady',
     'followUp',
     'enabled',
     'voice',
@@ -687,8 +691,13 @@ class ClickyController extends ChangeNotifier {
     voiceOut.geminiKey = key?.trim() ?? '';
   }
 
+  /// Voix toujours identique (oui par défaut) : tout passe par Gemini Live,
+  /// le même moteur et la même voix que la conversation.
+  bool get voiceSteady => _opt('voiceSteady', true);
+
   void _applyVoice({String? lang}) {
     voiceOut.geminiVoice = geminiVoice;
+    voiceOut.steady = voiceSteady;
     voiceOut
       ..rate = ttsRate
       ..pitch = ttsPitch
@@ -726,6 +735,8 @@ class ClickyController extends ChangeNotifier {
   bool _voiceTurn = false;
 
   Future<void> startListening({bool dictate = false, bool followUp = false}) async {
+    // Conversation en direct : le micro est déjà ouvert, rien à faire.
+    if (talking) return;
     await stopSpeaking();
     if (state == ClickyState.thinking || state == ClickyState.listening) return;
     // Coach de jeu lancé : ta voix part directement au coach, qui voit ta
@@ -1029,6 +1040,8 @@ class ClickyController extends ChangeNotifier {
   /// coupée (les briefings sont toujours lus).
   Future<void> speak(String text, {bool force = false}) async {
     if ((!voice && !force) || !_voicePlatform || text.isEmpty) return;
+    // Une seule voix : pendant la conversation en direct, c'est elle qui parle.
+    if (talking) return;
     _applyVoice();
     _wake.pause();
     try {
@@ -1046,6 +1059,7 @@ class ClickyController extends ChangeNotifier {
     _askId++;
     _voiceTurn = false;
     _followChain = 0;
+    if (talking) await stopTalk();
     ClaudeCode.cancelAll();
     await stopSpeaking();
     // Gemini Live : on coupe la voix et on ignore la fin de la réponse.
@@ -1488,7 +1502,21 @@ class ClickyController extends ChangeNotifier {
     final at = cursor;
     if (at == null) return;
     glance(at + const Offset(40, -30), note: text, hold: const Duration(seconds: 5));
+    // En plein cours : une bulle, jamais sa voix (la classe entendrait).
+    if (aloud && inClassQuiet) return;
     if (aloud && voice && await ClickyMind.instance.spendVoice()) unawaited(speak(withoutEmoji(text)));
+  }
+
+  /// Discret pendant les cours (oui par défaut) : rien à voix haute de
+  /// lui-même quand l'emploi du temps dit que la personne est en classe.
+  bool get quietInClass => _opt('quietInClass', true);
+
+  /// En ce moment, il se tait (en classe d'après École Directe).
+  bool get inClassQuiet {
+    if (!quietInClass) return false;
+    if (SchoolCalendar.instance.inClassNow) return true;
+    final until = ClickySituation.inClassUntil;
+    return until != null && DateTime.now().isBefore(until);
   }
 
   /// Applis où il ne regarde jamais de lui-même (messages, mails, comptes).
@@ -2210,7 +2238,7 @@ class ClickyController extends ChangeNotifier {
     // Un appel qui sonne : tout de suite, et à voix haute (comme un vrai
     // majordome qui annonce l'appel).
     if (MessageAnnounce.isCall(n)) {
-      unawaited(think(line));
+      unawaited(think(line, aloud: !inClassQuiet));
       return true;
     }
     final say = _pacer.onMessage(line, DateTime.now());
@@ -2560,6 +2588,14 @@ class ClickyController extends ChangeNotifier {
     }
     final pr = await call('assistant_priorites');
     if (pr is Map) ctx['trop'] = pr['trop_de_choses'] == true;
+    // L'école : un trou, pas cours aujourd'hui, pas cours demain…
+    final school = await call('agenda_ecole');
+    if (school is Map) {
+      ctx['ecole'] = school['maintenant'];
+      ctx['demain_cours'] = (school['demain'] as Map?)?['cours'];
+      final until = DateTime.tryParse('${school['jusqua_iso'] ?? ''}');
+      if (until != null && school['maintenant'] == 'trou') ctx['libre_min'] = until.difference(n).inMinutes;
+    }
     return Autonomy.rules(ctx, n, available: names, skip: skip);
   }
 
@@ -3383,6 +3419,25 @@ class ClickyController extends ChangeNotifier {
   /// Outils de Nexo lui-même (exécutés dans ce programme) : dépannage et
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
+    // La conversation mains libres (mode JARVIS, Gemini Live, gratuit).
+    if (PcmPlayer.supported)
+      HubTool(
+        name: 'clicky_conversation',
+        description:
+            'Ouvre (ou ferme) la conversation mains libres façon JARVIS : micro ouvert, réponses immédiates à voix '
+            'haute par Gemini Live (gratuit, sans jetons Claude), toujours la même voix. Pour « on discute », '
+            '« mode conversation », « parlons ».',
+        params: {'action': ('string', 'demarrer (défaut) ou arreter')},
+        run: (a) async {
+          if ('${a['action'] ?? ''}'.startsWith('arr')) {
+            await stopTalk();
+            return 'Conversation terminée.';
+          }
+          // Après la réponse en cours, pour ne pas couper sa phrase.
+          Timer(const Duration(seconds: 2), () => unawaited(startTalk()));
+          return 'Je passe en conversation directe dans un instant : parle normalement.';
+        },
+      ),
     // Ce qu'il sait de lui-même : capacités, nouveautés (GitHub), jetons.
     ...SelfKnowledge.tools(() => _tools),
     ...TokenBudget.instance.tools(),
@@ -3752,6 +3807,26 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     target = null;
     showHistory = false;
     clearMarks();
+    // « On discute », « mode conversation » : la conversation mains libres
+    // (Gemini Live, gratuit, sans jetons Claude). « Arrête la conversation ».
+    if (TalkRules.isStop(q) && talking) {
+      await stopTalk();
+      return;
+    }
+    // Écrit pendant la conversation : la question part dans la même
+    // conversation (même voix, même fil).
+    if (talking) {
+      _talk!.sendText(q);
+      return;
+    }
+    if (TalkRules.isStart(q)) {
+      final r = await startTalk();
+      if (!talking) {
+        _set(ClickyState.idle, status: '', reply: r);
+        _fadeSoon();
+      }
+      return;
+    }
     // « Prends la main et … » : Nexo agit tout de suite.
     final take = RegExp(
       r'^\s*(?:(?:hey|ok|dis)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
@@ -3889,7 +3964,13 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       await Carnet.instance.setSetting('city', name);
       _weather = null;
       unawaited(_refreshWeather());
-      r = 'C\'est noté : tu habites à $name. Je regarderai la météo de là-bas, et je m\'habillerai en conséquence.';
+      // La zone de vacances scolaires aussi (si elle n'a pas été choisie).
+      final zone = await SchoolCalendar.instance
+          .guessFromCity(name)
+          .timeout(const Duration(seconds: 6), onTimeout: () => null);
+      r =
+          'C\'est noté : tu habites à $name. Je regarderai la météo de là-bas, et je m\'habillerai en conséquence.'
+          '${zone == null ? '' : ' Tes vacances scolaires : ${SchoolRules.zoneLabel(zone)}.'}';
     }
     if (r == null) return false;
     unawaited(history.add(threadId, ChatMsg(mine: true, text: q), app: _appKey));
@@ -4580,6 +4661,83 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     return true;
   }
 
+  // ---------- Conversation mains libres (mode JARVIS) ----------
+
+  JarvisTalk? _talk;
+
+  /// Une conversation en direct est ouverte.
+  bool get talking => _talk?.active ?? false;
+
+  /// Ouvre la conversation mains libres : Gemini Live (gratuit, aucun jeton
+  /// Claude), micro ouvert, réponses immédiates, toujours la même voix.
+  /// Renvoie ce qu'il faut afficher si ça n'a pas pu démarrer.
+  Future<String> startTalk() async {
+    if (talking) return 'On discute déjà : parle-moi normalement.';
+    if (!PcmPlayer.supported) return 'La conversation en direct marche sur le PC (Windows).';
+    if (voiceOut.geminiKey.trim().isEmpty) {
+      return 'Pour discuter en direct (gratuit), ajoute ta clé Gemini : Réglages de Nexo → Voix.';
+    }
+    // Tout le reste se tait : une seule voix, un seul micro.
+    if (_liveMic != null) await _liveStop(send: false);
+    voiceOut.stop();
+    _livePlayer.stop();
+    _wake.pause();
+    final t = _talk = JarvisTalk(
+      key: voiceOut.geminiKey,
+      system: TalkRules.system(_liveSystem()),
+      tools: [
+        for (final x in _tools)
+          if (!x.name.startsWith('mcp_') && x.name != 'clicky_conversation') x,
+      ],
+      extra: _liveExtras,
+      onTool: _liveTool,
+      voice: voiceOut.geminiVoice,
+    );
+    t.onChanged = () {
+      transcript = t.heard.trim();
+      if (t.said.trim().isNotEmpty) reply = t.said.trim();
+      notifyListeners();
+    };
+    t.state.addListener(() {
+      if (!identical(_talk, t)) return;
+      switch (t.state.value) {
+        case TalkState.connecting:
+          _set(ClickyState.thinking, status: 'J\'ouvre la conversation…');
+        case TalkState.listening:
+          _set(ClickyState.listening, status: 'On discute — « merci Nexo, c\'est tout » pour finir');
+        case TalkState.thinking:
+          _set(ClickyState.thinking, status: 'Je regarde…');
+        case TalkState.speaking:
+          _set(ClickyState.speaking, status: '');
+        case TalkState.off:
+          break;
+      }
+    });
+    t.onTurn = (q, a) {
+      final app = _appKey;
+      unawaited(history.add(threadId, ChatMsg(mine: true, text: q.isEmpty ? '(à voix haute)' : q), app: app));
+      if (a.isNotEmpty) unawaited(history.add(threadId, ChatMsg(mine: false, text: a), app: app));
+    };
+    t.onEnd = (why) {
+      if (identical(_talk, t)) _talk = null;
+      _set(ClickyState.idle, status: '', reply: TalkRules.endNote(why));
+      _fadeSoon();
+      _wake.resume();
+    };
+    try {
+      await t.start();
+      lastBrain = 'Gemini';
+      return '';
+    } catch (e) {
+      if (identical(_talk, t)) _talk = null;
+      _wake.resume();
+      return '$e';
+    }
+  }
+
+  /// Ferme la conversation mains libres.
+  Future<void> stopTalk() async => _talk?.stop();
+
   /// Gemini Live peut servir maintenant.
   bool get liveReady =>
       instant &&
@@ -4618,6 +4776,7 @@ ${clickyPersona(callName, helpOnly: helpOnly)}
 ${ClickyMind.instance.promptBlock(name: callName)}
 ${_lifeBlock()}Tu es Nexo, l'assistant personnel façon JARVIS qui vit dans « Mon Hub » sur l'ordinateur de la personne. Nous sommes le ${now.day}/${now.month}/${now.year}, il est ${now.hour}h${now.minute.toString().padLeft(2, '0')}.
 Tu réponds À L'ORAL et TOUT DE SUITE : en français, naturel, 1 à 3 phrases courtes (plus seulement si on te le demande), sans liste ni symbole.
+${GeminiLive.voiceStyle}
 ${modules.isEmpty ? '' : 'Modules de Mon Hub : ${modules.map((m) => m.name).join(', ')}.'}
 Utilise les fonctions pour les vraies données (agenda, cours, devoirs, notes, messages, mails, musique, carnet…) et pour agir ; dis en une phrase ce que tu as fait. Celles qui envoient ou modifient quelque chose demandent la permission à la personne.
 ${PromptShield.rule}
@@ -4771,7 +4930,7 @@ $thinkingRules''';
   /// pendant un moment — une heure si c'est le quota gratuit.
   void _liveFailed(Object e) {
     final quota = isQuotaError(e);
-    liveError = quota ? 'Quota gratuit de Gemini atteint : voix Microsoft (illimitée) en attendant.' : '$e';
+    liveError = quota ? 'Quota gratuit de Gemini Live atteint : réponses écrites ou par Claude en attendant.' : '$e';
     _liveDownUntil = DateTime.now().add(quota ? const Duration(hours: 1) : const Duration(minutes: 10));
     ErrorLog.record(e, null, where: 'Gemini Live');
   }
@@ -4944,6 +5103,7 @@ $thinkingRules''';
 
   Future<void> _liveDone() async {
     _liveWatch?.cancel();
+    _livePlayer.flush();
     _liveTurn = false;
     if (_liveIgnore) {
       _liveIgnore = false;
@@ -7032,6 +7192,7 @@ class _QuickActions extends StatelessWidget {
   final Color color;
 
   static const actions = <(IconData, String, String)>[
+    (Icons.record_voice_over_rounded, 'Discuter', 'mode conversation'),
     (Icons.radar_rounded, 'Fais le point', 'fais le point'),
     (Icons.menu_book_rounded, 'Mes devoirs', 'j ai quoi a faire pour demain'),
     (Icons.schedule_rounded, 'Prochain cours', 'c est quoi mon prochain cours'),

@@ -228,6 +228,14 @@ class ClickyMoreSettings extends StatelessWidget {
             'Il les dit aussi tout haut (les codes et mots de passe ne sont jamais lus).',
           );
         }
+        sw(
+          'topo',
+          'quietInClass',
+          c.quietInClass,
+          'Discret pendant les cours',
+          'Quand ton emploi du temps dit que tu es en classe, il ne dit rien à voix haute de lui-même : juste une '
+              'bulle. Il sait aussi quand tu n\'as pas cours (week-end, vacances, férié, cours annulé).',
+        );
         // ---- Topos ----
         add('topo', 'topo matin soir briefing resume journee heure', const _TopoSettings());
 
@@ -246,6 +254,34 @@ class ClickyMoreSettings extends StatelessWidget {
           );
         }
         add('voice', 'voix gemini cle api gratuite ecouter la voix choisir', const _NeuralVoicePicker());
+        if (Win.supportedHere) {
+          sw(
+            'voice',
+            'voiceSteady',
+            c.voiceSteady,
+            'Voix toujours identique',
+            'Tout ce que Nexo dit passe par Gemini Live : le même moteur et la même voix que la conversation en direct '
+                '(gratuit, sans la limite d\'une quinzaine de lectures par jour). Désactivé : la synthèse Gemini lit, '
+                'puis Gemini Live quand son quota est épuisé (le son change alors un peu).',
+          );
+          add(
+            'voice',
+            'conversation jarvis mains libres discuter parler en direct gratuit',
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.record_voice_over_rounded),
+              title: const Text('Discuter en direct (mode JARVIS)'),
+              subtitle: const Text(
+                'Dis « Nexo, on discute » ou touche ici : micro ouvert, il répond tout de suite, tu peux lui couper la '
+                'parole. Gratuit (Gemini Live), aucun jeton Claude. « Merci Nexo, c\'est tout » ou Échap pour finir.',
+              ),
+              trailing: FilledButton.tonal(
+                onPressed: () => unawaited(c.ask('mode conversation')),
+                child: Text(c.talking ? 'En cours' : 'Discuter'),
+              ),
+            ),
+          );
+        }
         sw(
           'voice',
           'narrate',

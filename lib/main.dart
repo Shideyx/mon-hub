@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'core/cam_blur_env.dart';
 import 'core/install.dart';
+import 'core/school_calendar.dart';
 import 'core/version.dart';
 import 'core/account_sync.dart';
 import 'core/call_shield.dart';
@@ -658,6 +659,9 @@ class _HubAppState extends State<HubApp> {
               'nom': name,
             });
           })
+          // « La veille d'un jour de cours » : pas de robot des devoirs pendant
+          // les vacances (calendrier scolaire).
+          ..schoolDay = SchoolCalendar.instance.hasClassOn
           ..propose = ((r, text) {
             final install = r.id.startsWith('installer:');
             return nexo.proposeIdea(

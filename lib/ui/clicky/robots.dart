@@ -29,6 +29,7 @@ class Robot {
     required this.trigger,
     this.value = '',
     this.days = const [],
+    this.school = '',
     required this.actions,
     this.emoji = '🤖',
     this.on = true,
@@ -53,6 +54,11 @@ class Robot {
 
   /// Jours (1 = lundi … 7 = dimanche) ; vide = tous les jours.
   final List<int> days;
+
+  /// L'école : '' (toujours), 'ecole' (les jours de cours), 'veille' (la
+  /// veille d'un jour de cours : pas pendant les vacances), 'libre' (les
+  /// jours sans cours : week-end, vacances, fériés).
+  final String school;
 
   /// « phrase:… », « dire:… », « notifier:… », « protocole:… ».
   final List<String> actions;
@@ -85,6 +91,7 @@ class Robot {
     'declencheur': trigger,
     'valeur': value,
     if (days.isNotEmpty) 'jours': days,
+    if (school.isNotEmpty) 'ecole': school,
     'actions': actions,
     'actif': on,
     if (ask) 'demander': true,
@@ -108,6 +115,8 @@ class Robot {
       trigger: t,
       value: '${j['valeur'] ?? ''}',
       days: [for (final d in (j['jours'] as List? ?? const [])) (d as num).toInt()],
+      // Les robots tout prêts d'avant gardent la nouvelle règle de leur modèle.
+      school: '${j['ecole'] ?? RobotRules.template('${j['modele'] ?? ''}')?.school ?? ''}',
       actions: acts,
       on: j['actif'] != false,
       ask: j['demander'] == true,
@@ -135,8 +144,14 @@ class RobotTick {
     this.idleSeconds = 0,
     this.game = '',
     this.started = false,
+    this.schoolToday,
+    this.schoolTomorrow,
   });
   final DateTime now;
+
+  /// Cours aujourd'hui / demain (null : on ne sait pas).
+  final bool? schoolToday;
+  final bool? schoolTomorrow;
 
   /// L'appli au premier plan (nom de programme + titre, en minuscules).
   final String app;
@@ -159,6 +174,70 @@ class RobotRules {
   static bool budgetLeft(Robot r, DateTime now) => r.runsDay != dayKey(now) || r.runs < r.perDay;
 
   static bool dayOk(Robot r, DateTime now) => r.days.isEmpty || r.days.contains(now.weekday);
+
+  /// La règle « école » du robot (on ne bloque pas quand on ne sait pas).
+  static bool schoolOk(Robot r, {bool? today, bool? tomorrow}) => switch (r.school) {
+    'ecole' => today != false,
+    'veille' => tomorrow != false,
+    'libre' => today != true,
+    _ => true,
+  };
+
+  /// Les façons de dire la règle « école » : (motif, règle, ce qui reste).
+  static final _schoolWords = <(RegExp, String, String)>[
+    (
+      RegExp(r'\b(?:tous les|chaque) (?:jours?|matins?) (?:de cours|d ecole|ou j ai cours)\b'),
+      'ecole',
+      'tous les jours',
+    ),
+    (
+      RegExp(r'\b(?:tous les|chaque|les) soirs? (?:avant|ou j ai) (?:les |un jour de |des )?cours(?: le lendemain)?\b'),
+      'veille',
+      'tous les jours',
+    ),
+    (
+      RegExp(r'\b(?:tous les|chaque) (?:jours?|matins?) (?:de vacances|sans cours|ou j ai pas cours)\b'),
+      'libre',
+      'tous les jours',
+    ),
+    (
+      RegExp(r'\b(?:la veille (?:des|d un jour de) cours|quand j ai cours le lendemain|si j ai cours demain)\b'),
+      'veille',
+      '',
+    ),
+    (
+      RegExp(
+        r'\b(?:pendant les vacances|en vacances|les jours sans cours|quand j ai pas cours|quand je n ai pas cours|les jours de repos)\b',
+      ),
+      'libre',
+      '',
+    ),
+    (RegExp(r'\b(?:les jours (?:de cours|d ecole)|quand j ai cours|les jours ou j ai cours)\b'), 'ecole', ''),
+  ];
+
+  /// Les mots d'une phrase → la règle « école » (« les jours de cours »,
+  /// « la veille des cours », « pendant les vacances »…).
+  static String schoolFrom(String n) {
+    for (final (re, kind, _) in _schoolWords) {
+      if (re.hasMatch(n)) return kind;
+    }
+    return '';
+  }
+
+  /// Retire ces mots de la phrase (pour comprendre le reste).
+  static String withoutSchool(String n) {
+    for (final (re, _, keep) in _schoolWords) {
+      if (re.hasMatch(n)) {
+        return n
+            .replaceFirst(re, keep)
+            .replaceAll(RegExp(r'^\s*,\s*|\s*,\s*(?=,)'), '')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .replaceFirst(RegExp(r'^,\s*'), '')
+            .trim();
+      }
+    }
+    return n;
+  }
 
   /// « 19:00 » → (19, 0).
   static (int, int)? hm(String v) {
@@ -214,7 +293,8 @@ class RobotRules {
       '',
     );
     s = s.replaceFirst(RegExp(r'^robot\s*:\s*', caseSensitive: false), '');
-    final n = normalize(s);
+    final school = schoolFrom(normalize(s));
+    final n = school.isEmpty ? normalize(s) : withoutSchool(normalize(s));
     String? trigger, value;
     var days = <int>[];
     String? rest;
@@ -300,6 +380,7 @@ class RobotRules {
       trigger: trigger,
       value: value ?? '',
       days: days,
+      school: school,
       actions: acts,
       by: by,
       perDay: trigger == 'usage' ? 6 : 3,
@@ -373,7 +454,7 @@ class RobotRules {
         : r.days.length == 2 && r.days.contains(6) && r.days.contains(7)
         ? 'Le week-end'
         : 'Le ${[for (final x in r.days) _days.entries.firstWhere((e) => e.value == x).key].join(', ')}';
-    return switch (r.trigger) {
+    final base = switch (r.trigger) {
       'heure' => '$d à ${r.value.replaceFirst(':', ' h ').replaceFirst(' h 00', ' h')}',
       'appli' => 'Quand tu ouvres ${_cap(r.value)}',
       'jeu' => 'Quand tu lances un jeu',
@@ -383,6 +464,12 @@ class RobotRules {
       'demarrage' => 'Au démarrage de Mon Hub',
       'usage' => 'Après ${_mins(r.value)} devant l\'écran',
       _ => r.trigger,
+    };
+    return switch (r.school) {
+      'ecole' => '$base, les jours de cours',
+      'veille' => '$base, la veille d\'un jour de cours',
+      'libre' => '$base, les jours sans cours',
+      _ => base,
     };
   }
 
@@ -402,6 +489,7 @@ class RobotRules {
   /// une appli qui **arrive**, un jeu qui **commence**, un retour).
   static bool firesOnTick(Robot r, RobotTick t, RobotTick? prev, {int activeMinutes = 0, DateTime? lastRun}) {
     if (!r.on || !dayOk(r, t.now) || !budgetLeft(r, t.now)) return false;
+    if (!schoolOk(r, today: t.schoolToday, tomorrow: t.schoolTomorrow)) return false;
     switch (r.trigger) {
       case 'heure':
         final x = hm(r.value);
@@ -433,8 +521,9 @@ class RobotRules {
   }
 
   /// Ce robot part-il pour cette notification ?
-  static bool firesOnNote(Robot r, HubNotification n, DateTime now) {
+  static bool firesOnNote(Robot r, HubNotification n, DateTime now, {bool? schoolToday, bool? schoolTomorrow}) {
     if (!r.on || !dayOk(r, now) || !budgetLeft(r, now)) return false;
+    if (!schoolOk(r, today: schoolToday, tomorrow: schoolTomorrow)) return false;
     if (r.trigger == 'note') return n.id.startsWith('note:');
     if (r.trigger != 'message') return false;
     final isMsg =
@@ -469,22 +558,24 @@ class RobotRules {
       'devoirs_soir',
       '📚',
       'Les devoirs du lendemain',
-      'Chaque soir de semaine à 19 h, il te dit ce que tu as à faire pour demain.',
+      'Chaque soir avant un jour de cours, à 19 h, il te dit ce que tu as à faire pour demain (rien pendant les vacances).',
       'heure',
       '19:00',
       ['phrase:j ai quoi a faire pour demain'],
       days: [7, 1, 2, 3, 4],
+      school: 'veille',
       byDefault: true,
     ),
     RobotTemplate(
       'demain_cours',
       '🗓️',
       'Le programme de demain',
-      'À 21 h, le premier cours de demain (pour ne pas te lever trop tard).',
+      'À 21 h, la veille d\'un jour de cours : le premier cours de demain (pour ne pas te lever trop tard).',
       'heure',
       '21:00',
       ['phrase:j ai quoi demain'],
       days: [7, 1, 2, 3, 4],
+      school: 'veille',
       byDefault: true,
     ),
     RobotTemplate(
@@ -555,11 +646,12 @@ class RobotRules {
       'coucher',
       '🌙',
       'L\'heure de dormir',
-      'En semaine à 23 h : il est temps d\'aller dormir.',
+      'À 23 h, la veille d\'un jour de cours : il est temps d\'aller dormir.',
       'heure',
       '23:00',
       ['dire:Il est 23 h et tu as cours demain : bonne nuit 🌙'],
       days: [7, 1, 2, 3, 4],
+      school: 'veille',
     ),
     RobotTemplate(
       'demarrage_point',
@@ -590,6 +682,7 @@ class RobotTemplate {
     this.ask = false,
     this.perDay = 3,
     this.byDefault = false,
+    this.school = '',
   });
 
   final String id;
@@ -604,6 +697,9 @@ class RobotTemplate {
   final int perDay;
   final bool byDefault;
 
+  /// La règle « école » (voir [Robot.school]).
+  final String school;
+
   Robot build({String by = 'nexo'}) => Robot(
     id: 'modele_$id',
     name: name,
@@ -611,6 +707,7 @@ class RobotTemplate {
     trigger: trigger,
     value: value,
     days: days,
+    school: school,
     actions: actions,
     ask: ask,
     by: by,
@@ -652,6 +749,17 @@ class Robots extends ChangeNotifier {
   /// Demander d'abord (« Je lance ta musique ? ») : la boîte de Nexo avec
   /// Oui / Non, qui lance l'outil `robot_lancer`.
   Future<void> Function(Robot r, String text)? propose;
+
+  /// Cours ce jour-là ? (calendrier scolaire ; null = on ne sait pas).
+  bool? Function(DateTime day)? schoolDay;
+
+  bool? _school(DateTime d) {
+    try {
+      return schoolDay?.call(d);
+    } catch (_) {
+      return null;
+    }
+  }
 
   RobotTick? _prev;
   DateTime? _activeSince;
@@ -732,6 +840,8 @@ class Robots extends ChangeNotifier {
       idleSeconds: idleSeconds,
       game: game,
       started: !_startedSent,
+      schoolToday: _school(n),
+      schoolTomorrow: _school(DateTime(n.year, n.month, n.day + 1)),
     );
     _startedSent = true;
     final prev = _prev;
@@ -749,7 +859,15 @@ class Robots extends ChangeNotifier {
     if (!_loaded) await load();
     final n = DateTime.now();
     for (final r in [...list]) {
-      if (RobotRules.firesOnNote(r, note, n)) await fire(r, message: '${note.title} : ${note.body}');
+      if (RobotRules.firesOnNote(
+        r,
+        note,
+        n,
+        schoolToday: _school(n),
+        schoolTomorrow: _school(DateTime(n.year, n.month, n.day + 1)),
+      )) {
+        await fire(r, message: '${note.title} : ${note.body}');
+      }
     }
   }
 

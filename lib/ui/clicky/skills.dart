@@ -75,10 +75,41 @@ class ClickySkills {
       Skill('Dis « Nexo » (mot d\'activation, dans Réglages de Nexo → Écoute et micro) : mains libres.'),
       Skill('Après sa réponse, enchaîne directement : il t\'écoute encore quelques secondes.'),
       Skill(
+        '« Nexo, on discute » : la conversation en direct façon JARVIS. Micro ouvert, il répond tout de suite, tu '
+        'peux lui couper la parole ; gratuit (Gemini Live), aucun jeton Claude. « Merci Nexo, c\'est tout » pour finir.',
+        tryIt: 'Mode conversation',
+      ),
+      Skill(
+        'Toujours la même voix : tout ce qu\'il dit passe par le même moteur (Gemini Live), avec le même ton posé, et '
+        'le son ne hache plus (petit tampon anti-coupures).',
+      ),
+      Skill(
         '« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile',
         tryIt: 'Réfléchis bien : pourquoi le ciel est bleu ?',
       ),
       Skill('« Fais le point » : l\'heure, ton prochain cours, tes devoirs, l\'état du PC', tryIt: 'Fais le point'),
+    ]),
+    SkillGroup('🏫', 'Il sait quand tu as cours', Color(0xFFE5484D), isNew: true, [
+      Skill(
+        'Il comprend quand tu n\'as pas cours : week-end, vacances (calendrier officiel de ta zone), jours fériés, '
+        'ponts, cours annulés, heures de libre — sans IA, d\'après École Directe.',
+        tryIt: 'J\'ai cours demain ?',
+      ),
+      Skill('« C\'est quand les vacances ? », « Il reste combien de jours avant les vacances de Noël ? »', tryIt: 'C\'est quand les vacances ?'),
+      Skill('« C\'est quand la rentrée ? » : le jour et ton premier cours.', tryIt: 'C\'est quand la rentrée ?'),
+      Skill('« Je finis à quelle heure ? », « Je commence à quelle heure demain ? », « J\'ai un trou ? »', tryIt: 'Je finis à quelle heure ?'),
+      Skill('« C\'est férié demain ? », « Le prochain jour férié ? »', tryIt: 'Le prochain jour férié'),
+      Skill('« Je suis en zone B » : ta zone de vacances (devinée aussi d\'après ta ville).'),
+      Skill(
+        'Un cours annulé ? Il te dit ce que ça change : « Tu commences à 9 h au lieu de 8 h », « 1 h de libre ». '
+        'Sur une heure de libre, il te propose de revoir tes cartes.',
+      ),
+      Skill('Pendant un cours, il se tait à voix haute (juste une bulle) : Réglages de Nexo → Annonces et topos.'),
+      Skill(
+        'Ses robots « la veille d\'un jour de cours » (devoirs à 19 h, programme de demain, l\'heure de dormir) ne '
+        'sonnent plus pendant les vacances. Crée les tiens : « tous les jours de cours à 7 h, la météo ».',
+      ),
+      Skill('La veille de la reprise : « Demain, c\'est la reprise » avec ton premier cours et tes devoirs à rendre.'),
     ]),
     SkillGroup('🤖', 'Ce qu\'il sait de lui-même', Color(0xFF7C5CFF), isNew: true, [
       Skill(

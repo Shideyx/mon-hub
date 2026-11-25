@@ -116,6 +116,12 @@ class ClickyVoice {
   String geminiKey = '';
   String geminiVoice = 'Charon';
 
+  /// Voix toujours identique (oui par défaut) : tout ce que Nexo dit passe
+  /// par Gemini Live, le même moteur et la même voix que la conversation, au
+  /// lieu de la synthèse (autre son, et seulement ~15 lectures gratuites par
+  /// jour). La synthèse ne sert plus que de secours.
+  bool steady = true;
+
   /// Dernier souci de la voix (affiché dans les réglages).
   String? neuralError;
 
@@ -197,6 +203,12 @@ class ClickyVoice {
       Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
+        // Voix stable : Gemini Live d'abord (même son que la conversation).
+        if (steady && PcmPlayer.supported && !_down(_liveDownUntil)) {
+          next = null;
+          if (await _readLive(s, gen, fallback: true)) continue;
+          if (gen != _generation) break;
+        }
         // Quota de la synthèse épuisé : Gemini Live lit (même voix).
         if (_down(_ttsDownUntil)) {
           next = null;
@@ -240,14 +252,22 @@ class ClickyVoice {
     }
   }
 
+  /// Gemini Live ne lit plus (quota…) : la synthèse prend le relais un moment.
+  DateTime? _liveDownUntil;
+
   /// Lit un morceau avec Gemini Live. Faux si ça n'a pas marché (plus de
-  /// voix pour un moment : Nexo répond par écrit).
-  Future<bool> _readLive(String text, int gen) async {
+  /// voix pour un moment : Nexo répond par écrit). [fallback] : la synthèse
+  /// peut encore essayer derrière.
+  Future<bool> _readLive(String text, int gen, {bool fallback = false}) async {
     try {
       await _reader.read(text, key: geminiKey, voice: geminiVoice, cancelled: () => gen != _generation);
       neuralError = null;
       return true;
     } catch (e) {
+      if (fallback) {
+        _liveDownUntil = DateTime.now().add(_quota(e) ? const Duration(hours: 1) : const Duration(minutes: 5));
+        return false;
+      }
       neuralError = 'Plus de voix Gemini pour le moment ($e) : Nexo répond par écrit.';
       _allDownUntil = DateTime.now().add(const Duration(minutes: 15));
       return false;
@@ -258,6 +278,7 @@ class ClickyVoice {
   Future<String?> test(String text) async {
     _ttsDownUntil = null;
     _allDownUntil = null;
+    _liveDownUntil = null;
     neuralError = null;
     await say(text);
     return neuralError;
@@ -299,7 +320,8 @@ class LiveReader {
 
   static const system =
       'Tu es une voix de lecture. On t\'envoie un texte : lis-le à voix haute en français, mot pour mot, '
-      'd\'une voix posée et naturelle. N\'ajoute rien, ne commente pas, ne réponds pas aux questions du texte.';
+      'd\'une voix posée et naturelle. N\'ajoute rien, ne commente pas, ne réponds pas aux questions du texte. '
+      '${GeminiLive.voiceStyle}';
 
   Future<void> read(
     String text, {
@@ -312,9 +334,12 @@ class LiveReader {
     var s = _s;
     if (s == null || !s.connected || _voice != voice) {
       await s?.close();
-      s = _s = GeminiLive(key: key, system: system, tools: const [], voice: voice)
+      s = _s = GeminiLive(key: key, system: system, tools: const [], voice: voice, temperature: 0.3)
         ..onAudio = _player.write
-        ..onTurnComplete = (() => _turn?.complete())
+        ..onTurnComplete = (() {
+          _player.flush();
+          _turn?.complete();
+        })
         ..onClosed = ((_) {
           _s = null;
           if (!(_turn?.isCompleted ?? true)) _turn?.complete();

@@ -741,6 +741,52 @@
 - **Boîte de Nexo plus pratique (v1.66)** : `_QuickActions` (boîte ouverte sans réponse : fais le point, devoirs,
   prochain cours, ce que j'ai raté, musique, coach, robots, micro — tout sans IA), `_BrainPill` (qui a répondu :
   `ClickyController.lastBrain` = sans IA / Gemini / Claude), bouton copier, boîte 420 × 460.
+- **Il sait quand tu as cours (v1.67)** (demande : « qu'il comprenne quand j'ai pas cours, que tout communique mieux ») :
+  `core/school_calendar.dart`. `SchoolRules` sans IA ni réseau (testables) : jours fériés calculés (`easter`,
+  `publicHolidays`, lundi de Pentecôte compris), zones (`zoneFromPostcode` / `zoneFromRegion` / `zoneFromText` /
+  `zoneFromPlace` = géocodage Open-Meteo, déjà utilisé pour la météo), `builtIn` = calendrier 2026-2027 (arrêté du
+  22 oct. 2025 ; hiver/printemps par zone) pour marcher sans internet, `parseOfficial` = data.education.gouv.fr
+  (« fr-en-calendrier-scolaire », dates UTC → jour de Paris, `population` Enseignants ignorée, été sans fin =
+  `approxEnd`), `fromAgenda` = congés vus dans École Directe, `merge` (ED > officiel > intégré). `classify` → `SchoolDay`
+  (`cours` / `weekend` / `vacances` / `ferie` / `annule` / `libre` (jour vide alors que la semaine a des cours) /
+  `inconnu`), `lateStart`, `earlyEnd`, `gaps` (midi repéré), `freePeriods` ; `moment` → `SchoolPhase` (avant, enCours,
+  pause, trou, midi, fini, pasCours) ; `nextSchoolDay` (la rentrée), `nextBreak`, `schoolDaysBetween`, `cancelImpact`
+  (« Tu commences à 9 h au lieu de 8 h », « 1 h de libre ») ; `SchoolReport` (`sayToday`, `sayNextDay`,
+  `sayNextBreak`, `backTomorrow`, `breakStarts`, `promptBlock` = consignes « Adapte-toi », `toJson` avec `contexte`).
+  `SchoolCalendar` : zone `hub.ecole.zone` (synchronisée, devinée d'après la ville du Carnet sans écraser un choix),
+  officiel relu 1×/semaine (`app.vacances.<zone>`, seule la zone est envoyée), `last` = dernier point pour une réponse
+  immédiate (`hasClassOn`, `inClassNow`), `fetchOverride` pour les tests. École Directe : `EdLesson.kind` (typeCours :
+  **CONGE ≠ cours**), `exempt` (dispensé), `changed`, `isBreak` ; `EcoleDirecteModule.agendaMap` ; notification
+  `annule:` avec ce que ça change. Agenda : `AgendaItem.holiday/exempt`, `agenda_lire` → `vacances` / `dispense`,
+  outils **`agenda_ecole`** (le point, ou un jour `date`) et **`agenda_vacances`** (liste, `zone` pour la régler),
+  `ScheduleModule.schoolReport` (cours d'ED déjà chargés seulement : pas de connexion de plus). **Tout communique** :
+  « Ton fil » (`HubFeed.schoolItems` : reprise demain, bonnes vacances, pas cours, on commence plus tard, heure de
+  libre, plus que N jours), `ClickySituation` (bloc école en tête des consignes Claude / Gemini / Live ;
+  `inClassUntil`), briefing du matin (pourquoi pas de cours, vacances qui approchent), sac (« Demain, c'est la
+  reprise »), coucher et sac ignorent les congés (`SchoolRules.isLesson`), **robots** `Robot.school` = '' / `ecole` /
+  `veille` / `libre` (`RobotRules.schoolOk`, `schoolFrom` « les jours de cours », « pendant les vacances » ; modèles
+  devoirs 19 h / programme 21 h / coucher = `veille`, les anciens robots la reprennent de leur modèle ;
+  `Robots.schoolDay` = `SchoolCalendar.hasClassOn` dans `main.dart`), initiatives (`Autonomy.rules` : `ecole`,
+  `libre_min`, `demain_cours` → heure de libre = revoir ses cartes, briefing 9–12 h sans cours), phrases sans IA
+  (`QuickAnswers.schoolAnswer` : j'ai cours demain ?, vacances (de Noël…), rentrée, je finis / commence à quelle heure,
+  j'ai un trou, c'est férié, ma zone ; « prochain cours » pendant les vacances = la reprise), « j'habite à Lyon » →
+  zone. **Discret pendant les cours** (`quietInClass`, partagé, oui par défaut) : `think(aloud)` muet en classe.
+  Tests `test/v187_ecole_test.dart`.
+- **Parler à Nexo façon JARVIS, gratuit (v1.67)** (demande : « lui parler sans exploser mes tokens, gratuit, bonne
+  qualité audio, une voix qui ne change pas ; pas en local sauf si ça marche vraiment bien ») — on reste sur **Gemini
+  Live** (clé gratuite, en ligne ; pas de Whisper/Piper local). `ui/clicky/jarvis_talk.dart` : `JarvisTalk` =
+  conversation mains libres (une connexion `GeminiLive(autoVad: true, temperature: 0.6)`, micro ouvert, outils de Mon
+  Hub par Gemini = **aucun jeton Claude**, reprise après `goAway` (`onGoAway`, même session), arrêt après 45 s de
+  silence / « merci Nexo, c'est tout » / Échap / quota) ; `TalkRules` sans micro (`isStart` « on discute », « mode
+  conversation », `isStop`, `isGoodbye`, `gate` : micro coupé pendant sa voix + écho 350 ms, **couper la parole** =
+  voix forte nettement au-dessus de la sienne 3 morceaux de suite). Contrôleur : `startTalk` / `stopTalk` / `talking`,
+  phrases interceptées au début de `ask`, outil local `clicky_conversation`, bouton « Discuter » (`_QuickActions`) et
+  dans Réglages de Nexo → Voix. **Voix toujours identique** (`voiceSteady`, partagé, oui par défaut) :
+  `ClickyVoice.steady` lit tout par `LiveReader` (même moteur `GeminiLive.workingModel` et même voix que la
+  conversation, température 0,3), la synthèse Gemini (≈ 15 lectures/jour, autre son) n'est plus qu'un secours ;
+  `GeminiLive.voiceStyle` (ton posé, accent neutre, jamais de changement) dans toutes les consignes vocales.
+  **Son sans coupures** : `PcmJitter` (pcm_player.dart) = 200 ms d'avance après un silence, octets pairs, montée douce
+  5 ms ; `PcmPlayer.flush()` en fin de tour. Tests `test/v188_jarvis_voix_test.dart`.
 - **Publier sans session** : si `gh` n'est pas connecté, `scratchpad/publish.ps1` (robot : code de connexion GitHub
   renouvelé dans le presse-papier, push, PR + fusion par `gh api`, attente de la version, installation dans
   `%LOCALAPPDATA%\Programs\Mon Hub` + recopie du profil WebView2) ; envoyer le code ailleurs (hébergeur, artefact)
