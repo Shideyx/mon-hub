@@ -287,6 +287,13 @@ class ClickySkills {
       Skill('« Oublie que… » ; tout se voit et s\'efface dans ses réglages, « Sa mémoire »'),
     ]),
     SkillGroup('🎮', 'Tes jeux', Color(0xFF10B981), isNew: true, [
+      Skill(
+        'Il joue à ta place : « craft-moi une pioche », « ouvre mon inventaire », « mets le jour ». Il regarde le jeu '
+        '(Gemini, gratuit) et appuie lui-même sur les touches et la souris ; il connaît les recettes de Minecraft. '
+        'Échap pour l\'arrêter. Jamais dans un jeu en ligne avec anti-triche (ton compte pourrait être banni).',
+        tryIt: 'Craft-moi une pioche',
+      ),
+      Skill('Pendant le coach en direct, dis-lui « fais-le » : le coach confie l\'action à Nexo, qui joue.'),
       Skill('Il reconnaît ton jeu (Steam, Epic, Riot, Roblox, Minecraft…) et lit sa fiche'),
       Skill('« Aide-moi, je bloque sur ce boss » : il regarde ton écran et te donne des astuces'),
       Skill('Mode jeu : notifications gardées pour la fin de la partie, puis le bilan'),
@@ -324,6 +331,15 @@ class ClickySkills {
       ),
       Skill('Réglages → Mes appareils → Mon téléphone : un QR code à scanner une fois.'),
       Skill('Photos vers le PC sans câble, fichiers, presse-papier partagé, télécommande du PC depuis ton lit.'),
+      Skill(
+        'L\'écran du PC en direct sur ton téléphone : touche l\'image pour cliquer, appui long = clic droit, deux '
+        'doigts pour défiler, le clavier du téléphone écrit sur le PC (onglet Écran de la page « Mon PC »).',
+      ),
+      Skill(
+        'Parle à Nexo depuis le téléphone (onglet Nexo, avec la dictée du téléphone) : il agit sur le PC et te '
+        'répond sur le téléphone, sans faire de bruit sur le PC.',
+      ),
+      Skill('Depuis le téléphone : ouvrir une appli du PC, passer d\'une fenêtre à l\'autre, taper un texte.'),
       Skill('« Envoie le PDF de mon exposé sur mon téléphone »'),
     ]),
     SkillGroup('💰', 'Ton argent', Color(0xFF16A34A), [

@@ -21,8 +21,41 @@
 </header>
 
 <main>
+  <!-- Nexo : lui parler depuis le téléphone -->
+  <section data-tab="nexo" class="on">
+    <div class="chat" id="chat">
+      <div class="msg nexo">Salut ! Dis-moi ce que tu veux sur le PC : « mets de la musique », « fais le point »,
+        « ouvre Minecraft », « j'ai cours demain ? »…</div>
+    </div>
+    <div class="chips">
+      <button class="ghost small" data-ask="Fais le point">Fais le point</button>
+      <button class="ghost small" data-ask="Mets de la musique">Musique</button>
+      <button class="ghost small" data-ask="J'ai cours demain ?">Cours demain ?</button>
+      <button class="ghost small" data-ask="Qu'est-ce que j'ai raté ?">Ce que j'ai raté</button>
+    </div>
+    <div class="ask">
+      <button id="btn-mic" class="mic" title="Parler">🎙️</button>
+      <input id="ask-text" placeholder="Demande à Nexo…" autocomplete="off" enterkeyhint="send">
+      <button id="btn-ask">➤</button>
+    </div>
+    <label class="opt"><input type="checkbox" id="speak-reply"> Lire ses réponses sur le téléphone</label>
+  </section>
+
+  <!-- Écran du PC en direct -->
+  <section data-tab="ecran">
+    <div class="screen-wrap"><img id="screen" alt="Écran du PC"><div id="screen-hint" class="sub">Chargement de l'écran…</div></div>
+    <p class="sub">Touche l'image pour cliquer · reste appuyé pour un clic droit · double touche = double-clic.</p>
+    <div class="row">
+      <button class="ghost" id="btn-kbd">⌨️ Clavier</button>
+      <button class="ghost" id="btn-wins">🪟 Fenêtres</button>
+      <button class="ghost" id="btn-quality">Net</button>
+    </div>
+    <input id="live-kbd" class="hidden-input" autocomplete="off" autocapitalize="off" autocorrect="off">
+    <ul class="list" id="wins" hidden></ul>
+  </section>
+
   <!-- Envoyer -->
-  <section data-tab="envoyer" class="on">
+  <section data-tab="envoyer">
     <label class="drop" for="pick">
       <span class="big">📤</span>
       <b>Envoyer au PC</b>
@@ -54,6 +87,20 @@
   <section data-tab="telecommande">
     <div class="pad" id="pad"><span>Pavé tactile<br><small>Glisse pour bouger la souris · touche pour cliquer · 2 doigts pour défiler</small></span></div>
     <div class="row"><button data-cmd="clic">Clic</button><button data-cmd="clic_droit">Clic droit</button></div>
+    <h3>Écrire sur le PC</h3>
+    <div class="ask">
+      <input id="type-text" placeholder="Texte à taper dans l'appli ouverte" autocomplete="off">
+      <button id="btn-type">⌨️</button>
+    </div>
+    <div class="keys">
+      <button class="ghost small" data-key="enter">Entrée</button><button class="ghost small" data-key="backspace">⌫</button>
+      <button class="ghost small" data-key="tab">Tab</button><button class="ghost small" data-key="esc">Échap</button>
+      <button class="ghost small" data-key="ctrl+c">Copier</button><button class="ghost small" data-key="ctrl+v">Coller</button>
+      <button class="ghost small" data-key="ctrl+z">Annuler</button><button class="ghost small" data-key="alt+tab">Alt+Tab</button>
+    </div>
+    <h3>Ouvrir une appli</h3>
+    <input id="app-search" class="search" placeholder="Chercher une appli du PC…" autocomplete="off">
+    <div class="apps" id="apps"></div>
     <h3>Son et musique</h3>
     <div class="grid3">
       <button data-cmd="voldown">🔉</button><button data-cmd="mute">🔇</button><button data-cmd="volup">🔊</button>
@@ -77,10 +124,12 @@
 <div id="toast" hidden></div>
 
 <nav>
-  <button data-go="envoyer" class="on"><span>📤</span>Envoyer</button>
+  <button data-go="nexo" class="on"><span>✦</span>Nexo</button>
+  <button data-go="ecran"><span>🖥️</span>Écran</button>
+  <button data-go="telecommande"><span>🎛️</span>Télécom.</button>
+  <button data-go="envoyer"><span>📤</span>Envoyer</button>
   <button data-go="recevoir"><span>📥</span>Du PC</button>
   <button data-go="texte"><span>📋</span>Texte</button>
-  <button data-go="telecommande"><span>🎛️</span>Télécommande</button>
 </nav>
 
 <div id="home-help" hidden>

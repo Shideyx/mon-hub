@@ -67,6 +67,16 @@ class PhoneLink extends ChangeNotifier {
   /// pour le téléphone, ou null si l'action est inconnue.
   Future<String?> Function(String action, Map<String, dynamic> args)? command;
 
+  /// L'écran du PC en direct (JPEG de [width] pixels de large), ou null.
+  Future<Uint8List?> Function(int width)? screen;
+
+  /// Une question à Nexo depuis le téléphone → sa réponse.
+  Future<String> Function(String question)? ask;
+
+  /// Les applis du PC (recherche) et les fenêtres ouvertes.
+  Future<List<Map<String, Object?>>> Function(String query)? apps;
+  List<Map<String, Object?>> Function()? windows;
+
   /// Branché par l'appli : presse-papier du PC.
   Future<String?> Function()? readClipboard;
   Future<void> Function(String text)? writeClipboard;
@@ -319,6 +329,25 @@ class PhoneLink extends ChangeNotifier {
           return await sendJson(res, {'ok': true});
         case 'api/envoyer' when req.method == 'POST':
           return await _receive(req);
+        case 'api/ecran' when screen != null:
+          final w = int.tryParse(req.uri.queryParameters['l'] ?? '') ?? 960;
+          final jpg = await screen!(w.clamp(320, 1600));
+          if (jpg == null) return await send(res, 503, 'text/plain', const []);
+          return await send(res, 200, 'image/jpeg', jpg);
+        case 'api/nexo' when req.method == 'POST' && ask != null:
+          final body = await readText(req, maxJson);
+          var q = '';
+          try {
+            final d = jsonDecode(body ?? '');
+            q = d is Map ? '${d['texte'] ?? ''}'.trim() : '';
+          } catch (_) {}
+          if (q.isEmpty || q.length > 2000) return await sendJson(res, {'ok': false, 'reponse': 'Écris une question.'});
+          final r = await ask!(q).timeout(const Duration(seconds: 90), onTimeout: () => 'Je travaille encore dessus…');
+          return await sendJson(res, {'ok': true, 'reponse': r});
+        case 'api/applis' when apps != null:
+          return await sendJson(res, await apps!(req.uri.queryParameters['q'] ?? ''));
+        case 'api/fenetres' when windows != null:
+          return await sendJson(res, windows!());
         case 'api/commande' when req.method == 'POST':
           final body = await readText(req, maxJson);
           Map<String, dynamic> m = {};
@@ -364,6 +393,9 @@ class PhoneLink extends ChangeNotifier {
       'presse_papier': clip ?? '',
       'fichiers': [for (final f in shared) f.toJson()],
       'telecommande': command != null,
+      'ecran': screen != null,
+      'nexo': ask != null,
+      'applis': apps != null,
     };
   }
 

@@ -90,6 +90,7 @@ import 'course_listener.dart';
 import 'course_page.dart';
 import 'jarvis.dart';
 import 'jarvis_talk.dart';
+import 'game_agent.dart';
 import 'life.dart';
 import 'senses.dart';
 import 'pc_watch.dart';
@@ -576,6 +577,13 @@ class ClickyController extends ChangeNotifier {
     }
     if (r && enabled && here) {
       _startPresence();
+      // Le coach de jeu peut confier une action à l'agent de jeu, et parle
+      // par la bulle de Nexo.
+      if (GameCoach.supported) {
+        GameCoach.instance
+          ..actTool ??= gameActTool
+          ..say ??= ((t) => unawaited(think(t)));
+      }
     } else {
       _presence?.cancel();
       _presence = null;
@@ -1041,7 +1049,8 @@ class ClickyController extends ChangeNotifier {
   Future<void> speak(String text, {bool force = false}) async {
     if ((!voice && !force) || !_voicePlatform || text.isEmpty) return;
     // Une seule voix : pendant la conversation en direct, c'est elle qui parle.
-    if (talking) return;
+    // Une question venue du téléphone : la réponse part sur le téléphone.
+    if (talking || _phoneAsk) return;
     _applyVoice();
     _wake.pause();
     try {
@@ -1060,6 +1069,7 @@ class ClickyController extends ChangeNotifier {
     _voiceTurn = false;
     _followChain = 0;
     if (talking) await stopTalk();
+    GameAgent.instance.cancel();
     ClaudeCode.cancelAll();
     await stopSpeaking();
     // Gemini Live : on coupe la voix et on ignore la fin de la réponse.
@@ -3419,6 +3429,8 @@ class ClickyController extends ChangeNotifier {
   /// Outils de Nexo lui-même (exécutés dans ce programme) : dépannage et
   /// contrôle du PC. Aussi servis à Claude Code par le pont local.
   List<HubTool> get localTools => [
+    // Il joue à ta place dans le jeu ouvert (« craft-moi une pioche »).
+    if (GameAgent.supported) gameActTool,
     // La conversation mains libres (mode JARVIS, Gemini Live, gratuit).
     if (PcmPlayer.supported)
       HubTool(
@@ -3827,6 +3839,15 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
       }
       return;
     }
+    // « Craft-moi une pioche », « ouvre mon inventaire » (dans un jeu) : il
+    // joue à ta place (Gemini voit le jeu, gratuit ; vraies touches de jeu).
+    if (GameAgent.supported) {
+      final inFront = GameAgent.foregroundGame() != null;
+      if (GameAgentRules.isRequest(q, gameInFront: inFront)) {
+        unawaited(playGame(q));
+        return;
+      }
+    }
     // « Prends la main et … » : Nexo agit tout de suite.
     final take = RegExp(
       r'^\s*(?:(?:hey|ok|dis)\s+)?(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou)[\s,]+)?(?:prends la main|prend la main|pilote|agis)\b[\s,:]*(?:et\s+|pour\s+)?(.+)$',
@@ -3920,7 +3941,7 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
         unawaited(ClaudeUsage.saved());
         return;
       }
-      if (liveReady && !needsClassic(q) && await _liveAsk(q)) {
+      if (!_phoneAsk && liveReady && !needsClassic(q) && await _liveAsk(q)) {
         unawaited(ClaudeUsage.saved());
         return;
       }
@@ -4660,6 +4681,52 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     _fadeSoon();
     return true;
   }
+
+  // ---------- Depuis le téléphone (page « Mon PC ») ----------
+
+  bool _phoneAsk = false;
+
+  /// Une question tapée ou dictée sur le téléphone : Nexo fait comme si tu la
+  /// lui posais au PC (actions, musique, jeu…), mais la réponse revient sur
+  /// le téléphone et le PC reste silencieux.
+  Future<String> askFromPhone(String q) async {
+    if (_phoneAsk) return 'Je réponds déjà à une question du téléphone, une seconde.';
+    _phoneAsk = true;
+    try {
+      reply = '';
+      await ask(q);
+      for (var i = 0; i < 60 && state == ClickyState.thinking; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      final r = reply.trim();
+      return r.isEmpty ? 'C\'est parti.' : r;
+    } finally {
+      _phoneAsk = false;
+    }
+  }
+
+  // ---------- Il joue à ta place (agent de jeu) ----------
+
+  /// « Craft-moi une pioche » : Nexo regarde le jeu et appuie lui-même sur les
+  /// touches ([GameAgent], Gemini gratuit, jamais Claude).
+  Future<void> playGame(String goal) async {
+    final agent = GameAgent.instance
+      ..onStatus = (s) {
+        if (GameAgent.instance.active) _set(ClickyState.pointing, status: s);
+      };
+    _set(ClickyState.thinking, status: 'Je prends la manette… (Échap pour m\'arrêter)', reply: '');
+    final r = await agent.run(goal, key: voiceOut.geminiKey);
+    lastBrain = 'Gemini';
+    unawaited(history.add(threadId, ChatMsg(mine: true, text: goal), app: _appKey));
+    unawaited(history.add(threadId, ChatMsg(mine: false, text: r), app: _appKey));
+    _set(ClickyState.speaking, status: '', reply: r);
+    await speak(r);
+    if (state == ClickyState.speaking) _set(ClickyState.idle);
+    _fadeSoon();
+  }
+
+  /// L'action « jeu_agir » (pour Claude, Gemini, la conversation et le coach).
+  HubTool get gameActTool => GameAgent.instance.tool(() async => voiceOut.geminiKey);
 
   // ---------- Conversation mains libres (mode JARVIS) ----------
 

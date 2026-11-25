@@ -9,6 +9,7 @@ import '../../core/claude_api.dart';
 import '../../core/error_log.dart';
 import '../../core/game_pal.dart';
 import '../../core/hub_module.dart';
+import 'game_agent.dart';
 import 'live.dart';
 import 'pcm_player.dart';
 import 'shot_encode.dart';
@@ -75,6 +76,10 @@ class GameCoach extends ChangeNotifier {
   /// Prévenir (bulle de Nexo). Branché par le contrôleur.
   void Function(String text)? say;
 
+  /// L'agent de jeu (« craft-moi une pioche ») : le coach peut lui confier une
+  /// action. Branché par le contrôleur.
+  HubTool? actTool;
+
   /// Démarre le coach (le jeu au premier plan, ou [forGame]).
   Future<String> start({String? forGame}) async {
     if (!supported) return 'Le coach de jeu marche sur le PC.';
@@ -86,10 +91,11 @@ class GameCoach extends ChangeNotifier {
     final g = (forGame ?? _foregroundGame() ?? '').trim();
     game = g;
     final info = g.isEmpty ? null : await GamePal.instance.cached(g);
+    final act = actTool;
     final live = GeminiLive(
       key: key,
-      system: CoachRules.system(g, info?.summary ?? ''),
-      tools: const [],
+      system: CoachRules.system(g, info?.summary ?? '', canAct: act != null),
+      tools: [?act],
       autoVad: false,
       mediaResolution: 'MEDIA_RESOLUTION_LOW',
     );
@@ -116,6 +122,13 @@ class GameCoach extends ChangeNotifier {
         }
       }
       ..onTurnComplete = _endTurn
+      // « Craft-moi une pioche » : le coach confie la tâche à l'agent de jeu
+      // (il joue vraiment à ta place) et prévient quand c'est fini.
+      ..onToolCall = (name, args) async {
+        if (act == null || name != act.name) return 'Action inconnue.';
+        unawaited(act.run(args).then((r) => say?.call('$r')).catchError((Object e) => say?.call('$e')));
+        return 'Nexo s\'en occupe maintenant (il joue à sa place). Dis seulement « Je m\'en occupe. »';
+      }
       ..onClosed = (_) {};
     try {
       await live.connect();
@@ -272,7 +285,7 @@ class GameCoach extends ChangeNotifier {
   /// Toutes les ~25 s : un conseil s'il y en a un d'utile maintenant.
   Future<void> _tip() async {
     final live = _live;
-    if (live == null || talking || _hold || !_gameInFront()) return;
+    if (live == null || talking || _hold || !_gameInFront() || GameAgent.instance.active) return;
     await _ensureConnected();
     _hold = true;
     _decided = false;
@@ -326,7 +339,7 @@ class CoachRules {
   CoachRules._();
 
   /// Ses consignes (Gemini Live).
-  static String system(String game, String about) =>
+  static String system(String game, String about, {bool canAct = false}) =>
       'Tu es Nexo, le coach de jeu vidéo de la personne, en direct et à voix haute, en français. Tu reçois en continu '
       'des images de son écran de jeu (environ une toutes les 2 secondes).'
       '${game.isEmpty ? '' : ' Le jeu : $game.'}${about.isEmpty ? '' : ' Ce qu\'on en sait : $about'}\n'
@@ -335,7 +348,10 @@ class CoachRules {
       'phrases très courtes, concrètes, sur ce que tu vois MAINTENANT. Jamais de triche ni de logiciel interdit. '
       'Si tu ne vois pas assez bien pour être sûr, dis-le en trois mots au lieu d\'inventer. '
       'Quand on te demande « un conseil maintenant ? » et qu\'il n\'y a rien d\'important à dire, réponds exactement '
-      'RIEN et rien d\'autre.';
+      'RIEN et rien d\'autre.'
+      '${canAct ? ' Si la personne te demande de FAIRE quelque chose dans le jeu à sa place (ouvrir l\'inventaire, '
+                'crafter un objet, poser un bloc, une commande…), appelle jeu_agir avec le but, puis dis juste « Je m\'en '
+                'occupe. ». Jamais dans un jeu en ligne compétitif.' : ''}';
 
   /// La question posée de lui-même, régulièrement.
   static const tipPrompt =

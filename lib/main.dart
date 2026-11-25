@@ -345,6 +345,8 @@ class _HubAppState extends State<HubApp> {
             final id = 'tel:${DateTime.now().millisecondsSinceEpoch}';
             unawaited(n.post(HubNotification(id: id, title: title, body: body)));
           });
+          // « Demande à Nexo » depuis le téléphone (texte ou dictée).
+          PhoneLink.instance.ask = ClickyController.instance.askFromPhone;
           Perf.later(5, PhoneLink.instance.start);
         }
         // Temps d'écran et mode jeu : un coup d'œil à la fenêtre au premier

@@ -787,6 +787,30 @@
   `GeminiLive.voiceStyle` (ton posé, accent neutre, jamais de changement) dans toutes les consignes vocales.
   **Son sans coupures** : `PcmJitter` (pcm_player.dart) = 200 ms d'avance après un silence, octets pairs, montée douce
   5 ms ; `PcmPlayer.flush()` en fin de tour. Tests `test/v188_jarvis_voix_test.dart`.
+- **Il joue à ta place (v1.67)** (demande : « je lui dis ouvre mon inventaire, craft-moi une pioche sur MC et il le
+  fait ») : `ui/clicky/game_agent.dart` (`GameAgent.run` : capture de la fenêtre du jeu (`Win.captureScaled`, 1280 px,
+  JPEG) → **Gemini Flash** (`generateContent`, JSON, gratuit, jamais Claude ; `askOverride` pour les tests) → 1 à 4
+  actions → exécutées → nouvelle capture ; 25 tours au plus ; arrêt : Échap maintenu, Ctrl + Alt, changement de
+  fenêtre ; `GameInput.releaseAll` à la fin) ; `GameAgentRules` sans Windows (`isRequest` (verbes de jeu, « sur mc,
+  … » ; une question reste une question), `blocked` = jeux en ligne avec anti-triche (Valorant, Fortnite, CS2,
+  **Roblox**, LoL…) → **refus**, coach seulement, `playbook` Minecraft (touches, inventaire 2×2 / table 3×3, recettes,
+  /give en créatif), `guide`, `parse` (bornes ; « commande » seulement si elle commence par « / » : jamais de message
+  aux autres joueurs), `toScreen` (0–1000 → écran)). `ui/clicky/game_input.dart` : `GameKeys` (codes **scan**
+  physiques : avancer = 0x11 = Z en AZERTY / W en QWERTY, chiffres de la barre), `GameInput` (SendInput
+  `KEYEVENTF_SCANCODE`, `hold`, `look` = souris **relative** (caméra), `clickAt` (+ petit mouvement, Maj + clic),
+  `holdButton`, `drag`, `azerty`). Branché : début de `ClickyController.ask` (`playGame`), outil local `jeu_agir`
+  (Claude, Gemini, conversation en direct), **le coach de jeu Live** l'appelle (`GameCoach.actTool`, `canAct` dans
+  ses consignes ; ses conseils se taisent pendant que l'agent joue), groupe `jeu` du `ToolRouter`, Échap = `cancel`.
+  Tests `test/v189_agent_jeu_test.dart`.
+- **Le téléphone pilote le PC, en mieux (v1.67)** : `PhoneLink` (routes `api/ecran?l=` = JPEG de l'écran principal,
+  `api/nexo` = question → `ClickyController.askFromPhone` (même chemin que `ask`, mais **pas de voix sur le PC**
+  (`_phoneAsk` dans `speak`) ni Gemini Live ; la réponse revient au téléphone), `api/applis?q=` (`PcApps`),
+  `api/fenetres`), `PhoneRemote` (`capture`, `clic_ecran` x,y en 0..1 → `toScreen`, `taper`, `touche` (combinaisons
+  validées), `lancer`, `fenetre`). Page `assets/phone/` : onglets **Nexo** (bulles, dictée du navigateur
+  `webkitSpeechRecognition` fr-FR, réponse lue par `speechSynthesis` si coché), **Écran** (image rafraîchie ~4/s,
+  toucher = clic, appui long = clic droit, double touche = double-clic, 2 doigts = défiler, clavier du téléphone en
+  direct, fenêtres, Net/Rapide), Télécommande (+ écrire sur le PC, touches, applis). CSS : `[hidden]` gagne toujours.
+  Testé dans Chromium (faux PC). Tests `test/v190_telephone_plus_test.dart`.
 - **Publier sans session** : si `gh` n'est pas connecté, `scratchpad/publish.ps1` (robot : code de connexion GitHub
   renouvelé dans le presse-papier, push, PR + fusion par `gh api`, attente de la version, installation dans
   `%LOCALAPPDATA%\Programs\Mon Hub` + recopie du profil WebView2) ; envoyer le code ailleurs (hébergeur, artefact)
