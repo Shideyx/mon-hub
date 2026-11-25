@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr/qr.dart';
 
+import '../core/pc_apps.dart';
 import '../core/phone_link.dart';
 import '../core/safe_open.dart';
+import 'clicky/shot_encode.dart';
 import 'clicky/win.dart';
 import 'party_page.dart';
 
@@ -25,6 +29,10 @@ class PhoneLinkPage extends StatelessWidget {
     final link = PhoneLink.instance;
     link.notify = notify;
     link.command = Win.supportedHere ? PhoneRemote.run : null;
+    // L'écran du PC en direct sur le téléphone, ses applis et ses fenêtres.
+    link.screen = Win.supportedHere ? PhoneRemote.capture : null;
+    link.apps = PcApps.supported ? PhoneRemote.apps : null;
+    link.windows = Win.supportedHere ? PhoneRemote.windows : null;
     link.readClipboard = () async => (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     link.writeClipboard = (t) => Clipboard.setData(ClipboardData(text: t));
     link.loadAsset = (p) async {
@@ -235,6 +243,56 @@ class PhoneRemote {
 
   static int _int(Object? v, int lo, int hi) => ((v is num ? v : 0).round()).clamp(lo, hi);
 
+  static double _frac(Object? v) => ((v is num ? v : num.tryParse('$v') ?? 0.5).toDouble()).clamp(0.0, 1.0);
+
+  /// L'écran montré sur le téléphone (le principal).
+  static (int, int, int, int) get screenRect => Win.monitors().first;
+
+  /// L'écran du PC en JPEG ([width] pixels de large au plus).
+  static Future<Uint8List?> capture(int width) async {
+    try {
+      final (x, y, w, h) = screenRect;
+      final (tw, th) = shotSize(w, h, width);
+      final px = Win.captureScaled(x, y, w, h, tw, th);
+      return await Isolate.run(() => encodeShot(px, tw, th, quality: 55));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// La taille de l'image envoyée au téléphone.
+  static (int, int) shotSize(int w, int h, int width) {
+    final tw = math.min(width, w);
+    return (tw, (h * tw / w).round());
+  }
+
+  /// Un point touché sur l'image (0..1) → l'écran.
+  static (int, int) toScreen(double fx, double fy, (int, int, int, int) rect) {
+    final (x, y, w, h) = rect;
+    return ((x + fx * (w - 1)).round(), (y + fy * (h - 1)).round());
+  }
+
+  /// Les applis du PC (épinglées et fréquentes d'abord, ou la recherche).
+  static Future<List<Map<String, Object?>>> apps(String query) async {
+    final a = PcApps.instance;
+    await a.load();
+    final q = query.trim();
+    final list = q.isEmpty ? [...a.pinned, ...a.frequent(max: 12), ...a.apps.take(40)] : a.search(q, max: 40);
+    final seen = <String>{};
+    return [
+      for (final x in list)
+        if (seen.add(x.id)) {'id': x.id, 'nom': x.name, 'ini': x.initials},
+    ];
+  }
+
+  /// Les fenêtres ouvertes.
+  static List<Map<String, Object?>> windows() => [
+    for (final (id, title, exe) in Win.windowList().take(30)) {'id': id, 'titre': title, 'appli': exe},
+  ];
+
+  /// Les touches qu'on peut envoyer du téléphone.
+  static final _combo = RegExp(r'^[a-z0-9]{1,9}(?:\+[a-z0-9]{1,9}){0,3}$');
+
   static Future<String?> run(String action, Map<String, dynamic> a) async {
     switch (action) {
       case 'volup' || 'voldown' || 'mute' || 'next' || 'prev':
@@ -264,6 +322,32 @@ class PhoneRemote {
       case 'clic_droit':
         Win.clickHere(right: true);
         return 'Clic droit';
+      case 'clic_ecran':
+        // Toucher l'écran du PC sur le téléphone = cliquer à cet endroit.
+        final (x, y) = toScreen(_frac(a['x']), _frac(a['y']), screenRect);
+        Win.click(x, y, right: a['droit'] == true, double: a['double'] == true);
+        return 'OK';
+      case 'taper':
+        final t = '${a['texte'] ?? ''}';
+        if (t.isEmpty || t.length > 4000) return 'Rien à taper.';
+        Win.releaseModifiers();
+        Win.typeText(t);
+        if (a['entree'] == true) Win.pressCombo('enter');
+        return 'Tapé sur le PC ⌨️';
+      case 'touche':
+        final k = '${a['touche'] ?? ''}'.trim().toLowerCase();
+        if (!_combo.hasMatch(k)) return 'Touche inconnue.';
+        return Win.pressCombo(k) ? 'OK' : 'Touche inconnue.';
+      case 'lancer':
+        final id = '${a['id'] ?? ''}';
+        final app = PcApps.instance.apps.where((x) => x.id == id).firstOrNull;
+        if (app == null) return 'Appli introuvable.';
+        return await PcApps.instance.launch(app) ? '${app.name} s\'ouvre 🚀' : 'Pas réussi à ouvrir ${app.name}.';
+      case 'fenetre':
+        final id = a['id'] is num ? (a['id'] as num).toInt() : int.tryParse('${a['id']}');
+        final what = '${a['faire'] ?? 'activer'}';
+        if (id == null || !const {'activer', 'reduire', 'agrandir', 'fermer'}.contains(what)) return 'Fenêtre inconnue.';
+        return Win.windowAction(id, what) ? 'OK' : 'Cette fenêtre est déjà fermée.';
       case 'verrouiller':
         return Win.lock() ? 'PC verrouillé 🔒' : 'Le PC n\'a pas voulu se verrouiller.';
       case 'veille':

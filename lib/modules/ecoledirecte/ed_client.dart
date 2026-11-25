@@ -1147,7 +1147,18 @@ class EdGrade {
 }
 
 class EdLesson {
-  EdLesson(this.subject, this.start, this.end, this.room, this.teacher, this.cancelled, [this.color]);
+  EdLesson(
+    this.subject,
+    this.start,
+    this.end,
+    this.room,
+    this.teacher,
+    this.cancelled, [
+    this.color,
+    this.kind = 'COURS',
+    this.exempt = false,
+    this.changed = false,
+  ]);
   final String subject;
   final DateTime start;
   final DateTime end;
@@ -1158,6 +1169,23 @@ class EdLesson {
   /// Couleur de la matière choisie par l'établissement (#rrggbb).
   final String? color;
 
+  /// Le type École Directe : COURS, PERMANENCE, CONGE, EVENEMENT…
+  final String kind;
+
+  /// Tu es dispensé de ce cours (sport…).
+  final bool exempt;
+
+  /// Cours modifié (salle, horaire, prof remplaçant).
+  final bool changed;
+
+  /// Un congé (vacances, pont, férié) affiché dans l'emploi du temps, pas un
+  /// cours : Nexo ne doit jamais le prendre pour « ton prochain cours ».
+  bool get isBreak =>
+      kind.toUpperCase().contains('CONGE') ||
+      RegExp(r'^(?:cong[ée]s?|vacances|f[ée]ri[ée])\b|\bvacances\b', caseSensitive: false).hasMatch(subject);
+
+  static bool _yes(Object? v) => v == true || v == 1 || '$v' == '1' || '$v'.toLowerCase() == 'true';
+
   factory EdLesson.fromJson(Map<String, dynamic> j) => EdLesson(
     (j['matiere'] as String?)?.isNotEmpty == true ? j['matiere'] as String : (j['text'] as String? ?? 'Cours'),
     DateTime.parse((j['start_date'] as String).replaceFirst(' ', 'T')),
@@ -1166,5 +1194,8 @@ class EdLesson {
     j['prof'] as String? ?? '',
     j['isAnnule'] == true,
     j['color'] as String?,
+    '${j['typeCours'] ?? 'COURS'}',
+    _yes(j['dispense']),
+    j['isModifie'] == true,
   );
 }

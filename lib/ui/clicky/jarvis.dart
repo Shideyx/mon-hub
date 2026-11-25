@@ -565,6 +565,9 @@ class ClickySituation {
     return lines.join('\n');
   }
 
+  /// La fin du cours en cours (d'après le dernier point « école »), ou null.
+  static DateTime? inClassUntil;
+
   /// Lit les modules et fabrique le texte.
   static Future<String> build(
     Future<Object?> Function(String tool, Map<String, dynamic> args) call,
@@ -586,20 +589,29 @@ class ClickySituation {
       get('ecole_devoirs'),
       get('revision_paquets'),
       get('musique_en_cours'),
+      get('agenda_ecole'),
     ]);
     List<Map> maps(Object? v) => [
       if (v is List)
         for (final x in v)
           if (x is Map) x,
     ];
+    final school = r[4] is Map ? r[4] as Map : const {};
+    // En classe jusqu'à… (Nexo se tait à voix haute), aussi dans Nexo partout.
+    inClassUntil = school['maintenant'] == 'enCours' ? DateTime.tryParse('${school['jusqua_iso'] ?? ''}') : null;
     final feed = HubFeed.build(
       events: maps(r[0]),
       homework: maps(r[1]),
       revisions: r[2] is Map ? r[2] as Map : const {},
+      school: school,
       now: now,
     );
     final f = FocusMode.instance;
     await f.sync();
-    return describe(feed: feed, music: r[3] is Map ? r[3] as Map : null, focus: f.active, focusLeft: f.left);
+    final text = describe(feed: feed, music: r[3] is Map ? r[3] as Map : null, focus: f.active, focusLeft: f.left);
+    // L'école en premier : Nexo sait si la personne a cours, est en vacances,
+    // en classe, a fini sa journée… et s'adapte.
+    final ctx = '${school['contexte'] ?? ''}'.trim();
+    return [ctx, text].where((t) => t.isNotEmpty).join('\n');
   }
 }

@@ -116,7 +116,9 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
 
   /// Sans IA : quelques décisions évidentes, d'après la situation.
   /// [ctx] : 'controle' (matière, dans ≤ 3 jours, sans fiche), 'cartes'
-  /// (à revoir), 'trop' (trop de choses à faire), 'briefing_fait'.
+  /// (à revoir), 'trop' (trop de choses à faire), 'briefing_fait', 'ecole'
+  /// (où on en est : avant, enCours, trou, midi, fini, pasCours), 'libre_min'
+  /// (minutes avant le prochain cours), 'demain_cours'.
   static ClickyIdea? rules(
     Map<String, Object?> ctx,
     DateTime now, {
@@ -133,18 +135,40 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
         why: 'contrôle bientôt',
       );
     }
-    if (now.hour >= 7 && now.hour < 10 && ctx['briefing_fait'] != true && can('assistant_briefing')) {
-      return ClickyIdea(say: 'Je te fais le point sur ta journée ?', tool: 'assistant_briefing', why: 'le matin');
+    // L'école : ce que dit l'emploi du temps (« trou », « pasCours », « fini »…).
+    final school = '${ctx['ecole'] ?? ''}';
+    final noClass = school == 'pasCours';
+    final cards0 = (ctx['cartes'] as num?)?.toInt() ?? 0;
+    final free = (ctx['libre_min'] as num?)?.toInt() ?? 0;
+    // Une heure de libre (cours annulé, trou) : de quoi revoir des cartes.
+    if (school == 'trou' && free >= 40 && cards0 >= 5 && can('revision_lancer')) {
+      return ClickyIdea(
+        say: 'Tu as $free minutes de libre avant ton prochain cours. On revoit tes $cards0 cartes ?',
+        tool: 'revision_lancer',
+        args: {'mode': 'cartes'},
+        why: 'heure de libre',
+      );
     }
-    if (now.hour >= 16 && now.hour < 21 && ctx['trop'] == true && can('assistant_ajouter_plan_journee')) {
+    // Le matin : plus tôt un jour de cours, plus tard quand il n'y a pas cours.
+    final (from, to) = noClass ? (9, 12) : (7, 10);
+    if (now.hour >= from && now.hour < to && ctx['briefing_fait'] != true && can('assistant_briefing')) {
+      return ClickyIdea(
+        say: noClass ? 'Pas cours aujourd\'hui. Je te fais le point sur ta journée ?' : 'Je te fais le point sur ta journée ?',
+        tool: 'assistant_briefing',
+        why: 'le matin',
+      );
+    }
+    final restDays = noClass && ctx['demain_cours'] == false;
+    if (!restDays && now.hour >= 16 && now.hour < 21 && ctx['trop'] == true && can('assistant_ajouter_plan_journee')) {
       return ClickyIdea(
         say: 'Tu as pas mal de choses à faire. Je t\'organise ta soirée dans ton agenda ?',
         tool: 'assistant_ajouter_plan_journee',
         why: 'soirée chargée',
       );
     }
-    final cards = (ctx['cartes'] as num?)?.toInt() ?? 0;
-    if (cards >= 10 && now.hour >= 17 && now.hour < 22 && can('revision_lancer')) {
+    final cards = cards0;
+    // Sans cours (week-end, vacances) : dès le milieu de la matinée.
+    if (cards >= 10 && now.hour >= (noClass ? 10 : 17) && now.hour < 22 && can('revision_lancer')) {
       return ClickyIdea(
         say: 'Tu as $cards cartes à revoir. On en fait quelques-unes ensemble ?',
         tool: 'revision_lancer',

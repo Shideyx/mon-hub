@@ -23,11 +23,18 @@ class PcmPlayer {
   final _pending = <Pointer<WAVEHDR>>[];
   Timer? _reaper;
 
+  /// Petit tampon anti-coupures : le son de Gemini arrive par morceaux
+  /// irréguliers ; on en garde un peu avant de commencer à jouer.
+  late final _jitter = PcmJitter(rate: rate);
+  Timer? _hold;
+
   /// Volume du dernier morceau joué (0..1), pour l'animation.
   double level = 0;
 
-  /// Des morceaux sont encore en train d'être joués.
-  bool get playing {
+  /// Des morceaux sont encore en train d'être joués (ou attendent).
+  bool get playing => _jitter.pending || _devicePlaying;
+
+  bool get _devicePlaying {
     _reap();
     return _pending.isNotEmpty;
   }
@@ -55,10 +62,30 @@ class PcmPlayer {
     _reaper ??= Timer.periodic(const Duration(milliseconds: 200), (_) => _reap());
   }
 
-  /// Ajoute un morceau de son à jouer (il démarre tout de suite si rien ne
-  /// joue).
+  /// Ajoute un morceau de son à jouer. Après un silence, il attend d'en avoir
+  /// un peu d'avance (≈ 0,2 s) pour ne pas hacher la voix.
   void write(Uint8List pcm) {
     if (!supported || pcm.isEmpty) return;
+    final idle = !_devicePlaying;
+    for (final (i, b) in _jitter.add(pcm, playing: !idle).indexed) {
+      _out(b, fadeIn: idle && i == 0);
+    }
+    _hold?.cancel();
+    if (_jitter.pending) _hold = Timer(PcmJitter.maxWait, flush);
+  }
+
+  /// Joue tout de suite ce qui attend (fin d'une réponse).
+  void flush() {
+    _hold?.cancel();
+    final idle = !_devicePlaying;
+    for (final (i, b) in _jitter.drain().indexed) {
+      _out(b, fadeIn: idle && i == 0);
+    }
+  }
+
+  void _out(Uint8List pcm, {bool fadeIn = false}) {
+    if (pcm.isEmpty) return;
+    if (fadeIn) PcmJitter.fadeIn(pcm);
     _open();
     final hwo = _hwo!;
     final data = calloc<Uint8>(pcm.length);
@@ -94,6 +121,8 @@ class PcmPlayer {
 
   /// Coupe tout de suite (interruption, Échap).
   void stop() {
+    _hold?.cancel();
+    _jitter.clear();
     final hwo = _hwo;
     if (hwo == null) return;
     waveOutReset(hwo);
@@ -109,6 +138,9 @@ class PcmPlayer {
     if (hwo != null) waveOutClose(hwo);
   }
 
+  /// Du silence (PCM 16 bits) de la même taille qu'un morceau du micro.
+  static Uint8List silence(int bytes) => Uint8List(bytes);
+
   /// Volume (0..1) d'un morceau de PCM 16 bits.
   static double rms(Uint8List pcm) {
     final s = ByteData.sublistView(pcm);
@@ -123,5 +155,56 @@ class PcmPlayer {
       count++;
     }
     return math.min(1, math.sqrt(sum / count) * 4);
+  }
+}
+
+
+/// Le tampon anti-coupures, **sans Windows** (testable) : après un silence,
+/// on attend [prebuffer] de son avant de jouer (le morceau suivant a le temps
+/// d'arriver, la voix ne hache plus) ; pendant la lecture, tout part tout de
+/// suite. Les morceaux gardent un nombre pair d'octets (PCM 16 bits).
+class PcmJitter {
+  PcmJitter({this.rate = 24000, this.prebuffer = const Duration(milliseconds: 200)});
+
+  final int rate;
+  final Duration prebuffer;
+
+  /// Au plus ce temps d'attente : un petit bout de son (fin de phrase) part
+  /// quand même.
+  static const maxWait = Duration(milliseconds: 160);
+
+  final _buf = BytesBuilder(copy: true);
+
+  bool get pending => _buf.isNotEmpty;
+
+  int get _need => (rate * 2 * prebuffer.inMilliseconds / 1000).round() & ~1;
+
+  /// Ajoute du son ; renvoie ce qu'il faut jouer maintenant. [playing] : le
+  /// haut-parleur a encore du son en cours.
+  List<Uint8List> add(Uint8List pcm, {required bool playing}) {
+    _buf.add(pcm);
+    if (!playing && _buf.length < _need) return const [];
+    return drain();
+  }
+
+  /// Tout ce qui attend (nombre pair d'octets ; l'octet en trop reste).
+  List<Uint8List> drain() {
+    if (_buf.isEmpty) return const [];
+    final all = _buf.takeBytes();
+    final even = all.length & ~1;
+    if (even < all.length) _buf.add(all.sublist(even));
+    return even == 0 ? const [] : [Uint8List.sublistView(all, 0, even)];
+  }
+
+  void clear() => _buf.clear();
+
+  /// Montée douce (≈ 5 ms) au début d'un son : pas de « clic ».
+  static void fadeIn(Uint8List pcm, {int samples = 120}) {
+    final d = ByteData.sublistView(pcm);
+    final n = math.min(samples, pcm.length ~/ 2);
+    for (var i = 0; i < n; i++) {
+      final v = d.getInt16(i * 2, Endian.little);
+      d.setInt16(i * 2, (v * i / n).round(), Endian.little);
+    }
   }
 }

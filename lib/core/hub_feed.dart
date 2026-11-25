@@ -80,12 +80,14 @@ class HubFeed extends ChangeNotifier {
         get('ecole_devoirs'),
         get('revision_paquets'),
         get('livres_lister'),
+        get('agenda_ecole'),
       ]);
       items = build(
         events: _maps(results[0]),
         homework: _maps(results[1]),
         revisions: results[2] is Map ? results[2] as Map : const {},
         books: _maps(results[3]),
+        school: results[4] is Map ? results[4] as Map : const {},
         badges: badges,
         names: names,
         now: n,
@@ -126,15 +128,19 @@ class HubFeed extends ChangeNotifier {
     List<Map> books = const [],
     Map<String, int> badges = const {},
     Map<String, String> names = const {},
+    Map school = const {},
     required DateTime now,
   }) {
     final out = <FeedItem>[];
     final today = DateTime(now.year, now.month, now.day);
 
-    // 1. Le prochain cours / rendez-vous (Agenda).
+    // 0. L'école : pas cours, la rentrée, un cours annulé qui change la journée.
+    out.addAll(schoolItems(school, homework: homework, now: now));
+
+    // 1. Le prochain cours / rendez-vous (Agenda). Jamais un « CONGÉS ».
     final next = [
       for (final e in events)
-        if (e['annule'] != true)
+        if (e['annule'] != true && e['vacances'] != true && e['allDay'] != true)
           if (_date(e['debut']) case final d? when d.isAfter(now)) (e, d),
     ]..sort((a, b) => a.$2.compareTo(b.$2));
     if (next.isNotEmpty) {
@@ -273,9 +279,169 @@ class HubFeed extends ChangeNotifier {
     return out;
   }
 
+  /// Les infos « école » du fil, d'après l'action `agenda_ecole` (sans IA) :
+  /// la veille de la rentrée, le début des vacances, pas cours aujourd'hui ou
+  /// demain, on commence plus tard, une heure de libre, les vacances qui
+  /// approchent.
+  static List<FeedItem> schoolItems(Map school, {List<Map> homework = const [], required DateTime now}) {
+    if (school.isEmpty) return const [];
+    final out = <FeedItem>[];
+    final day = DateTime(now.year, now.month, now.day).toIso8601String().substring(0, 10);
+    final today = (school['aujourdhui'] as Map?) ?? const {};
+    final tomorrow = (school['demain'] as Map?) ?? const {};
+    final phase = '${school['maintenant'] ?? ''}';
+    final nextDay = (school['prochain_jour_de_cours'] as Map?) ?? const {};
+    String noPrefix(String t) => t.replaceFirst(RegExp(r'^Pas de cours (?:aujourd.hui|demain)\s*:\s*'), '');
+    String cap(String t) => t.isEmpty ? t : t[0].toUpperCase() + t.substring(1);
+    // Devoirs à rendre le jour de la reprise.
+    final backOn = DateTime.tryParse('${nextDay['date'] ?? ''}');
+    final dueBack = backOn == null
+        ? 0
+        : homework.where((h) {
+            final d = _date(h['pour_le']);
+            return h['fait'] != true &&
+                d != null &&
+                d.year == backOn.year &&
+                d.month == backOn.month &&
+                d.day == backOn.day;
+          }).length;
+    final hw = dueBack > 0 ? ' · $dueBack devoir${dueBack > 1 ? 's' : ''} à rendre' : '';
+
+    if (school['reprise_demain'] == true && now.hour >= 14) {
+      out.add(
+        FeedItem(
+          id: 'rentree:$day',
+          moduleId: 'schedule',
+          icon: Icons.backpack_rounded,
+          title: 'Demain, c\'est la reprise',
+          detail: '${nextDay['texte'] ?? ''}$hw · prépare ton sac'.replaceFirst(RegExp(r'^ · '), ''),
+          action: 'Agenda',
+          from: const ['schedule', 'ecoledirecte'],
+          priority: now.hour >= 17 ? 80 : 65,
+        ),
+      );
+    } else if (school['debut_vacances'] == true) {
+      final b = (school['vacances_en_cours'] as Map?) ?? const {};
+      out.add(
+        FeedItem(
+          id: 'vacances:${b['debut'] ?? day}',
+          moduleId: 'schedule',
+          icon: Icons.beach_access_rounded,
+          title: 'Bonnes vacances ! 🎉',
+          detail: '${b['nom'] ?? 'Vacances'}${nextDay['texte'] == null ? '' : ' · reprise : ${nextDay['texte']}'}$hw',
+          action: 'Agenda',
+          from: const ['schedule'],
+          priority: 60,
+        ),
+      );
+    } else if (today['cours'] == false && '${today['type']}' != 'inconnu') {
+      out.add(
+        FeedItem(
+          id: 'pascours:$day',
+          moduleId: 'schedule',
+          icon: Icons.weekend_rounded,
+          title: 'Pas cours aujourd\'hui',
+          detail: cap(noPrefix('${school['resume'] ?? ''}')).replaceAll(RegExp(r'\.$'), ''),
+          action: 'Agenda',
+          from: const ['schedule', 'ecoledirecte'],
+          priority: 20,
+        ),
+      );
+    }
+    // Ton premier cours est annulé : tu commences plus tard (dit tôt le matin).
+    if (today['commence_plus_tard'] == true && phase == 'avant') {
+      out.add(
+        FeedItem(
+          id: 'tard:$day',
+          moduleId: 'schedule',
+          icon: Icons.snooze_rounded,
+          title: 'Tu commences à ${today['debut']} aujourd\'hui',
+          detail: 'Premier cours annulé (${(today['annules'] as List?)?.firstOrNull ?? ''})',
+          action: 'Agenda',
+          from: const ['ecoledirecte', 'schedule'],
+          priority: 85,
+        ),
+      );
+    }
+    if (now.hour >= 16 && school['reprise_demain'] != true) {
+      if (tomorrow['commence_plus_tard'] == true) {
+        out.add(
+          FeedItem(
+            id: 'tard-demain:$day',
+            moduleId: 'schedule',
+            icon: Icons.snooze_rounded,
+            title: 'Demain, tu commences à ${tomorrow['debut']}',
+            detail: 'Premier cours annulé (${(tomorrow['annules'] as List?)?.firstOrNull ?? ''})',
+            action: 'Agenda',
+            from: const ['ecoledirecte', 'schedule'],
+            priority: 75,
+          ),
+        );
+      } else if (const {'annule', 'ferie', 'libre'}.contains('${tomorrow['type']}') && today['cours'] == true) {
+        out.add(
+          FeedItem(
+            id: 'pascours-demain:$day',
+            moduleId: 'schedule',
+            icon: Icons.celebration_rounded,
+            title: 'Pas cours demain',
+            detail: switch ('${tomorrow['type']}') {
+              'annule' => 'Tous tes cours sont annulés 🎉',
+              'ferie' => 'Jour férié (${tomorrow['raison'] ?? ''})',
+              _ => 'Rien dans ton emploi du temps',
+            },
+            action: 'Agenda',
+            from: const ['ecoledirecte', 'schedule'],
+            priority: 75,
+          ),
+        );
+      }
+    }
+    // Une heure de libre en ce moment (cours annulé, trou).
+    if (phase == 'trou') {
+      out.add(
+        FeedItem(
+          id: 'trou:$day:${school['jusqua']}',
+          moduleId: 'revisions',
+          icon: Icons.free_breakfast_rounded,
+          title: 'Heure de libre jusqu\'à ${school['jusqua']}',
+          detail: 'De quoi avancer un devoir ou revoir quelques cartes',
+          action: 'Réviser',
+          from: const ['ecoledirecte', 'revisions'],
+          priority: 50,
+        ),
+      );
+    }
+    // Les vacances approchent.
+    final left = (school['jours_de_cours_avant_vacances'] as num?)?.toInt();
+    final next = (school['prochaines_vacances'] as Map?) ?? const {};
+    if (left != null && left >= 1 && left <= 5 && school['vacances_en_cours'] == null) {
+      out.add(
+        FeedItem(
+          id: 'bientot:${next['debut']}:$left',
+          moduleId: 'schedule',
+          icon: Icons.beach_access_rounded,
+          title: 'Plus que $left jour${left > 1 ? 's' : ''} de cours',
+          detail: '${next['nom'] ?? 'Vacances'}${_dm(next['debut'])}',
+          action: 'Agenda',
+          from: const ['schedule'],
+          priority: 25,
+        ),
+      );
+    }
+    return out;
+  }
+
+  static String _dm(Object? ymd) {
+    final d = DateTime.tryParse('${ymd ?? ''}');
+    return d == null ? '' : ' le ${d.day}/${d.month}';
+  }
+
   /// Ce que Nexo peut dire de l'info la plus importante (sans IA).
   static String? say(FeedItem? i) {
     if (i == null || i.priority < 50) return null;
+    if (RegExp(r'^(?:rentree|vacances|tard|tard-demain|pascours-demain|trou):').hasMatch(i.id)) {
+      return '${i.title}. ${i.detail}.'.replaceAll('..', '.');
+    }
     return switch (i.moduleId) {
       'revisions' => '${i.title}. ${i.detail}.',
       'schedule' => 'Petit rappel : ${i.title}.',

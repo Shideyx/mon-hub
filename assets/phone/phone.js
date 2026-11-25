@@ -4,14 +4,19 @@ const $ = (id) => document.getElementById(id);
 const api = (p) => `api/${p}`;
 
 // ------------------------------------------------------------ Onglets
+let tabNow = 'nexo';
 function go(tab) {
+  tabNow = tab;
   for (const s of document.querySelectorAll('section')) s.classList.toggle('on', s.dataset.tab === tab);
   for (const b of document.querySelectorAll('nav button')) b.classList.toggle('on', b.dataset.go === tab);
   try { localStorage.setItem('onglet', tab); } catch {}
   if (tab === 'texte' || tab === 'recevoir') refresh();
+  if (tab === 'ecran') screenLoop();
+  if (tab === 'telecommande') loadApps();
 }
 for (const b of document.querySelectorAll('nav button')) b.onclick = () => go(b.dataset.go);
-try { const t = localStorage.getItem('onglet'); if (t) go(t); } catch {}
+// Après tout le reste (l'onglet Écran a besoin de ce qui est plus bas).
+setTimeout(() => { try { const t = localStorage.getItem('onglet'); if (t) go(t); } catch {} }, 0);
 
 let toastTimer = null;
 function toast(text, ms = 2500) {
@@ -56,6 +61,9 @@ async function refresh() {
       list.append(li);
     }
     for (const b of document.querySelectorAll('[data-cmd]')) b.disabled = !st.telecommande;
+    // Ce que ce PC sait faire (l'écran et Nexo : Windows avec Mon Hub ouvert).
+    document.querySelector('[data-go="ecran"]').hidden = !st.ecran;
+    document.querySelector('[data-go="nexo"]').hidden = !st.nexo;
   } catch {
     online = false;
     $('dot').className = 'dot ko';
@@ -145,7 +153,8 @@ $('btn-send-text').onclick = async () => {
 async function cmd(action, extra = {}) {
   try {
     const r = await (await fetch(api('commande'), { method: 'POST', body: JSON.stringify({ action, ...extra }), keepalive: true })).json();
-    if (r.message && r.message !== 'OK' && action !== 'souris' && action !== 'defiler') toast(r.message);
+    const quiet = ['souris', 'defiler', 'taper', 'touche', 'clic_ecran'].includes(action);
+    if (r.message && r.message !== 'OK' && (!quiet || !r.ok)) toast(r.message);
   } catch {
     if (action !== 'souris') toast('Le PC ne répond pas.');
   }
@@ -228,3 +237,238 @@ const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
 if (ios && !navigator.standalone) $('btn-home').hidden = false;
 $('btn-home').onclick = () => ($('home-help').hidden = false);
 $('btn-home-ok').onclick = () => ($('home-help').hidden = true);
+
+
+// ------------------------------------------------------------ Nexo
+const chat = $('chat');
+function bubble(text, who) {
+  const d = document.createElement('div');
+  d.className = `msg ${who}`;
+  d.textContent = text;
+  chat.append(d);
+  chat.scrollTop = chat.scrollHeight;
+  return d;
+}
+try { $('speak-reply').checked = localStorage.getItem('lire') === '1'; } catch {}
+$('speak-reply').onchange = (e) => { try { localStorage.setItem('lire', e.target.checked ? '1' : '0'); } catch {} };
+
+function say(text) {
+  if (!$('speak-reply').checked || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ''));
+  u.lang = 'fr-FR';
+  const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.startsWith('fr'));
+  if (v) u.voice = v;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+let asking = false;
+async function askNexo(q) {
+  q = (q || '').trim();
+  if (!q || asking) return;
+  asking = true;
+  bubble(q, 'me');
+  const wait = bubble('Nexo réfléchit…', 'nexo wait');
+  try {
+    const r = await (await fetch(api('nexo'), { method: 'POST', body: JSON.stringify({ texte: q }) })).json();
+    wait.className = 'msg nexo';
+    wait.textContent = r.reponse || 'C\'est fait.';
+    say(wait.textContent);
+  } catch {
+    wait.className = 'msg nexo';
+    wait.textContent = 'Le PC ne répond pas (Mon Hub ouvert ? même Wi-Fi ?).';
+  }
+  chat.scrollTop = chat.scrollHeight;
+  asking = false;
+}
+$('btn-ask').onclick = () => { const t = $('ask-text'); askNexo(t.value); t.value = ''; };
+$('ask-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('btn-ask').click(); } });
+for (const b of document.querySelectorAll('[data-ask]')) b.onclick = () => askNexo(b.dataset.ask);
+
+// La dictée du téléphone (Chrome sur Android, Safari sur iPhone).
+const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+if (!Rec) {
+  $('btn-mic').onclick = () => toast('Ton navigateur n\'a pas la dictée : utilise le micro du clavier 🎙️', 3500);
+} else {
+  $('btn-mic').onclick = () => {
+    if (rec) { rec.stop(); return; }
+    rec = new Rec();
+    rec.lang = 'fr-FR';
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    let text = '';
+    $('btn-mic').classList.add('on');
+    rec.onresult = (e) => {
+      text = Array.from(e.results).map((r) => r[0].transcript).join(' ');
+      $('ask-text').value = text;
+    };
+    rec.onerror = (e) => { if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Micro : ' + e.error); };
+    rec.onend = () => {
+      $('btn-mic').classList.remove('on');
+      rec = null;
+      if (text.trim()) { $('ask-text').value = ''; askNexo(text); }
+    };
+    if (navigator.vibrate) navigator.vibrate(20);
+    rec.start();
+  };
+}
+
+// ------------------------------------------------------------ Écran du PC
+const screen = $('screen');
+let screenOn = false;
+let sharp = true;
+try { sharp = localStorage.getItem('net') !== '0'; } catch {}
+$('btn-quality').textContent = sharp ? 'Net' : 'Rapide';
+$('btn-quality').onclick = () => {
+  sharp = !sharp;
+  $('btn-quality').textContent = sharp ? 'Net' : 'Rapide';
+  try { localStorage.setItem('net', sharp ? '1' : '0'); } catch {}
+};
+async function screenLoop() {
+  if (screenOn) return;
+  screenOn = true;
+  let lastUrl = null;
+  while (tabNow === 'ecran' && !document.hidden) {
+    const t0 = Date.now();
+    try {
+      const w = Math.round(Math.min(1600, (screen.clientWidth || 360) * (window.devicePixelRatio || 1) * (sharp ? 1 : 0.6)));
+      const r = await fetch(api(`ecran?l=${Math.max(320, w)}`), { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      const url = URL.createObjectURL(await r.blob());
+      await new Promise((ok) => { screen.onload = ok; screen.onerror = ok; screen.src = url; });
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = url;
+      $('screen-hint').hidden = true;
+    } catch {
+      $('screen-hint').hidden = false;
+      $('screen-hint').textContent = 'Écran indisponible (Mon Hub ouvert sur le PC ?)';
+      await new Promise((ok) => setTimeout(ok, 1500));
+    }
+    await new Promise((ok) => setTimeout(ok, Math.max(60, 250 - (Date.now() - t0))));
+  }
+  screenOn = false;
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && tabNow === 'ecran') screenLoop(); });
+
+// Toucher = clic ; appui long = clic droit ; deux touches rapides = double-clic ; 2 doigts = défiler.
+let press = null;
+let lastTap = 0;
+function point(t) {
+  const r = screen.getBoundingClientRect();
+  return { x: (t.clientX - r.left) / r.width, y: (t.clientY - r.top) / r.height };
+}
+screen.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  press = { ...point(t), cx: t.clientX, cy: t.clientY, y0: t.clientY, at: Date.now(), moved: 0, fingers: e.touches.length };
+  press.timer = setTimeout(() => {
+    if (press && press.moved < 10 && press.fingers === 1) {
+      if (navigator.vibrate) navigator.vibrate(30);
+      cmd('clic_ecran', { x: press.x, y: press.y, droit: true });
+      press.done = true;
+    }
+  }, 550);
+}, { passive: false });
+screen.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!press) return;
+  const t = e.touches[0];
+  press.moved += Math.abs(t.clientX - press.cx) + Math.abs(t.clientY - press.cy);
+  press.fingers = Math.max(press.fingers, e.touches.length);
+  if (e.touches.length >= 2) {
+    const n = Math.trunc((press.y0 - t.clientY) / 24);
+    if (n) { cmd('defiler', { n }); press.y0 = t.clientY; }
+  }
+  press.cx = t.clientX;
+  press.cy = t.clientY;
+}, { passive: false });
+screen.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (!press || e.touches.length) return;
+  clearTimeout(press.timer);
+  if (!press.done && press.moved < 10 && press.fingers === 1) {
+    const now = Date.now();
+    const double = now - lastTap < 320;
+    lastTap = double ? 0 : now;
+    if (navigator.vibrate) navigator.vibrate(12);
+    cmd('clic_ecran', { x: press.x, y: press.y, double });
+  }
+  press = null;
+}, { passive: false });
+screen.addEventListener('click', (e) => {
+  if (e.pointerType === 'touch' || !e.isTrusted || e.detail === 0) return;
+  const p = point(e);
+  cmd('clic_ecran', { x: p.x, y: p.y });
+});
+
+// Le clavier du téléphone tape directement sur le PC.
+const kbd = $('live-kbd');
+$('btn-kbd').onclick = () => { kbd.value = ''; kbd.focus(); toast('Tape : ça s\'écrit sur le PC ⌨️'); };
+kbd.addEventListener('input', (e) => {
+  if (e.inputType === 'deleteContentBackward') cmd('touche', { touche: 'backspace' });
+  else if (e.data) cmd('taper', { texte: e.data });
+  kbd.value = '';
+});
+kbd.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); cmd('touche', { touche: 'enter' }); }
+  else if (e.key === 'Backspace' && !kbd.value) { e.preventDefault(); cmd('touche', { touche: 'backspace' }); }
+});
+
+// Les fenêtres ouvertes.
+$('btn-wins').onclick = async () => {
+  const ul = $('wins');
+  if (!ul.hidden) { ul.hidden = true; return; }
+  try {
+    const list = await (await fetch(api('fenetres'), { cache: 'no-store' })).json();
+    ul.replaceChildren(...list.map((w) => {
+      const li = document.createElement('li');
+      const n = document.createElement('span');
+      n.className = 'name';
+      n.textContent = w.titre;
+      const a = document.createElement('button');
+      a.className = 'small';
+      a.textContent = 'Afficher';
+      a.onclick = () => { cmd('fenetre', { id: w.id, faire: 'activer' }); ul.hidden = true; };
+      li.append(n, a);
+      return li;
+    }));
+    ul.hidden = false;
+  } catch { toast('Le PC ne répond pas.'); }
+};
+
+// ------------------------------------------------------------ Taper et applis
+$('btn-type').onclick = () => {
+  const t = $('type-text');
+  if (!t.value) return toast('Écris le texte à taper.');
+  cmd('taper', { texte: t.value });
+  t.value = '';
+};
+$('type-text').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); const t = $('type-text'); if (t.value) { cmd('taper', { texte: t.value, entree: true }); t.value = ''; } }
+});
+for (const b of document.querySelectorAll('[data-key]')) b.onclick = () => cmd('touche', { touche: b.dataset.key });
+
+let appsTimer = null;
+let appsLoaded = false;
+async function loadApps(q = '') {
+  if (!q && appsLoaded) return;
+  try {
+    const list = await (await fetch(api(`applis?q=${encodeURIComponent(q)}`), { cache: 'no-store' })).json();
+    appsLoaded = !q;
+    $('apps').replaceChildren(...list.slice(0, 24).map((a) => {
+      const b = document.createElement('button');
+      const i = document.createElement('b');
+      i.textContent = a.ini;
+      const n = document.createElement('span');
+      n.textContent = a.nom;
+      b.append(i, n);
+      b.onclick = () => { if (navigator.vibrate) navigator.vibrate(15); cmd('lancer', { id: a.id }); };
+      return b;
+    }));
+  } catch {}
+}
+$('app-search').addEventListener('input', (e) => {
+  clearTimeout(appsTimer);
+  appsTimer = setTimeout(() => loadApps(e.target.value.trim()), 250);
+});

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -6,6 +7,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/google_auth.dart';
 import '../../core/hub_module.dart';
+import '../../core/school_calendar.dart';
+import '../carnet/carnet_store.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
 import '../ecoledirecte/ecoledirecte_module.dart';
@@ -34,6 +37,8 @@ class AgendaItem {
     this.detail = '',
     this.cancelled = false,
     this.allDay = false,
+    this.holiday = false,
+    this.exempt = false,
     this.personal,
   });
   final String title;
@@ -45,6 +50,12 @@ class AgendaItem {
   final String detail;
   final bool cancelled;
   final bool allDay;
+
+  /// Un congé d'École Directe (« CONGÉS », « Vacances ») : pas un cours.
+  final bool holiday;
+
+  /// Tu es dispensé de ce cours.
+  final bool exempt;
 
   /// Évènement perso d'origine (modifiable).
   final PersonalEvent? personal;
@@ -360,6 +371,9 @@ class ScheduleModule extends HubModule {
             place: l.room,
             detail: l.teacher,
             cancelled: l.cancelled,
+            allDay: l.isBreak,
+            holiday: l.isBreak,
+            exempt: l.exempt,
           ),
         );
       }
@@ -420,6 +434,7 @@ class ScheduleModule extends HubModule {
   @override
   Future<List<HubNotification>> poll() async {
     final now = DateTime.now();
+    unawaited(_schoolUpkeep());
     final stale = _icsAt == null || now.difference(_icsAt!).inMinutes >= 10;
     if (urls.isNotEmpty && stale) await _loadIcs(force: true);
     final items = await itemsBetween(now, now.add(const Duration(minutes: 16)));
@@ -435,8 +450,112 @@ class ScheduleModule extends HubModule {
     ];
   }
 
+  // ---- Calendrier scolaire (« est-ce que j'ai cours ? ») -------------------
+
+  bool _zoneTried = false;
+
+  /// La zone (devinée d'après la ville du Carnet) et le calendrier officiel.
+  Future<void> _schoolUpkeep() async {
+    final cal = SchoolCalendar.instance;
+    try {
+      if (!_zoneTried && (cal.zone == null || cal.zoneGuessed)) {
+        _zoneTried = true;
+        await Carnet.instance.load();
+        final city = Carnet.instance.setting<String>('city', '');
+        if (city.trim().isNotEmpty) await cal.guessFromCity(city);
+      }
+      await cal.refresh();
+    } catch (_) {}
+  }
+
+  /// Les créneaux d'École Directe (cours, annulés, congés) au format
+  /// `agenda_lire`, pour le calendrier scolaire. Lus dans ce qu'École Directe
+  /// a déjà chargé (pas de connexion de plus).
+  Future<List<Map>> schoolEvents(DateTime from, DateTime to) async {
+    final ed = ecole;
+    if (ed == null || !ed.configured) return const [];
+    try {
+      return [
+        for (final l in await ed.lessonsBetween(from, to))
+          if (l.end.isAfter(from) && l.start.isBefore(to)) EcoleDirecteModule.agendaMap(l),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  SchoolReport? _report;
+
+  /// Le point « école » (au plus un calcul par minute).
+  Future<SchoolReport> schoolReport({DateTime? now, bool force = false}) async {
+    final n = now ?? DateTime.now();
+    final r = _report;
+    if (!force && now == null && r != null && n.difference(r.now) < const Duration(minutes: 1)) return r;
+    final today = DateTime(n.year, n.month, n.day);
+    final events = await schoolEvents(today, today.add(const Duration(days: 21)));
+    final known = ecole?.configured == true && (ecole?.lessons.isNotEmpty ?? false);
+    return _report = SchoolCalendar.instance.build(n, events: events, known: known);
+  }
+
   @override
   List<HubTool> get tools => [
+    HubTool(
+      name: 'agenda_ecole',
+      description:
+          'Est-ce que j\'ai cours ? Calculé sans IA d\'après École Directe et le calendrier scolaire officiel : '
+          'jour de cours ou non (week-end, vacances, jour férié, pont, tous les cours annulés), cours en ce moment, '
+          'trou, heure de début et de fin, cours annulés et ce que ça change, demain, prochain jour de cours (la '
+          'rentrée), prochaines vacances. À utiliser pour « j\'ai cours demain ? », « je finis à quelle heure ? », '
+          '« c\'est quand la rentrée ? », « je suis en vacances ? ».',
+      params: {'date': ('string', 'Un jour précis AAAA-MM-JJ (défaut : aujourd\'hui et demain)')},
+      run: (a) async {
+        final r = await schoolReport();
+        final d = DateTime.tryParse('${a['date'] ?? ''}');
+        if (d == null) return r.toJson();
+        final day = DateTime(d.year, d.month, d.day);
+        final events = await schoolEvents(day, day.add(const Duration(days: 1)));
+        final known = ecole?.configured == true && (ecole?.lessons.isNotEmpty ?? false);
+        final info = SchoolRules.classify(
+          day,
+          events: events,
+          breaks: SchoolCalendar.instance.breaks(events: events),
+          known: known,
+        );
+        return {'resume': SchoolRules.sayDay(info, DateTime.now()), ...info.toJson()};
+      },
+    ),
+    HubTool(
+      name: 'agenda_vacances',
+      description:
+          'Les vacances scolaires (calendrier officiel de l\'Éducation nationale pour la zone de la personne, et '
+          'congés vus dans École Directe) et les jours fériés à venir. Avec « zone » (A, B, C, Corse…), règle la '
+          'zone de vacances.',
+      params: {'zone': ('string', 'Facultatif : la zone de vacances à régler (A, B, C, Corse, Réunion…)')},
+      run: (a) async {
+        final cal = SchoolCalendar.instance;
+        final want = '${a['zone'] ?? ''}'.trim();
+        if (want.isNotEmpty) {
+          final z = SchoolRules.zoneFromText(want) ?? SchoolRules.zoneFromText('zone $want');
+          if (z == null) return {'ok': false, 'message': 'Je ne connais pas la zone « $want » (A, B, C ou Corse).'};
+          await cal.setZone(z);
+        }
+        final r = await schoolReport(force: true);
+        final now = DateTime.now();
+        final (ferie, ferieName) = SchoolRules.nextPublicHoliday(now);
+        return {
+          'zone': SchoolRules.zoneLabel(cal.zone),
+          if (cal.zone == null) 'conseil': 'Zone inconnue : dis-moi ta ville ou ta zone (A, B ou C) pour tes vacances.',
+          if (r.currentBreak != null)
+            'en_cours': {...r.currentBreak!.toJson(), 'texte': SchoolRules.sayDay(r.today, now)},
+          'prochaines': r.sayNextBreak(),
+          'a_venir': [
+            for (final b in r.breaks)
+              if (b.end.isAfter(now)) b.toJson(),
+          ].take(8).toList(),
+          'prochain_ferie': '${SchoolRules.longDate(ferie)} ($ferieName)',
+        };
+      },
+    ),
     HubTool(
       name: 'agenda_lire',
       description:
@@ -461,6 +580,8 @@ class ScheduleModule extends HubModule {
               if (e.place.isNotEmpty) 'lieu': e.place,
               if (e.detail.isNotEmpty) 'detail': e.detail,
               if (e.cancelled) 'annule': true,
+              if (e.holiday) 'vacances': true,
+              if (e.exempt) 'dispense': true,
               if (e.personal != null) 'id': e.personal!.id,
             },
         ];
@@ -512,7 +633,7 @@ class ScheduleModule extends HubModule {
         final days = ((a['jours'] as num?)?.toInt() ?? 7).clamp(1, 31);
         final items = await itemsBetween(from, from.add(Duration(days: days)));
         return freeSlots(
-          items.where((e) => !e.cancelled).map((e) => (e.start, e.end)).toList(),
+          items.where((e) => !e.cancelled && !e.holiday).map((e) => (e.start, e.end)).toList(),
           from: from,
           days: days,
           dayStart: ((a['de'] as num?)?.toInt() ?? 8).clamp(0, 23),
@@ -579,11 +700,14 @@ class ScheduleModule extends HubModule {
       future: upcoming(),
       initialData: _upcoming,
       builder: (context, snap) {
-        final items = (snap.data ?? []).where((e) => !e.cancelled).take(7).toList();
+        final items = (snap.data ?? []).where((e) => !e.cancelled && !e.holiday).take(7).toList();
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
         if (items.isEmpty) {
+          if (SchoolCalendar.instance.last?.onBreak ?? false) {
+            return const EmptyHint('Vacances : rien de prévu. Profite !', icon: Icons.beach_access_rounded);
+          }
           return const EmptyHint('Rien de prévu. Touche pour ajouter un évènement', icon: Icons.add_rounded);
         }
         return NextUpSummary(

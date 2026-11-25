@@ -1,4 +1,5 @@
 import '../../modules/ecoledirecte/grade_math.dart';
+import '../../core/school_calendar.dart';
 
 /// **Prépare ton sac** (sans IA) : d'après les cours de demain, les affaires
 /// à prendre (tenue de sport le jour d'EPS, calculatrice en maths…), et les
@@ -76,7 +77,7 @@ class SchoolBag {
     bool same(DateTime? x) => x != null && x.year == d.year && x.month == d.month && x.day == d.day;
     final lessons = [
       for (final e in events)
-        if (e['annule'] != true && same(_date(e['debut'])) && '${e['source'] ?? ''}'.toLowerCase().contains('cole')) e,
+        if (same(_date(e['debut'])) && SchoolRules.isLesson(e)) e,
     ]..sort((a, b) => _date(a['debut'])!.compareTo(_date(b['debut'])!));
     if (lessons.isEmpty) return null;
     final subjects = <String>[];

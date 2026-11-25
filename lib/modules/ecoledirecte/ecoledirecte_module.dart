@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hub_module.dart';
 import '../../core/nav.dart';
+import '../../core/school_calendar.dart';
 import '../../ui/file_viewer.dart';
 import '../../ui/summary.dart';
 import '../../ui/widgets.dart';
@@ -311,14 +312,32 @@ class EcoleDirecteModule extends HubModule {
           body: 'Pour ${dayLabel(h.due).toLowerCase()}',
         ),
       for (final l in _cache)
-        if (l.cancelled && l.end.isAfter(now))
+        if (l.cancelled && !l.isBreak && l.end.isAfter(now))
           HubNotification(
             id: 'annule:${l.subject}@${l.start.toIso8601String()}',
             title: '🎉 Cours annulé : ${l.subject}',
-            body: '${dayLabel(l.start)} à ${hhmm(l.start)}',
+            body: [
+              '${dayLabel(l.start)} à ${hhmm(l.start)}',
+              // Ce que ça change à ta journée (tu commences plus tard, un trou…).
+              SchoolRules.cancelImpact(
+                SchoolRules.classify(l.start, events: [for (final x in _cache) agendaMap(x)]),
+                agendaMap(l),
+              ),
+            ].where((t) => t.isNotEmpty).join(' · '),
           ),
     ];
   }
+
+  /// Un cours au format de l'action `agenda_lire` (pour le calendrier scolaire).
+  static Map<String, Object?> agendaMap(EdLesson l) => {
+    'titre': l.subject,
+    'debut': l.start,
+    'fin': l.end,
+    'source': 'École Directe',
+    if (l.cancelled) 'annule': true,
+    if (l.isBreak) 'vacances': true,
+    if (l.exempt) 'dispense': true,
+  };
 
   @override
   List<HubTool> get tools => [
@@ -696,7 +715,10 @@ class EcoleDirecteModule extends HubModule {
               return EmptyHint(lastError!, action: ('Réessayer', retry));
             }
             final now = DateTime.now();
-            final next = (snap.data ?? []).where((l) => l.end.isAfter(now) && !l.cancelled).take(7).toList();
+            final next = (snap.data ?? [])
+                .where((l) => l.end.isAfter(now) && !l.cancelled && !l.isBreak)
+                .take(7)
+                .toList();
             if (snap.connectionState == ConnectionState.waiting && next.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
