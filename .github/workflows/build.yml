@@ -161,7 +161,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - run: flutter build web --release -t lib/web/main.dart --base-href "/${{ github.event.repository.name }}/" --no-web-resources-cdn --dart-define=APP_VERSION=v1.${{ github.run_number }} --dart-define=UPDATE_REPO=${{ github.repository }} --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         continue-on-error: true
         with: { enablement: true }
       # Un nom par essai : relancer le job ne trouve pas deux fois le même site.
