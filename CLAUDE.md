@@ -37,8 +37,8 @@
 - **Une seule voix : Gemini** (demande de la personne, v1.43). Voix de Windows (flutter_tts) et voix Microsoft (Edge)
   **retirées, ne pas les remettre**. `ClickyVoice` (`voice.dart`) : synthèse `GeminiVoice` par **gros morceaux**
   (`ClickyVoice.chunks/cutAt` : quota gratuit ~15 lectures/jour), relais `LiveReader` (Gemini Live, même voix) quand
-  le quota est épuisé ; sans clé ni internet : réponse écrite. Les briefings/topos sont **toujours lus**
-  (`presentTopo` → `speak(force: true)`).
+  le quota est épuisé ; sans clé ni internet : **la voix du PC (Piper)** depuis la v1.68 (voir plus bas), sinon réponse
+  écrite. Les briefings/topos sont **toujours lus** (`presentTopo` → `speak(force: true)`).
 - Certificats https : `TrustedCertificates.install()` (magasins Windows ROOT + CA, et
   `assets/cacert.pem` de Mozilla) au démarrage des deux programmes.
 - Look : **interface HUD (v1.60, validée par la personne sur maquette)** : mêmes couleurs (violet #7C5CFF, rose
@@ -811,6 +811,24 @@
   toucher = clic, appui long = clic droit, double touche = double-clic, 2 doigts = défiler, clavier du téléphone en
   direct, fenêtres, Net/Rapide), Télécommande (+ écrire sur le PC, touches, applis). CSS : `[hidden]` gagne toujours.
   Testé dans Chromium (faux PC). Tests `test/v190_telephone_plus_test.dart`.
+- **La voix du PC, sans Gemini (v1.68)** (demande : « que la voix marche nickel même sans API Gemini » ; voix de
+  Windows/Edge toujours **interdites**) : `ui/clicky/piper_voice.dart` (`PiperVoice` = **Piper**, voix neuronale libre
+  sur le PC : programme `piper_windows_amd64.zip` 2023.11.14-2 de GitHub avec **SHA-256 épinglée** (`zipSha256`), voix
+  `voices` tom (défaut, homme) / siwis / pierre (upmc, `speaker` 1) depuis Hugging Face `rhasspy/piper-voices` v1.0.0,
+  **secours** siwis depuis GitHub v0.0.2 (tar.gz, SHA-256 épinglée) si Hugging Face ne répond pas ; dans
+  %APPDATA%\MonHub\piper ; `Whisper.download/unzip` réutilisés ; `autoInstall` une fois en fond au démarrage
+  (`Perf.later(9)` dans `main.dart`, `app.piper.auto` = false pour refuser, échec retenté après 1 j), notification ;
+  synthèse : programme **gardé ouvert** `--json-input --output_dir` (une ligne sur sa sortie = une phrase prête), lancé
+  en `detachedWithStdio` (pas de fenêtre ; **jamais lire `exitCode`** : la fin = sortie fermée), sinon repli
+  `_noPersist` = un lancement par phrase `--output_file` ; texte en JSON **ASCII** (`jsonLine`, accents en \uXXXX),
+  `speakable` sans émojis/Markdown, `lengthScale` d'après la vitesse). Branché dans `ClickyVoice` (`engine` : `auto` =
+  Gemini puis PC, `pc` = toujours le PC, `gemini` ; `_piperFirst`, `_speakPiper` avec morceau suivant préparé, relais
+  après chaque échec Gemini), réglage partagé `voiceEngine` (`liveReady` faux en `pc`, sinon Gemini Live parlerait
+  avec sa voix), panneau `_PiperSettings` (Réglages de Nexo → Voix : installer, choisir, écouter). **Conversation sans
+  Gemini** : `startTalk` → `_startHandsFree` (écoute de Mon Hub + voix du PC + conversation continue sans limite de
+  tours, `_handsFree`, 12 s de silence ou « merci Nexo, c'est tout » pour finir) ; quota épuisé en pleine
+  conversation Live → bascule toute seule. Programme téléchargé **jamais exécuté ici** (refusé par la sécurité de Claude
+  Code) : le protocole a deux chemins pour ne dépendre d'aucune supposition. Tests `test/v191_voix_pc_test.dart`.
 - **Publier sans session** : si `gh` n'est pas connecté, `scratchpad/publish.ps1` (robot : code de connexion GitHub
   renouvelé dans le presse-papier, push, PR + fusion par `gh api`, attente de la version, installation dans
   `%LOCALAPPDATA%\Programs\Mon Hub` + recopie du profil WebView2) ; envoyer le code ailleurs (hébergeur, artefact)

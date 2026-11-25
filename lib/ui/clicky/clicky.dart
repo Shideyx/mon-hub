@@ -294,6 +294,7 @@ class ClickyController extends ChangeNotifier {
     'helpOnly',
     'quietInClass',
     'voiceSteady',
+    'voiceEngine',
     'followUp',
     'enabled',
     'voice',
@@ -703,9 +704,14 @@ class ClickyController extends ChangeNotifier {
   /// le même moteur et la même voix que la conversation.
   bool get voiceSteady => _opt('voiceSteady', true);
 
+  /// Qui parle : 'auto' (Gemini, puis la voix du PC quand Gemini manque),
+  /// 'pc' (toujours la voix du PC, Piper : illimitée, sans internet), 'gemini'.
+  String get voiceEngine => _opt('voiceEngine', 'auto');
+
   void _applyVoice({String? lang}) {
     voiceOut.geminiVoice = geminiVoice;
     voiceOut.steady = voiceSteady;
+    voiceOut.engine = voiceEngine;
     voiceOut
       ..rate = ttsRate
       ..pitch = ttsPitch
@@ -837,7 +843,7 @@ class ClickyController extends ChangeNotifier {
   void _armFollowTimer() {
     _followTimer?.cancel();
     bool spoke() => _followSpoke || _liveSpoke || transcript.trim().isNotEmpty;
-    _followTimer = Timer(const Duration(seconds: 6), () {
+    _followTimer = Timer(Duration(seconds: _handsFree ? 12 : 6), () {
       if (!following || state != ClickyState.listening) return;
       // Ctrl + Alt maintenus : c'est une écoute normale maintenant.
       if (_holding) {
@@ -854,14 +860,26 @@ class ClickyController extends ChangeNotifier {
 
   void _endFollow() {
     _followChain = 0;
+    if (_handsFree) {
+      // Conversation mains libres (sans Gemini) : plus rien entendu, on arrête.
+      _handsFree = false;
+      unawaited(
+        stopListening(send: false).then((_) {
+          _set(ClickyState.idle, status: '', reply: TalkRules.endNote('silence'));
+          _fadeSoon();
+        }),
+      );
+      return;
+    }
     unawaited(stopListening(send: false).then((_) => _fadeSoon()));
   }
 
   /// Après une réponse à voix haute : il attend la fin de sa phrase et
   /// réécoute (5 fois de suite au plus, puis il faut le rappeler).
   Future<void> _followUpSoon() async {
-    if (_followChain >= 5 || !mic || !_voicePlatform || !active) {
+    if ((_followChain >= 5 && !_handsFree) || !mic || !_voicePlatform || !active) {
       _followChain = 0;
+      _handsFree = false;
       return;
     }
     for (var i = 0; i < 600 && (voiceOut.speaking || _livePlayer.playing); i++) {
@@ -1068,7 +1086,7 @@ class ClickyController extends ChangeNotifier {
     _askId++;
     _voiceTurn = false;
     _followChain = 0;
-    if (talking) await stopTalk();
+    if (talking || _handsFree) await stopTalk();
     GameAgent.instance.cancel();
     ClaudeCode.cancelAll();
     await stopSpeaking();
@@ -2653,7 +2671,7 @@ class ClickyController extends ChangeNotifier {
         _voiceTurn &&
         (was == ClickyState.speaking || was == ClickyState.thinking || was == ClickyState.pointing)) {
       _voiceTurn = false;
-      if (followUp) unawaited(_followUpSoon());
+      if (followUp || _handsFree) unawaited(_followUpSoon());
     }
     state = s;
     // On l'appelle pendant qu'il dort ou qu'il est assis : il revient.
@@ -3821,8 +3839,17 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     clearMarks();
     // « On discute », « mode conversation » : la conversation mains libres
     // (Gemini Live, gratuit, sans jetons Claude). « Arrête la conversation ».
-    if (TalkRules.isStop(q) && talking) {
+    if (TalkRules.isStop(q) && (talking || _handsFree)) {
       await stopTalk();
+      return;
+    }
+    // Conversation sans Gemini : « merci Nexo, c'est tout ».
+    if (_handsFree && TalkRules.isGoodbye(q)) {
+      _handsFree = false;
+      _set(ClickyState.speaking, status: '', reply: 'À plus tard.');
+      await speak('À plus tard.');
+      if (state == ClickyState.speaking) _set(ClickyState.idle);
+      _fadeSoon();
       return;
     }
     // Écrit pendant la conversation : la question part dans la même
@@ -4739,11 +4766,12 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
   /// Claude), micro ouvert, réponses immédiates, toujours la même voix.
   /// Renvoie ce qu'il faut afficher si ça n'a pas pu démarrer.
   Future<String> startTalk() async {
-    if (talking) return 'On discute déjà : parle-moi normalement.';
+    if (talking || _handsFree) return 'On discute déjà : parle-moi normalement.';
     if (!PcmPlayer.supported) return 'La conversation en direct marche sur le PC (Windows).';
-    if (voiceOut.geminiKey.trim().isEmpty) {
-      return 'Pour discuter en direct (gratuit), ajoute ta clé Gemini : Réglages de Nexo → Voix.';
-    }
+    // Sans Gemini (pas de clé, quota épuisé) : on discute quand même, avec
+    // l'écoute de Mon Hub et la voix du PC.
+    final liveDown = _liveDownUntil != null && DateTime.now().isBefore(_liveDownUntil!);
+    if (voiceOut.geminiKey.trim().isEmpty || liveDown || voiceEngine == 'pc') return _startHandsFree();
     // Tout le reste se tait : une seule voix, un seul micro.
     if (_liveMic != null) await _liveStop(send: false);
     voiceOut.stop();
@@ -4787,6 +4815,13 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     };
     t.onEnd = (why) {
       if (identical(_talk, t)) _talk = null;
+      // Quota de Gemini épuisé en pleine discussion : on continue avec la voix
+      // du PC (sans couper la conversation).
+      if (why == 'quota' && voiceOut.hasVoice) {
+        _liveDownUntil = DateTime.now().add(const Duration(hours: 1));
+        unawaited(_startHandsFree(note: 'Gemini est épuisé : je continue avec ma voix du PC.'));
+        return;
+      }
       _set(ClickyState.idle, status: '', reply: TalkRules.endNote(why));
       _fadeSoon();
       _wake.resume();
@@ -4802,13 +4837,44 @@ Le tableau n'est pas lu à voix haute : ta réponse orale le présente en une ph
     }
   }
 
+  /// Conversation mains libres **sans Gemini** : l'écoute de Mon Hub (Whisper
+  /// ou Windows), la réponse (sans IA d'abord), la voix du PC, puis il
+  /// réécoute — jusqu'à « merci Nexo, c'est tout » ou 12 s de silence.
+  bool _handsFree = false;
+  bool get handsFree => _handsFree;
+
+  Future<String> _startHandsFree({String note = 'Je t\'écoute.'}) async {
+    if (!mic) return 'Active le micro dans mes réglages pour qu\'on discute.';
+    if (!voiceOut.hasVoice) {
+      return 'Pour discuter sans Gemini, installe ma voix du PC : Réglages de Nexo → Voix (gratuit, sans limite).';
+    }
+    _handsFree = true;
+    _followChain = 0;
+    _set(ClickyState.speaking, status: '', reply: note);
+    await speak(note);
+    if (!_handsFree) return '';
+    _set(ClickyState.idle);
+    await startListening(followUp: true);
+    return '';
+  }
+
   /// Ferme la conversation mains libres.
-  Future<void> stopTalk() async => _talk?.stop();
+  Future<void> stopTalk() async {
+    if (_handsFree) {
+      _handsFree = false;
+      if (state == ClickyState.listening) await stopListening(send: false);
+      _set(ClickyState.idle, status: '', reply: TalkRules.endNote(''));
+      _fadeSoon();
+    }
+    await _talk?.stop();
+  }
 
   /// Gemini Live peut servir maintenant.
   bool get liveReady =>
       instant &&
       voice &&
+      // « Toujours la voix du PC » : Gemini Live parlerait avec sa voix à lui.
+      voiceEngine != 'pc' &&
       PcmPlayer.supported &&
       voiceOut.geminiKey.trim().isNotEmpty &&
       (_liveDownUntil == null || DateTime.now().isAfter(_liveDownUntil!));

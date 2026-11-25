@@ -144,6 +144,26 @@ class Whisper {
     }
   }
 
+  /// Télécharge un fichier (le même chemin que Whisper : module intégré, sinon
+  /// curl.exe de Windows). Sert aussi à la voix du PC (Piper).
+  static Future<File> download(
+    String url,
+    String path,
+    void Function(double) progress,
+    List<String> log, {
+    int minBytes = 100 * 1024,
+  }) async {
+    final c = http.Client();
+    try {
+      return await _download(c, url, path, progress, log, minBytes: minBytes);
+    } finally {
+      c.close();
+    }
+  }
+
+  /// Décompresse un zip (voir [_unzip]).
+  static Future<void> unzip(File zip, Directory dest, List<String> log) => _unzip(zip, dest, log);
+
   /// Décompresse (module intégré, sinon tar.exe de Windows).
   static Future<void> _unzip(File zip, Directory dest, List<String> log) async {
     final sep = Platform.pathSeparator;

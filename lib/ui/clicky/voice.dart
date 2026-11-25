@@ -9,6 +9,7 @@ import '../../core/claude_bridge.dart';
 import 'live.dart';
 import 'neural_voice.dart';
 import 'pcm_player.dart';
+import 'piper_voice.dart';
 
 /// La voix de Nexo : **une seule voix, celle de Gemini** (demande de la
 /// personne : une voix naturelle, toujours la même). Lecture par morceaux
@@ -134,7 +135,7 @@ class ClickyVoice {
   /// Plus aucune voix (ni synthèse ni Live) : réponse écrite jusque-là.
   DateTime? _allDownUntil;
 
-  bool get hasVoice => geminiKey.trim().isNotEmpty;
+  bool get hasVoice => (engine != 'pc' && geminiKey.trim().isNotEmpty) || _piperOk;
 
   bool _down(DateTime? until) => until != null && DateTime.now().isBefore(until);
 
@@ -196,23 +197,35 @@ class ClickyVoice {
     await VoiceLock.acquire();
     try {
       if (!hasVoice) {
-        neuralError = 'Ajoute ta clé Gemini gratuite pour que Nexo parle (sinon il répond par écrit).';
+        neuralError =
+            'Ajoute ta clé Gemini gratuite, ou installe la voix du PC (Réglages de Nexo → Voix) : sinon il répond '
+            'par écrit.';
         return;
       }
-      if (_down(_allDownUntil)) return;
       Future<Uint8List>? next;
       while (_queue.isNotEmpty && gen == _generation) {
         final s = _queue.removeAt(0);
+        // La voix du PC (Piper) : choisie, ou plus rien du côté de Gemini
+        // (pas de clé, quota épuisé, pas d'internet).
+        if (_piperFirst) {
+          next = null;
+          if (await _speakPiper(s, gen)) continue;
+          if (gen != _generation) break;
+          if (engine == 'pc' || geminiKey.trim().isEmpty) break;
+        }
+        if (_down(_allDownUntil)) break;
         // Voix stable : Gemini Live d'abord (même son que la conversation).
         if (steady && PcmPlayer.supported && !_down(_liveDownUntil)) {
           next = null;
           if (await _readLive(s, gen, fallback: true)) continue;
           if (gen != _generation) break;
         }
-        // Quota de la synthèse épuisé : Gemini Live lit (même voix).
+        // Quota de la synthèse épuisé : Gemini Live lit (même voix), sinon
+        // la voix du PC.
         if (_down(_ttsDownUntil)) {
           next = null;
-          if (!await _readLive(s, gen)) break;
+          if (await _readLive(s, gen, fallback: _piperOk)) continue;
+          if (gen != _generation || !await _speakPiper(s, gen)) break;
           continue;
         }
         try {
@@ -234,7 +247,8 @@ class ClickyVoice {
           } catch (_) {}
           if (gen != _generation) break;
           _ttsDownUntil = DateTime.now().add(_quota(e) ? const Duration(hours: 2) : const Duration(minutes: 5));
-          if (!await _readLive(s, gen)) {
+          if (!await _readLive(s, gen, fallback: _piperOk)) {
+            if (gen == _generation && await _speakPiper(s, gen)) continue;
             neuralError = '$e';
             break;
           }
@@ -254,6 +268,43 @@ class ClickyVoice {
 
   /// Gemini Live ne lit plus (quota…) : la synthèse prend le relais un moment.
   DateTime? _liveDownUntil;
+
+  /// Qui parle : 'auto' (Gemini, puis la voix du PC quand Gemini manque),
+  /// 'pc' (toujours la voix du PC : illimitée, sans internet), 'gemini'.
+  String engine = 'auto';
+
+  bool get _piperOk => engine != 'gemini' && PiperVoice.ready;
+
+  /// La voix du PC passe en premier (choisie, ou Gemini indisponible).
+  bool get _piperFirst =>
+      _piperOk &&
+      (engine == 'pc' || geminiKey.trim().isEmpty || _down(_allDownUntil) || (_down(_liveDownUntil) && _down(_ttsDownUntil)));
+
+  /// Le morceau suivant, préparé pendant la lecture.
+  (String, Future<Uint8List>)? _piperNext;
+
+  /// Lit un morceau avec la voix du PC. Faux si ça n'a pas marché.
+  Future<bool> _speakPiper(String text, int gen) async {
+    if (!_piperOk) return false;
+    try {
+      final pre = _piperNext;
+      _piperNext = null;
+      final audio = await (pre != null && pre.$1 == text ? pre.$2 : PiperVoice.synthesize(text, rate: rate));
+      if (gen != _generation) return false;
+      if (_queue.isNotEmpty) {
+        final t = _queue.first;
+        final f = PiperVoice.synthesize(t, rate: rate);
+        f.then((_) {}, onError: (Object _) {});
+        _piperNext = (t, f);
+      }
+      if (audio.isNotEmpty) await _play(audio, gen);
+      neuralError = null;
+      return true;
+    } catch (e) {
+      neuralError = 'Voix du PC : $e';
+      return false;
+    }
+  }
 
   /// Lit un morceau avec Gemini Live. Faux si ça n'a pas marché (plus de
   /// voix pour un moment : Nexo répond par écrit). [fallback] : la synthèse
@@ -279,6 +330,7 @@ class ClickyVoice {
     _ttsDownUntil = null;
     _allDownUntil = null;
     _liveDownUntil = null;
+    _piperNext = null;
     neuralError = null;
     await say(text);
     return neuralError;
@@ -293,6 +345,7 @@ class ClickyVoice {
   /// Se tait tout de suite.
   void stop() {
     _generation++;
+    _piperNext = null;
     _queue.clear();
     _fed = 0;
     _running = false;
