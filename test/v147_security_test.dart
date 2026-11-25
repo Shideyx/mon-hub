@@ -316,7 +316,7 @@ void main() {
       PromptShield.reset();
     });
 
-    test('Smily économe : seulement les actions du groupe demandé', () async {
+    test('Nexo économe : seulement les actions du groupe demandé', () async {
       final req = await client.post('127.0.0.1', bridge.port!, '/mcp?groupes=agenda');
       req.headers.set('authorization', 'Bearer ${bridge.key}');
       req.headers.contentType = ContentType.json;
@@ -330,7 +330,7 @@ void main() {
     });
   });
 
-  group('Smily économe', () {
+  group('Nexo économe', () {
     test('les bons groupes d\'actions', () {
       expect(ToolRouter.groupsFor('Quels sont mes devoirs pour demain ?'), containsAll(['ecole', 'agenda']));
       expect(ToolRouter.groupsFor('mets de la musique'), contains('musique'));

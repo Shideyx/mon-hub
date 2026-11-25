@@ -388,7 +388,7 @@ ConvertTo-Json -InputObject @($out) -Compress
       return (b.date ?? DateTime(2000)).compareTo(a.date ?? DateTime(2000));
     });
 
-  /// Ce que Smily dit.
+  /// Ce que Nexo dit.
   static String say(String query, List<SearchHit> hits) {
     if (hits.isEmpty) return 'Je n\'ai rien trouvé pour « $query ».';
     final by = <String, int>{};

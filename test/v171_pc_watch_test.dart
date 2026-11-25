@@ -109,7 +109,7 @@ void main() {
 
   group('sa ville', () {
     test('« j\'habite à Lyon »', () {
-      expect(ClickyLife.cityFrom('Smily, j\'habite à Lyon'), 'lyon');
+      expect(ClickyLife.cityFrom('Nexo, j\'habite à Lyon'), 'lyon');
       expect(ClickyLife.cityFrom('ma ville c\'est Nantes'), 'nantes');
       expect(ClickyLife.cityFrom('j\'habite en Bretagne'), 'bretagne');
       expect(QuickAnswers.original('j\'habite à Lyon', 'lyon'), 'Lyon');

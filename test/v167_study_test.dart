@@ -216,7 +216,7 @@ void main() {
     });
   });
 
-  group('Smily', () {
+  group('Nexo', () {
     test('phrases sans IA', () async {
       final calls = <String>[];
       Future<Object?> fake(String name, Map<String, dynamic> a) async {

@@ -35,12 +35,12 @@ void main() {
       expect(r.map((x) => x.id), isNot(contains('gels')));
     });
 
-    test('Smily partout qui n\'arrive pas à tenir', () {
+    test('Nexo partout qui n\'arrive pas à tenir', () {
       final r = RepairRules.diagnose(
         log([
-          "Smily partout s'est fermé : relancé",
-          "Smily partout s'est fermé : relancé",
-          "Smily partout s'est fermé : relancé",
+          "Nexo partout s'est fermé : relancé",
+          "Nexo partout s'est fermé : relancé",
+          "Nexo partout s'est fermé : relancé",
         ]),
         now: now,
       );

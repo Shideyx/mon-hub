@@ -1,4 +1,4 @@
-// Smily a **sa vie à lui** (v1.57) : il garde son look de curseur, mais il
+// Nexo a **sa vie à lui** (v1.57) : il garde son look de curseur, mais il
 // vit à côté de toi et le montre avec des émojis. Il a sommeil le soir, il
 // s'endort dans son coin quand tu pars (et se réveille en sursaut), il rêve
 // et te raconte ses rêves, il porte de petits « accessoires » selon la vraie
@@ -19,7 +19,7 @@ import 'package:flutter/foundation.dart';
 
 import 'tutor.dart' show normalize;
 
-/// Ce que Smily vit en ce moment (émoji, accessoire, sommeil, danse).
+/// Ce que Nexo vit en ce moment (émoji, accessoire, sommeil, danse).
 class ClickyLife extends ChangeNotifier {
   ClickyLife({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
   static final instance = ClickyLife();
@@ -324,7 +324,7 @@ class ClickyLife extends ChangeNotifier {
       'J\'ai rêvé que ta souris s\'était transformée en vraie souris et qu\'elle me courait après. Je me suis réveillé en sursaut.',
       'J\'ai rêvé qu\'on faisait la course, ton curseur et moi. J\'ai gagné, évidemment.',
       'J\'ai rêvé que je devenais un fond d\'écran. C\'était reposant, mais on s\'ennuie vite.',
-      'J\'ai rêvé qu\'il pleuvait des petits smileys. Ils voulaient tous que je leur montre où cliquer.',
+      'J\'ai rêvé qu\'il pleuvait des petits curseurs. Ils voulaient tous que je leur montre où cliquer.',
       'J\'ai rêvé que la touche Échap avait disparu du clavier. Personne ne pouvait plus s\'enfuir de rien.',
     ];
     return ideas[r.nextInt(ideas.length)];
@@ -338,7 +338,7 @@ class ClickyLife extends ChangeNotifier {
       if (artist.isNotEmpty) 'il·elle écoutait $artist',
       if (memory.isNotEmpty) 'il·elle t\'a dit : « $memory »',
     ];
-    return 'Tu es Smily, un petit smiley vivant sur le PC de $who. Tu viens de te réveiller. '
+    return 'Tu es Nexo, un curseur lumineux vivant sur le PC de $who. Tu viens de te réveiller. '
         'Raconte en une ou deux phrases courtes (160 caractères au plus), à la première personne, au passé, un rêve '
         'drôle et un peu absurde que tu as fait${hints.isEmpty ? '' : ', inspiré de ceci : ${hints.join(' ; ')}'}. '
         'Commence par « J\'ai rêvé ». Pas d\'émoji, pas de guillemets autour, rien d\'autre que le rêve.';
@@ -361,9 +361,9 @@ class ClickyLife extends ChangeNotifier {
     Future<void> Function(bool dance)? setDance,
   }) {
     var n = normalize(said)
-        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '')
         .trim();
-    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile)$'), '').trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile)$'), '').trim();
     if (RegExp(r'^(?:tu dors|tu dormais|t es reveille|tu es reveille|reveille toi|debout)$').hasMatch(n)) {
       return asleep || now.difference(_wokeHint ?? DateTime(2000)).inMinutes < 2
           ? 'Hein ? Non non… je reposais juste mes pixels. Je suis là !'
@@ -373,7 +373,7 @@ class ClickyLife extends ChangeNotifier {
       final h = lastSleep.inMinutes;
       if (h < 20) return 'Pas vraiment dormi : tu étais là tout le temps. Mais je ne me plains pas !';
       final d = h >= 60 ? '${h ~/ 60} h${h % 60 == 0 ? '' : ' ${(h % 60).toString().padLeft(2, '0')}'}' : '$h minutes';
-      return 'Comme un bébé smiley : $d dans mon coin, en bas de l\'écran. Et toi ?';
+      return 'Comme un bébé curseur : $d dans mon coin, en bas de l\'écran. Et toi ?';
     }
     if (RegExp(
       r'^(?:tu as|t as|as tu) reve(?: de quoi| cette nuit)?$|^(?:tu as reve|t as reve) de quoi$|^raconte(?: moi)? ton reve$|^c etait quoi ton reve$',
@@ -444,9 +444,9 @@ class ClickyLife extends ChangeNotifier {
   /// accents, en minuscules), ou null.
   static String? cityFrom(String said) {
     var n = normalize(said)
-        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|simile) ?'), '')
+        .replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|alors) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '')
         .trim();
-    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|simile|stp|svp|merci)$'), '').trim();
+    n = n.replaceFirst(RegExp(r' (?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile|stp|svp|merci)$'), '').trim();
     final m = RegExp(
       r'^(?:j habite|je vis|je reside|moi j habite) (?:a|au|aux|en|sur) (.{2,40})$|^ma ville (?:c est |est |s appelle )?(.{2,40})$',
     ).firstMatch(n);

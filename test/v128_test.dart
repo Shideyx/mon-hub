@@ -16,7 +16,7 @@ import 'package:hub/ui/clicky/voice.dart';
 import 'package:hub/ui/clicky/whisper.dart';
 
 void main() {
-  group('Smily agit', () {
+  group('Nexo agit', () {
     test('lit une action, même entourée de texte', () {
       final s = ActStep.parse(
         'Voilà : {"pense":"Je clique sur la barre","action":"clic","x":640,"y":52,"libelle":"Rechercher"} ok',
@@ -98,7 +98,7 @@ void main() {
             {
               'content': {
                 'parts': [
-                  {'text': 'Bonjour Smily '},
+                  {'text': 'Bonjour Nexo '},
                 ],
               },
             },
@@ -107,7 +107,7 @@ void main() {
         200,
       );
     });
-    expect(await GeminiTranscriber.transcribe(wav.path, 'cle', client: client), 'Bonjour Smily');
+    expect(await GeminiTranscriber.transcribe(wav.path, 'cle', client: client), 'Bonjour Nexo');
   });
 
   test('espaces de travail École Directe', () {

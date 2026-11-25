@@ -91,7 +91,7 @@ void main() {
 
   test('heure, date, politesse', () async {
     expect(await ask('Quelle heure est-il ?'), 'Il est 18 h 05.');
-    expect(await ask('Smily, on est quel jour aujourd\'hui ?'), 'Nous sommes mardi 17 novembre 2026.');
+    expect(await ask('Nexo, on est quel jour aujourd\'hui ?'), 'Nous sommes mardi 17 novembre 2026.');
     expect(await ask('merci !'), 'Avec plaisir !');
   });
 

@@ -4,7 +4,7 @@ import 'package:hub/ui/clicky/smily.dart';
 import 'package:hub/ui/clicky/wake.dart';
 
 void main() {
-  group('Le smiley de Smily', () {
+  group('Le smiley de Nexo', () {
     test('au repos, il est tranquille', () {
       expect(SmilyRules.moodFor(doing: AliveMood.idle), SmilyMood.calm);
       expect(SmilyMood.calm.emoji, '🙂');
@@ -50,7 +50,7 @@ void main() {
   });
 
   group('On l\'appelle par son nouveau nom', () {
-    test('« Smily » le réveille, avec les fautes d\'écoute courantes', () {
+    test('« Nexo » le réveille, avec les fautes d\'écoute courantes', () {
       expect(WakeWord.phrases, contains('smily'));
       expect(WakeWord.phrases, contains('smiley'));
       expect(WakeWord.phrases.any((p) => p.contains('hey smily')), isTrue);

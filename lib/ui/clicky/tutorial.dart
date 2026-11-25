@@ -8,23 +8,24 @@ import '../../core/module_store.dart';
 import 'board.dart';
 import 'clicky.dart';
 import 'hud.dart';
+import 'identity.dart';
 import 'life.dart';
 import 'life_view.dart';
 import 'marks.dart';
 import 'senses_page.dart';
 import 'skills.dart';
 
-/// **La visite guidée** de Smily : montrée à la création du compte et une
+/// **La visite guidée** de Nexo : montrée à la création du compte et une
 /// fois après une grosse mise à jour (nouvelle clé [_seenKey]). Chaque page
 /// présente un thème en animation, avec des phrases qu'on peut **essayer
-/// tout de suite** (Smily répond par-dessus la visite).
+/// tout de suite** (Nexo répond par-dessus la visite).
 class ClickyTutorial extends StatefulWidget {
   const ClickyTutorial({super.key, this.onBrain, this.onTry});
 
-  /// « Choisir son cerveau » (réglages de Claude et Smily).
+  /// « Choisir son cerveau » (réglages de Claude et Nexo).
   final VoidCallback? onBrain;
 
-  /// Essayer une phrase (par défaut : Smily la reçoit).
+  /// Essayer une phrase (par défaut : Nexo la reçoit).
   final void Function(String phrase)? onTry;
 
   static const _seenKey = 'tutorial.v159';
@@ -51,14 +52,14 @@ class ClickyTutorial extends StatefulWidget {
   /// Le texte de chaque page (testable).
   static const tour = <TourPage>[
     TourPage(
-      'Salut, moi c\'est Smily',
+      'Salut, moi c\'est Nexo',
       'Ton assistant personnel, façon JARVIS. Je vis à côté de ta souris, sur tout ton PC. Je vois, j\'entends, je parle, '
           'je montre, j\'explique… et je fais des trucs à ta place. Voilà tout ce que je sais faire.',
     ),
     TourPage(
       'Parle-moi',
       'Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris. Ou active le mot d\'activation et dis '
-          'simplement « Smily ». Après ma réponse, enchaîne : je t\'écoute encore un peu.',
+          'simplement « Nexo ». Après ma réponse, enchaîne : je t\'écoute encore un peu.',
       examples: ['Fais le point', 'Qu\'est-ce que j\'ai demain ?'],
     ),
     TourPage(
@@ -358,7 +359,7 @@ class _Page extends StatelessWidget {
                 for (final e in page.examples)
                   ActionChip(
                     avatar: const Icon(Icons.play_arrow_rounded, size: 18, color: hudCyan),
-                    backgroundColor: const Color(0xFF12263A),
+                    backgroundColor: const Color(0xFF221A3D),
                     side: BorderSide(color: hudCyan.withValues(alpha: 0.5)),
                     label: Text('« $e »', style: const TextStyle(color: Colors.white)),
                     onPressed: () => onTry(e),
@@ -449,7 +450,10 @@ class _BootVisual extends StatelessWidget {
         _Ticker(
           builder: (t) => CustomPaint(size: const Size(280, 280), painter: _RingsPainter(t)),
         ),
-        HudReactor(mode: small ? HudMode.speaking : HudMode.thinking, size: 120),
+        Transform.translate(
+          offset: const Offset(18, 10),
+          child: NexoPointer(mode: small ? NexoMode.speaking : NexoMode.thinking, size: 96),
+        ),
       ],
     ),
   );
@@ -527,7 +531,7 @@ class _KeysVisual extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         transform: Matrix4.translationValues(0, down ? 4 : 0, 0),
         decoration: BoxDecoration(
-          color: down ? hudCyan.withValues(alpha: 0.25) : const Color(0xFF12263A),
+          color: down ? hudCyan.withValues(alpha: 0.25) : const Color(0xFF221A3D),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: hudCyan.withValues(alpha: down ? 1 : 0.4)),
           boxShadow: down ? [BoxShadow(color: hudCyan.withValues(alpha: 0.5), blurRadius: 18)] : null,
@@ -550,10 +554,14 @@ class _KeysVisual extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          HudReactor(mode: down ? HudMode.listening : HudMode.idle, levels: levels, size: 90),
+          NexoPointer(
+            mode: down ? NexoMode.listening : NexoMode.idle,
+            level: levels.reduce(math.max),
+            size: 72,
+          ),
           const SizedBox(height: 16),
           Text(
-            down ? '« Smily, explique-moi cet exercice »' : '…',
+            down ? '« Nexo, explique-moi cet exercice »' : '…',
             style: const TextStyle(color: hudCyan, fontSize: 16, fontStyle: FontStyle.italic),
           ),
         ],
@@ -562,7 +570,7 @@ class _KeysVisual extends StatelessWidget {
   );
 }
 
-/// Un faux écran : le curseur vole vers le bouton, Smily entoure et fléche.
+/// Un faux écran : le curseur vole vers le bouton, Nexo entoure et fléche.
 class _PointVisual extends StatelessWidget {
   const _PointVisual();
 
@@ -617,9 +625,9 @@ class _PointVisual extends StatelessWidget {
                 ),
               ),
             Positioned(
-              left: pos.dx - 17,
-              top: pos.dy - 17,
-              child: HudReactor(mode: fly >= 1 ? HudMode.pointing : HudMode.thinking, size: 34),
+              left: pos.dx,
+              top: pos.dy,
+              child: NexoPointer(mode: fly >= 1 ? NexoMode.acting : NexoMode.thinking, size: 30),
             ),
           ],
         );
@@ -670,7 +678,7 @@ class _Panel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: const BoxDecoration(
-              color: Color(0xFF12263A),
+              color: Color(0xFF221A3D),
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Text(
@@ -939,7 +947,7 @@ class _WatchVisual extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF12263A),
+                    color: const Color(0xFF221A3D),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -1004,7 +1012,7 @@ class _LifeGridVisual extends StatelessWidget {
               width: 104,
               height: 92,
               decoration: BoxDecoration(
-                color: const Color(0xFF12263A),
+                color: const Color(0xFF221A3D),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: hudCyan.withValues(alpha: 0.3)),
               ),
@@ -1026,7 +1034,7 @@ class _LifeGridVisual extends StatelessWidget {
   );
 }
 
-/// Smily vivant : le vrai curseur avec ses émojis qui changent.
+/// Nexo vivant : le vrai curseur avec ses émojis qui changent.
 class _AliveVisual extends StatefulWidget {
   const _AliveVisual();
 
@@ -1117,7 +1125,7 @@ class _AliveVisualState extends State<_AliveVisual> {
   );
 }
 
-/// Le curseur bleu de Smily.
+/// Le curseur bleu de Nexo.
 class _CursorPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size s) {

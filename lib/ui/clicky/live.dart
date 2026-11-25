@@ -10,7 +10,7 @@ import '../../core/token_budget.dart';
 
 /// Gemini Live : la conversation **en direct**, comme le JARVIS « Mark LII »
 /// (Gemini Live API). Le micro part vers Gemini pendant que tu parles, et la
-/// réponse revient directement en voix, morceau par morceau : Smily répond
+/// réponse revient directement en voix, morceau par morceau : Nexo répond
 /// au tac au tac, sans attendre une transcription, une IA, puis une voix.
 ///
 /// Une connexion (WebSocket) reste ouverte entre deux questions : pas de
@@ -24,13 +24,18 @@ class GeminiLive {
     this.extraDeclarations = const [],
     this.language = 'fr-FR',
     this.autoVad = false,
+    this.mediaResolution,
   });
+
+  /// Qualité des images envoyées en direct (coach de jeu) :
+  /// `MEDIA_RESOLUTION_LOW` = peu de jetons par image. null : par défaut.
+  final String? mediaResolution;
 
   /// Langue de la voix (null : Gemini choisit, ex. pour l'interprète).
   final String? language;
 
   /// true : Gemini repère tout seul quand on commence et finit de parler
-  /// (conversation continue, interprète) ; false : Smily le lui dit.
+  /// (conversation continue, interprète) ; false : Nexo le lui dit.
   final bool autoVad;
 
   final String key;
@@ -141,6 +146,7 @@ class GeminiLive {
           },
           'languageCode': ?language,
         },
+        'mediaResolution': ?mediaResolution,
       },
       'systemInstruction': {
         'parts': [
@@ -153,7 +159,7 @@ class GeminiLive {
             'functionDeclarations': [for (final t in tools) declaration(t), ...extraDeclarations],
           },
         ],
-      // Smily dit lui-même quand tu commences et finis de parler
+      // Nexo dit lui-même quand tu commences et finis de parler
       // (Ctrl + Alt, ou silence) : la réponse part dès que tu lâches.
       if (!autoVad)
         'realtimeInputConfig': {
@@ -203,6 +209,14 @@ class GeminiLive {
   void sendAudio(Uint8List pcm) => _send({
     'realtimeInput': {
       'audio': {'data': base64Encode(pcm), 'mimeType': 'audio/pcm;rate=16000'},
+    },
+  });
+
+  /// Une image de l'écran, en direct (JPEG en base64) : Gemini « voit »
+  /// comme une vidéo, sans question à poser.
+  void sendVideo(String jpeg64) => _send({
+    'realtimeInput': {
+      'video': {'data': jpeg64, 'mimeType': 'image/jpeg'},
     },
   });
 

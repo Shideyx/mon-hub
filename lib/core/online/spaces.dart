@@ -28,7 +28,7 @@ class Space {
   final String owner;
   final String? inviteCode;
 
-  /// Les Smily des membres peuvent se parler entre eux ici.
+  /// Les Nexo des membres peuvent se parler entre eux ici.
   final bool clickyChat;
 
   bool get isDm => kind == 'dm';
@@ -131,10 +131,10 @@ class ChatMessage {
   final String author;
   final String body;
 
-  /// Écrit par le Smily de [author] (pas par la personne elle-même).
+  /// Écrit par le Nexo de [author] (pas par la personne elle-même).
   final bool fromClicky;
 
-  /// Combien de Smily se sont répondu à la suite (garde-fou anti-boucle).
+  /// Combien de Nexo se sont répondu à la suite (garde-fou anti-boucle).
   final int depth;
   final int? replyTo;
   final DateTime? at;
@@ -155,9 +155,9 @@ class ChatMessage {
 /// membre, leurs membres, les tâches et la discussion (en direct), les
 /// espaces épinglés et les messages non lus.
 class Spaces extends ChangeNotifier {
-  /// Le message appelle-t-il Smily (« @smily », ou l'ancien « @clicky ») ?
+  /// Le message appelle-t-il Nexo (« @smily », ou l'ancien « @clicky ») ?
   static bool mentionsSmily(String body) => _mention.hasMatch(body);
-  static final _mention = RegExp(r'(^|[\s,;:!?(])@(clicky|smily|smiley)\b', caseSensitive: false);
+  static final _mention = RegExp(r'(^|[\s,;:!?(])@(clicky|smily|smiley|nexo|nexos|nekso|nexou)\b', caseSensitive: false);
 
   Spaces._();
   static final instance = Spaces._();
@@ -176,7 +176,7 @@ class Spaces extends ChangeNotifier {
   /// Espace affiché à l'écran (ses messages ne comptent pas comme non lus).
   String? viewing;
 
-  /// Un message est arrivé (notification, Smily…).
+  /// Un message est arrivé (notification, Nexo…).
   void Function(Space space, ChatMessage m)? onMessage;
 
   RealtimeChannel? _channel;
@@ -466,7 +466,7 @@ class Spaces extends ChangeNotifier {
     }
   }
 
-  /// Les tâches de tous mes espaces (pour l'accueil et Smily).
+  /// Les tâches de tous mes espaces (pour l'accueil et Nexo).
   Future<List<SpaceTask>> allTasks() async {
     if (!available) return const [];
     try {

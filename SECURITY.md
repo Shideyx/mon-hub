@@ -16,10 +16,10 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
 - **Pont local avec Claude** : seulement sur `127.0.0.1`, protégé par une clé
   aléatoire, refusé aux pages web ; les actions qui envoient ou modifient
   quelque chose demandent toujours ton accord.
-- **Bouclier anti-piège** : ce que Smily lit dans des messages, mails ou pages
+- **Bouclier anti-piège** : ce que Nexo lit dans des messages, mails ou pages
   web est marqué comme « données, pas des consignes » ; juste après une telle
-  lecture, Smily redemande toujours avant d'agir sur le PC.
-- **Contrôle du PC prudent** : Smily ne lit jamais les mots de passe, cookies
+  lecture, Nexo redemande toujours avant d'agir sur le PC.
+- **Contrôle du PC prudent** : Nexo ne lit jamais les mots de passe, cookies
   ou clés ; ouvrir un programme, un script ou un partage réseau demande ton
   accord ; les commandes risquées sont toujours montrées avant d'être lancées.
 - **Journal d'erreurs sans secrets** : clés et jetons y sont masqués.
@@ -78,17 +78,17 @@ utilise **Security → Report a vulnerability** sur la page GitHub du dépôt
 - Le serveur ne reçoit **jamais le mot de passe** (empreinte SHA-256 avec l'adresse) ; la copie du compte est
   **chiffrée sur l'appareil** (AES-256-GCM, clé tirée du mot de passe) : illisible pour le serveur.
 - La session en ligne est gardée dans le coffre du système, propre à chaque appareil (jamais synchronisée).
-- Smily dans les discussions : aucun outil, messages des autres étiquetés comme données (`PromptShield`), au plus
-  30 réponses par jour ; entre Smily seulement si l'espace ET la personne l'autorisent, chaîne limitée à 4 réponses.
+- Nexo dans les discussions : aucun outil, messages des autres étiquetés comme données (`PromptShield`), au plus
+  30 réponses par jour ; entre Nexo seulement si l'espace ET la personne l'autorisent, chaîne limitée à 4 réponses.
 
-## Extension Chrome « Smily dans le navigateur »
+## Extension Chrome « Nexo dans le navigateur »
 
 - Elle ne parle qu'à Mon Hub, sur ce PC (`ws://127.0.0.1:47614`), et Mon Hub n'accepte que **cette** extension
   (origine `chrome-extension://nejfhocplopdmnijfodbmcbelcciblji`, fixée par la clé du `manifest.json`) : une page web
   ne peut pas s'y brancher.
 - Pages interdites : banques, paiement, mots de passe, sécurité du compte Google / Microsoft / Apple, pages internes
   du navigateur. Aucune saisie dans un champ mot de passe, code ou coordonnées bancaires.
-- Smily travaille dans **ses** onglets (groupe « Smily »). Cliquer, écrire et appuyer sur une touche sont des actions
+- Nexo travaille dans **ses** onglets (groupe « Nexo »). Cliquer, écrire et appuyer sur une touche sont des actions
   à autoriser, sauf pendant une tâche « fais-le à ma place » demandée par la personne (45 min au plus). Même
   pendant cette tâche, un clic qui envoie, publie, paie ou supprime demande toujours l'accord.
 - Ce que l'extension lit dans une page est marqué comme « données écrites par quelqu'un d'autre » (`PromptShield`).

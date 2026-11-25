@@ -19,7 +19,7 @@ class Repair {
   /// Ce que la personne lira : « Ton micro était bloqué ».
   final String title;
 
-  /// Ce que Smily a fait, dit simplement : « je l'ai relancé ».
+  /// Ce que Nexo a fait, dit simplement : « je l'ai relancé ».
   final String fixed;
 
   /// L'action de Mon Hub à lancer (null : réparé ici même).
@@ -103,12 +103,12 @@ class RepairRules {
       );
     }
 
-    // Smily partout se ferme en boucle : il reste dans la fenêtre.
-    if (!light && _count(lines, RegExp(r"Smily partout s'est ferm", caseSensitive: false)) >= 3) {
+    // Nexo partout se ferme en boucle : il reste dans la fenêtre.
+    if (!light && _count(lines, RegExp(r"Nexo partout s'est ferm", caseSensitive: false)) >= 3) {
       out.add(
         const Repair(
           id: 'clicky-partout',
-          title: 'Smily partout n\'arrivait pas à tenir ouvert',
+          title: 'Nexo partout n\'arrivait pas à tenir ouvert',
           fixed: 'je l\'ai ramené dans la fenêtre de Mon Hub (mode léger)',
         ),
       );
@@ -141,7 +141,7 @@ class RepairRules {
     return out;
   }
 
-  /// Ce que Smily dit après s'être réparé.
+  /// Ce que Nexo dit après s'être réparé.
   static String say(List<Repair> done) {
     if (done.isEmpty) return 'Tout va bien, je n\'ai rien eu à réparer.';
     if (done.length == 1) return '${done.first.title} : ${done.first.fixed}.';
@@ -149,11 +149,11 @@ class RepairRules {
   }
 }
 
-/// **Smily se répare tout seul.**
+/// **Nexo se répare tout seul.**
 ///
 /// Il relit son journal d'erreurs (qui ne quitte jamais le PC), repère les
 /// pannes qu'il sait corriger, et les corrige : micro bloqué, certificats
-/// cassés, appli qui fige, Smily partout qui n'arrive pas à tenir, disque
+/// cassés, appli qui fige, Nexo partout qui n'arrive pas à tenir, disque
 /// plein, fichier de données abîmé.
 ///
 /// Il ne supprime jamais rien, et il dit toujours ce qu'il a fait.
@@ -220,7 +220,7 @@ class SelfRepair {
     lastRun = DateTime.now();
     lastDone = done;
     if (done.isNotEmpty) {
-      tell?.call('🔧 Smily s\'est réparé tout seul', RepairRules.say(done));
+      tell?.call('🔧 Nexo s\'est réparé tout seul', RepairRules.say(done));
     }
     return done;
   }

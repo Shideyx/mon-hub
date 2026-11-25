@@ -1,4 +1,4 @@
-// **Les yeux et les oreilles de Smily** (v1.58) : il voit ton écran et
+// **Les yeux et les oreilles de Nexo** (v1.58) : il voit ton écran et
 // entend le son de ton PC **en continu**, mais tout se passe sur le PC :
 // - les yeux : quand la fenêtre au premier plan change, il en lit le texte
 //   (lecture de texte de Windows, sans internet) ;
@@ -855,7 +855,7 @@ class ClickySenses extends ChangeNotifier {
     encode: (v) => v,
   );
 
-  /// Ce qu'il voit et entend en ce moment, pour Smily partout (petit
+  /// Ce qu'il voit et entend en ce moment, pour Nexo partout (petit
   /// fichier, réécrit toutes les minutes).
   Future<void> _writeRecent(DateTime n) async {
     String cut(String s, int max) => s.length > max ? '${s.substring(0, max)}…' : s;
@@ -902,13 +902,13 @@ class ClickySenses extends ChangeNotifier {
 
   // --------------------------------------------------------------- Outils
 
-  /// Les actions de Smily sur sa mémoire et ses sens. [explain] : il
+  /// Les actions de Nexo sur sa mémoire et ses sens. [explain] : il
   /// ouvre sa boîte et répond sur ce qu'il y a à l'écran.
   List<HubTool> tools({required void Function(String question) explain}) => [
     HubTool(
       name: 'memoire_ecran',
       description:
-          'La mémoire de l\'écran (« tu te souviens ? ») : ce que Smily a vu à l\'écran et entendu dans les vidéos ces 7 '
+          'La mémoire de l\'écran (« tu te souviens ? ») : ce que Nexo a vu à l\'écran et entendu dans les vidéos ces 7 '
           'derniers jours. texte = ce qu\'on cherche (« le site sur les volcans ») ; quand = un moment (« hier vers 16 h », '
           '« mardi », « tout à l\'heure ») ; les deux peuvent se combiner.',
       params: {
@@ -926,7 +926,7 @@ class ClickySenses extends ChangeNotifier {
           return {
             'resume': screenOn || soundOn
                 ? 'Je n\'ai encore rien vu : ça se remplit au fil de ta journée.'
-                : 'Je ne regarde pas ton écran pour l\'instant (Réglages de Smily → Ses yeux et ses oreilles).',
+                : 'Je ne regarde pas ton écran pour l\'instant (Réglages de Nexo → Ses yeux et ses oreilles).',
           };
         }
         if (ScreenMemory.words(q).isEmpty && w != null) {
@@ -945,7 +945,7 @@ class ClickySenses extends ChangeNotifier {
     ),
     HubTool(
       name: 'memoire_oublier',
-      description: 'Oublie ce que Smily a vu et entendu ces N dernières minutes (0 = tout effacer).',
+      description: 'Oublie ce que Nexo a vu et entendu ces N dernières minutes (0 = tout effacer).',
       params: {'minutes': ('integer', 'Minutes à oublier (0 = tout)')},
       run: (a) async {
         final m = (a['minutes'] as num?)?.toInt() ?? 15;
@@ -959,7 +959,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'sens_etat',
       description:
-          'Ce que Smily voit et entend en ce moment (fenêtre lue, son du PC, ce qui vient d\'être dit dans la vidéo, '
+          'Ce que Nexo voit et entend en ce moment (fenêtre lue, son du PC, ce qui vient d\'être dit dans la vidéo, '
           'notes « à retenir »), et si ses yeux et ses oreilles sont allumés.',
       run: (_) async => {
         'yeux': screenOn ? (paused ? 'en pause' : 'allumés') : 'éteints',
@@ -973,7 +973,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'sens_regler',
       description:
-          'Allume ou éteint les yeux (voir l\'écran en continu) et les oreilles (entendre le son du PC) de Smily, ou les '
+          'Allume ou éteint les yeux (voir l\'écran en continu) et les oreilles (entendre le son du PC) de Nexo, ou les '
           'met en pause.',
       params: {
         'ecran': ('boolean', 'Voir l\'écran en continu'),
@@ -995,7 +995,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'clicky_habitudes',
       description:
-          'Ce que Smily a remarqué sur tes habitudes (temps d\'écran par heure, sur ce PC) : « le mercredi vers 14 h, c\'est '
+          'Ce que Nexo a remarqué sur tes habitudes (temps d\'écran par heure, sur ce PC) : « le mercredi vers 14 h, c\'est '
           'Roblox », ton heure la plus active, l\'heure où tu quittes le PC le soir, ton appli n° 1.',
       run: (_) async {
         final st = ScreenTime.instance;
@@ -1013,7 +1013,7 @@ class ClickySenses extends ChangeNotifier {
     HubTool(
       name: 'clicky_expliquer_ecran',
       description:
-          'Smily ouvre sa boîte, regarde l\'écran et répond à une question dessus (« explique cette erreur »).',
+          'Nexo ouvre sa boîte, regarde l\'écran et répond à une question dessus (« explique cette erreur »).',
       params: {'question': ('string', 'La question sur l\'écran')},
       run: (a) async {
         final q = '${a['question'] ?? ''}'.trim();

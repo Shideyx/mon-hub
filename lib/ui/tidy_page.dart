@@ -169,9 +169,9 @@ class _TidyPageState extends State<TidyPage> {
                 SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    'Smily range tes fichiers en vrac dans des dossiers (Images, PDF, Programmes, Cours/Maths…). '
+                    'Nexo range tes fichiers en vrac dans des dossiers (Images, PDF, Programmes, Cours/Maths…). '
                     'Tu vois tout avant, rien n\'est supprimé, et tu peux annuler. Tu peux aussi lui dire : '
-                    '« Smily, range mes téléchargements ».',
+                    '« Nexo, range mes téléchargements ».',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -220,7 +220,7 @@ class _TidyPageState extends State<TidyPage> {
               spacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('Connecte ton compte Google pour que Smily range ton Drive.'),
+                const Text('Connecte ton compte Google pour que Nexo range ton Drive.'),
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.login_rounded),
                   label: Text(GoogleAuth.available ? 'Connecter Google' : 'Activer la connexion Google'),

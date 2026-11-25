@@ -240,7 +240,7 @@ class _MockExamPageState extends State<MockExamPage> {
       advice = '';
     });
     try {
-      if (!await AiText.available()) throw 'Il faut une IA : ta clé Gemini gratuite ou Claude (Réglages de Smily).';
+      if (!await AiText.available()) throw 'Il faut une IA : ta clé Gemini gratuite ou Claude (Réglages de Nexo).';
       final e = MockExam.parse(
         await AiText.ask(MockExam.prompt(widget.subject, widget.material), system: MockExam.system),
       );

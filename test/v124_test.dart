@@ -58,13 +58,13 @@ void main() {
     expect(HoloScene.strip('a [HOLO]{"titre"'), 'a');
   });
 
-  test('Smily vivant : petits mouvements bornés', () {
+  test('Nexo vivant : petits mouvements bornés', () {
     for (var t = 0.0; t < 30; t += 0.37) {
       final o = aliveOffset(t);
       expect(o.dx.abs(), lessThan(20));
       expect(o.dy.abs(), lessThan(20));
     }
-    expect(parseCommand('Smily, protocole travail'), (ClickyCommand.protocol, 'travail'));
+    expect(parseCommand('Nexo, protocole travail'), (ClickyCommand.protocol, 'travail'));
     expect(Routine.templates().map((r) => r.name), contains('Bilan du soir'));
   });
 

@@ -15,7 +15,7 @@ import 'phone_bridge.dart';
 import 'web_smily.dart';
 
 /// **Mon Hub sur le téléphone** (version web, à mettre sur l'écran d'accueil
-/// de l'iPhone) : Smily qui agit sur le téléphone, les espaces et messages du
+/// de l'iPhone) : Nexo qui agit sur le téléphone, les espaces et messages du
 /// compte en ligne, le même compte que le PC.
 class WebApp extends StatelessWidget {
   const WebApp({super.key});
@@ -114,7 +114,7 @@ class _WelcomePageState extends State<WelcomePage> {
               const Center(child: Text('🙂', style: TextStyle(fontSize: 72))),
               const SizedBox(height: 8),
               Text(
-                'Salut ! Je suis Smily.',
+                'Salut ! Je suis Nexo.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
@@ -197,7 +197,7 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 }
 
-/// Colle le code du PC (MONHUB-TEL: ou le lien). Renvoie ce qu'a dit Smily.
+/// Colle le code du PC (MONHUB-TEL: ou le lien). Renvoie ce qu'a dit Nexo.
 Future<String?> pasteLinkCode(BuildContext context) async {
   final ctl = TextEditingController();
   try {
@@ -361,7 +361,7 @@ class _WebShellState extends State<WebShell> {
             selectedIndex: _tab,
             onDestinationSelected: (i) => setState(() => _tab = i),
             destinations: [
-              const NavigationDestination(icon: Text('🙂', style: TextStyle(fontSize: 22)), label: 'Smily'),
+              const NavigationDestination(icon: Text('🙂', style: TextStyle(fontSize: 22)), label: 'Nexo'),
               NavigationDestination(
                 icon: Badge(
                   isLabelVisible: unread > 0,
@@ -400,7 +400,7 @@ class _WebShellState extends State<WebShell> {
   );
 }
 
-// ------------------------------------------------------------------ Smily
+// ------------------------------------------------------------------ Nexo
 
 class ChatTab extends StatefulWidget {
   const ChatTab({super.key});
@@ -462,7 +462,7 @@ class _ChatTabState extends State<ChatTab> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _smily.name.isEmpty ? 'Smily' : 'Salut ${_smily.name} !',
+                      _smily.name.isEmpty ? 'Nexo' : 'Salut ${_smily.name} !',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
@@ -527,7 +527,7 @@ class _ChatTabState extends State<ChatTab> {
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _send(),
                         decoration: const InputDecoration(
-                          hintText: 'Demande à Smily…',
+                          hintText: 'Demande à Nexo…',
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -624,7 +624,7 @@ class _PhoneTabState extends State<PhoneTab> {
     ('📅', 'Rappel dans l\'agenda', 'Rappelle-moi de prendre mon sac demain à 7 h'),
     ('🎵', 'Musique', 'Mets de la musique'),
     ('📱', 'Ouvrir une appli', 'Ouvre Spotify'),
-    ('⚡', 'Lancer un raccourci', 'Lance le raccourci Smily alarme'),
+    ('⚡', 'Lancer un raccourci', 'Lance le raccourci Nexo alarme'),
   ];
 
   @override
@@ -683,7 +683,7 @@ class _PhoneTabState extends State<PhoneTab> {
           ),
         ),
         const SizedBox(height: 12),
-        HudSectionLabel('CE QUE SMILY FAIT ICI'),
+        HudSectionLabel('CE QUE NEXO FAIT ICI'),
         const SizedBox(height: 6),
         for (final e in can)
           ListTile(
@@ -703,10 +703,10 @@ class _PhoneTabState extends State<PhoneTab> {
               const SizedBox(height: 8),
               const Text(
                 'Apple ne laisse pas une page web régler une alarme, le mode concentration ou la luminosité. '
-                'L\'appli Raccourcis, si : crée un raccourci une fois, et Smily le lance quand tu le demandes.\n\n'
-                'Exemple « Smily alarme » : Raccourcis → + → Ajouter une action → « Créer une alarme » → touche '
-                'l\'heure → « Entrée du raccourci ». Renomme-le « Smily alarme ». Ensuite : « lance le raccourci '
-                'Smily alarme ».\n\n'
+                'L\'appli Raccourcis, si : crée un raccourci une fois, et Nexo le lance quand tu le demandes.\n\n'
+                'Exemple « Nexo alarme » : Raccourcis → + → Ajouter une action → « Créer une alarme » → touche '
+                'l\'heure → « Entrée du raccourci ». Renomme-le « Nexo alarme ». Ensuite : « lance le raccourci '
+                'Nexo alarme ».\n\n'
                 'Ça marche avec n\'importe quel raccourci : « Mode nuit », « Je rentre », « Lampe »…',
               ),
               const SizedBox(height: 10),
@@ -810,7 +810,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             ListTile(
               leading: const Icon(Icons.psychology_rounded),
-              title: const Text('Le cerveau de Smily'),
+              title: const Text('Le cerveau de Nexo'),
               subtitle: Text(
                 _smily.hasBrain ? 'Prêt (Gemini)' : 'Pas encore : relie ton PC ou mets une clé Gemini',
               ),
@@ -848,7 +848,7 @@ class _SettingsTabState extends State<SettingsTab> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  'Dis à Smily « le numéro de maman c\'est 06… » : il s\'en souviendra pour appeler ou écrire.',
+                  'Dis à Nexo « le numéro de maman c\'est 06… » : il s\'en souviendra pour appeler ou écrire.',
                   style: TextStyle(color: c.muted),
                 ),
               ),
@@ -866,7 +866,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 ),
               ),
             const SizedBox(height: 12),
-            HudSectionLabel('CE QUE SMILY SAIT DE TOI (${_smily.memories.length})'),
+            HudSectionLabel('CE QUE NEXO SAIT DE TOI (${_smily.memories.length})'),
             for (var i = 0; i < _smily.memories.length; i++)
               ListTile(
                 dense: true,

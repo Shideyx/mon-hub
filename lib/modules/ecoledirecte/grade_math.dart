@@ -145,7 +145,7 @@ class GradeMath {
     return r == r.roundToDouble() ? '${r.round()}' : r.toStringAsFixed(1).replaceAll('.', ',');
   }
 
-  /// Ce que Smily dit pour « il me faut combien en maths pour avoir 14 ? ».
+  /// Ce que Nexo dit pour « il me faut combien en maths pour avoir 14 ? ».
   static String sayNeeded(String subject, List<EdGrade> grades, double target, {double coef = 1, double outOf = 20}) {
     final avg = average(grades);
     final n = needed(grades, target, coef: coef, outOf: outOf);

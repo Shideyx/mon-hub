@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'hub_files.dart';
 
-/// Un moment vu (ou entendu) par Smily : la fenêtre, et le texte qu'il y
+/// Un moment vu (ou entendu) par Nexo : la fenêtre, et le texte qu'il y
 /// a lu (ou ce qui a été dit dans la vidéo).
 class ScreenMoment {
   ScreenMoment({
@@ -68,7 +68,7 @@ class MemoryHit {
   };
 }
 
-/// **La mémoire de l'écran** (« Tu te souviens ? ») : ce que Smily a vu à
+/// **La mémoire de l'écran** (« Tu te souviens ? ») : ce que Nexo a vu à
 /// l'écran (les fenêtres, et le texte lu sur le PC) et entendu (le son des
 /// vidéos), pendant 7 jours. **Seulement sur ce PC**, chiffré, jamais
 /// synchronisé ni envoyé ; jamais tes messageries, ta banque, tes mots de

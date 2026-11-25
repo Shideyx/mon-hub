@@ -13,7 +13,7 @@ import '../../core/online/spaces.dart';
 import '../hud/hud.dart';
 
 /// Réglages → **Compte en ligne** : le serveur (ton projet Supabase), ton
-/// compte (même compte sur tous tes appareils), ton profil et Smily.
+/// compte (même compte sur tous tes appareils), ton profil et Nexo.
 class OnlinePage extends StatefulWidget {
   const OnlinePage({super.key});
 
@@ -134,7 +134,7 @@ class _OnlinePageState extends State<OnlinePage> {
                       const SizedBox(height: 16),
                       Text(
                         'Vie privée : la copie de ton compte est chiffrée sur ton appareil avec ton mot de passe — le '
-                        'serveur ne peut pas la lire, et ne reçoit jamais ton mot de passe. Ce que Smily voit à l\'écran, '
+                        'serveur ne peut pas la lire, et ne reçoit jamais ton mot de passe. Ce que Nexo voit à l\'écran, '
                         'ton temps d\'écran et tes guetteurs restent sur ton PC. Seul ce que tu mets dans un espace '
                         'partagé est visible par ses membres.',
                         style: TextStyle(color: c.dim, fontSize: 12, height: 1.45),
@@ -463,10 +463,10 @@ class _OnlinePageState extends State<OnlinePage> {
               await ClickyChat.setWithOthers(v);
               if (mounted) setState(() {});
             },
-            title: const Text('Mon Smily peut parler avec les Smily des autres'),
+            title: const Text('Mon Nexo peut parler avec les Nexo des autres'),
             subtitle: Text(
               'Dans les espaces qui l\'autorisent. Il ne fait aucune action et ne dit rien de privé ; au plus '
-              '${ClickyChat.perDay} réponses par jour. « @clicky … » dans tes messages : ton Smily répond toujours.',
+              '${ClickyChat.perDay} réponses par jour. « @clicky … » dans tes messages : ton Nexo répond toujours.',
               style: TextStyle(color: c.muted, fontSize: 12),
             ),
           ),

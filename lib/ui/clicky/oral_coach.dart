@@ -209,7 +209,7 @@ class OralCoach {
   }
 
   /// Analyse une répétition : Gemini écoute l'audio (meilleur), sinon
-  /// transcription (Whisper) puis le cerveau de Smily lit le texte.
+  /// transcription (Whisper) puis le cerveau de Nexo lit le texte.
   static Future<OralReport> analyze({
     required String wav,
     required String subject,
@@ -570,7 +570,7 @@ class _OralCoachPageState extends State<OralCoachPage> {
                 if (r.questions.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text('🧑‍⚖️ Les questions du jury', style: theme.textTheme.titleMedium),
-                  const Text('Smily lit la question, tu réponds à voix haute, il te dit ce qu\'il en pense.'),
+                  const Text('Nexo lit la question, tu réponds à voix haute, il te dit ce qu\'il en pense.'),
                   for (var i = 0; i < r.questions.length; i++)
                     Card(
                       color: _question == i ? theme.colorScheme.primaryContainer : null,

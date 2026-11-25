@@ -71,7 +71,7 @@ void main() {
       expect(setup.containsKey('realtimeInputConfig'), isFalse);
       expect(setup.containsKey('tools'), isFalse);
       expect(((setup['generationConfig'] as Map)['speechConfig'] as Map).containsKey('languageCode'), isFalse);
-      // Smily garde ses réglages habituels.
+      // Nexo garde ses réglages habituels.
       final clicky = GeminiLive(key: 'k', system: 's', tools: const []).setupMessage('m')['setup'] as Map;
       expect(clicky['realtimeInputConfig'], isNotNull);
       expect(((clicky['generationConfig'] as Map)['speechConfig'] as Map)['languageCode'], 'fr-FR');
@@ -86,7 +86,7 @@ void main() {
     });
   });
 
-  group('Smily', () {
+  group('Nexo', () {
     test('phrases sans IA', () async {
       final calls = <String>[];
       Future<Object?> fake(String name, Map<String, dynamic> a) async {

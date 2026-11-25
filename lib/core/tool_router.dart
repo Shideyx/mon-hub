@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'hub_module.dart';
 
-/// Smily économe : au lieu d'envoyer à Claude les ~90 actions de Mon Hub à
+/// Nexo économe : au lieu d'envoyer à Claude les ~90 actions de Mon Hub à
 /// chaque question (des milliers de mots relus à chaque fois), on n'envoie
 /// que celles qui servent à cette question, plus deux petites actions pour
 /// atteindre toutes les autres si besoin ([metaTools]).
@@ -421,7 +421,7 @@ class ToolRouter {
     return g;
   }
 
-  /// Toujours envoyées (petites) : Smily vérifie ce qu'il sait faire avant
+  /// Toujours envoyées (petites) : Nexo vérifie ce qu'il sait faire avant
   /// de dire « je ne sais pas ».
   static const always = {'clicky_capacites'};
 

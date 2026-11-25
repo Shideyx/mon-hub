@@ -151,7 +151,7 @@ class GameRules {
     return t[0].toUpperCase() + t.substring(1);
   }
 
-  /// Ce que Smily sait du jeu, pour les consignes de l'IA.
+  /// Ce que Nexo sait du jeu, pour les consignes de l'IA.
   static String promptLine(String game, {String summary = '', String genres = '', Duration played = Duration.zero}) {
     final b = StringBuffer('La personne joue en ce moment à **$game**');
     if (played.inMinutes >= 1) b.write(' (depuis ${played.inMinutes} min)');
@@ -207,7 +207,7 @@ class GameInfo {
   }
 }
 
-/// **Smily et tes jeux** : il reconnaît le jeu au premier plan, va lire ce
+/// **Nexo et tes jeux** : il reconnaît le jeu au premier plan, va lire ce
 /// qu'il y a à savoir dessus (fiche Steam en français, sinon Wikipédia), et
 /// s'en sert quand tu lui demandes de l'aide. Rien n'est envoyé ailleurs que
 /// ces deux sites publics (seulement le nom du jeu).
@@ -228,7 +228,7 @@ class GamePal {
     encode: (v) => v,
   );
 
-  /// Petit fichier lu par Smily partout (l'autre programme).
+  /// Petit fichier lu par Nexo partout (l'autre programme).
   final _now = JsonFile<Map<String, dynamic>>(
     'jeu-en-cours.json',
     empty: () => <String, dynamic>{},
@@ -381,7 +381,7 @@ class GamePal {
   }
 
   /// Le bloc des consignes (lu dans le petit fichier : marche aussi dans
-  /// Smily partout). Vide si on ne joue pas.
+  /// Nexo partout). Vide si on ne joue pas.
   static Future<String> promptBlock({DateTime? now}) async {
     final f = instance._now;
     try {

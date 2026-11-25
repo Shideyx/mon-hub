@@ -1,4 +1,4 @@
-// **Smily réagit à ce que tu fais sur le PC** (v1.58), sans IA :
+// **Nexo réagit à ce que tu fais sur le PC** (v1.58), sans IA :
 // - le presse-papier malin : tu copies un lien d'arnaque → il te prévient ;
 //   un calcul → le résultat ; une date → « je l'ajoute à ton agenda ? » ; un
 //   numéro de colis → le suivi ; une adresse → le plan ; un texte en anglais
@@ -36,7 +36,7 @@ import 'tutor.dart' show isSensitiveTitle;
 import 'watchers.dart' show Watchers;
 import 'win.dart';
 
-/// Ce que Smily propose pour ce que tu viens de copier.
+/// Ce que Nexo propose pour ce que tu viens de copier.
 class ClipIdea {
   const ClipIdea(this.kind, this.say, {this.tool, this.args = const {}, this.warn = false});
 
@@ -300,7 +300,7 @@ class PcWatch {
     _pending.clear();
   }
 
-  /// Smily écrit lui-même dans le presse-papier : on ne réagit pas.
+  /// Nexo écrit lui-même dans le presse-papier : on ne réagit pas.
   void ignoreClipboard([Duration d = const Duration(seconds: 4)]) => _ignoreUntil = DateTime.now().add(d);
 
   static Directory? _screenshots() {
@@ -310,13 +310,13 @@ class PcWatch {
     return d.existsSync() ? d : null;
   }
 
-  /// Smily partout corrige un texte (Ctrl + Alt + C) : il copie la sélection.
+  /// Nexo partout corrige un texte (Ctrl + Alt + C) : il copie la sélection.
   static File? get _clipMarker {
     final d = ClaudeBridge.folder;
     return d == null ? null : File('$d${Platform.pathSeparator}clip-ignore');
   }
 
-  /// À appeler par Smily partout quand il utilise le presse-papier.
+  /// À appeler par Nexo partout quand il utilise le presse-papier.
   static void markClipboardUse() {
     try {
       _clipMarker?.writeAsStringSync('${DateTime.now().millisecondsSinceEpoch}');

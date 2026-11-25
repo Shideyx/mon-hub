@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/gemini_agent.dart';
 import '../../modules/claude/claude_module.dart';
 import 'assistant_view.dart';
 import 'clicky.dart';
@@ -14,10 +15,12 @@ import 'course_page.dart';
 import 'skills.dart';
 import 'tutorial.dart';
 import 'mic_test.dart';
+import 'wake.dart';
 import 'mind_page.dart';
+import 'robots_page.dart';
 import 'settings.dart';
 
-/// **Tous les réglages de Smily, au même endroit**, rangés par rubrique
+/// **Tous les réglages de Nexo, au même endroit**, rangés par rubrique
 /// (avant : éparpillés entre Réglages, le cerveau et une longue liste).
 /// En haut : l'essentiel ; puis une rubrique par sujet ; et une recherche.
 class ClickySettingsPage extends StatefulWidget {
@@ -63,7 +66,7 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
         'Bien démarrer',
         [
           _Entry(
-            'Ce que Smily sait faire',
+            'Ce que Nexo sait faire',
             'Tout ce que tu peux lui demander, par thème, avec des phrases à essayer en un clic',
             Icons.auto_awesome_rounded,
             const Color(0xFF7C5CFF),
@@ -71,7 +74,7 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
           ),
           _Entry(
             'Revoir la visite guidée',
-            'La présentation animée de Smily, avec ses nouveautés',
+            'La présentation animée de Nexo, avec ses nouveautés',
             Icons.slideshow_rounded,
             const Color(0xFF0EA5E9),
             (ctx) => ClickyTutorial.show(ctx),
@@ -100,7 +103,14 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
         'Ce qu\'il fait pour toi',
         [
           _Entry(
-            'Smily prend les devants',
+            'Ses robots',
+            'Petites automatisations sans IA ni jetons : « quand j\'ouvre Discord, coupe mon micro », les devoirs à 19 h…',
+            Icons.smart_toy_rounded,
+            const Color(0xFFE0457B),
+            (ctx) => RobotsPage.open(ctx),
+          ),
+          _Entry(
+            'Nexo prend les devants',
             'Rappels de devoirs, plan de la journée, objectifs, idées (toujours avec ton accord)',
             Icons.lightbulb_rounded,
             const Color(0xFFF59E0B),
@@ -123,7 +133,7 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
             (ctx) => CoursePage.open(ctx),
           ),
           _Entry(
-            'Smily dans le navigateur',
+            'Nexo dans le navigateur',
             'L\'extension Chrome : il utilise tes sites dans ses onglets, pendant que tu fais autre chose',
             Icons.extension_rounded,
             const Color(0xFF10B981),
@@ -173,7 +183,7 @@ class _ClickySettingsPageState extends State<ClickySettingsPage> {
     final c = ClickyController.instance;
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Réglages de Smily')),
+      appBar: AppBar(title: const Text('Réglages de Nexo')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
@@ -254,7 +264,7 @@ class _Essentials extends StatelessWidget {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.power_settings_new_rounded),
-              title: const Text('Smily activé'),
+              title: const Text('Nexo activé'),
               subtitle: const Text('Maintiens Ctrl + Alt pour parler, appui court pour écrire'),
               value: c.enabled,
               onChanged: (v) async {
@@ -266,7 +276,7 @@ class _Essentials extends StatelessWidget {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 secondary: const Icon(Icons.desktop_windows_rounded),
-                title: const Text('Smily partout'),
+                title: const Text('Nexo partout'),
                 subtitle: const Text('Au-dessus de toutes tes applis, même quand Mon Hub est réduit'),
                 value: c.everywhere,
                 onChanged: (v) async {
@@ -292,6 +302,46 @@ class _Essentials extends StatelessWidget {
               subtitle: const Text('Sinon, Ctrl + Alt ouvre la zone pour écrire'),
               value: c.mic,
               onChanged: (v) => c.setOption('mic', v),
+            ),
+            // Le réglage le plus « JARVIS » : avant, il était caché dans
+            // « Écoute et micro ».
+            if (WakeWord.supported && c.mic)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.record_voice_over_rounded),
+                title: const Text('Dis « Nexo » pour l\'appeler'),
+                subtitle: const Text(
+                  'Mains libres : « Nexo, fais le point ». Le mot est guetté sur ton PC, rien ne part avant.',
+                ),
+                value: c.wakeOn,
+                onChanged: (v) => c.setOption('wake', v),
+              ),
+            // Qui répond : Gemini (gratuit) d'abord, Claude pour les gros
+            // travaux. Avant, tout ce qui touchait à tes données partait
+            // chez Claude (trop de jetons).
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.savings_rounded),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text('Qui répond', style: Theme.of(context).textTheme.titleSmall),
+                  ),
+                ],
+              ),
+            ),
+            SegmentedButton<String>(
+              segments: [
+                for (final m in BrainRules.modes)
+                  ButtonSegment(value: m, label: Text(BrainRules.label(m).replaceAll(' (conseillé)', ''))),
+              ],
+              selected: {c.brainMode},
+              onSelectionChanged: (v) => c.setOption('economie', v.first),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 6, 0, 8),
+              child: Text(BrainRules.explain(c.brainMode), style: Theme.of(context).textTheme.bodySmall),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

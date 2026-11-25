@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'clicky.dart';
 import 'life_view.dart' show emojiFonts;
 
-/// Une chose que Smily sait faire. [tryIt] : la phrase à lui dire pour
+/// Une chose que Nexo sait faire. [tryIt] : la phrase à lui dire pour
 /// essayer (null : pas d'essai direct, par exemple un raccourci clavier).
 class Skill {
   const Skill(this.text, {this.tryIt});
@@ -23,14 +23,56 @@ class SkillGroup {
   final bool isNew;
 }
 
-/// **Tout ce que Smily sait faire**, par thème, avec des phrases à essayer.
+/// **Tout ce que Nexo sait faire**, par thème, avec des phrases à essayer.
 class ClickySkills {
   ClickySkills._();
 
   static const groups = <SkillGroup>[
+    SkillGroup('🎯', 'Nexo, ton nouveau bras droit', Color(0xFFE0457B), isNew: true, [
+      Skill(
+        'Nexo est de retour en curseur : la Pointe suit ta souris, et son noyau s\'allume quand il t\'écoute, réfléchit, '
+        'parle ou agit.',
+      ),
+      Skill('« Qui es-tu ? » : il se présente.', tryIt: 'Qui es-tu ?'),
+      Skill(
+        'Il t\'annonce tes messages dès qu\'ils arrivent : « Léa sur Discord : t\'es là ? » (Discord, Instagram, mails, '
+        'École Directe). À voix haute si tu veux : Réglages de Nexo → Annonces et topos.',
+      ),
+      Skill(
+        'Un appel Discord sonne : il te l\'annonce. Dis « décroche », « décroche en vidéo », « refuse l\'appel » ou '
+        '« raccroche ».',
+      ),
+      Skill('Au démarrage, il te salue avec la chose importante du moment (un contrôle demain, un cours…).'),
+      Skill('« Nexo, protocole travail » : il enchaîne tes actions préparées (Carnet → Protocoles).'),
+      Skill(
+        '« Coach-moi » pendant une partie : il voit ton jeu en direct (flux léger vers Gemini, gratuit) et te guide à '
+        'voix haute ; Ctrl + Alt pour lui parler, « arrête le coach » pour finir.',
+        tryIt: 'Coach-moi',
+      ),
+      Skill('Ctrl + Alt + M : coupe ou rallume ton micro partout, même en jeu. « On ne m\'entend plus » : il le répare.'),
+      Skill(
+        'Ses robots, sans IA ni jetons : « crée un robot : quand j\'ouvre Discord, coupe mon micro », « tous les jours à '
+        '19 h, j\'ai quoi à faire pour demain ». Il en propose aussi lui-même (Réglages de Nexo → Ses robots).',
+        tryIt: 'Mes robots',
+      ),
+      Skill(
+        '« Floute mon arrière-plan » : dans les appels de Mon Hub, ta pièce est floue et ton visage net (ou « floute '
+        'mon visage » pour le cacher).',
+      ),
+      Skill(
+        'Économe : Gemini (gratuit) répond à presque tout avec tes données ; Claude seulement pour les gros travaux '
+        '(Réglages de Nexo → L\'essentiel → Qui répond).',
+      ),
+      Skill(
+        'Messages Discord et Instagram en direct : tu es prévenu dès qu\'on t\'écrit (Instagram : Réglages → '
+        'Notifications → Messages Instagram en direct).',
+      ),
+      Skill('Tes connexions (Discord, Instagram, Google…) restent gardées, même quand Mon Hub se met à jour.'),
+      Skill('Une seule copie de Mon Hub à la fois : plus de notifications ni d\'assistant en double.'),
+    ]),
     SkillGroup('🗣️', 'Lui parler', Color(0xFF2B6CFF), [
       Skill('Maintiens Ctrl + Alt et parle, relâche pour envoyer. Appui court : tu écris.'),
-      Skill('Dis « Smily » (mot d\'activation, dans Réglages de Smily → Écoute et micro) : mains libres.'),
+      Skill('Dis « Nexo » (mot d\'activation, dans Réglages de Nexo → Écoute et micro) : mains libres.'),
       Skill('Après sa réponse, enchaîne directement : il t\'écoute encore quelques secondes.'),
       Skill(
         '« Réfléchis bien : pourquoi le ciel est bleu ? » pour un problème difficile',
@@ -62,9 +104,9 @@ class ClickySkills {
         'Crée un espace (exposé, classe, équipe, entreprise) et invite tes amis avec un code : tableau de tâches et discussion en direct.',
       ),
       Skill('Épingle tes espaces : ils restent en haut du menu, sur tous tes appareils.'),
-      Skill('Écris « @clicky résume la discussion » dans un espace : ton Smily répond pour tout le monde.'),
+      Skill('Écris « @clicky résume la discussion » dans un espace : ton Nexo répond pour tout le monde.'),
       Skill(
-        'Allume « Mon Smily peut parler avec les Smily des autres » (Réglages → Compte en ligne) : vos Smily se répondent.',
+        'Allume « Mon Nexo peut parler avec les Nexo des autres » (Réglages → Compte en ligne) : vos Nexo se répondent.',
       ),
       Skill('Même compte partout : sur un autre PC, un Android ou un iPhone, « Mon compte en ligne » et tout revient.'),
     ]),
@@ -244,7 +286,7 @@ class ClickySkills {
       Skill('« Montre le bureau », « Mets Chrome à gauche », « Range mes téléchargements »'),
     ]),
     SkillGroup('📱', 'Ton téléphone', Color(0xFF0EA5E9), isNew: true, [
-      Skill('Smily sur l\'iPhone sans PC : Réglages → Mes appareils → Ajouter mon iPhone → Version web (QR code).'),
+      Skill('Nexo sur l\'iPhone sans PC : Réglages → Mes appareils → Ajouter mon iPhone → Version web (QR code).'),
       Skill(
         'Là-bas il appelle, prépare tes SMS, lance un itinéraire, un minuteur, un rappel dans l\'agenda, ta '
         'musique et tes Raccourcis iPhone.',
@@ -262,7 +304,7 @@ class ClickySkills {
       Skill('« L\'anniversaire de Léa c\'est le 12 mars » : rappel la veille et le jour même, avec un message prêt'),
       Skill('« Les prochains anniversaires »', tryIt: 'Les prochains anniversaires'),
     ]),
-    SkillGroup('🐾', 'Smily vivant', Color(0xFF7C5CFF), isNew: true, [
+    SkillGroup('🐾', 'Nexo vivant', Color(0xFF7C5CFF), isNew: true, [
       Skill('Il garde son look de curseur et vit avec des émojis : 💤 il dort quand tu pars, 🥱 il bâille le soir.'),
       Skill('Il porte un accessoire selon la vraie météo et les fêtes : 🧣 ☂️ 😎 🎅 ☕'),
       Skill(
@@ -309,12 +351,12 @@ class ClickySkills {
   static int get count => groups.fold<int>(0, (a, g) => a + g.items.length);
 }
 
-/// **Ce que Smily sait faire** : tout le catalogue, par thème, avec une
+/// **Ce que Nexo sait faire** : tout le catalogue, par thème, avec une
 /// recherche ; une phrase avec ▶ se touche pour l'essayer tout de suite.
 class ClickySkillsPage extends StatefulWidget {
   const ClickySkillsPage({super.key, this.onTry});
 
-  /// Essayer une phrase (par défaut : Smily la reçoit).
+  /// Essayer une phrase (par défaut : Nexo la reçoit).
   final void Function(String phrase)? onTry;
 
   static Future<void> open(BuildContext context) =>
@@ -343,7 +385,7 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
       ClickyController.instance.askAnywhere(phrase);
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('C\'est demandé à Smily : « $phrase »'), duration: const Duration(seconds: 2)),
+      SnackBar(content: Text('C\'est demandé à Nexo : « $phrase »'), duration: const Duration(seconds: 2)),
     );
   }
 
@@ -352,7 +394,7 @@ class _ClickySkillsPageState extends State<ClickySkillsPage> {
     final theme = Theme.of(context);
     final found = ClickySkills.search(q).where((g) => only == null || g.title == only).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Ce que Smily sait faire')),
+      appBar: AppBar(title: const Text('Ce que Nexo sait faire')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),

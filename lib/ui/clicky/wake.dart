@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/powershell.dart';
 
-/// Mot d'activation (Windows) : dis « Smily » et il
+/// Mot d'activation (Windows) : dis « Nexo » et il
 /// t'écoute, sans toucher au clavier.
 ///
 /// La reconnaissance vocale de Windows ne cherche que ces quelques mots
 /// (liste fermée), sur le PC : rien n'est envoyé tant que le mot n'a pas été
-/// entendu. Elle se met en pause pendant que Smily écoute ta question.
+/// entendu. Elle se met en pause pendant que Nexo écoute ta question.
 class WakeWord {
   WakeWord(this.onWake);
   final void Function() onWake;
@@ -26,16 +26,20 @@ class WakeWord {
 
   /// Ce qui le réveille.
   static const phrases = [
+    'nexo',
+    // La reconnaissance de Windows entend parfois « nexos » ou « nekso ».
+    'nexos',
+    'nekso',
+    'hey nexo',
+    'ok nexo',
+    'dis nexo',
+    'hé nexo',
+    'salut nexo',
+    // Les anciens noms marchent encore, le temps de prendre l'habitude.
     'smily',
-    // La reconnaissance de Windows entend souvent « smiley » ou « similé ».
     'smiley',
     'similé',
     'hey smily',
-    'ok smily',
-    'dis smily',
-    'hé smily',
-    'salut smily',
-    // L'ancien nom marche encore, le temps de prendre l'habitude.
     'clicky',
     'hey clicky',
   ];
@@ -79,7 +83,7 @@ class WakeWord {
     } catch (_) {}
   }
 
-  /// Pendant que Smily écoute ou parle.
+  /// Pendant que Nexo écoute ou parle.
   void pause() {
     if (_proc == null || _paused) return;
     _paused = true;
@@ -107,7 +111,7 @@ class WakeWord {
 
   @visibleForTesting
   static const script = r'''
-param([string]$Words = 'smily')
+param([string]$Words = 'nexo')
 $ErrorActionPreference = 'Stop'
 $out = New-Object System.IO.StreamWriter([Console]::OpenStandardOutput())
 $out.AutoFlush = $true

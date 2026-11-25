@@ -10,15 +10,15 @@ import '../../core/powershell.dart';
 import '../../core/safe_open.dart';
 import '../../core/tidy.dart';
 
-/// Smily agit sur ton ordinateur quand tu le lui demandes : commandes
+/// Nexo agit sur ton ordinateur quand tu le lui demandes : commandes
 /// (PowerShell sur Windows), fichiers, applis, réglages du système.
 ///
-/// Réglage « Contrôle du PC » (module Claude → Réglages → Smily) :
+/// Réglage « Contrôle du PC » (module Claude → Réglages → Nexo) :
 /// * `ask` (par défaut) : chaque commande et chaque écriture de fichier
 ///   s'affiche et attend ton « Autoriser » ;
-/// * `auto` : Smily agit sans demander, sauf pour les commandes
+/// * `auto` : Nexo agit sans demander, sauf pour les commandes
 ///   dangereuses (formatage, suppression d'un disque, registre système…) ;
-/// * `off` : Smily ne touche pas au PC.
+/// * `off` : Nexo ne touche pas au PC.
 class PcControl {
   PcControl._();
 
@@ -34,7 +34,7 @@ class PcControl {
       toolName == 'pc_ranger' ||
       toolName == 'pc_ranger_annuler';
 
-  /// Ce que Smily sait faire sur le PC (ajouté à ses consignes).
+  /// Ce que Nexo sait faire sur le PC (ajouté à ses consignes).
   static String get guide =>
       '''
 Contrôle du PC : quand la personne te demande de FAIRE quelque chose sur son ordinateur (ouvrir ou fermer une appli, ranger, renommer, chercher ou créer des fichiers, installer un logiciel, régler le son, le Wi-Fi, le mode sombre, éteindre, redémarrer, nettoyer, voir l'espace disque…), fais-le vraiment avec les outils pc_ au lieu d'expliquer comment faire :
@@ -191,7 +191,7 @@ Fais d'abord les étapes qui lisent, puis celle qui agit. Ne supprime ou n'écra
     ).hasMatch(c);
   }
 
-  /// Fichiers que Smily ne lit **jamais** : mots de passe des navigateurs,
+  /// Fichiers que Nexo ne lit **jamais** : mots de passe des navigateurs,
   /// cookies, clés (SSH, coffres), la clé du pont de Mon Hub, les secrets de
   /// Windows… Même si on le lui demande (ou si un message piégé le lui demande).
   static bool secretPath(String path) {
@@ -355,7 +355,7 @@ $command
   static Future<Object> read(String path) async {
     final p = expand(path);
     if (secretPath(p)) {
-      throw 'Fichier protégé : Smily ne lit jamais les mots de passe, cookies, clés ou fichiers de connexion.';
+      throw 'Fichier protégé : Nexo ne lit jamais les mots de passe, cookies, clés ou fichiers de connexion.';
     }
     if (await Directory(p).exists()) {
       final items = <String>[];
@@ -387,7 +387,7 @@ $command
   static Future<String> write(String path, String content, {bool append = false}) async {
     final p = expand(path);
     if (p.isEmpty) throw 'Chemin vide.';
-    if (secretPath(p)) throw 'Fichier protégé : Smily ne modifie pas les fichiers de mots de passe ou de clés.';
+    if (secretPath(p)) throw 'Fichier protégé : Nexo ne modifie pas les fichiers de mots de passe ou de clés.';
     final f = File(p);
     await f.parent.create(recursive: true);
     await f.writeAsString(content, mode: append ? FileMode.append : FileMode.write, flush: true);

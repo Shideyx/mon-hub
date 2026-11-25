@@ -123,7 +123,7 @@ class FileViewer extends StatefulWidget {
     final kind = kindOf(name, bytes.take(16).toList());
     if (kind == FileKind.pdf) {
       if (!await AiText.hasGemini()) {
-        throw 'Pour lire un PDF, Smily a besoin de ta clé Gemini gratuite (Réglages de Smily → Voix).';
+        throw 'Pour lire un PDF, Nexo a besoin de ta clé Gemini gratuite (Réglages de Nexo → Voix).';
       }
       if (bytes.length > 15 * 1024 * 1024) throw 'Ce PDF est trop gros pour être lu par l\'IA (15 Mo au plus).';
       return AiText.ask(ask, pdf: base64Encode(bytes));

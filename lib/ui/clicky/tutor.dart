@@ -1,4 +1,4 @@
-/// Ce que Smily comprend sans demander à l'IA (commandes vocales), et les
+/// Ce que Nexo comprend sans demander à l'IA (commandes vocales), et les
 /// petits outils du « prof » : protection de la vie privée, mode code,
 /// langue de la question, lecture du petit texte (OCR).
 library;
@@ -43,7 +43,7 @@ enum ClickyCommand {
   /// « protocole travail ».
   protocol,
 
-  /// « répare le micro », « le micro ne marche pas » : Smily se répare.
+  /// « répare le micro », « le micro ne marche pas » : Nexo se répare.
   repair,
 }
 
@@ -62,8 +62,8 @@ String normalize(String s) {
 /// Reconnaît une commande. Renvoie (commande, reste de la phrase).
 (ClickyCommand, String)? parseCommand(String raw) {
   var n = normalize(raw);
-  // « Smily, … », « dis Smily … » au début.
-  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|simile) ?'), '').trim();
+  // « Nexo, … », « dis Nexo … » au début.
+  n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '').trim();
   if (n.isEmpty) return null;
   bool any(List<String> l) => l.any((p) => n == p || n == '$p s il te plait' || n == '$p merci');
   if (any([
@@ -139,7 +139,7 @@ String normalize(String s) {
   return null;
 }
 
-/// Fenêtres sensibles : Smily ne prend pas de capture quand l'une d'elles
+/// Fenêtres sensibles : Nexo ne prend pas de capture quand l'une d'elles
 /// est ouverte à l'écran (gestionnaires de mots de passe, banque…).
 bool isSensitiveTitle(String title) {
   final t = title.toLowerCase();

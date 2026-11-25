@@ -10,6 +10,8 @@ import 'online/online_page.dart';
 
 import '../core/browser.dart';
 import '../core/error_log.dart';
+import '../core/install.dart';
+import '../modules/instagram/instagram_watch.dart';
 import 'phone_link_page.dart';
 import 'account_sync_view.dart';
 import 'backup_page.dart';
@@ -159,7 +161,8 @@ class _SettingsPageState extends State<SettingsPage> {
           child: TextField(
             controller: name,
             decoration: const InputDecoration(
-              labelText: 'Ton prénom (pour le message d\'accueil)',
+              labelText: 'Ton prénom',
+              helperText: 'Pour l\'accueil, et c\'est comme ça que Nexo t\'appelle (sauf si tu lui donnes un surnom).',
               prefixIcon: Icon(Icons.person_rounded),
             ),
             onChanged: (v) => ModuleStore.prefs.setString('hub.name', v.trim()),
@@ -200,7 +203,20 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.logout_rounded),
           title: const Text('Se déconnecter'),
           subtitle: const Text('Tes données restent sur l\'appareil'),
-          onTap: () {
+          // Avant : un seul clic par erreur et on était déconnecté.
+          onTap: () async {
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (d) => AlertDialog(
+                title: const Text('Te déconnecter ?'),
+                content: const Text('Tes données restent sur l\'appareil : tu les retrouves en te reconnectant.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Annuler')),
+                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me déconnecter')),
+                ],
+              ),
+            );
+            if (ok != true || !context.mounted) return;
             Navigator.of(context).popUntil((r) => r.isFirst);
             AppSession.instance.signOut();
           },
@@ -219,7 +235,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Annuler')),
-                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Supprimer')),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
+                    onPressed: () => Navigator.pop(d, true),
+                    child: const Text('Supprimer'),
+                  ),
                 ],
               ),
             );
@@ -272,8 +292,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.timer_outlined),
           title: const Text('Vérifier toutes les'),
+          subtitle: const Text('Discord et Instagram arrivent tout de suite, sans attendre'),
           trailing: DropdownButton<int>(
-            value: n.interval,
+            // Une valeur hors de la liste faisait planter la page.
+            value: const [1, 2, 5, 10, 15, 30].contains(n.interval) ? n.interval : 2,
             underline: const SizedBox.shrink(),
             items: const [1, 2, 5, 10, 15, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v min'))).toList(),
             onChanged: (v) => n.interval = v ?? 2,
@@ -284,7 +306,7 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('Regrouper les notifications'),
           subtitle: const Text('Un seul résumé au lieu de 15 notifications d\'affilée (les appels passent toujours)'),
           trailing: DropdownButton<int>(
-            value: n.digest,
+            value: const [0, 15, 30, 60].contains(n.digest) ? n.digest : 30,
             underline: const SizedBox.shrink(),
             items: const [
               DropdownMenuItem(value: 0, child: Text('Non')),
@@ -295,6 +317,20 @@ class _SettingsPageState extends State<SettingsPage> {
             onChanged: (v) => n.digest = v ?? 30,
           ),
         ),
+        if (InstagramWatch.supported)
+          SwitchListTile(
+            secondary: const Icon(Icons.camera_alt_rounded),
+            title: const Text('Messages Instagram en direct'),
+            subtitle: const Text(
+              'Le vrai Instagram reste ouvert en fond, comme un onglet : tu es prévenu dès qu\'on t\'écrit. '
+              'Rien n\'est demandé à Instagram (aucun risque pour ton compte).',
+            ),
+            value: InstagramWatch.wanted,
+            onChanged: (v) async {
+              await InstagramWatch.setWanted(v);
+              refresh();
+            },
+          ),
         ListTile(
           leading: const Icon(Icons.notifications_active_outlined),
           title: const Text('Tester une alerte'),
@@ -481,7 +517,7 @@ class _SettingsPageState extends State<SettingsPage> {
           title: Text('Ce qui part sur internet'),
           subtitle: Text(
             'Seulement vers le service concerné, directement depuis ton appareil : École Directe, '
-            'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Smily va à '
+            'Spotify, Google, Discord, Instagram, ta boîte mail… ; ce que tu demandes à Nexo va à '
             'Claude (ton compte Anthropic) ou à Gemini (ta clé Google), et sa voix aussi à Gemini. Les mises à jour viennent '
             'de GitHub, qui ne reçoit rien de toi.',
           ),
@@ -497,7 +533,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Text(
-            'Mon Hub regarde la puissance de ton PC et s\'adapte. En mode léger, Smily reste dans la '
+            'Mon Hub regarde la puissance de ton PC et s\'adapte. En mode léger, Nexo reste dans la '
             'fenêtre de Mon Hub (pas de second programme) et tout ce qui surveille en continu se fait '
             'plus rarement.',
             style: theme.textTheme.bodyMedium,
@@ -532,13 +568,26 @@ class _SettingsPageState extends State<SettingsPage> {
                 choice(
                   'complet',
                   'Toujours complet',
-                  'Smily partout, ses yeux et ses oreilles, sauvegarde en continu.',
+                  'Nexo partout, ses yeux et ses oreilles, sauvegarde en continu.',
                 ),
                 ListTile(
                   leading: const Icon(Icons.speed_rounded),
                   title: Text(Perf.explain),
-                  subtitle: const Text('Change de mode puis redémarre Mon Hub pour que tout reparte au bon rythme.'),
+                  subtitle: const Text('Après un changement de mode, Mon Hub redémarre pour que tout reparte au bon rythme.'),
                 ),
+                // Avant : « redémarre Mon Hub » sans bouton pour le faire.
+                if (AppInstall.canRestart)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Redémarrer Mon Hub maintenant'),
+                        onPressed: AppInstall.restart,
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -568,7 +617,7 @@ class _SettingsPageState extends State<SettingsPage> {
               builder: (context, setState) => SwitchListTile(
                 secondary: const Icon(Icons.power_settings_new_rounded),
                 title: const Text('Lancer Mon Hub au démarrage de Windows'),
-                subtitle: const Text('Pratique pour avoir Smily et les alertes tout de suite'),
+                subtitle: const Text('Pratique pour avoir Nexo et les alertes tout de suite'),
                 value: AppShortcuts.startup,
                 onChanged: (v) async {
                   await AppShortcuts.setStartup(v);
@@ -744,8 +793,10 @@ class _SettingsPageState extends State<SettingsPage> {
         final v = e.value;
         if (v is String) await prefs.setString(e.key, v);
         if (v is int) await prefs.setInt(e.key, v);
+        // Les nombres à virgule (vitesse de la voix…) étaient perdus à l'import.
+        if (v is double) await prefs.setDouble(e.key, v);
         if (v is bool) await prefs.setBool(e.key, v);
-        if (v is List) await prefs.setStringList(e.key, v.cast<String>());
+        if (v is List) await prefs.setStringList(e.key, [for (final x in v) '$x']);
       }
       for (final e in (j['secrets'] as Map<String, dynamic>).entries) {
         await ModuleStore.writeSecretRaw(e.key, e.value as String);
@@ -892,7 +943,7 @@ class SettingsCategory {
     ];
   }
 
-  /// La carte de Smily correspond-elle à [q] ?
+  /// La carte de Nexo correspond-elle à [q] ?
   static bool clickyMatches(String q) {
     final ws = _words(q);
     return ws.isEmpty ||
@@ -903,7 +954,7 @@ class SettingsCategory {
   }
 }
 
-/// La carte de Smily, en tête des réglages : ses réglages, tout ce qu'il
+/// La carte de Nexo, en tête des réglages : ses réglages, tout ce qu'il
 /// sait faire, et la visite guidée.
 class _ClickyHero extends StatelessWidget {
   const _ClickyHero();
@@ -931,7 +982,7 @@ class _ClickyHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Smily',
+                      'Nexo',
                       style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
                     ),
                     const Text(
@@ -951,7 +1002,7 @@ class _ClickyHero extends StatelessWidget {
               FilledButton.icon(
                 style: white(),
                 icon: const Icon(Icons.tune_rounded),
-                label: const Text('Réglages de Smily'),
+                label: const Text('Réglages de Nexo'),
                 onPressed: () => ClickySettingsPage.open(context),
               ),
               OutlinedButton.icon(

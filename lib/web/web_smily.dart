@@ -11,7 +11,7 @@ import 'account_copy.dart';
 import 'phone_actions.dart';
 import 'phone_bridge.dart';
 
-/// Un message de la discussion avec Smily (version web).
+/// Un message de la discussion avec Nexo (version web).
 class WebMsg {
   WebMsg(this.mine, this.text, {this.actions = const [], DateTime? at}) : at = at ?? DateTime.now();
   final bool mine;
@@ -49,7 +49,7 @@ class WebTimer {
   Duration get left => end.difference(DateTime.now());
 }
 
-/// **Smily sur le téléphone** (version web) : le compte (lien du PC ou
+/// **Nexo sur le téléphone** (version web) : le compte (lien du PC ou
 /// compte en ligne), sa mémoire, tes contacts, la discussion, les actions sur
 /// le téléphone et les minuteurs.
 class WebSmily extends ChangeNotifier {
@@ -157,7 +157,7 @@ class WebSmily extends ChangeNotifier {
     ];
     return what.isEmpty
         ? 'Ton PC est relié.'
-        : 'Ton PC m\'a donné ${what.join(', ')}. Je suis le même Smily que sur ton PC.';
+        : 'Ton PC m\'a donné ${what.join(', ')}. Je suis le même Nexo que sur ton PC.';
   }
 
   void _mergeMemories(List<(String, String)> more) {
@@ -191,7 +191,7 @@ class WebSmily extends ChangeNotifier {
         if (g is String && g.trim().isNotEmpty) await setGemini(g);
         final mem = AccountCopy.memories(c);
         _mergeMemories(mem);
-        done = 'Connecté : je suis le même Smily que sur ton PC${mem.isEmpty ? '' : ' (${mem.length} souvenirs)'}.';
+        done = 'Connecté : je suis le même Nexo que sur ton PC${mem.isEmpty ? '' : ' (${mem.length} souvenirs)'}.';
       }
     } catch (e) {
       done = 'Connecté, mais je n\'ai pas pu lire ton compte : ${Online.explain(e)}';
@@ -284,7 +284,7 @@ class WebSmily extends ChangeNotifier {
     const days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
     final mem = memories.take(40).map((m) => '- ${m.$2}').join('\n');
     return [
-      'Tu es Smily, un petit smiley (un compagnon IA) qui aide ${name.isEmpty ? 'la personne' : name}. Tu es ici dans '
+      'Tu es Nexo, un compagnon IA (un curseur lumineux sur le PC) qui aide ${name.isEmpty ? 'la personne' : name}. Tu es ici dans '
           'la version web de Mon Hub, sur son téléphone.',
       'Nous sommes ${days[now.weekday - 1]} ${now.day}/${now.month}/${now.year}, il est ${now.hour} h '
           '${now.minute.toString().padLeft(2, '0')} (heure locale).',
@@ -429,7 +429,7 @@ class WebSmily extends ChangeNotifier {
       timers.remove(t);
       final what = t.what.isEmpty ? 'Ton minuteur est fini !' : 'C\'est l\'heure : ${t.what} !';
       messages.add(WebMsg(false, '⏰ $what'));
-      unawaited(PhoneBridge.notify('Smily ⏰', what, tag: 'minuteur'));
+      unawaited(PhoneBridge.notify('Nexo ⏰', what, tag: 'minuteur'));
       PhoneBridge.vibrate(800);
       unawaited(_save());
     }
@@ -443,7 +443,7 @@ class WebSmily extends ChangeNotifier {
   /// Un message reçu dans un espace : notification si l'appli est cachée.
   void onSpaceMessage(Space s, ChatMessage m) {
     if (!PhoneBridge.hidden) return;
-    final who = Spaces.instance.people[m.author]?.label ?? (m.fromClicky ? 'Smily' : 'Quelqu\'un');
+    final who = Spaces.instance.people[m.author]?.label ?? (m.fromClicky ? 'Nexo' : 'Quelqu\'un');
     unawaited(PhoneBridge.notify(s.isDm ? who : '${s.name} · $who', m.body, tag: 'espace:${s.id}'));
   }
 }

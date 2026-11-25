@@ -103,7 +103,7 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                       subtitle: Text(
                         assistant.consent
                             ? 'La veille au soir (19 h) et le jour même, avec un petit message tout prêt.'
-                            : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Smily).',
+                            : 'Il faut d\'abord accepter l\'assistant personnel (Réglages de Nexo).',
                       ),
                       value: assistant.on('anniversaires'),
                       onChanged: assistant.consent ? (v) => assistant.setOn('anniversaires', v) : null,
@@ -111,7 +111,7 @@ class _BirthdaysPageState extends State<BirthdaysPage> {
                   ),
                   Text(
                     'Ceux de Google Agenda (calendrier « Anniversaires » de tes contacts) arrivent tout seuls. '
-                    'Tu peux aussi dire à Smily : « l\'anniversaire de Léa c\'est le 12 mars ». Ta liste est '
+                    'Tu peux aussi dire à Nexo : « l\'anniversaire de Léa c\'est le 12 mars ». Ta liste est '
                     'synchronisée sur tes appareils.',
                     style: theme.textTheme.bodySmall,
                   ),

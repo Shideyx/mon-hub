@@ -1,5 +1,5 @@
-// **« Préviens-moi quand… »** (v1.58) : Smily surveille un truc pour toi et
-// te prévient dès que ça arrive (notification + Smily le dit) :
+// **« Préviens-moi quand… »** (v1.58) : Nexo surveille un truc pour toi et
+// te prévient dès que ça arrive (notification + Nexo le dit) :
 // - « …quand j'ai ma note de maths », « …quand j'ai un nouveau devoir » ;
 // - « …quand Lucas m'écrit », « …quand je reçois un mail de Pronote » ;
 // - « …quand cette page change » (lien copié ou dans la phrase), « …quand le
@@ -260,7 +260,7 @@ class Watchers extends ChangeNotifier {
     encode: (v) => [for (final w in v) w.toJson()],
   );
 
-  /// Branché par Mon Hub : prévenir (notification + Smily le dit).
+  /// Branché par Mon Hub : prévenir (notification + Nexo le dit).
   void Function(String title, String body)? alert;
 
   /// Requêtes web (tests).
@@ -449,7 +449,7 @@ class Watchers extends ChangeNotifier {
     ),
     HubTool(
       name: 'guetteur_liste',
-      description: 'Ce que Smily surveille (« préviens-moi quand… »). supprimer = un mot de ce qu\'il faut arrêter de surveiller (ou « tout »).',
+      description: 'Ce que Nexo surveille (« préviens-moi quand… »). supprimer = un mot de ce qu\'il faut arrêter de surveiller (ou « tout »).',
       params: {'supprimer': ('string', 'Ce qu\'il faut arrêter de surveiller (facultatif)')},
       run: (a) async {
         await load();
@@ -466,7 +466,7 @@ class Watchers extends ChangeNotifier {
 
 /// **Réponses toutes prêtes** : quelqu'un te pose une question sur Discord →
 /// « je te prépare une réponse ? » → une réponse courte, **copiée** dans le
-/// presse-papier, prête à coller. Smily n'envoie jamais rien tout seul.
+/// presse-papier, prête à coller. Nexo n'envoie jamais rien tout seul.
 class Replies {
   Replies._();
 

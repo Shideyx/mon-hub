@@ -234,7 +234,7 @@ void main() {
         },
         tools: const {'clicky_corriger_selection'},
       ))?.text;
-      expect(await ask('Smily, corrige ce que j\'ai surligné'), 'Corrigé ✓');
+      expect(await ask('Nexo, corrige ce que j\'ai surligné'), 'Corrigé ✓');
       expect(await ask('traduis la sélection en anglais'), 'Corrigé ✓');
       expect(await ask('reformule mon texte'), 'Corrigé ✓');
       expect(calls, [

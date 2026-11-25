@@ -13,7 +13,7 @@ class ScamVerdict {
   bool get danger => level == ScamLevel.danger;
   bool get suspect => level != ScamLevel.ok;
 
-  /// Ce que Smily dit.
+  /// Ce que Nexo dit.
   String say() => switch (level) {
     ScamLevel.ok => 'Je ne vois rien de suspect.',
     ScamLevel.suspect => 'Méfie-toi : ${reasons.join(' ; ')}.',

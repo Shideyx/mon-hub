@@ -117,7 +117,7 @@ void main() {
 
     test('après une mise à jour : annoncé une fois, rien à la première ouverture', () async {
       WhatsNew.fetchOverride = () async => [
-        {'tag_name': 'v1.83', 'published_at': '2026-11-24T12:00:00Z', 'body': 'Smily compte ses jetons'},
+        {'tag_name': 'v1.83', 'published_at': '2026-11-24T12:00:00Z', 'body': 'Nexo compte ses jetons'},
         {'tag_name': 'v1.82', 'published_at': '2026-11-24T10:00:00Z', 'body': body},
         {'tag_name': 'v1.81', 'published_at': '2026-11-23T10:00:00Z', 'body': 'Version web'},
       ];
@@ -127,7 +127,7 @@ void main() {
       final news = await w.afterUpdate(current: 83);
       expect(news.map((r) => r.tag), ['v1.83', 'v1.82']);
       expect(await w.afterUpdate(current: 83), isEmpty);
-      expect(NewsRules.say(news), contains('v1.83 : Smily compte ses jetons'));
+      expect(NewsRules.say(news), contains('v1.83 : Nexo compte ses jetons'));
       expect(w.cached, hasLength(3));
       final tool = w.tools().single;
       expect('${(await tool.run({}) as Map)['resume']}', contains('v1.83'));

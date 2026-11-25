@@ -124,7 +124,7 @@ void main() {
 
     test('« écoute le cours » et « arrête le cours » sans IA', () async {
       calls.clear();
-      expect(await ask('Smily, écoute le cours'), contains('SVT'));
+      expect(await ask('Nexo, écoute le cours'), contains('SVT'));
       expect(await ask('prends le cours en notes'), contains('jusqu\'à 11 h 00'));
       expect(await ask('fais-moi un compte rendu du cours'), isNotNull);
       expect(await ask('arrête le cours'), contains('compte rendu'));
@@ -146,7 +146,7 @@ void main() {
       await ModuleStore.init();
     });
 
-    testWidgets('réglages de Smily : l\'essentiel, les rubriques, la recherche', (tester) async {
+    testWidgets('réglages de Nexo : l\'essentiel, les rubriques, la recherche', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

@@ -6,13 +6,15 @@ import '../widgets.dart';
 import 'tutor.dart' show normalize;
 import 'patience.dart';
 import 'watchers.dart' show WatchParse;
+import 'game_coach.dart' show CoachRules;
+import 'robots.dart' show RobotRules;
 import '../../core/cam_blur.dart';
 import '../../core/birthdays.dart';
 
 /// Appel d'une action de Mon Hub (agenda, devoirs, musique…).
 typedef QuickTool = Future<Object?> Function(String name, Map<String, dynamic> args);
 
-/// Ce que Smily répond sans l'IA.
+/// Ce que Nexo répond sans l'IA.
 class QuickReply {
   const QuickReply(this.text, {this.timer, this.timerLabel = '', this.media});
   final String text;
@@ -35,11 +37,28 @@ class QuickAnswers {
 
   static const _days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
-  /// La phrase nettoyée : minuscules, sans accents, sans « Smily » ni
+  /// « Décroche », « réponds en vidéo », « refuse l'appel », « raccroche »
+  /// (phrase nettoyée) → l'action de `discord_appel`, ou null.
+  static String? callAction(String n) {
+    if (RegExp(r'^(?:decroche|reponds|repond|accepte|prends)(?: l appel| a l appel)?(?: en video| avec la camera)$')
+        .hasMatch(n)) {
+      return 'repondre_video';
+    }
+    if (RegExp(r'^(?:decroche|decroches|accepte l appel|reponds a l appel|repond a l appel|prends l appel)$').hasMatch(n)) {
+      return 'repondre';
+    }
+    if (RegExp(r'^(?:refuse|refuses|rejette|ignore) (?:l appel|cet appel)$').hasMatch(n)) return 'refuser';
+    if (RegExp(r'^(?:raccroche|raccroches|coupe l appel|termine l appel|quitte l appel)$').hasMatch(n)) {
+      return 'raccrocher';
+    }
+    return null;
+  }
+
+  /// La phrase nettoyée : minuscules, sans accents, sans « Nexo » ni
   /// « s'il te plaît ».
   static String clean(String raw) {
     var n = normalize(raw);
-    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he|alors) )?(?:clicky|smily|smiley|simile) ?'), '');
+    n = n.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis|eh|he|alors) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) ?'), '');
     n = n.replaceFirst(RegExp(r' (?:s il te plait|s il vous plait|stp|svp|merci)$'), '');
     return n.trim();
   }
@@ -103,7 +122,7 @@ class QuickAnswers {
 
   static DateTime? _date(Object? v) => v is DateTime ? v : DateTime.tryParse('$v');
 
-  /// Ce que Smily sait ouvrir tout seul.
+  /// Ce que Nexo sait ouvrir tout seul.
   static const opens = {
     'youtube': 'https://www.youtube.com',
     'discord': 'https://discord.com/app',
@@ -297,8 +316,74 @@ class QuickAnswers {
       if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
     }
 
+    // ---- Les robots de Nexo (« crée un robot : quand j'ouvre Discord, coupe mon
+    // micro », « tous les jours à 19 h, j'ai quoi demain », « mes robots ») ----
+    if (has('robot_creer') && RobotRules.looksLikeRobot(n)) {
+      final r = RobotRules.parse(raw);
+      if (r != null) {
+        final res = await call('robot_creer', {
+          'nom': r.name,
+          'declencheur': r.trigger,
+          'valeur': r.value,
+          'jours': r.days.join(','),
+          'actions': r.actions.join('|'),
+        });
+        if (res is Map && res['resume'] != null) {
+          return QuickReply('🤖 ${res['resume']} Il ne coûte aucun jeton. (« mes robots » pour les voir.)');
+        }
+      }
+    }
+    if (has('robot_liste') && RegExp(r'^(?:mes robots|quels sont mes robots|montre(?: moi)? mes robots|liste (?:de )?mes robots)$').hasMatch(n)) {
+      final res = await call('robot_liste', {});
+      final list = res is Map ? (res['robots'] as List? ?? const []) : const [];
+      if (list.isEmpty) return const QuickReply('Tu n\'as pas encore de robot. Dis par exemple « crée un robot : tous les jours à 19 h, j\'ai quoi à faire pour demain ».');
+      final on = [for (final x in list) if (x is Map && x['allume'] == true) x];
+      return QuickReply(
+        '🤖 ${on.length} robot${on.length > 1 ? 's' : ''} allumé${on.length > 1 ? 's' : ''} : '
+        '${[for (final x in on.take(5)) '${x['nom']} (${x['quand']})'].join(' ; ')}'
+        '${on.length > 5 ? '… et ${on.length - 5} autres' : ''}. Tout est dans Réglages de Nexo → Ses robots.',
+      );
+    }
+
+    // ---- Le coach de jeu en direct (« coach-moi », « arrête le coach ») ----
+    if (has('jeu_coach')) {
+      final action = CoachRules.command(n);
+      if (action != null) {
+        final r = await call('jeu_coach', {'action': action});
+        if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+      }
+    }
+
+    // ---- Les appels Discord à la voix (« décroche », « raccroche ») ----
+    if (has('discord_appel')) {
+      final action = QuickAnswers.callAction(n);
+      if (action != null) {
+        try {
+          final r = await call('discord_appel', {'action': action});
+          final ok = r is Map && r['ok'] == true;
+          final who = r is Map && r['qui'] != null ? ' avec ${r['qui']}' : '';
+          return QuickReply(switch (action) {
+            'repondre' || 'repondre_video' => ok ? 'Je décroche$who.' : 'Je ne vois pas d\'appel qui sonne.',
+            'refuser' => ok ? 'Appel refusé.' : 'Je ne vois pas d\'appel qui sonne.',
+            _ => ok ? 'J\'ai raccroché.' : 'Tu n\'es pas en appel dans Mon Hub.',
+          });
+        } catch (e) {
+          return QuickReply('$e');
+        }
+      }
+    }
+
     // ---- Caméra et micro : couper, rallumer, savoir qui s'en sert ----
 
+    // Personne ne t'entend : il rend le micro partout où il était coupé.
+    if (has('micro_rendre') &&
+        RegExp(
+          r'^(?:rends|rend|redonne)(?: moi)? (?:mon|le) micro$|^(?:debloque|repare) (?:moi )?(?:mon|le) micro$|'
+          r'^(?:on|personne) ne m entend (?:plus|pas)$|^on m entend plus$|^mon micro (?:est bloque|est coupe|ne marche plus)$',
+        ).hasMatch(n)) {
+      final r = await call('micro_rendre', {});
+      if (r is Map && r['resume'] != null) return QuickReply('${r['resume']}');
+    }
     // La sourdine (instantanée, dans toutes les applis, l'appel continue).
     if (has('micro_sourdine')) {
       final mute = RegExp(
@@ -433,7 +518,7 @@ class QuickAnswers {
       }
     }
 
-    // ---- Ce que Smily sait de lui-même : capacités, nouveautés, jetons ----
+    // ---- Ce que Nexo sait de lui-même : capacités, nouveautés, jetons ----
     Future<QuickReply?> said(String tool, [Map<String, dynamic> args = const {}]) async {
       final r = await call(tool, args);
       return r is Map && r['resume'] != null ? QuickReply('${r['resume']}') : null;
@@ -1335,7 +1420,7 @@ class Calc {
   /// Le résultat en phrase, ou null si ce n'est pas un calcul.
   static String? fromSentence(String raw) {
     var s = raw.toLowerCase().trim();
-    s = s.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis) )?(?:clicky|smily|smiley|simile)[, ]*'), '');
+    s = s.replaceFirst(RegExp(r'^(?:(?:hey|ok|dis) )?(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile)[, ]*'), '');
     final before = s;
     s = s.replaceFirst(
       RegExp(

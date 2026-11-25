@@ -12,7 +12,7 @@ import 'token_budget.dart';
 
 /// Accès direct à Claude (API Anthropic) avec ta propre clé API.
 ///
-/// Sert au compagnon « Smily » (qui voit l'écran de Mon Hub, répond à voix
+/// Sert au compagnon « Nexo » (qui voit l'écran de Mon Hub, répond à voix
 /// haute et montre les boutons) et à la discussion intégrée du module Claude.
 /// La clé se crée sur console.anthropic.com (facturée à l'usage) et reste
 /// chiffrée sur l'appareil.
@@ -49,9 +49,17 @@ class ClaudeApi {
     ];
   }
 
+  /// Mode économe (réglé par Nexo) et question difficile (« réfléchis bien »).
+  static bool econome = true;
+  static bool deep = false;
+
+  /// Le modèle : celui choisi dans les réglages ; sinon, en mode économe,
+  /// Sonnet (deux fois moins cher qu'Opus), et Opus seulement pour
+  /// « réfléchis bien ».
   static String get model {
     final m = store.getJson<String>('model');
-    return models.containsKey(m) ? m! : 'claude-opus-5-5';
+    if (models.containsKey(m)) return m!;
+    return econome && !deep ? 'claude-sonnet-5-5' : 'claude-opus-5-5';
   }
 
   static Future<void> setModel(String m) => store.setJson('model', m);
@@ -146,7 +154,7 @@ class ClaudeApi {
       final blocks = <int, Map<String, dynamic>>{};
       final json = <int, StringBuffer>{};
       var stop = '';
-      // Les jetons de cette demande (comptés pour le budget de Smily).
+      // Les jetons de cette demande (comptés pour le budget de Nexo).
       final usage = <String, dynamic>{};
       final shown = StringBuffer();
       await for (final line

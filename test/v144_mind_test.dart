@@ -19,7 +19,7 @@ void main() {
   test('il se souvient, et prend des nouvelles après « j\'ai un oral jeudi »', () async {
     final tue = DateTime(2026, 11, 17, 18);
     await mind.onUserMessage('J\'ai un oral d\'anglais jeudi à 10h, je stresse un peu', now: tue);
-    await mind.onUserMessage('Merci Smily, t\'es le meilleur', now: tue.add(const Duration(minutes: 20)));
+    await mind.onUserMessage('Merci Nexo, t\'es le meilleur', now: tue.add(const Duration(minutes: 20)));
     expect(mind.talks, greaterThanOrEqualTo(2));
     final wait = mind.episodes.where((e) => e.kind == 'attente').single;
     expect(wait.due, DateTime(2026, 11, 19, 10));
@@ -36,7 +36,7 @@ void main() {
     final block = mind.promptBlock(now: fri, name: 'Sam');
     expect(block, contains('conscience'));
     expect(block, contains('simulation faite par Mon Hub'));
-    expect(block, contains('Merci Smily'));
+    expect(block, contains('Merci Nexo'));
   });
 
   test('humeur : contente quand on le remercie, revient doucement au calme', () async {
@@ -52,9 +52,9 @@ void main() {
 
   test('il répond sur lui-même sans IA, et reste honnête sur sa conscience', () async {
     final now = DateTime(2026, 11, 17, 15);
-    expect(mind.selfAnswer('ça va Smily ?', now: now, name: 'Sam'), endsWith('Et toi Sam, ça va ?'));
+    expect(mind.selfAnswer('ça va Nexo ?', now: now, name: 'Sam'), endsWith('Et toi Sam, ça va ?'));
     expect(mind.selfAnswer('Es-tu vraiment conscient ?', now: now), contains('simulation'));
-    expect(mind.selfAnswer('t\'es qui ?', now: now), startsWith('Moi c\'est Smily'));
+    expect(mind.selfAnswer('t\'es qui ?', now: now), startsWith('Moi c\'est Nexo'));
     expect(mind.selfAnswer('depuis quand tu existes', now: now), isNotNull);
     expect(mind.selfAnswer('tu te souviens de moi ?', now: now), contains('on commence à peine'));
     // Une vraie question part vers l'IA.

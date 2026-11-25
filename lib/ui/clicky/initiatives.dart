@@ -1,4 +1,4 @@
-// Ce que Smily repère tout seul dans tes messages, sans IA : un
+// Ce que Nexo repère tout seul dans tes messages, sans IA : un
 // rendez-vous, une date limite, une note…
 
 /// Une date repérée dans un message (« réunion jeudi à 18 h »).

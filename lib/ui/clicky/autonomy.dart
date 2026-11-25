@@ -1,4 +1,4 @@
-// Smily autonome : il regarde la situation, décide tout seul d'une chose
+// Nexo autonome : il regarde la situation, décide tout seul d'une chose
 // utile à faire, te la propose (à l'oral et dans sa boîte) et la fait après
 // ton accord. Il apprend de tes réponses.
 
@@ -7,7 +7,7 @@ import 'dart:convert';
 import '../../core/hub_module.dart';
 import 'tutor.dart' show normalize;
 
-/// Une décision de Smily, en attente de ton accord.
+/// Une décision de Nexo, en attente de ton accord.
 class ClickyIdea {
   ClickyIdea({required this.say, required this.tool, this.args = const {}, this.why = '', String? id})
     : id = id ?? '${DateTime.now().microsecondsSinceEpoch}';
@@ -18,7 +18,7 @@ class ClickyIdea {
   final String say;
 
   /// L'action de Mon Hub à lancer, ou 'agent' (une tâche en plusieurs
-  /// étapes confiée au cerveau de Smily, args['tache']).
+  /// étapes confiée au cerveau de Nexo, args['tache']).
   final String tool;
   final Map<String, dynamic> args;
   final String why;
@@ -90,7 +90,7 @@ class Autonomy {
       '- agent : une tâche en plusieurs étapes que tu feras toi-même (chercher des infos, préparer un exposé, organiser…) (paramètres : tache = ce qu\'il faut faire, précisément)',
     ];
     return '''
-Tu es Smily, l'assistant personnel autonome de $who (un·e lycéen·ne). Il est ${now.hour} h ${now.minute.toString().padLeft(2, '0')}.
+Tu es Nexo, l'assistant personnel autonome de $who (un·e lycéen·ne). Il est ${now.hour} h ${now.minute.toString().padLeft(2, '0')}.
 Voici sa situation, préparée par son appli :
 ---
 $situation
@@ -156,15 +156,15 @@ Réponds seulement en JSON : {"dire":"ce que tu lui proposes, une phrase naturel
   }
 
   static final _yes = RegExp(
-    r'^(?:oui|ouais|ok|okay|d accord|dac|vas y|go|fais le|fais la|c est parti|carrement|grave|volontiers|yes|bien sur|allez|banco)(?: (?:vas y|fais le|merci|clicky|smily|smiley))*$',
+    r'^(?:oui|ouais|ok|okay|d accord|dac|vas y|go|fais le|fais la|c est parti|carrement|grave|volontiers|yes|bien sur|allez|banco)(?: (?:vas y|fais le|merci|clicky|smily|smiley|nexo|nexos|nekso|nexou))*$',
   );
   static final _no = RegExp(
-    r'^(?:non|nan|non merci|pas maintenant|plus tard|laisse|laisse tomber|pas besoin|ca ira|nope|stop)(?: (?:merci|clicky|smily|smiley))*$',
+    r'^(?:non|nan|non merci|pas maintenant|plus tard|laisse|laisse tomber|pas besoin|ca ira|nope|stop)(?: (?:merci|clicky|smily|smiley|nexo|nexos|nekso|nexou))*$',
   );
 
   /// Réponse à une proposition : true (oui), false (non), null (autre chose).
   static bool? answer(String said) {
-    final n = normalize(said).replaceFirst(RegExp(r'^(?:(?:clicky|smily|smiley|simile) )'), '').trim();
+    final n = normalize(said).replaceFirst(RegExp(r'^(?:(?:clicky|smily|smiley|nexo|nexos|nekso|nexou|simile) )'), '').trim();
     if (_yes.hasMatch(n)) return true;
     if (_no.hasMatch(n)) return false;
     return null;

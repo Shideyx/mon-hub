@@ -7,7 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/hub_files.dart';
 import 'routines.dart';
 
-/// Les **compagnons** de Smily : de petits agents (chacun son nom, sa
+/// Les **compagnons** de Nexo : de petits agents (chacun son nom, sa
 /// couleur) qui se proposent d'eux-mêmes pour faire une tâche utile pour
 /// toi — d'après tes réponses à quatre questions, tes cours, tes devoirs…
 /// Tu réponds « Non », « Ajuster » ou « Oui, fais-le » ; ils travaillent en
@@ -113,7 +113,7 @@ class Buddies extends ChangeNotifier {
   Buddies._();
   static final instance = Buddies._();
 
-  /// Fait le travail d'un agent (branché sur Smily) : renvoie le texte brut.
+  /// Fait le travail d'un agent (branché sur Nexo) : renvoie le texte brut.
   Future<String> Function(String prompt)? runner;
 
   /// Prévient (alerte dans la fenêtre + système, voix).
@@ -297,7 +297,7 @@ Réponds UNIQUEMENT par un tableau JSON d'un seul élément, même format (nom, 
   }
 
   String _task(Buddy b) =>
-      'Tu es « ${b.name} », un compagnon de Smily. Ta mission : ${b.mission}\n${b.detail}\n\nConsignes : ${b.prompt}\n\n'
+      'Tu es « ${b.name} », un compagnon de Nexo. Ta mission : ${b.mission}\n${b.detail}\n\nConsignes : ${b.prompt}\n\n'
       'Ce que tu sais de la personne :\n$_profileText\n\n'
       'Fais la tâche jusqu\'au bout avec tes outils, puis termine par un compte rendu clair en français '
       '(ce que tu as trouvé ou fait, et la prochaine étape conseillée).';

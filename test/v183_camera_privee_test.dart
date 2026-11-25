@@ -41,7 +41,7 @@ void main() {
     test('rallumée hors appel : 20 minutes de répit', () {
       expect(step(blocked: false, openedAt: now.subtract(const Duration(minutes: 5))), PrivateStep.none);
       expect(step(blocked: false, openedAt: now.subtract(const Duration(minutes: 21))), PrivateStep.reblock);
-      // Rallumée sans Smily (avant le mode) : on n'y touche pas.
+      // Rallumée sans Nexo (avant le mode) : on n'y touche pas.
       expect(step(blocked: false), PrivateStep.none);
     });
 
@@ -58,7 +58,9 @@ void main() {
       expect(CamBlur.modeFrom('floute tout'), 'tout');
       expect(CamBlur.modeFrom('enlève le flou'), 'non');
       expect(CamBlur.modeFrom('Pourquoi mon visage est flou sur les photos ?'), isNull);
-      expect(CamBlur.modeFrom('floute mon arrière-plan'), isNull);
+      // v1.66 : l'arrière-plan flou existe dans les appels de Mon Hub.
+      expect(CamBlur.modeFrom('floute mon arrière-plan'), 'fond');
+      expect(CamBlur.modeFrom('floute le fond'), 'fond');
     });
 
     test('script : mode choisi, filtre branché, jamais d\'image nette si le flou rate', () {

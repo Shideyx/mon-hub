@@ -25,7 +25,7 @@ enum Answer {
 
 /// Les règles, **sans fichiers** : testables.
 ///
-/// Le principe : plus la personne refuse un sujet, plus Smily se taît
+/// Le principe : plus la personne refuse un sujet, plus Nexo se taît
 /// longtemps dessus. Au troisième refus, il laisse tomber le sujet (il n'en
 /// reparle que si on lui demande).
 class PatienceRules {
@@ -89,7 +89,7 @@ class PatienceRules {
   }
 }
 
-/// **Smily n'insiste pas** : il retient tes refus, sujet par sujet.
+/// **Nexo n'insiste pas** : il retient tes refus, sujet par sujet.
 ///
 /// Avant, chaque système (l'assistant, les rappels, les guetteurs, les
 /// initiatives) relançait dans son coin sans savoir que la personne avait

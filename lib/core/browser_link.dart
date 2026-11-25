@@ -7,13 +7,13 @@ import 'package:flutter/foundation.dart';
 import 'error_log.dart';
 import 'hub_module.dart';
 
-/// Le lien entre Mon Hub et **l'extension Chrome** « Mon Hub — Smily dans
+/// Le lien entre Mon Hub et **l'extension Chrome** « Mon Hub — Nexo dans
 /// le navigateur » (dossier `assets/chrome-extension`). Sur ce PC seulement
 /// (127.0.0.1), et seulement avec cette extension-là (son identifiant fixe) :
 /// une page web ne peut pas s'y brancher.
 ///
-/// Smily peut alors lister tes onglets, ouvrir ses propres onglets en
-/// arrière-plan (groupe « Smily »), lire une page, cliquer, écrire — pendant
+/// Nexo peut alors lister tes onglets, ouvrir ses propres onglets en
+/// arrière-plan (groupe « Nexo »), lire une page, cliquer, écrire — pendant
 /// que tu fais autre chose.
 class BrowserLink extends ChangeNotifier {
   BrowserLink._();
@@ -33,7 +33,7 @@ class BrowserLink extends ChangeNotifier {
 
   bool get connected => _ws != null;
 
-  /// Ce que Smily fait en ce moment dans le navigateur (pour la pastille).
+  /// Ce que Nexo fait en ce moment dans le navigateur (pour la pastille).
   final step = ValueNotifier<String>('');
 
   /// Les actions dans le navigateur sont permises sans demander jusqu'à cette
@@ -128,7 +128,7 @@ class BrowserLink extends ChangeNotifier {
   Future<Object?> call(String cmd, Map<String, dynamic> args, {Duration timeout = const Duration(seconds: 45)}) async {
     final ws = _ws;
     if (ws == null) {
-      throw 'L\'extension Chrome de Mon Hub n\'est pas branchée : Réglages de Smily → Smily dans le navigateur.';
+      throw 'L\'extension Chrome de Mon Hub n\'est pas branchée : Réglages de Nexo → Nexo dans le navigateur.';
     }
     if (stopped) throw 'Tâche arrêtée.';
     final id = ++_next;
@@ -154,7 +154,7 @@ class BrowserLink extends ChangeNotifier {
 
   int _tab(Object? v) => (v as num?)?.toInt() ?? int.tryParse('$v') ?? (throw 'Numéro d\'onglet manquant');
 
-  /// Les outils de Smily pour le navigateur.
+  /// Les outils de Nexo pour le navigateur.
   List<HubTool> get tools => [
     HubTool(
       name: 'nav_onglets',
@@ -164,7 +164,7 @@ class BrowserLink extends ChangeNotifier {
     HubTool(
       name: 'nav_ouvrir',
       description:
-          'Navigateur : ouvre une page dans un nouvel onglet de Smily (en arrière-plan par défaut, groupe « Smily »), '
+          'Navigateur : ouvre une page dans un nouvel onglet de Nexo (en arrière-plan par défaut, groupe « Nexo »), '
           'et donne son numéro d\'onglet.',
       params: {'url': ('string', 'Adresse https://…'), 'premier_plan': ('boolean', 'Montrer l\'onglet à la personne')},
       required: ['url'],
@@ -251,7 +251,7 @@ class BrowserLink extends ChangeNotifier {
     ),
     HubTool(
       name: 'nav_fermer',
-      description: 'Navigateur : ferme un onglet (seulement ceux que Smily a ouverts, sauf si la personne le demande).',
+      description: 'Navigateur : ferme un onglet (seulement ceux que Nexo a ouverts, sauf si la personne le demande).',
       params: {'onglet': ('integer', 'Numéro de l\'onglet')},
       required: ['onglet'],
       run: (a) async => call('close', {'tab': _tab(a['onglet'])}),
@@ -267,6 +267,6 @@ class BrowserLink extends ChangeNotifier {
       'fiable que taper dans la page). Ne saisis jamais de mot de passe. Les pages de banque, paiement et mots de passe '
       'sont bloquées. Avant d\'envoyer, publier, payer ou supprimer, l\'accord de la personne est demandé tout seul.';
 
-  /// Garde la trace des erreurs du navigateur sans faire planter Smily.
+  /// Garde la trace des erreurs du navigateur sans faire planter Nexo.
   static void record(Object e) => ErrorLog.record(e, null, where: 'Extension Chrome');
 }

@@ -270,7 +270,7 @@ void main() {
     test('ses réponses sur lui, sans IA', () async {
       final life = ClickyLife();
       final now = DateTime(2026, 11, 22, 23, 40);
-      expect(life.answer('Smily, tu dors ?', now: now), contains('sieste'));
+      expect(life.answer('Nexo, tu dors ?', now: now), contains('sieste'));
       life.fallAsleep();
       expect(life.answer('tu dors ?', now: now), contains('pixels'));
       life.wake();

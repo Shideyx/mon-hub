@@ -71,7 +71,7 @@ class NewsRules {
       if ((r.number ?? 0) > version) r,
   ]..sort((a, b) => (b.number ?? 0).compareTo(a.number ?? 0));
 
-  /// Ce que Smily dit des dernières versions.
+  /// Ce que Nexo dit des dernières versions.
   static String say(List<Release> rs, {int max = 3}) {
     if (rs.isEmpty) return 'Pas de nouveauté depuis ta dernière mise à jour.';
     final b = StringBuffer();
@@ -87,7 +87,7 @@ class NewsRules {
 }
 
 /// **Les nouveautés de Mon Hub** : lues dans les versions publiées sur
-/// GitHub (les mêmes que la mise à jour automatique installe). Smily sait
+/// GitHub (les mêmes que la mise à jour automatique installe). Nexo sait
 /// ainsi ce qui a changé, et le dit une fois après chaque mise à jour.
 class WhatsNew {
   WhatsNew._();
@@ -186,7 +186,7 @@ class WhatsNew {
     HubTool(
       name: 'clicky_nouveautes',
       description:
-          'Les nouveautés de Mon Hub et de Smily, lues dans les mises à jour publiées sur GitHub (les mêmes que la '
+          'Les nouveautés de Mon Hub et de Nexo, lues dans les mises à jour publiées sur GitHub (les mêmes que la '
           'mise à jour automatique installe) : version installée, dernières versions et ce qu\'elles ont changé, '
           'mise à jour en attente. À utiliser pour « quoi de neuf ? », « c\'est quoi la dernière mise à jour ? », '
           '« tu as appris quoi de nouveau ? ».',

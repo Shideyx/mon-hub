@@ -113,7 +113,7 @@ class GoogleAuth {
     'email',
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
-    // Ton Drive en entier : le lire, y ranger tes fichiers (Smily), ouvrir
+    // Ton Drive en entier : le lire, y ranger tes fichiers (Nexo), ouvrir
     // et enregistrer tes Google Docs dans le Word de Mon Hub.
     driveScope,
   ];

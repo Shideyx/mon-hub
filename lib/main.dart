@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'dart:io' show Directory, Platform;
+import 'dart:io' show Directory, Platform, exit;
 
 import 'package:material_ui/material_ui.dart';
 
 import 'core/cam_blur_env.dart';
+import 'core/install.dart';
+import 'core/version.dart';
 import 'core/account_sync.dart';
 import 'core/call_shield.dart';
 import 'core/camera_guard.dart';
@@ -19,6 +21,7 @@ import 'core/game_pal.dart';
 import 'core/screen_time.dart';
 import 'ui/clicky/autonomy.dart';
 import 'ui/clicky/live_captions.dart';
+import 'ui/clicky/robots.dart';
 import 'ui/clicky/senses.dart';
 import 'ui/clicky/pc_watch.dart';
 import 'ui/clicky/watchers.dart';
@@ -33,6 +36,8 @@ import 'core/error_log.dart';
 import 'modules/claude/claude_module.dart';
 import 'modules/discord/discord_module.dart';
 import 'modules/discord/discord_phone.dart';
+import 'modules/instagram/instagram_module.dart';
+import 'modules/instagram/instagram_watch.dart';
 import 'modules/youtube/youtube_module.dart';
 import 'core/hub_controller.dart';
 import 'core/module_registry.dart';
@@ -60,9 +65,12 @@ import 'ui/online/online_page.dart';
 import 'ui/spaces/spaces_page.dart';
 
 Future<void> main(List<String> args) async {
-  // Avant tout navigateur intégré : la détection des visages (flou caméra).
+  // Avant tout navigateur intégré, pour tous les programmes : tes connexions
+  // (Discord, Instagram, Google…) dans un dossier fixe — plus perdues à chaque
+  // nouveau zip — et la détection des visages (flou caméra).
+  AppInstall.useStableWebData();
   enableFaceDetection();
-  // « hub.exe --clicky » : Smily partout (Windows), voir clicky_desktop.dart.
+  // « hub.exe --clicky » : Nexo partout (Windows), voir clicky_desktop.dart.
   if (args.contains('--clicky')) return runClickyDesktop();
   // « hub.exe --widget=musique » : un widget détaché sur le bureau.
   final widget = args.where((a) => a.startsWith('--widget=')).firstOrNull;
@@ -73,6 +81,12 @@ Future<void> main(List<String> args) async {
   // Journal des erreurs (sur le PC) et garde-fous : une erreur ne casse
   // plus tout l'écran.
   ErrorLog.install('Mon Hub');
+  // Les connexions rangées à côté de l'ancien programme : recopiées une fois.
+  await AppInstall.migrateWebData();
+  // Lancé depuis l'intérieur d'un zip (dossier temporaire) ou les
+  // Téléchargements : Mon Hub s'installe pour de bon et redémarre de là.
+  if (await AppInstall.moveIfTemporary(appVersion)) exit(0);
+  unawaited(AppInstall.stamp(appVersion));
   // Certificats de Windows (antivirus, réseau…) et de Mozilla : plus
   // d'erreur « CERTIFICATE_VERIFY_FAILED ».
   await TrustedCertificates.install();
@@ -85,7 +99,7 @@ Future<void> main(List<String> args) async {
   final updater = Updater.instance..beforeInstall = ClickyDesktop.stop;
   var paused = false;
   updater.addListener(() {
-    // Smily partout se met en pause pendant la mise à jour.
+    // Nexo partout se met en pause pendant la mise à jour.
     if (updater.showing && !paused) {
       paused = true;
       unawaited(ClickyDesktop.stop());
@@ -101,7 +115,7 @@ Future<void> main(List<String> args) async {
   runApp(const HubApp());
 }
 
-/// Une fois : « Smily peut maintenant voir ton écran et entendre ton PC ».
+/// Une fois : « Nexo peut maintenant voir ton écran et entendre ton PC ».
 Future<void> _announceSenses(NotificationCenter n) async {
   const key = 'app.sens.annonce';
   if (ModuleStore.global.getBool(key) == true) return;
@@ -111,10 +125,10 @@ Future<void> _announceSenses(NotificationCenter n) async {
   await n.post(
     HubNotification(
       id: 'sens:annonce',
-      title: '👀 Nouveau : Smily peut voir ton écran et entendre ton PC',
+      title: '👀 Nouveau : Nexo peut voir ton écran et entendre ton PC',
       body:
           'En continu, mais tout reste sur ton PC (jamais tes messages, ta banque ni pendant un appel). '
-          'À allumer dans Réglages de Smily → Ses yeux et ses oreilles.',
+          'À allumer dans Réglages de Nexo → Ses yeux et ses oreilles.',
       moduleId: 'claude',
     ),
   );
@@ -204,7 +218,13 @@ class _HubAppState extends State<HubApp> {
       ..onApplied = null
       ..onNotice = null
       ..stop();
-    DiscordPhone.instance.stop();
+    DiscordPhone.instance
+      ..onActivity = null
+      ..stop();
+    InstagramWatch.instance
+      ..onNews = null
+      ..onUnread = null
+      ..stop();
     _notifications?.dispose();
     unawaited(_bridge?.stop());
     unawaited(PhoneLink.instance.stop());
@@ -229,8 +249,8 @@ class _HubAppState extends State<HubApp> {
   }
 
   /// Mon Hub en ligne : reprend la session du compte, puis les espaces, les
-  /// discussions (notification quand on t'écrit) et Smily dans les
-  /// discussions (« @clicky », Smily entre eux).
+  /// discussions (notification quand on t'écrit) et Nexo dans les
+  /// discussions (« @clicky », Nexo entre eux).
   Future<void> _startOnline(NotificationCenter n) async {
     Online.instance.addListener(_onlineChanged);
     Spaces.instance.onMessage = (space, m) {
@@ -239,7 +259,7 @@ class _HubAppState extends State<HubApp> {
       unawaited(ClickyChat.instance.handle(space, m, myName: myName));
       if (m.author == sp.me || sp.viewing == space.id) return;
       final who = sp.person(m.author)?.label ?? 'Quelqu\'un';
-      final from = m.fromClicky ? 'Smily de $who' : who;
+      final from = m.fromClicky ? 'Nexo de $who' : who;
       unawaited(
         n.post(
           HubNotification(
@@ -313,7 +333,7 @@ class _HubAppState extends State<HubApp> {
         // Tes travaux (Documents, Bureau) copiés dans ton Drive : lourd, donc
         // jamais en mode léger.
         if (Perf.heavy) Perf.later(4, WorkBackup.instance.start);
-        // L'extension Chrome de Mon Hub (Smily dans le navigateur).
+        // L'extension Chrome de Mon Hub (Nexo dans le navigateur).
         Perf.later(3, BrowserLink.instance.start);
         // Les hologrammes ont été retirés (v1.60) : on efface la « vision des
         // mains » qu'ils avaient téléchargée (~ 30 Mo), une fois.
@@ -352,7 +372,7 @@ class _HubAppState extends State<HubApp> {
               PhoneState.inCall,
             }.contains(DiscordPhone.instance.state));
           unawaited(_announceSenses(n));
-          // Après une mise à jour : Smily dit ce qui a changé (lu dans les
+          // Après une mise à jour : Nexo dit ce qui a changé (lu dans les
           // versions publiées sur GitHub), une seule fois.
           Perf.later(6, () async {
             final news = await WhatsNew.instance.afterUpdate();
@@ -379,7 +399,7 @@ class _HubAppState extends State<HubApp> {
               );
             });
           Perf.later(3, PcWatch.instance.start);
-          // Une appli allume la caméra : Smily le dit tout de suite.
+          // Une appli allume la caméra : Nexo le dit tout de suite.
           CameraGuard.instance.warn = (title, body) {
             unawaited(
               n.post(HubNotification(id: 'camera:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
@@ -387,7 +407,7 @@ class _HubAppState extends State<HubApp> {
             unawaited(clicky.think(body, aloud: false));
           };
           // Bouclier d'appel : une autre appli écoute ou filme pendant ton
-          // appel → alerte tout de suite, et Smily propose de LUI couper l'accès.
+          // appel → alerte tout de suite, et Nexo propose de LUI couper l'accès.
           CallShield.instance
             ..warn = (title, body, key, mic) {
               unawaited(n.post(HubNotification(id: 'arnaque:appel:$key:$mic', title: title, body: body)));
@@ -407,7 +427,7 @@ class _HubAppState extends State<HubApp> {
               unawaited(clicky.think('Caméra allumée sur $call. Pour flouter ton arrière-plan : $how', aloud: false));
             };
           // Mode caméra privée : coupée tout le temps ; pendant un appel,
-          // Smily demande avant de l'allumer, et la recoupe à la fin.
+          // Nexo demande avant de l'allumer, et la recoupe à la fin.
           CameraGuard.inAppCall = () =>
               const {PhoneState.calling, PhoneState.inCall}.contains(DiscordPhone.instance.state)
               ? 'Discord (dans Mon Hub)'
@@ -437,7 +457,7 @@ class _HubAppState extends State<HubApp> {
               final full = Win.foregroundFullscreen();
               final path = Win.foregroundPath();
               // Le jeu au premier plan (un vrai signe, pas « tout ce qui est
-              // en plein écran ») : Smily va lire ce qu'il y a à savoir dessus.
+              // en plein écran ») : Nexo va lire ce qu'il y a à savoir dessus.
               await GamePal.instance.tick(exe: exe, path: path, title: title);
               final end = GameMode.instance.tick(
                 exe: exe,
@@ -457,6 +477,9 @@ class _HubAppState extends State<HubApp> {
               CallShield.instance.tick();
               // Mode caméra privée : demander / recouper.
               await CameraGuard.instance.privateTick(callNow());
+              // Les robots de Nexo : une heure, une appli qui s'ouvre, un jeu,
+              // ton retour, le temps d'écran (sans IA, sans jetons).
+              await Robots.instance.tick(app: '$exe $title', idleSeconds: Win.idleSeconds(), game: GamePal.instance.current);
               // Ses yeux et ses oreilles (s'ils sont allumés), sur le PC.
               await ClickySenses.instance.tick(
                 exe: exe,
@@ -485,12 +508,37 @@ class _HubAppState extends State<HubApp> {
         if (Platform.isIOS || Platform.isAndroid) unawaited(_phoneUpdateNotice(n));
         // Ctrl + Espace (ici) ou Ctrl + Alt + Espace (partout) : la recherche.
         HubHome.instance.onSearchText = (text) => unawaited(SearchPage.show(text));
-        // Première ouverture du compte : la visite guidée de Smily.
+        // Première ouverture du compte : la visite guidée de Nexo.
         unawaited(_tutorial());
         unawaited(n.start());
         // Appels Discord reçus dans Mon Hub (Discord officiel caché).
         DiscordPhone.allowed = true;
         DiscordPhone.instance.notifications = n;
+        // Un message arrive dans le vrai Discord : relevé tout de suite (avant :
+        // jusqu'à 2 minutes d'attente).
+        DiscordPhone.instance.onActivity = () => unawaited(n.pollModules(const {'discord'}));
+        // Les messages Instagram en direct : le vrai Instagram ouvert en fond,
+        // comme un onglet (rien n'est demandé à Instagram).
+        InstagramWatch.allowed = true;
+        final insta = hub.enabled.whereType<InstagramModule>().firstOrNull;
+        if (insta != null) {
+          InstagramWatch.instance
+            ..onUnread = ((count) => insta.badge.value = count)
+            ..onNews = (news) {
+              final (title, body) = InstagramWatch.describe(news);
+              unawaited(
+                n.post(
+                  HubNotification(
+                    id: 'insta:${DateTime.now().millisecondsSinceEpoch}',
+                    title: title,
+                    body: body,
+                    moduleId: 'instagram',
+                  ),
+                ),
+              );
+            };
+          Perf.later(4, InstagramWatch.instance.start);
+        }
         // « Menu » ferme aussi la fenêtre d'appel Discord (l'appel continue).
         final phone = DiscordPhone.instance;
         HubHome.instance
@@ -500,12 +548,12 @@ class _HubAppState extends State<HubApp> {
           ..awayChecks.add(() => phone.active && phone.shown);
         phone.addListener(HubHome.instance.refresh);
         hub.available.whereType<DiscordModule>().firstOrNull?.syncPhone();
-        // Quand Claude Code (Smily) veut agir, Mon Hub demande la permission.
+        // Quand Claude Code (Nexo) veut agir, Mon Hub demande la permission.
         ClaudeBridge.confirm = ClickyController.instance.confirmAction;
-        // Les outils de Smily (contrôle du PC, réparation du micro) aussi
+        // Les outils de Nexo (contrôle du PC, réparation du micro) aussi
         // pour Claude Code.
         ClaudeBridge.appTools = () => ClickyController.instance.localTools;
-        // Smily réagit aux nouvelles (une bonne note, un cours annulé…).
+        // Nexo réagit aux nouvelles (une bonne note, un cours annulé…).
         NotificationCenter.onAny = (note) {
           ClickyController.instance.reactTo(note);
           // Un nouveau devoir : il peut le faire pendant ton absence.
@@ -514,6 +562,8 @@ class _HubAppState extends State<HubApp> {
           }
           // « Préviens-moi quand… » (note, devoir, message de quelqu'un).
           unawaited(Watchers.instance.onNotification(note).catchError((Object _) {}));
+          // Les robots de Nexo (un message de Léa, une note…).
+          unawaited(Robots.instance.onNotification(note).catchError((Object _) {}));
           // Une question sur Discord : « je te prépare une réponse ? ».
           final idea = Replies.on && Win.supportedHere && Win.idleSeconds() < 120 ? Replies.ideaFor(note) : null;
           if (idea != null) {
@@ -538,7 +588,7 @@ class _HubAppState extends State<HubApp> {
             unawaited(ClickyController.instance.think(body, aloud: false));
           };
         Perf.later(6, ArtistWatch.instance.start);
-        // Les guetteurs : notification + Smily le dit.
+        // Les guetteurs : notification + Nexo le dit.
         Watchers.instance.alert = (title, body) {
           unawaited(
             n.post(HubNotification(id: 'guetteur:${DateTime.now().millisecondsSinceEpoch}', title: title, body: body)),
@@ -546,7 +596,7 @@ class _HubAppState extends State<HubApp> {
           unawaited(ClickyController.instance.think(body));
         };
         Perf.later(2, Watchers.instance.start);
-        // Smily se répare tout seul : il relit son journal d'erreurs et
+        // Nexo se répare tout seul : il relit son journal d'erreurs et
         // corrige ce qu'il sait corriger (micro bloqué, certificats cassés,
         // appli qui fige, disque plein), puis il le dit.
         SelfRepair.instance
@@ -572,7 +622,55 @@ class _HubAppState extends State<HubApp> {
             unawaited(ClickyController.instance.think(body, aloud: false));
           });
         Perf.later(7, () => SelfRepair.instance.run(diskFreeGb: SelfRepair.diskFreeGb()));
-        // Alertes de Smily (agent terminé…).
+        // Le micro coupé par erreur par l'ancien bouclier d'appel (ton jeu,
+        // Discord, Mon Hub) : rendu une fois, en le disant. Et le rappel si
+        // le micro est resté en sourdine.
+        if (Win.supportedHere) {
+          Perf.later(8, () async {
+            final fixed = await CallShield.instance.repairOnce();
+            if (fixed != null) {
+              await n.post(HubNotification(id: 'micro:repare', title: '🎙️ Micro réparé', body: fixed, moduleId: 'claude'));
+            }
+            final muted = await CallShield.instance.muteReminder();
+            if (muted != null) await ClickyController.instance.think(muted, aloud: false);
+          });
+        }
+        // Ses petits robots : ce qu'ils disent passe par Nexo (une bulle), ce
+        // qu'ils font aussi (phrases sans IA), et il demande avant ce qui
+        // dérange (avec Oui / Non).
+        final nexo = ClickyController.instance;
+        Robots.instance
+          ..say = ((t) => unawaited(nexo.think(t, aloud: false)))
+          ..quick = nexo.robotPhrase
+          ..notify = ((title, body) => unawaited(
+            n.post(
+              HubNotification(
+                id: 'robot:${DateTime.now().millisecondsSinceEpoch}',
+                title: title,
+                body: body,
+                moduleId: 'claude',
+              ),
+            ),
+          ))
+          ..protocol = ((name) async {
+            await nexo.hubTools.where((t) => t.name == 'carnet_protocole').firstOrNull?.run({
+              'action': 'lancer',
+              'nom': name,
+            });
+          })
+          ..propose = ((r, text) {
+            final install = r.id.startsWith('installer:');
+            return nexo.proposeIdea(
+              ClickyIdea(
+                tool: install ? 'robot_installer' : 'robot_lancer',
+                args: install ? {'modele': r.id.substring('installer:'.length)} : {'id': r.id},
+                say: text,
+                why: 'robot « ${r.name} »',
+              ),
+            );
+          });
+        Perf.later(3, Robots.instance.load);
+        // Alertes de Nexo (agent terminé…).
         ClickyController.instance.notify = (title, body) => n.post(
           HubNotification(
             id: 'clicky:${DateTime.now().millisecondsSinceEpoch}',
@@ -604,7 +702,7 @@ class _HubAppState extends State<HubApp> {
       // Compte déjà là : on laisse l'appli s'ouvrir tranquillement.
       await Future<void>.delayed(const Duration(seconds: 4));
     }
-    // Puis Smily demande le compte Google (Drive, Docs, agenda), une fois.
+    // Puis Nexo demande le compte Google (Drive, Docs, agenda), une fois.
     // S'il vient d'ouvrir les réglages du cerveau, ce sera au prochain
     // démarrage.
     if (brain) return;
@@ -612,11 +710,11 @@ class _HubAppState extends State<HubApp> {
     if (ctx != null && ctx.mounted) await GoogleWelcome.maybeShow(ctx);
   }
 
-  /// Windows : Smily au-dessus de tout l'écran (petit programme à part).
+  /// Windows : Nexo au-dessus de tout l'écran (petit programme à part).
   Future<void> _startClicky() async {
-    // Smily est un bonus : s'il échoue, le reste de l'appli continue.
+    // Nexo est un bonus : s'il échoue, le reste de l'appli continue.
     try {
-      // Réglages de ce compte partagés avec Smily partout, qu'on relance
+      // Réglages de ce compte partagés avec Nexo partout, qu'on relance
       // pour qu'il reprenne le bon compte.
       await ClickyController.instance.shareOptions();
       await ClickyDesktop.restart();
@@ -625,7 +723,7 @@ class _HubAppState extends State<HubApp> {
       // Les widgets laissés sur le bureau se rouvrent.
       unawaited(DesktopWidgets.instance.launchAll());
     } catch (e) {
-      debugPrint('Smily : $e');
+      debugPrint('Nexo : $e');
     }
   }
 
@@ -637,7 +735,7 @@ class _HubAppState extends State<HubApp> {
       title: 'Mon Hub',
       navigatorKey: hubNavigatorKey,
       navigatorObservers: [HubHome.instance.observer],
-      // Smily, le compagnon Claude, au-dessus de toutes les pages.
+      // Nexo, le compagnon Claude, au-dessus de toutes les pages.
       builder: (context, child) => UpdateGate(
         child: ClickyLayer(
           hub: hub,
@@ -647,12 +745,15 @@ class _HubAppState extends State<HubApp> {
           child: HubHomeLayer(
             enabled: hub != null,
             child: YouTubeMiniLayer(
-              child: DiscordPhoneLayer(
-                // Les propositions de l'assistant personnel (en bas à gauche).
-                child: AssistantLayer(
-                  enabled: hub != null,
-                  // La pastille « Smily écoute le cours » (en haut, au milieu).
-                  child: CourseRecLayer(child: child ?? const SizedBox.shrink()),
+              // Instagram ouvert en fond (messages en direct), tout en dessous.
+              child: InstagramWatchLayer(
+                child: DiscordPhoneLayer(
+                  // Les propositions de l'assistant personnel (en bas à gauche).
+                  child: AssistantLayer(
+                    enabled: hub != null,
+                    // La pastille « Nexo écoute le cours » (en haut, au milieu).
+                    child: CourseRecLayer(child: child ?? const SizedBox.shrink()),
+                  ),
                 ),
               ),
             ),

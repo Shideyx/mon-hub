@@ -26,7 +26,7 @@ import 'settings_page.dart';
 import 'spaces/spaces_page.dart';
 
 /// **Aujourd'hui** : l'accueil de Mon Hub, façon HUD. En haut la console de
-/// Smily (une question, ou le nom d'une appli à lancer), puis des blocs que
+/// Nexo (une question, ou le nom d'une appli à lancer), puis des blocs que
 /// l'on range comme on veut (« Personnaliser » : glisser, taille, ajouter,
 /// retirer).
 class HomePage extends StatefulWidget {
@@ -542,7 +542,7 @@ class _Header extends StatelessWidget {
                 itemBuilder: (_) => [
                   const PopupMenuItem(
                     value: 'clicky',
-                    child: ListTile(leading: Icon(Icons.auto_awesome_outlined), title: Text('Ce que Smily sait faire')),
+                    child: ListTile(leading: Icon(Icons.auto_awesome_outlined), title: Text('Ce que Nexo sait faire')),
                   ),
                   if (Platform.isWindows)
                     const PopupMenuItem(
@@ -579,7 +579,7 @@ class _Header extends StatelessWidget {
 
 // ------------------------------------------------------------ Console
 
-/// La console de Smily : une question (Entrée), ou le nom d'une appli du PC
+/// La console de Nexo : une question (Entrée), ou le nom d'une appli du PC
 /// (elle apparaît tout de suite : Entrée l'ouvre).
 class _Console extends StatefulWidget {
   const _Console({this.onOpenApps, this.onOpenSpace});
@@ -619,7 +619,7 @@ class _ConsoleState extends State<_Console> {
     });
   }
 
-  /// Entrée : l'appli dont le nom commence par le texte, sinon Smily.
+  /// Entrée : l'appli dont le nom commence par le texte, sinon Nexo.
   void _submit(String q) {
     final t = q.trim();
     if (t.isEmpty) return;
@@ -630,7 +630,7 @@ class _ConsoleState extends State<_Console> {
       unawaited(PcApps.instance.launch(app));
       return;
     }
-    FreezeWatch.note('console : question à Smily');
+    FreezeWatch.note('console : question à Nexo');
     unawaited(ClickyController.instance.ask(t));
   }
 
@@ -670,7 +670,7 @@ class _ConsoleState extends State<_Console> {
                           if (!narrow) ...[
                             const SizedBox(width: 10),
                             Text(
-                              'CLICKY',
+                              'NEXO',
                               style: hudTitle(context, size: 15, color: Colors.white).copyWith(letterSpacing: 2.4),
                             ),
                           ],
@@ -696,8 +696,8 @@ class _ConsoleState extends State<_Console> {
                         style: hudMono(context, size: 15),
                         decoration: InputDecoration(
                           hintText: narrow
-                              ? 'Demande à Smily…'
-                              : 'Demande quelque chose à Smily, ou tape le nom d\'une appli…',
+                              ? 'Demande à Nexo…'
+                              : 'Demande quelque chose à Nexo, ou tape le nom d\'une appli…',
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -715,7 +715,7 @@ class _ConsoleState extends State<_Console> {
                         HudButton(
                           icon: Icons.mic_rounded,
                           primary: true,
-                          tooltip: 'Parler à Smily',
+                          tooltip: 'Parler à Nexo',
                           onPressed: () => unawaited(ClickyController.instance.startListening()),
                         ),
                       ],
@@ -758,7 +758,7 @@ class _ConsoleState extends State<_Console> {
                         },
                       ),
                     Text(
-                      _apps.isNotEmpty ? 'Entrée : ouvrir l\'appli' : 'Entrée : demander à Smily',
+                      _apps.isNotEmpty ? 'Entrée : ouvrir l\'appli' : 'Entrée : demander à Nexo',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: c.dim),
                     ),
                   ],
@@ -1175,7 +1175,7 @@ class _ChatsBlock extends StatelessWidget {
       builder: (context, _) {
         final s = Spaces.instance;
         if (!s.available) {
-          return _offline(context, 'Discussions', 'Écris à tes amis avec leur @pseudo, et laisse vos Smily se parler.');
+          return _offline(context, 'Discussions', 'Écris à tes amis avec leur @pseudo, et laisse vos Nexo se parler.');
         }
         final list = [...s.chats, ...s.spaces]..sort((a, b) => (s.unread[b.id] ?? 0).compareTo(s.unread[a.id] ?? 0));
         return HudPanel(

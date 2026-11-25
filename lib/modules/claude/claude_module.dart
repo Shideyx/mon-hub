@@ -21,7 +21,7 @@ import 'claude_ai_sync.dart';
 const extensionUrl = 'https://github.com/Shideyx/mon-hub/releases/latest/download/MonHub-Claude.mcpb';
 
 /// Claude dans Mon Hub :
-/// * **Smily** : compagnon à côté du curseur (Ctrl + Alt), qui voit l'écran,
+/// * **Nexo** : compagnon à côté du curseur (Ctrl + Alt), qui voit l'écran,
 ///   parle et montre les boutons (voir ui/clicky/clicky.dart) ;
 /// * **Discuter** : conversation directe avec Claude (clé API) ;
 /// * **claude.ai** : le site habituel, intégré.
@@ -31,7 +31,7 @@ class ClaudeModule extends HubModule {
   @override
   String get name => 'Claude';
   @override
-  String get description => 'Ton assistant Claude et Smily, le compagnon qui voit ton écran';
+  String get description => 'Ton assistant Claude et Nexo, le compagnon qui voit ton écran';
   @override
   IconData get icon => Icons.auto_awesome_rounded;
   @override
@@ -41,7 +41,7 @@ class ClaudeModule extends HubModule {
 
   @override
   Widget buildSummary(BuildContext context) => ListenableBuilder(
-    // On lit simplement l'état de Smily (avant : chaque affichage relançait
+    // On lit simplement l'état de Nexo (avant : chaque affichage relançait
     // toute sa préparation — micro, voix… — et l'accueil ramait).
     listenable: Listenable.merge([ClaudeApi.store, ClickyController.instance]),
     builder: (context, _) => Builder(
@@ -55,9 +55,9 @@ class ClaudeModule extends HubModule {
               children: [
                 Text(
                   ready
-                      ? 'Maintiens Ctrl + Alt et parle à Smily, ou touche la bulle bleue. '
+                      ? 'Maintiens Ctrl + Alt et parle à Nexo, ou touche la bulle bleue. '
                             'Il voit ton écran et te montre où cliquer.'
-                      : 'Choisis le cerveau de Smily (Claude, ou une IA gratuite sur ton PC) : le compagnon '
+                      : 'Choisis le cerveau de Nexo (Claude, ou une IA gratuite sur ton PC) : le compagnon '
                             'qui voit ton écran, parle et te montre où cliquer.',
                   textAlign: TextAlign.center,
                 ),
@@ -70,13 +70,13 @@ class ClaudeModule extends HubModule {
                     if (!ready)
                       FilledButton.icon(
                         icon: const Icon(Icons.key_rounded),
-                        label: const Text('Configurer Smily'),
+                        label: const Text('Configurer Nexo'),
                         onPressed: () => showBrain(context),
                       )
                     else
                       FilledButton.icon(
                         icon: const Icon(Icons.auto_awesome_rounded),
-                        label: const Text('Parler à Smily'),
+                        label: const Text('Parler à Nexo'),
                         onPressed: () {
                           final c = ClickyController.instance;
                           if (c.handledElsewhere) {
@@ -101,7 +101,7 @@ class ClaudeModule extends HubModule {
     ),
   );
 
-  /// Pose une question à Smily (celui de l'appli, ou Smily partout).
+  /// Pose une question à Nexo (celui de l'appli, ou Nexo partout).
   static Future<void> askClicky(String q) async {
     final c = ClickyController.instance;
     if (c.handledElsewhere) {
@@ -121,7 +121,7 @@ class ClaudeModule extends HubModule {
         title: Text(name),
         actions: [
           IconButton(
-            tooltip: 'Réglages de Claude et Smily',
+            tooltip: 'Réglages de Claude et Nexo',
             icon: const Icon(Icons.key_rounded),
             onPressed: () => showSettings(context),
           ),
@@ -137,7 +137,7 @@ class ClaudeModule extends HubModule {
           tabAlignment: TabAlignment.start,
           tabs: [
             Tab(icon: Icon(Icons.chat_rounded), text: 'Discuter'),
-            Tab(icon: Icon(Icons.history_rounded), text: 'Historique Smily'),
+            Tab(icon: Icon(Icons.history_rounded), text: 'Historique Nexo'),
             Tab(icon: Icon(Icons.psychology_rounded), text: 'Journal'),
             Tab(icon: Icon(Icons.cloud_rounded), text: 'Compagnons'),
             Tab(icon: Icon(Icons.event_repeat_rounded), text: 'Routines'),
@@ -152,7 +152,7 @@ class ClaudeModule extends HubModule {
           ChatHistoryList(
             history: ChatHistory.clicky,
             color: color,
-            otherName: 'Smily',
+            otherName: 'Nexo',
             onOpen: (t) => Navigator.push(
               context,
               MaterialPageRoute<void>(
@@ -180,10 +180,10 @@ class ClaudeModule extends HubModule {
     ),
   );
 
-  /// Tous les réglages de Smily (rangés par rubrique).
+  /// Tous les réglages de Nexo (rangés par rubrique).
   static Future<void> showSettings(BuildContext context) => ClickySettingsPage.open(context);
 
-  /// Le cerveau de Smily : Claude Pro, clé API ou Ollama.
+  /// Le cerveau de Nexo : Claude Pro, clé API ou Ollama.
   static Future<void> showBrain(BuildContext context) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _SettingsDialog()));
 
@@ -244,8 +244,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (key.text.trim().isNotEmpty) await ClaudeApi.setApiKey(key.text);
     await ClaudeApi.store.setJson('ollama.url', ollamaUrl.text.trim());
     await ClaudeApi.store.setJson('ollama.model', ollamaModel.text.trim());
-    // Smily vient d'avoir un cerveau : on le démarre (Windows : partout).
-    // Nouveau cerveau / modèle : Smily partout repart avec.
+    // Nexo vient d'avoir un cerveau : on le démarre (Windows : partout).
+    // Nouveau cerveau / modèle : Nexo partout repart avec.
     if (await c.refreshReady()) unawaited(ClickyDesktop.restart());
   }
 
@@ -258,7 +258,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Cerveau de Smily'),
+          title: const Text('Cerveau de Nexo'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -278,7 +278,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
                     icon: const Icon(Icons.tune_rounded),
-                    label: const Text('Les autres réglages de Smily (voix, micro, apparence…)'),
+                    label: const Text('Les autres réglages de Nexo (voix, micro, apparence…)'),
                     onPressed: () => ClickySettingsPage.open(context),
                   ),
                 ),
@@ -297,7 +297,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Cerveau de Smily', style: text.titleSmall),
+          Text('Cerveau de Nexo', style: text.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<String>(
             segments: [
@@ -361,7 +361,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               'Sans clé ni compte : une IA tourne directement sur ton PC, rien ne sort sur '
               'internet. 1. Installe Ollama (ollama.com). 2. Dans un terminal, tape '
               '« ollama pull qwen2.5vl » (un modèle qui voit les images). Il faut un PC '
-              'assez puissant ; Smily voit et répond, mais sans le mode agent.',
+              'assez puissant ; Nexo voit et répond, mais sans le mode agent.',
             ),
             const SizedBox(height: 8),
             Row(
@@ -420,7 +420,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           const SizedBox(height: 4),
           Text(
             'Astuce : commence par « Agent, … » (ex. « Agent, fais-moi le résumé de mes '
-            'devoirs de la semaine ») pour une tâche de fond ; Smily te prévient quand '
+            'devoirs de la semaine ») pour une tâche de fond ; Nexo te prévient quand '
             'c\'est fini.',
             style: text.labelSmall,
           ),
@@ -465,7 +465,7 @@ class _ClaudeProSectionState extends State<_ClaudeProSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Smily utilise ton abonnement Claude (Pro, Max…) au lieu d\'une clé payante : '
+          'Nexo utilise ton abonnement Claude (Pro, Max…) au lieu d\'une clé payante : '
           'il passe par Claude Code, l\'outil officiel d\'Anthropic. Tu te connectes '
           'toi-même sur la page d\'Anthropic ; Mon Hub ne voit jamais ta connexion. '
           'Les questions comptent dans les limites de ton abonnement.',
@@ -795,7 +795,7 @@ class _ChatTabState extends State<_ChatTab> with AutomaticKeepAliveClientMixin {
   }
 }
 
-/// Une conversation de Smily enregistrée, avec « Continuer ».
+/// Une conversation de Nexo enregistrée, avec « Continuer ».
 class _ClickyThreadPage extends StatelessWidget {
   const _ClickyThreadPage({required this.thread, required this.color});
   final ChatThread thread;
@@ -819,7 +819,7 @@ class _ClickyThreadPage extends StatelessWidget {
             ),
         ],
       ),
-      body: ChatThreadView(thread: thread, color: color, otherName: 'Smily'),
+      body: ChatThreadView(thread: thread, color: color, otherName: 'Nexo'),
     );
   }
 }

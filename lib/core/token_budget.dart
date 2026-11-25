@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'claude_api.dart';
 import 'hub_module.dart';
 
-/// Ce que Smily fait selon ce qu'il a déjà dépensé aujourd'hui.
+/// Ce que Nexo fait selon ce qu'il a déjà dépensé aujourd'hui.
 enum TokenLevel {
   /// Moins de la moitié du budget : comme d'habitude.
   normal,
@@ -124,7 +124,7 @@ class TokenRules {
     TokenLevel.depasse => 'budget dépassé',
   };
 
-  /// La phrase de Smily sur ses jetons.
+  /// La phrase de Nexo sur ses jetons.
   static String say({
     required int used,
     required int budget,
@@ -152,7 +152,7 @@ class TokenRules {
   }
 }
 
-/// Le compteur de jetons de Smily (sur ce compte), et le budget du jour.
+/// Le compteur de jetons de Nexo (sur ce compte), et le budget du jour.
 ///
 /// Rien n'est envoyé nulle part : les chiffres viennent des réponses de
 /// Claude et de Gemini.
@@ -294,7 +294,7 @@ class TokenBudget extends ChangeNotifier {
     HubTool(
       name: 'clicky_jetons',
       description:
-          'Les jetons (tokens) que Smily a utilisés aujourd\'hui et cette semaine (Claude, payant ; Gemini, gratuit), '
+          'Les jetons (tokens) que Nexo a utilisés aujourd\'hui et cette semaine (Claude, payant ; Gemini, gratuit), '
           'son budget du jour, ce que ça a coûté et comment il se règle. À utiliser pour « combien de tokens », '
           '« tu consommes beaucoup ? », « combien tu m\'as coûté ».',
       run: (_) async => {
@@ -311,7 +311,7 @@ class TokenBudget extends ChangeNotifier {
     HubTool(
       name: 'clicky_budget_jetons',
       description:
-          'Change le budget de jetons Claude par jour (Smily s\'y adapte tout seul : Gemini pour le simple, moins '
+          'Change le budget de jetons Claude par jour (Nexo s\'y adapte tout seul : Gemini pour le simple, moins '
           'd\'historique, réflexion légère). Valeurs conseillées : 50000, 100000, 200000 (défaut), 400000, 1000000.',
       params: {'jetons': ('integer', 'Le nouveau budget par jour')},
       required: const ['jetons'],

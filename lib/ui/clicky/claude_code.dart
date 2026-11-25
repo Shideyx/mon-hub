@@ -9,7 +9,7 @@ import '../../core/claude_bridge.dart';
 import 'shot_encode.dart';
 import '../../core/token_budget.dart';
 
-/// Cerveau « Claude Pro » de Smily : ton propre Claude Code, connecté à ton
+/// Cerveau « Claude Pro » de Nexo : ton propre Claude Code, connecté à ton
 /// abonnement Claude (Pro, Max…).
 ///
 /// Mon Hub ne voit **jamais** ta connexion : tu te connectes toi-même dans
@@ -19,7 +19,7 @@ import '../../core/token_budget.dart';
 /// comptent dans les limites de ton abonnement.
 ///
 /// Claude Code reçoit la capture d'écran et peut utiliser les actions de
-/// Mon Hub (agenda, notes, messages…) et celles de Smily (contrôle du PC,
+/// Mon Hub (agenda, notes, messages…) et celles de Nexo (contrôle du PC,
 /// avec ta permission) via le pont local (`/mcp`), mais aucun de ses propres
 /// outils de programmation.
 class ClaudeCode {
@@ -29,7 +29,7 @@ class ClaudeCode {
 
   static const models = {
     '': 'Celui de ton abonnement (par défaut)',
-    // Conseillé : Smily n'appelle plus Claude que pour les demandes
+    // Conseillé : Nexo n'appelle plus Claude que pour les demandes
     // difficiles, autant qu'elles aient le meilleur.
     'claude-opus-5-5': 'Claude Opus 5.5 (conseillé)',
     'sonnet': 'Sonnet (rapide)',
@@ -39,7 +39,10 @@ class ClaudeCode {
 
   static String get model {
     final m = ClaudeApi.store.getJson<String>('claudecode.model') ?? '';
-    return models.containsKey(m) ? m : '';
+    if (models.containsKey(m)) return m;
+    // Économe : Sonnet (moins de ton forfait Claude utilisé), Opus seulement
+    // pour « réfléchis bien ».
+    return ClaudeApi.econome && !ClaudeApi.deep ? 'sonnet' : '';
   }
 
   static Future<void> setModel(String m) => ClaudeApi.store.setJson('claudecode.model', m);
@@ -182,7 +185,7 @@ class ClaudeCode {
         'mcpServers': {
           'monhub': {
             'type': 'http',
-            // Smily économe : seulement les actions utiles à la question.
+            // Nexo économe : seulement les actions utiles à la question.
             'url':
                 'http://127.0.0.1:${info['port']}/mcp'
                 '${groups == null || groups.isEmpty ? '' : '?groupes=${Uri.encodeQueryComponent(groups.join(','))}'}',
@@ -325,7 +328,7 @@ class ClaudeCode {
           case 'result':
             result = '${e['result'] ?? ''}';
             // Les jetons de la réponse (abonnement : pas facturés à l'unité,
-            // mais comptés pour que Smily se règle).
+            // mais comptés pour que Nexo se règle).
             final u = e['usage'];
             if (u is Map) unawaited(TokenBudget.instance.recordClaude(ClaudeApi.model, u).catchError((Object _) {}));
             failed = e['is_error'] == true || '${e['subtype']}' != 'success';

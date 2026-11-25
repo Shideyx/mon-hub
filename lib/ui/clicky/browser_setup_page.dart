@@ -9,7 +9,7 @@ import '../../core/browser_link.dart';
 import '../../core/claude_bridge.dart';
 import '../widgets.dart';
 
-/// Réglages de Smily → **Smily dans le navigateur** : installer
+/// Réglages de Nexo → **Nexo dans le navigateur** : installer
 /// l'extension Chrome (ou Edge) de Mon Hub en 3 étapes.
 class BrowserSetupPage extends StatefulWidget {
   const BrowserSetupPage({super.key});
@@ -102,7 +102,7 @@ class _BrowserSetupPageState extends State<BrowserSetupPage> {
       ),
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('Smily dans le navigateur')),
+      appBar: AppBar(title: const Text('Nexo dans le navigateur')),
       body: ListenableBuilder(
         listenable: link,
         builder: (context, _) => Center(
@@ -128,7 +128,7 @@ class _BrowserSetupPageState extends State<BrowserSetupPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Avec l\'extension, Smily peut utiliser tes sites (Google Classroom, Docs, Slides, Forms, Pronote…) dans '
+                  'Avec l\'extension, Nexo peut utiliser tes sites (Google Classroom, Docs, Slides, Forms, Pronote…) dans '
                   'ses propres onglets, en arrière-plan, pendant que tu fais autre chose. Tout reste sur ton PC. Il ne va '
                   'jamais sur les pages de banque, de paiement ou de mots de passe, ne tape jamais de mot de passe, et te '
                   'demande avant d\'envoyer, publier, payer ou supprimer.',
@@ -168,7 +168,7 @@ class _BrowserSetupPageState extends State<BrowserSetupPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Bon à savoir : quand Smily tape dans un éditeur comme Google Slides, Chrome affiche un bandeau jaune '
+                  'Bon à savoir : quand Nexo tape dans un éditeur comme Google Slides, Chrome affiche un bandeau jaune '
                   '« Mon Hub a commencé à déboguer ce navigateur » : c\'est normal, il disparaît tout seul après.',
                   style: theme.textTheme.bodySmall,
                 ),

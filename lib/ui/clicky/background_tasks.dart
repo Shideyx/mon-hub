@@ -6,7 +6,7 @@ import '../../core/browser_link.dart';
 import '../../core/error_log.dart';
 import 'claude_code.dart';
 
-/// Une tâche faite par Smily en arrière-plan.
+/// Une tâche faite par Nexo en arrière-plan.
 class BgTask {
   BgTask(this.goal) : started = DateTime.now();
   final String goal;
@@ -19,7 +19,7 @@ class BgTask {
   bool get running => status == 'en cours';
 }
 
-/// **« Fais-le à ma place »** : Smily fait une tâche **en arrière-plan**
+/// **« Fais-le à ma place »** : Nexo fait une tâche **en arrière-plan**
 /// pendant que tu continues à utiliser ton PC — avec les modules de Mon Hub
 /// (agenda, devoirs, mails, Google Docs, Drive…), le PC (commandes, fichiers,
 /// sans prendre la souris) et ton navigateur grâce à l'extension (dans ses
@@ -31,10 +31,10 @@ class BackgroundTasks extends ChangeNotifier {
 
   final tasks = <BgTask>[];
 
-  /// Fait le travail (l'agent de Smily, avec tous ses outils).
+  /// Fait le travail (l'agent de Nexo, avec tous ses outils).
   Future<String> Function(String prompt)? runner;
 
-  /// Prévenir à la fin (notification + Smily qui le dit).
+  /// Prévenir à la fin (notification + Nexo qui le dit).
   void Function(String title, String body)? onDone;
 
   BgTask? get current => tasks.where((t) => t.running).lastOrNull;
@@ -79,7 +79,7 @@ class BackgroundTasks extends ChangeNotifier {
           t
             ..status = 'fini'
             ..result = text;
-          onDone?.call('Smily a fini : ${_short(g)}', text);
+          onDone?.call('Nexo a fini : ${_short(g)}', text);
           whenDone?.call(t);
         }
       } catch (e) {
@@ -87,7 +87,7 @@ class BackgroundTasks extends ChangeNotifier {
           t
             ..status = 'erreur'
             ..result = '$e';
-          onDone?.call('Smily n\'a pas pu finir', '$e');
+          onDone?.call('Nexo n\'a pas pu finir', '$e');
           whenDone?.call(t);
           ErrorLog.record(e, null, where: 'Tâche en arrière-plan');
         }

@@ -25,7 +25,7 @@ import 'flight.dart';
 import 'shot_encode.dart';
 import 'win.dart';
 
-/// « Smily partout » (Windows) : Smily sort de la fenêtre de Mon Hub.
+/// « Nexo partout » (Windows) : Nexo sort de la fenêtre de Mon Hub.
 ///
 /// Mon Hub lance une seconde fois son propre programme avec `--clicky`.
 /// Ce second programme n'affiche qu'une petite fenêtre transparente, toujours
@@ -36,7 +36,7 @@ import 'win.dart';
 class ClickyDesktop {
   ClickyDesktop._();
 
-  /// Port local qui sert de verrou (un seul Smily) et de télécommande.
+  /// Port local qui sert de verrou (un seul Nexo) et de télécommande.
   static const port = 47613;
 
   static bool get supported => !kIsWeb && Platform.isWindows;
@@ -51,11 +51,11 @@ class ClickyDesktop {
     }
   }
 
-  /// Démarre Smily partout (s'il n'est pas déjà lancé).
+  /// Démarre Nexo partout (s'il n'est pas déjà lancé).
   static Future<void> launch() async {
     _paused = false;
     final c = ClickyController.instance;
-    // Mode léger (PC modeste) : Smily reste dans la fenêtre de Mon Hub.
+    // Mode léger (PC modeste) : Nexo reste dans la fenêtre de Mon Hub.
     // Ce second programme est ce qui ralentissait le plus les petits PC.
     if (!Perf.everywhere) return;
     // Pas de cerveau configuré : on ne lance rien du tout.
@@ -64,14 +64,14 @@ class ClickyDesktop {
     try {
       await Process.start(Platform.resolvedExecutable, ['--clicky'], mode: ProcessStartMode.detached);
     } catch (e) {
-      debugPrint('Smily partout : $e');
+      debugPrint('Nexo partout : $e');
     }
   }
 
-  /// Pose une question à Smily partout (il s'ouvre et répond).
+  /// Pose une question à Nexo partout (il s'ouvre et répond).
   static Future<bool> ask(String question) => send('ask ${question.replaceAll(RegExp(r'[\r\n]+'), ' ')}');
 
-  /// Envoie un ordre à Smily partout ('open', 'quit', 'ask …').
+  /// Envoie un ordre à Nexo partout ('open', 'quit', 'ask …').
   static Future<bool> send(String command) async {
     try {
       final s = await Socket.connect(InternetAddress.loopbackIPv4, port, timeout: const Duration(milliseconds: 400));
@@ -94,7 +94,7 @@ class ClickyDesktop {
   static bool _paused = false;
   static final _restarts = <DateTime>[];
 
-  /// Surveille Smily partout : s'il a planté, il est relancé (au plus 5
+  /// Surveille Nexo partout : s'il a planté, il est relancé (au plus 5
   /// fois en 10 minutes, pour ne pas tourner en boucle).
   static void watch() {
     if (!supported) return;
@@ -107,16 +107,16 @@ class ClickyDesktop {
       _restarts.removeWhere((t) => now.difference(t) > const Duration(minutes: 10));
       if (_restarts.length >= 5) return;
       _restarts.add(now);
-      ErrorLog.record('Smily partout s\'est fermé : relancé', null, where: 'surveillance');
+      ErrorLog.record('Nexo partout s\'est fermé : relancé', null, where: 'surveillance');
       await launch();
     });
   }
 
-  /// Relance Smily partout (compte changé, cerveau ou modèle modifié…).
+  /// Relance Nexo partout (compte changé, cerveau ou modèle modifié…).
   static Future<void> restart() async {
     if (!supported) return;
     if (await send('quit')) {
-      // Attend que l'ancien Smily soit bien parti (3 s au plus).
+      // Attend que l'ancien Nexo soit bien parti (3 s au plus).
       for (var i = 0; i < 15 && await running(); i++) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       }
@@ -128,7 +128,7 @@ class ClickyDesktop {
 /// Point d'entrée de `hub.exe --clicky`.
 Future<void> runClickyDesktop() async {
   WidgetsFlutterBinding.ensureInitialized();
-  ErrorLog.install('Smily partout');
+  ErrorLog.install('Nexo partout');
   await TrustedCertificates.install();
   final ServerSocket lock;
   try {
@@ -164,14 +164,14 @@ Future<void> runClickyDesktop() async {
           unawaited(c.presentTopo('${j['t']}', '${j['x']}', speakIt: j['v'] != false));
         } catch (_) {}
       }
-      // « Smily agit » demandé depuis Mon Hub : c'est Smily partout (au-
+      // « Nexo agit » demandé depuis Mon Hub : c'est Nexo partout (au-
       // dessus de tout l'écran) qui prend la souris.
       if (cmd.startsWith('act64 ')) {
         try {
           unawaited(c.act(utf8.decode(base64Decode(cmd.substring(6)))));
         } catch (_) {}
       }
-      // Une idée décidée par Mon Hub : c'est Smily partout qui la propose.
+      // Une idée décidée par Mon Hub : c'est Nexo partout qui la propose.
       if (cmd.startsWith('idea64 ')) {
         try {
           final i = ClickyIdea.fromJson(jsonDecode(utf8.decode(base64Decode(cmd.substring(7)))));
@@ -188,10 +188,16 @@ Future<void> runClickyDesktop() async {
           unawaited(c.feel('${j['e']}', text: t is String ? t : null));
         } catch (_) {}
       }
-      // Une pensée de Smily (rappel de l'assistant…) envoyée par Mon Hub.
+      // Une pensée de Nexo (rappel de l'assistant…) envoyée par Mon Hub.
       if (cmd.startsWith('think64 ')) {
         try {
           unawaited(c.think(utf8.decode(base64Decode(cmd.substring(8)))));
+        } catch (_) {}
+      }
+      // La même, en silence (une bulle seulement).
+      if (cmd.startsWith('thinkq64 ')) {
+        try {
+          unawaited(c.think(utf8.decode(base64Decode(cmd.substring(9))), aloud: false));
         } catch (_) {}
       }
       // Question envoyée par Mon Hub (révisions du journal…).
@@ -205,7 +211,7 @@ Future<void> runClickyDesktop() async {
   runApp(const _ClickyDesktopApp());
 }
 
-/// Là où Smily peut aller regarder tout seul (pixels de l'écran) : la barre
+/// Là où Nexo peut aller regarder tout seul (pixels de l'écran) : la barre
 /// de titre et le milieu de ta fenêtre, l'horloge, l'autre écran.
 List<Offset> _lookSpots() {
   final out = <Offset>[];
@@ -231,11 +237,11 @@ List<Offset> _lookSpots() {
 }
 
 /// Captures de chaque écran, **rapides** :
-/// - Smily reste à l'écran : Windows le retire seulement de la photo (avant,
+/// - Nexo reste à l'écran : Windows le retire seulement de la photo (avant,
 ///   il disparaissait 80 ms à chaque capture) ;
 /// - Windows réduit l'image pendant la copie (1280 px au plus) ;
 /// - l'image devient un JPEG à côté (Isolate), bien plus léger qu'un PNG à
-///   envoyer à l'IA, pendant que Smily continue de bouger.
+///   envoyer à l'IA, pendant que Nexo continue de bouger.
 Future<List<ClickyShot>> _captureScreens() async {
   final hwnd = _DesktopState.hwnd;
   final excluded = hwnd != null && Win.excludeFromCapture(hwnd, true);
@@ -306,7 +312,7 @@ class _BridgeTools {
     try {
       final req = await client.openUrl(method, Uri.parse('http://127.0.0.1:${info['port']}$path'));
       req.headers.set('authorization', 'Bearer ${info['key']}');
-      // Smily partout a déjà demandé ton accord dans sa propre bulle : Mon
+      // Nexo partout a déjà demandé ton accord dans sa propre bulle : Mon
       // Hub ne redemande pas une deuxième fois.
       req.headers.set('x-monhub-client', 'clicky');
       req.headers.contentType = ContentType.json;
@@ -365,7 +371,7 @@ class _ClickyDesktopApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Smily',
+    title: 'Nexo',
     debugShowCheckedModeBanner: false,
     navigatorKey: hubNavigatorKey,
     themeMode: AppSession.instance.themeMode,
@@ -401,7 +407,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   Timer? _tick, _slow;
   bool _wasBoth = false;
   bool _wasEsc = false;
-  bool _wasFix = false, _wasFind = false, _wasClick = false;
+  bool _wasFix = false, _wasFind = false, _wasClick = false, _wasMute = false;
   bool _fullscreen = false;
   int _n = 0;
   bool _interactive = false;
@@ -570,7 +576,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     ClaudeApi.forget(); // clé ajoutée / retirée dans Mon Hub
     await c.refreshReady();
     if (!c.active || !c.everywhere) exit(0);
-    // Mon Hub fermé depuis un moment : Smily s'en va aussi.
+    // Mon Hub fermé depuis un moment : Nexo s'en va aussi.
     if (await _BridgeTools.alive()) {
       _deadChecks = 0;
     } else if (++_deadChecks >= 5) {
@@ -592,7 +598,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
 
   (Offset, Rect)? _perchSpot() {
     final t = Win.foregroundTitle();
-    if (t.trim().isEmpty || t == 'Smily' || t == 'Program Manager' || _fullscreen) return null;
+    if (t.trim().isEmpty || t == 'Nexo' || t == 'Program Manager' || _fullscreen) return null;
     final f = Win.foregroundRect();
     if (f == null) return null;
     final (x, y, w, h) = f;
@@ -616,6 +622,10 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final fix = both && Win.down(0x43);
     if (fix && !_wasFix) unawaited(c.fixSelection());
     _wasFix = fix;
+    // Ctrl + Alt + M : coupe / rallume le micro, partout (même en jeu).
+    final muteKey = both && Win.down(0x4D);
+    if (muteKey && !_wasMute) unawaited(c.toggleMute());
+    _wasMute = muteKey;
     // Ctrl + Alt + Espace : la recherche partout (dans Mon Hub).
     final find = both && Win.down(0x20);
     if (find && !_wasFind) unawaited(c.openSearch());
@@ -651,7 +661,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
   void _place({bool force = false}) {
     final h = hwnd;
     if (h == null || !mounted) return;
-    // Un jeu ou une vidéo en plein écran : Smily disparaît tant qu'on ne
+    // Un jeu ou une vidéo en plein écran : Nexo disparaît tant qu'on ne
     // l'appelle pas (rien par-dessus le jeu, aucun ralentissement).
     final quiet =
         _fullscreen &&
@@ -677,7 +687,7 @@ class _DesktopState extends State<_Desktop> with SingleTickerProviderStateMixin 
     final cur = c.cursor;
     if (cur == null) return;
     // Il suit simplement la souris : c'est Windows qui déplace la fenêtre,
-    // à chaque mouvement (fluide, même quand Smily réfléchit ou capture).
+    // à chaque mouvement (fluide, même quand Nexo réfléchit ou capture).
     final follow = _flightTo == null && _flight == null && !_interactive && !_pinned && c.marks.isEmpty;
     if (follow) {
       if (_frames.isActive) _frames.stop();

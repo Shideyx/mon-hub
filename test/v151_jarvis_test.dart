@@ -168,7 +168,7 @@ void main() {
 
     test('mode concentration', () async {
       calls.clear();
-      expect(await ask('Smily, mode concentration'), contains('45 minutes'));
+      expect(await ask('Nexo, mode concentration'), contains('45 minutes'));
       expect(await ask('mode focus 30 minutes'), contains('30 minutes, jusqu\'à 17 h 15'));
       expect(await ask('je dois travailler pendant une heure'), contains('1 heure'));
       expect(await ask('arrête le mode concentration'), 'Séance terminée : 30 minutes.');
@@ -235,7 +235,7 @@ void main() {
       await ModuleStore.init();
     });
 
-    testWidgets('ce que Smily sait faire', (tester) async {
+    testWidgets('ce que Nexo sait faire', (tester) async {
       tester.view.physicalSize = const Size(1000, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -254,7 +254,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(const MaterialApp(home: ClickySettingsPage()));
       await tester.pump();
-      expect(find.text('Ce que Smily sait faire'), findsOneWidget);
+      expect(find.text('Ce que Nexo sait faire'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'conversation');
       await tester.pump();
       expect(find.text('Conversation continue'), findsOneWidget);

@@ -15,7 +15,7 @@ class FreezeWatch {
   static SendPort? _to;
   static Timer? _beat;
 
-  /// Ce que l'appli est en train de faire (ouvre un module, Smily réfléchit…).
+  /// Ce que l'appli est en train de faire (ouvre un module, Nexo réfléchit…).
   static String doing = 'démarrage';
   static DateTime _since = DateTime.now();
 

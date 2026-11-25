@@ -21,10 +21,10 @@ class CarnetItem {
   String get category => '${data['category'] ?? ''}';
 }
 
-/// Le Carnet : tout ce que Smily retient pour toi (porté des plugins de
+/// Le Carnet : tout ce que Nexo retient pour toi (porté des plugins de
 /// ton JARVIS) — tâches, notes, idées en vrac, mémoire, budget, sport, jeux,
 /// poèmes, protocoles, presse-papier. Un fichier par compte, partagé avec
-/// Smily partout.
+/// Nexo partout.
 class Carnet extends ChangeNotifier {
   Carnet._();
   static final instance = Carnet._();
@@ -117,7 +117,7 @@ class Carnet extends ChangeNotifier {
 
   // ---------- Mémoire ----------
 
-  /// Ce que Smily sait de toi (ajouté à ses consignes).
+  /// Ce que Nexo sait de toi (ajouté à ses consignes).
   List<String> get facts => [for (final m in list('memory')) m.text];
 
   // ---------- Budget ----------

@@ -20,7 +20,7 @@ void main() {
   group('la visite guidée', () {
     test('elle montre tout, nouveautés comprises', () {
       final titles = [for (final p in ClickyTutorial.tour) p.title];
-      expect(titles.first, 'Salut, moi c\'est Smily');
+      expect(titles.first, 'Salut, moi c\'est Nexo');
       expect(titles.last, 'Prêt ?');
       for (final t in [
         'Parle-moi',
@@ -35,7 +35,7 @@ void main() {
         expect(titles, contains(t));
       }
       expect(ClickyTutorial.tour.where((p) => p.badge == 'Nouveau'), hasLength(4));
-      // Les phrases à essayer sont comprises par Smily.
+      // Les phrases à essayer sont comprises par Nexo.
       expect(ClickyTutorial.tour.expand((p) => p.examples), contains('Préviens-moi quand j\'ai ma note de maths'));
     });
 
@@ -52,7 +52,7 @@ void main() {
       final tried = <String>[];
       await tester.pumpWidget(MaterialApp(home: ClickyTutorial(onTry: tried.add)));
       await tester.pump(const Duration(milliseconds: 800));
-      expect(find.text('Salut, moi c\'est Smily'), findsOneWidget);
+      expect(find.text('Salut, moi c\'est Nexo'), findsOneWidget);
       expect(find.text('1 / ${ClickyTutorial.tour.length}'), findsOneWidget);
       Future<void> next() async {
         await tester.tap(find.text('Suivant'));
@@ -103,7 +103,7 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
-  group('ce que Smily sait faire', () {
+  group('ce que Nexo sait faire', () {
     test('tout le catalogue, avec les nouveautés', () {
       expect(ClickySkills.count, greaterThan(80));
       final titles = [for (final g in ClickySkills.groups) g.title];
@@ -112,13 +112,13 @@ void main() {
         'Ses yeux et ses oreilles',
         'Préviens-moi quand…',
         'Il prend les devants',
-        'Smily vivant',
+        'Nexo vivant',
         'École',
       ]) {
         expect(titles, contains(t));
       }
       expect(ClickySkills.search('arnaque').map((g) => g.title), contains('Sécurité'));
-      expect(ClickySkills.search('écharpe').single.title, 'Smily vivant');
+      expect(ClickySkills.search('écharpe').single.title, 'Nexo vivant');
       expect(ClickySkills.search('zzzzzz'), isEmpty);
     });
 
@@ -182,7 +182,7 @@ void main() {
       expect(SettingsCategory.clickyMatches('téléphone'), isFalse);
     });
 
-    testWidgets('Réglages : Smily en tête, puis des rubriques claires', (tester) async {
+    testWidgets('Réglages : Nexo en tête, puis des rubriques claires', (tester) async {
       tester.view.physicalSize = const Size(1000, 2200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -194,7 +194,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Réglages de Smily'), findsOneWidget);
+      expect(find.text('Réglages de Nexo'), findsOneWidget);
       expect(find.text('Revoir la visite guidée'), findsOneWidget);
       for (final k in SettingsCategory.all.where((k) => k.id != 'demarrage')) {
         expect(find.text(k.title), findsOneWidget);
@@ -220,7 +220,7 @@ void main() {
       n.dispose();
     });
 
-    testWidgets('Réglages de Smily : rangés par thème', (tester) async {
+    testWidgets('Réglages de Nexo : rangés par thème', (tester) async {
       tester.view.physicalSize = const Size(1000, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);

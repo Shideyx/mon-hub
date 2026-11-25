@@ -6,8 +6,8 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:win32/win32.dart';
 
-/// Petits appels Windows pour « Smily partout » : clavier et souris de tout
-/// le système, écrans, capture, et placement de la fenêtre de Smily.
+/// Petits appels Windows pour « Nexo partout » : clavier et souris de tout
+/// le système, écrans, capture, et placement de la fenêtre de Nexo.
 class Win {
   Win._();
 
@@ -113,10 +113,10 @@ class Win {
     }
   }
 
-  /// La fenêtre de Smily (créée par le lanceur avec le titre « Smily »),
+  /// La fenêtre de Nexo (créée par le lanceur avec le titre « Nexo »),
   /// en vérifiant qu'elle appartient bien à ce programme.
   static HWND? findClicky(int myPid) => using((a) {
-    final r = FindWindow('FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a), 'Smily'.toPcwstr(allocator: a));
+    final r = FindWindow('FLUTTER_RUNNER_WIN32_WINDOW'.toPcwstr(allocator: a), 'Nexo'.toPcwstr(allocator: a));
     final h = r.value;
     if (h.address == 0) return null;
     final owner = a<Uint32>();
@@ -161,7 +161,7 @@ class Win {
   /// Message compris par le lanceur (windows/runner/clicky_follow.h).
   static const _followMessage = WM_APP + 0x51;
 
-  /// **Smily colle à la souris** : Windows déplace lui-même la fenêtre à
+  /// **Nexo colle à la souris** : Windows déplace lui-même la fenêtre à
   /// chaque mouvement de la souris (jusqu'à 1000 fois par seconde), sans
   /// attendre le code Dart — c'est ce qui le rend fluide. [dx]/[dy] : où se
   /// tient la fenêtre par rapport au curseur (pixels physiques).
@@ -190,7 +190,7 @@ class Win {
   static bool _affinityLooked = false;
 
   /// Retire (ou remet) une fenêtre des captures d'écran (Windows 10 2004 et
-  /// plus) : Smily reste visible pour toi pendant que la photo de l'écran
+  /// plus) : Nexo reste visible pour toi pendant que la photo de l'écran
   /// se fait sans lui. Renvoie false si Windows ne sait pas faire.
   static bool excludeFromCapture(HWND hwnd, bool exclude) {
     if (!_affinityLooked) {
@@ -271,7 +271,7 @@ class Win {
 
   /// Ouvre la dictée de Windows (Win + H) : elle écrit ce que tu dis dans la
   /// zone de texte qui a le focus. Solution de secours si le micro de
-  /// Smily ne marche pas.
+  /// Nexo ne marche pas.
   static void voiceTyping() => using((a) {
     const keys = [(VK_LWIN, false), (VIRTUAL_KEY(0x48), false), (VIRTUAL_KEY(0x48), true), (VK_LWIN, true)];
     final inputs = a<INPUT>(keys.length);
@@ -327,7 +327,7 @@ class Win {
   }
 
   /// La fenêtre au premier plan couvre tout un écran (jeu, vidéo en grand) :
-  /// Smily se fait discret.
+  /// Nexo se fait discret.
   static bool foregroundFullscreen() {
     final f = foregroundRect();
     if (f == null) return false;
@@ -380,7 +380,7 @@ class Win {
     return out;
   }
 
-  // ---------- Clavier et souris (Smily pilote, dictée) ----------
+  // ---------- Clavier et souris (Nexo pilote, dictée) ----------
 
   static void _keys(List<(int vk, bool up)> keys) => using((a) {
     final inputs = a<INPUT>(keys.length);
@@ -511,7 +511,7 @@ class Win {
     SendInput(1, input, sizeOf<INPUT>());
   });
 
-  // ---------- Smily agit : souris visible, glisser, fenêtres ----------
+  // ---------- Nexo agit : souris visible, glisser, fenêtres ----------
 
   /// Déplace la souris en douceur jusqu'au point (on la voit bouger).
   static Future<void> glide(int x, int y, {Duration duration = const Duration(milliseconds: 380)}) async {
@@ -593,7 +593,7 @@ class Win {
       final hwnd = HWND(h);
       if (IsWindowVisible(hwnd)) {
         final t = _title(hwnd);
-        if (t.trim().isNotEmpty && t != 'Smily' && t != 'Program Manager') {
+        if (t.trim().isNotEmpty && t != 'Nexo' && t != 'Program Manager') {
           var exe = '';
           try {
             exe = _exeOf(hwnd);

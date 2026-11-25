@@ -13,7 +13,7 @@ import 'phone_link_page.dart' show QrView;
 
 /// Réglages → Mes appareils → Ajouter mon iPhone : **la version web** (sans
 /// PC ni App Store). Le QR code ouvre Mon Hub dans Safari avec ton prénom,
-/// le cerveau de Smily (clé Gemini), ton serveur Mon Hub en ligne et ses
+/// le cerveau de Nexo (clé Gemini), ton serveur Mon Hub en ligne et ses
 /// souvenirs. Ces données sont dans la partie « # » du lien : le site ne
 /// les reçoit jamais, elles restent dans le téléphone.
 class WebVersionCard extends StatefulWidget {
@@ -76,8 +76,8 @@ class _WebVersionCardState extends State<WebVersionCard> {
             const SizedBox(height: 8),
             const Text(
               'Le plus simple. Vise ce QR code avec l\'appareil photo de l\'iPhone : Mon Hub s\'ouvre dans Safari, '
-              'déjà relié (ton prénom, le cerveau de Smily, ses souvenirs). Puis Partager → « Sur l\'écran '
-              'd\'accueil ». Smily y appelle, prépare tes SMS, lance tes itinéraires, tes rappels, ta musique et tes '
+              'déjà relié (ton prénom, le cerveau de Nexo, ses souvenirs). Puis Partager → « Sur l\'écran '
+              'd\'accueil ». Nexo y appelle, prépare tes SMS, lance tes itinéraires, tes rappels, ta musique et tes '
               'Raccourcis. Avec ton compte en ligne, tu y retrouves aussi tes espaces et tes messages.',
             ),
             const SizedBox(height: 12),
@@ -97,7 +97,7 @@ class _WebVersionCardState extends State<WebVersionCard> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Ce QR code contient la clé de Smily : ne le montre qu\'à ton propre téléphone.',
+                'Ce QR code contient la clé de Nexo : ne le montre qu\'à ton propre téléphone.',
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 8),

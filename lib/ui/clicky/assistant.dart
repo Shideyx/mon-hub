@@ -73,7 +73,7 @@ class AssistantFeature {
       Icons.bookmark_rounded,
       Color(0xFF8E44AD),
       'Mémoire',
-      'Se souvenir de tes projets, décisions et objectifs quand tu en parles à Smily.',
+      'Se souvenir de tes projets, décisions et objectifs quand tu en parles à Nexo.',
     ),
     AssistantFeature(
       'automatisation',
@@ -124,7 +124,7 @@ class AssistantFeature {
   ];
 }
 
-/// Une proposition de Smily, à accepter ou non.
+/// Une proposition de Nexo, à accepter ou non.
 class Proposal {
   Proposal({
     required this.id,
@@ -162,7 +162,7 @@ class RankedTask {
   final bool isTest;
 }
 
-/// L'assistant personnel : Smily qui prend les devants (si tu le veux).
+/// L'assistant personnel : Nexo qui prend les devants (si tu le veux).
 /// Tout est calculé par Mon Hub, sans IA, à partir de ton agenda, de ton
 /// cahier de texte, de ta liste et de tes messages.
 class Assistant extends ChangeNotifier {
@@ -178,7 +178,7 @@ class Assistant extends ChangeNotifier {
   /// Alerte (bandeau + notification de Windows).
   void Function(String title, String body)? notify;
 
-  /// Afficher un texte en grand chez Smily (briefing).
+  /// Afficher un texte en grand chez Nexo (briefing).
   Future<void> Function(String title, String text)? present;
 
   Timer? _timer;
@@ -255,7 +255,7 @@ class Assistant extends ChangeNotifier {
   /// Les actions de Mon Hub sont branchées (assistant démarré).
   bool get ready => _call != null;
 
-  /// Donne les actions sans démarrer l'assistant (briefing demandé à Smily
+  /// Donne les actions sans démarrer l'assistant (briefing demandé à Nexo
   /// partout, par exemple).
   void useTools({required QuickTool call, required Set<String> Function() tools}) {
     _call ??= call;
@@ -277,7 +277,7 @@ class Assistant extends ChangeNotifier {
 
   void propose(Proposal p) {
     if (proposals.any((x) => x.id == p.id)) return;
-    // Sujet déjà refusé plusieurs fois : Smily n'insiste plus (sauf le
+    // Sujet déjà refusé plusieurs fois : Nexo n'insiste plus (sauf le
     // consentement, qui est la question de départ).
     if (p.id != 'consent' && !Patience.instance.mayTalk('assistant:${subjectOf(p.id)}')) return;
     proposals.add(p);
@@ -796,7 +796,7 @@ class Assistant extends ChangeNotifier {
           rest.add(task);
           continue;
         }
-        plan.add({'titre': task.text, 'debut': fmt(t), 'fin': fmt(stop), 'note': 'Placé par Smily (${task.reason})'});
+        plan.add({'titre': task.text, 'debut': fmt(t), 'fin': fmt(stop), 'note': 'Placé par Nexo (${task.reason})'});
         // 10 minutes de pause entre deux choses.
         t = stop.add(const Duration(minutes: 10));
       }
@@ -915,7 +915,7 @@ class Assistant extends ChangeNotifier {
               'titre': title,
               'debut': iso(d.at),
               'fin': iso(d.at.add(const Duration(hours: 1))),
-              'note': 'Repéré par Smily dans $source',
+              'note': 'Repéré par Nexo dans $source',
             });
             return 'C\'est dans ton agenda : $title, $when.';
           }
@@ -1165,7 +1165,7 @@ class Assistant extends ChangeNotifier {
       'initiatives VRAIMENT utiles en plus (préparer quelque chose à l\'avance, profiter d\'un créneau libre, un '
       'message important à traiter, la santé, un objectif…). Rien d\'utile : réponds []. Réponds seulement en JSON : '
       '[{"titre":"court","texte":"une phrase","action":"tache|evenement|aucune","quand":"AAAA-MM-JJTHH:MM","duree_min":30}]',
-      system: 'Tu es Smily, l\'assistant personnel proactif d\'un lycéen français. Tu es concret et bref.',
+      system: 'Tu es Nexo, l\'assistant personnel proactif d\'un lycéen français. Tu es concret et bref.',
       geminiOnly: true,
     );
     for (final (i, idea) in parseIdeas(AiText.json(r), n).take(2).indexed) {
@@ -1188,7 +1188,7 @@ class Assistant extends ChangeNotifier {
                 'titre': idea.title,
                 'debut': at.toIso8601String().substring(0, 16),
                 'fin': at.add(Duration(minutes: idea.minutes)).toIso8601String().substring(0, 16),
-                'note': 'Idée de Smily',
+                'note': 'Idée de Nexo',
               });
               return 'C\'est dans ton agenda.';
             },
@@ -1225,7 +1225,7 @@ class Assistant extends ChangeNotifier {
           ),
   ];
 
-  // Outils (pour Smily et Claude) ------------------------------------------
+  // Outils (pour Nexo et Claude) ------------------------------------------
 
   List<HubTool> get tools => [
     HubTool(
@@ -1715,7 +1715,7 @@ class Assistant extends ChangeNotifier {
         'Réécris-le de façon naturelle et chaleureuse, comme un assistant personnel (JARVIS), sans rien inventer et '
         'sans rien oublier d\'important : garde les mêmes rubriques avec leurs emojis, des phrases courtes, et termine '
         'par 3 recommandations concrètes et réalistes pour la journée.',
-        system: 'Tu es Smily, l\'assistant personnel d\'un lycéen français. Tu écris en français, simplement.',
+        system: 'Tu es Nexo, l\'assistant personnel d\'un lycéen français. Tu écris en français, simplement.',
         geminiOnly: true,
       );
       return r.trim().isEmpty ? text : r.trim();

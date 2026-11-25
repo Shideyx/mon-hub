@@ -80,7 +80,7 @@ void main() {
 
   test('« ce lien est sûr ? » (le lien copié)', () async {
     final r = await QuickAnswers.answer(
-      'Smily, est-ce que ce lien est sûr ?',
+      'Nexo, est-ce que ce lien est sûr ?',
       call: (n, a) async => n == 'securite_lien' ? {'resume': 'Attention, arnaque.'} : null,
       tools: const {'securite_lien'},
     );

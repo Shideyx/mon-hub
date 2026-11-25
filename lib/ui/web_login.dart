@@ -254,9 +254,14 @@ class HubWebView extends StatefulWidget {
     this.onTitleChanged,
     this.reloadButton = true,
     this.sameSiteInPlace = false,
+    this.userScripts,
   });
   final String url;
   final bool desktopUserAgent;
+
+  /// Scripts mis **avant** le site, dans la page et ses fenêtres (appels
+  /// Instagram : le flou de la caméra). Relus à chaque fenêtre ouverte.
+  final List<UserScript> Function()? userScripts;
 
   /// Le petit bouton « Recharger » flottant en haut à droite. À couper quand
   /// la page a ses propres boutons à cet endroit (Google Docs : « Partager »)
@@ -396,6 +401,7 @@ class _HubWebViewState extends State<HubWebView> {
               key: const ValueKey('hub-webview'),
               initialUrlRequest: URLRequest(url: WebUri(widget.url)),
               initialSettings: _settings,
+              initialUserScripts: widget.userScripts == null ? null : UnmodifiableListView(widget.userScripts!()),
               onWebViewCreated: (c) {
                 _c = c;
                 widget.onController?.call(c);
@@ -425,7 +431,12 @@ class _HubWebViewState extends State<HubWebView> {
                     context,
                     MaterialPageRoute(
                       fullscreenDialog: true,
-                      builder: (_) => _PopupWindow(action: action, settings: _settings, login: _isLogin(to)),
+                      builder: (_) => _PopupWindow(
+                        action: action,
+                        settings: _settings,
+                        login: _isLogin(to),
+                        scripts: widget.userScripts,
+                      ),
                     ),
                   ).then((_) => _scheduleBlankCheck()),
                 );
@@ -491,9 +502,10 @@ class _HubWebViewState extends State<HubWebView> {
 /// Fenêtre ouverte par un site (connexion Google, ou un lien), reliée à la
 /// page d'origine.
 class _PopupWindow extends StatefulWidget {
-  const _PopupWindow({required this.action, required this.settings, required this.login});
+  const _PopupWindow({required this.action, required this.settings, required this.login, this.scripts});
   final CreateWindowAction action;
   final InAppWebViewSettings settings;
+  final List<UserScript> Function()? scripts;
   final bool login;
 
   @override
@@ -524,6 +536,11 @@ class _PopupWindowState extends State<_PopupWindow> {
       body: InAppWebView(
         windowId: widget.action.windowId,
         initialSettings: widget.settings,
+        initialUserScripts: widget.scripts == null ? null : UnmodifiableListView(widget.scripts!()),
+        // La fenêtre d'appel (Instagram…) : caméra et micro autorisés (avant :
+        // rien n'était répondu, l'appel n'avait ni image ni son).
+        onPermissionRequest: (_, req) async =>
+            PermissionResponse(resources: req.resources, action: PermissionResponseAction.GRANT),
         onWebViewCreated: (c) => _c = c,
         onTitleChanged: widget.login
             ? null

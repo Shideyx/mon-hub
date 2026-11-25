@@ -10,14 +10,14 @@ import 'live.dart';
 import 'neural_voice.dart';
 import 'pcm_player.dart';
 
-/// La voix de Smily : **une seule voix, celle de Gemini** (demande de la
+/// La voix de Nexo : **une seule voix, celle de Gemini** (demande de la
 /// personne : une voix naturelle, toujours la même). Lecture par morceaux
 /// pendant que la réponse s'écrit (il commence à parler sans attendre la fin).
 ///
 /// Le quota gratuit de la synthèse Gemini est petit (une quinzaine de
 /// lectures par jour) : on lit par **gros morceaux**, et quand il est épuisé,
 /// c'est Gemini Live (même voix, autre quota) qui lit. Sans clé Gemini ni
-/// internet, Smily répond par écrit.
+/// internet, Nexo répond par écrit.
 ///
 /// Retirées : la voix de Windows (robotique, et flutter_tts plantait) et la
 /// voix Microsoft (Edge) — ne pas les remettre.
@@ -51,7 +51,7 @@ class ClickyVoice {
   }
 
   /// Lecture en direct : on lui donne le texte (propre) au fur et à mesure.
-  /// Le premier morceau part dès la première phrase (Smily parle vite), les
+  /// Le premier morceau part dès la première phrase (Nexo parle vite), les
   /// suivants sont gros (chaque morceau coûte une lecture du quota Gemini).
   void feed(String cleanText) {
     if (cleanText.length < _fed) _fed = 0; // texte reparti de zéro
@@ -190,7 +190,7 @@ class ClickyVoice {
     await VoiceLock.acquire();
     try {
       if (!hasVoice) {
-        neuralError = 'Ajoute ta clé Gemini gratuite pour que Smily parle (sinon il répond par écrit).';
+        neuralError = 'Ajoute ta clé Gemini gratuite pour que Nexo parle (sinon il répond par écrit).';
         return;
       }
       if (_down(_allDownUntil)) return;
@@ -241,14 +241,14 @@ class ClickyVoice {
   }
 
   /// Lit un morceau avec Gemini Live. Faux si ça n'a pas marché (plus de
-  /// voix pour un moment : Smily répond par écrit).
+  /// voix pour un moment : Nexo répond par écrit).
   Future<bool> _readLive(String text, int gen) async {
     try {
       await _reader.read(text, key: geminiKey, voice: geminiVoice, cancelled: () => gen != _generation);
       neuralError = null;
       return true;
     } catch (e) {
-      neuralError = 'Plus de voix Gemini pour le moment ($e) : Smily répond par écrit.';
+      neuralError = 'Plus de voix Gemini pour le moment ($e) : Nexo répond par écrit.';
       _allDownUntil = DateTime.now().add(const Duration(minutes: 15));
       return false;
     }
@@ -343,7 +343,7 @@ class LiveReader {
   }
 }
 
-/// Petit son « bip-bip » de Smily (généré, aucun fichier).
+/// Petit son « bip-bip » de Nexo (généré, aucun fichier).
 class ClickyChime {
   ClickyChime._();
   static AudioPlayer? _p;
@@ -402,7 +402,7 @@ class ClickyChime {
   }
 }
 
-/// Une seule voix à la fois sur le PC, même quand Mon Hub et « Smily
+/// Une seule voix à la fois sur le PC, même quand Mon Hub et « Nexo
 /// partout » parlent en même temps : celui qui parle tient un petit verrou
 /// (fichier voix.lock), l'autre attend son tour.
 class VoiceLock {

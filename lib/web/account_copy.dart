@@ -64,7 +64,7 @@ class AccountCopy {
     };
   }
 
-  /// Les souvenirs de Smily (`memoire.json`) : (sujet, texte), les plus
+  /// Les souvenirs de Nexo (`memoire.json`) : (sujet, texte), les plus
   /// importants d'abord.
   static List<(String, String)> memories(Map<String, Object?> content, {int max = 60}) {
     final raw = content['f:memoire.json'];

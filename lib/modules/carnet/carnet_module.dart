@@ -11,9 +11,9 @@ import 'carnet_store.dart';
 import '../../core/browser.dart';
 
 /// Carnet : les plugins de ton JARVIS, dans Mon Hub (tâches, notes, idées en
-/// vrac, mémoire de Smily, budget, sport, jeux, poèmes, météo + tenue,
+/// vrac, mémoire de Nexo, budget, sport, jeux, poèmes, météo + tenue,
 /// bilan du soir, protocoles, presse-papier, notification téléphone).
-/// Smily s'en sert à la voix (« note que… », « j'ai dépensé 12 € »,
+/// Nexo s'en sert à la voix (« note que… », « j'ai dépensé 12 € »,
 /// « protocole travail »…).
 class CarnetModule extends HubModule {
   @override
@@ -21,7 +21,7 @@ class CarnetModule extends HubModule {
   @override
   String get name => 'Carnet';
   @override
-  String get description => 'Tâches, notes, idées, mémoire de Smily, budget, sport, jeux, poèmes, météo, protocoles';
+  String get description => 'Tâches, notes, idées, mémoire de Nexo, budget, sport, jeux, poèmes, météo, protocoles';
   @override
   IconData get icon => Icons.auto_stories_rounded;
   @override
@@ -31,7 +31,7 @@ class CarnetModule extends HubModule {
 
   final c = Carnet.instance;
 
-  /// Branché par Smily : dire une phrase, appeler un outil de Mon Hub.
+  /// Branché par Nexo : dire une phrase, appeler un outil de Mon Hub.
   static Future<void> Function(String text)? say;
   static Future<Object?> Function(String tool, Map<String, dynamic> args)? callTool;
 
@@ -64,7 +64,7 @@ class CarnetModule extends HubModule {
           case 'dire':
             await say?.call(v);
           case 'notifier':
-            await PhoneNotify.send(ntfy, 'Smily', v);
+            await PhoneNotify.send(ntfy, 'Nexo', v);
           case 'attendre':
             await Future<void>.delayed(Duration(milliseconds: ((double.tryParse(v) ?? 1) * 1000).round()));
           case 'spotify':
@@ -87,7 +87,7 @@ class CarnetModule extends HubModule {
     HubTool(
       name: 'carnet_memoire',
       description:
-          'Ma mémoire à long terme (ce que Smily doit retenir sur moi) : action=retenir + texte '
+          'Ma mémoire à long terme (ce que Nexo doit retenir sur moi) : action=retenir + texte '
           '(« retiens que je suis allergique aux noix »), action=oublier + texte, action=liste.',
       params: {'action': ('string', 'retenir, oublier ou liste'), 'texte': ('string', 'le souvenir')},
       required: ['action'],
@@ -372,7 +372,7 @@ class CarnetModule extends HubModule {
     HubTool(
       name: 'carnet_protocole',
       description:
-          'Protocoles (« Smily, protocole travail ») : une suite d\'actions préparées (ouvrir des '
+          'Protocoles (« Nexo, protocole travail ») : une suite d\'actions préparées (ouvrir des '
           'applis, lancer une playlist, mettre en pause, prévenir le téléphone…). action=lancer + nom, '
           'action=liste.',
       params: {'action': ('string', 'lancer ou liste'), 'nom': ('string', 'nom du protocole')},
@@ -412,7 +412,7 @@ class CarnetModule extends HubModule {
       required: ['message'],
       run: (a) async {
         await c.load();
-        await PhoneNotify.send(ntfy, '${a['titre'] ?? 'Smily'}', '${a['message']}', urgent: a['urgent'] == true);
+        await PhoneNotify.send(ntfy, '${a['titre'] ?? 'Nexo'}', '${a['message']}', urgent: a['urgent'] == true);
         return 'Notification envoyée sur ton téléphone.';
       },
     ),
@@ -483,7 +483,7 @@ class CarnetModule extends HubModule {
               child: todos.isEmpty
                   ? Center(
                       child: Text(
-                        'Rien à faire 🎉\nDis à Smily « ajoute … à ma liste ».',
+                        'Rien à faire 🎉\nDis à Nexo « ajoute … à ma liste ».',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall,
                       ),
@@ -599,9 +599,9 @@ class _CarnetPage extends StatelessWidget {
               m: module,
               list: 'inbox',
               hint: 'Une pensée, une idée, un truc à pas oublier…',
-              empty: 'Boîte vide. Dis à Smily « note ça : … », il range plus tard.',
+              empty: 'Boîte vide. Dis à Nexo « note ça : … », il range plus tard.',
               action: (
-                'Demander à Smily de trier',
+                'Demander à Nexo de trier',
                 () => ClaudeModule.askClicky(
                   'Trie mes idées en vrac du carnet : range chacune au bon endroit (tâche, note, budget, agenda…) puis retire-la de la boîte.',
                 ),
@@ -611,8 +611,8 @@ class _CarnetPage extends StatelessWidget {
             _TextList(
               m: module,
               list: 'memory',
-              hint: 'Quelque chose que Smily doit savoir sur toi',
-              empty: 'Smily ne sait encore rien de toi. Dis-lui « retiens que … ».',
+              hint: 'Quelque chose que Nexo doit savoir sur toi',
+              empty: 'Nexo ne sait encore rien de toi. Dis-lui « retiens que … ».',
             ),
             _BudgetTab(m: module),
             _SportTab(m: module),
@@ -896,7 +896,7 @@ class _SportTab extends StatelessWidget {
           ),
         ],
         if (l.isEmpty)
-          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Smily « 80 kg au squat pour 5 ».')),
+          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Nexo « 80 kg au squat pour 5 ».')),
         for (final e in l.take(80))
           ListTile(
             leading: const Icon(Icons.fitness_center_rounded),
@@ -939,7 +939,7 @@ class _GamesTab extends StatelessWidget {
           },
         ),
         if (games.isEmpty)
-          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Smily « j\'ai joué 2 h à Roblox ».')),
+          const Padding(padding: EdgeInsets.all(24), child: EmptyHint('Dis à Nexo « j\'ai joué 2 h à Roblox ».')),
         for (final g in games)
           ListTile(
             leading: const Icon(Icons.sports_esports_rounded),
@@ -1027,7 +1027,7 @@ class _PoemsTab extends StatelessWidget {
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.auto_awesome_rounded),
-                      label: const Text('Avis de Smily'),
+                      label: const Text('Avis de Nexo'),
                       onPressed: () => ClaudeModule.askClicky(
                         'Donne-moi un retour bienveillant et précis sur mon poème « ${p.data['title']} » (images, rythme, rimes, ce qui marche, une piste d\'amélioration) :\n${p.text}',
                       ),
@@ -1052,7 +1052,7 @@ class _ProtocolsTab extends StatelessWidget {
   final CarnetModule m;
 
   static const kinds = {
-    'dire': 'Smily dit',
+    'dire': 'Nexo dit',
     'site': 'Ouvrir le site',
     'appli': 'Ouvrir l\'appli',
     'spotify': 'Spotify (playlist / chercher_jouer)',
@@ -1083,7 +1083,7 @@ class _ProtocolsTab extends StatelessWidget {
             children: [
               TextField(
                 controller: n,
-                decoration: const InputDecoration(labelText: 'Nom (« Smily, protocole … »)'),
+                decoration: const InputDecoration(labelText: 'Nom (« Nexo, protocole … »)'),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1133,7 +1133,7 @@ class _ProtocolsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Dis « Smily, protocole travail » : il enchaîne toutes les étapes.'),
+        const Text('Dis « Nexo, protocole travail » : il enchaîne toutes les étapes.'),
         const SizedBox(height: 8),
         FilledButton.icon(
           icon: const Icon(Icons.add_rounded),
@@ -1198,7 +1198,7 @@ class _ClipboardTabState extends State<_ClipboardTab> {
           title: const Text('Garder l\'historique du presse-papier'),
           subtitle: const Text(
             'Ce que tu copies est gardé sur ce PC (pas les textes qui ressemblent à des mots de passe, '
-            'ni ceux copiés dans une fenêtre sensible). Smily peut le retrouver : « retrouve le lien que j\'ai copié ».',
+            'ni ceux copiés dans une fenêtre sensible). Nexo peut le retrouver : « retrouve le lien que j\'ai copié ».',
           ),
           value: on,
           onChanged: (v) => c.setSetting('clipboard', v),
@@ -1285,7 +1285,7 @@ class _SettingsTabState extends State<_SettingsTab> {
             onPressed: () async {
               await widget.m.c.setSetting('ntfy', topic.text.trim());
               try {
-                await PhoneNotify.send(topic.text.trim(), 'Smily', 'Test : les notifications arrivent bien ✔');
+                await PhoneNotify.send(topic.text.trim(), 'Nexo', 'Test : les notifications arrivent bien ✔');
                 setState(() => info = 'Notification de test envoyée.');
               } catch (e) {
                 setState(() => info = '$e');

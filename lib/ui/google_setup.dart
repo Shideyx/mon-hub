@@ -169,7 +169,7 @@ class _GoogleSetupPageState extends State<GoogleSetupPage> {
                 color: const Color(0xFF23A55A).withValues(alpha: 0.14),
               ),
               child: Text(
-                '✅ $connected est connecté. Dis à Smily « range mon Drive » !',
+                '✅ $connected est connecté. Dis à Nexo « range mon Drive » !',
                 style: theme.textTheme.titleSmall,
               ),
             )

@@ -5,7 +5,7 @@ import '../core/module_store.dart';
 import 'clicky/hud.dart';
 import 'google_setup.dart';
 
-/// Smily demande ton compte Google (une fois par compte Mon Hub) : pour
+/// Nexo demande ton compte Google (une fois par compte Mon Hub) : pour
 /// ranger ton Drive, ouvrir et écrire tes Google Docs dans le Word de Mon
 /// Hub, et voir ton agenda Google.
 class GoogleWelcome {
@@ -139,8 +139,8 @@ class _GoogleWelcomeDialogState extends State<_GoogleWelcomeDialog> {
                   : upgrade
                   ? 'Ton compte $existing est connecté en lecture seule. Autorise-moi aussi à modifier ton Drive :'
                   : !GoogleAuth.available
-                  ? 'C\'est Smily. Active Google une fois (5 minutes, je t\'explique tout) et je pourrai :'
-                  : 'C\'est Smily. Avec ton compte Google, je peux faire beaucoup plus pour toi :',
+                  ? 'C\'est Nexo. Active Google une fois (5 minutes, je t\'explique tout) et je pourrai :'
+                  : 'C\'est Nexo. Avec ton compte Google, je peux faire beaucoup plus pour toi :',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFFB7D9E6), fontSize: 15, height: 1.45),
             ),

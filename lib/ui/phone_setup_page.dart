@@ -169,7 +169,7 @@ class _PhoneSetupPageState extends State<PhoneSetupPage> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
               Text(
-                'Mon Hub sur ton iPhone, avec le même compte que ce PC : tes modules, Smily, tes réglages, tes '
+                'Mon Hub sur ton iPhone, avec le même compte que ce PC : tes modules, Nexo, tes réglages, tes '
                 'révisions, tes anniversaires… Ce que tu changes d\'un côté arrive de l\'autre. Rien ne passe par un '
                 'serveur à nous : la copie chiffrée est dans ton propre Google Drive.',
                 style: theme.textTheme.bodyMedium,

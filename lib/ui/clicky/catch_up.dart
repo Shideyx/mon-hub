@@ -121,7 +121,7 @@ class CatchUp {
     return 'Pendant ton absence : ${parts.join(' ; ')}.$wait';
   }
 
-  /// Une seule phrase courte (pour le « re-bonjour » de Smily).
+  /// Une seule phrase courte (pour le « re-bonjour » de Nexo).
   static String short(String full) {
     if (full.isEmpty) return '';
     final body = full.replaceFirst('Pendant ton absence : ', '');
